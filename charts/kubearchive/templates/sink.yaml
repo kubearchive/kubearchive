@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.sink.name }}
+  namespace: {{ .Values.kubearchive.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: &labels
+      app: {{ .Values.sink.name }}
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      containers:
+        - name: {{ .Values.sink.name }}
+          image: {{ .Values.sink.image }}
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Values.sink.name }}
+  namespace: {{ .Values.kubearchive.namespace }}
+spec:
+  selector:
+    app: {{ .Values.sink.name }}
+  ports:
+  - protocol: {{ .Values.sink.protocol }}
+    port: {{ .Values.sink.port }}
+    targetPort: {{ .Values.sink.targetPort }}

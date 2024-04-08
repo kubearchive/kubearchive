@@ -1,0 +1,21 @@
+apiVersion: sources.knative.dev/v1
+kind: ApiServerSource
+metadata:
+  name: {{ .Values.apiServerSource.name }}
+  namespace: {{ .Values.kubearchive.namespace }}
+spec:
+  serviceAccountName: {{ .Values.kubearchive.serviceAccount }}
+  mode: {{ .Values.apiServerSource.mode }}
+  resources:
+    {{- range .Values.apiServerSource.resources }}
+    - apiVersion: {{ .apiVersion }}
+      kind: {{ .kind }}
+    {{- end }}
+  namespaceSelector:
+    matchLabels:
+      kubearchive: "watch"
+  sink:
+    ref:
+      apiVersion: v1
+      kind: Service
+      name: {{ .Values.sink.name }}

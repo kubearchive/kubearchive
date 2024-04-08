@@ -1,0 +1,61 @@
+# Default values for kn-api-server-source.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# template values relevant to all of kubearchive
+kubearchive:
+  # the name of the namespace to deploy kubearchive into
+  namespace: "kubearchive"
+  # configuration for a test namespace
+  testNamespace:
+    # if true, the test namespace will be created
+    create: true
+    name: test
+    # if true, ApiServerSource will watch for changes to resources in this namespace
+    watch: true
+  # values used to create the ClusterRole
+  role:
+    name: "kubearchive"
+    # rules give the service account used by ApiServerSource ability to watch specific resources
+    # on the cluster.
+    rules:
+        # the API group the resources are a part of. "" indicates the core API group
+      - apiGroups:
+        - ""
+        # resources that the role gives permission to
+        resources:
+          - events
+        # actions on the resource that the role gives permissions to
+        verbs:
+          - get
+          - list
+          - watch
+  # ClusterRoleBinding name
+  roleBinding: "kubearchive"
+  # Name of Service Account
+  serviceAccount: "kubearchive"
+
+# values used to create a sink
+sink:
+  name: "kubearchive-sink"
+  # event_display is a place holder that prints cloud events to stdout but should be replaced with a
+  # component for kubearchive that can receive cloud events.
+  image: gcr.io/knative-releases/knative.dev/eventing/cmd/event_display
+  protocol: TCP
+  port: 80
+  # 8080 is the port that the cloud events sdk uses by default when listening for events
+  targetPort: 8080
+
+# values used to create a knative-eventing ApiServerSource
+apiServerSource: 
+  name: "api-server-source"
+  # can be Resource or Reference or Resource
+  # Reference means that a reference to the resource is include in the cloud event
+  # Resource means that the full resource is included in the cloud event
+  mode: "Resource"
+  resources:
+    # apiVersion and kind of the resource that ApiServerSource should watch.
+    # The list can contain more than one resource. Make sure that the Role provides
+    # appropriate perms for the resources here.
+    - apiVersion: v1
+      kind: Event

@@ -1,0 +1,20 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Values.kubearchive.role.name }}
+rules: 
+  {{- range .Values.kubearchive.role.rules }}
+  - apiGroups:
+    {{- range .apiGroups }}
+      {{- /* quote values in apiGroups so that if empty string is one of the values, helm doesn't remove it */}}
+      - {{ . | quote }}
+    {{- end }}
+    resources:
+    {{- range .resources }}
+      - {{ . }}
+    {{- end }}
+    verbs:
+    {{- range .verbs }}
+      - {{ . }}
+    {{- end }}
+  {{- end }}

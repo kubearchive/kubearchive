@@ -1,6 +1,6 @@
 ---
-name: yamllint
-run-name: ${{ github.actor }} is testing out GitHub Actions
+name: static_code_analysis
+run-name: Running static code analysis
 on: [push]
 permissions:
     contents: read
@@ -10,8 +10,8 @@ jobs:
         name: "YAML lint"
         runs-on: ubuntu-latest
         steps:
-            - run: echo "Job triggered by ${{ github.event_name }} event."
-            - run: echo "Running on a ${{ runner.os }} server hosted by GitHub!"
+            - run: echo "Job triggered by ${{ github.actor }}."
+            - run: echo "Running on a ${{ runner.os }} server hosted by GitHub."
             - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
             - name: Check out repository code
               uses: actions/checkout@v4
@@ -24,7 +24,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-            - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+            - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub."
             - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
             - name: Check out repository code
               uses: actions/checkout@v4

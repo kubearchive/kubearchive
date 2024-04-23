@@ -1,3 +1,4 @@
+---
 apiVersion: v2
 name: kubearchive
 description: A Helm chart that deploys kubearchive on a Kubernetes cluster

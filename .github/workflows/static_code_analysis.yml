@@ -1,0 +1,22 @@
+---
+name: static_code_analysis
+run-name: Running static code analysis
+on: [push]
+permissions:
+    contents: read
+    pull-requests: read
+jobs:
+    yamllint:
+        name: "YAML lint"
+        runs-on: ubuntu-latest
+        steps:
+            - run: echo "Job triggered by ${{ github.actor }}."
+            - run: echo "Running on a ${{ runner.os }} server hosted by GitHub."
+            - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
+            - name: Check out repository code
+              uses: actions/checkout@v4
+            - name: Run yamllint
+              uses: karancode/yamllint-github-action@master
+              with:
+                  yamllint_strict: false
+                  yamllint_comment: false

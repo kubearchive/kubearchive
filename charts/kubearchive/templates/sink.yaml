@@ -1,3 +1,5 @@
+# yamllint disable rule:braces
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,9 +17,7 @@ spec:
       containers:
         - name: {{ .Values.sink.name }}
           image: {{ .Values.sink.image }}
-
 ---
-
 kind: Service
 apiVersion: v1
 metadata:
@@ -27,6 +27,6 @@ spec:
   selector:
     app: {{ .Values.sink.name }}
   ports:
-  - protocol: {{ .Values.sink.protocol }}
-    port: {{ .Values.sink.port }}
-    targetPort: {{ .Values.sink.targetPort }}
+    - protocol: {{ .Values.sink.protocol }}
+      port: {{ .Values.sink.port }}
+      targetPort: {{ .Values.sink.targetPort }}

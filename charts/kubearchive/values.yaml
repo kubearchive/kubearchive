@@ -2,6 +2,7 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+---
 # template values relevant to all of kubearchive
 kubearchive:
   # the name of the namespace to deploy kubearchive into
@@ -19,9 +20,9 @@ kubearchive:
     # rules give the service account used by ApiServerSource ability to watch specific resources
     # on the cluster.
     rules:
-        # the API group the resources are a part of. "" indicates the core API group
+      # the API group the resources are a part of. "" indicates the core API group
       - apiGroups:
-        - ""
+        - ""       # yamllint disable-line rule:indentation
         # resources that the role gives permission to
         resources:
           - events
@@ -47,7 +48,7 @@ sink:
   targetPort: 8080
 
 # values used to create a knative-eventing ApiServerSource
-apiServerSource: 
+apiServerSource:
   name: "api-server-source"
   # can be Resource or Reference or Resource
   # Reference means that a reference to the resource is include in the cloud event

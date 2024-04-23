@@ -1,3 +1,5 @@
+# yamllint disable-file
+---
 apiVersion: sources.knative.dev/v1
 kind: ApiServerSource
 metadata:

@@ -50,10 +50,11 @@ helm install [deployment name] charts/kubearchive
 ```
 You can use the `-g` flag to have helm generate a deployment name for you.
 
-Run this command remove the the kubearchive deployment:
+Run this command remove the kubearchive deployment:
 ```bash
-helm uninstall [deployment name]
+helm uninstall [deployment name] -n default
 ```
+**NOTE**: This assumes you installed the helm chart under the `default` namespace.
 
 ## Kubearchive Helm Chart
 
@@ -66,18 +67,22 @@ The kubearchive helm chart deploys the following:
 * Deployment and Service for `kubearchive-sink` in the `kubearchive` namespace
 * (optionally) Namespace named `test`
 
+The settings of each resource are the same as in 
+[Create an ApiServerSource object](https://knative.dev/docs/eventing/sources/apiserversource/getting-started/#create-an-apiserversource-object) 
+tutorial of the knative docs.
+
 ### ApiServerSource Configuration
 The ApiServerSource deployed by this helm chart uses the `kubearchive` service account to watch resources
-on the cluster. By default it is deployed to watch for events. The `ClusterRole` and `ClusterRoleBinding`
-by default give the kubearchive service account permissions to `get`, `list`, and `watch` `Events` cluster-wide.
-The ApiServerSource is deploy by default to only listen for events in namepspaces with the label `kubearchive: watch`.
+on the cluster. By default, it is deployed to watch for events. The `ClusterRole` and `ClusterRoleBinding`
+by default give the kubearchive service account permissions to `get`, `list`, and `watch` `Events` resources cluster-wide.
+The ApiServerSource is deployed by default to only listen for events in namespaces with the label `kubearchive: watch`.
 The `test` namespace, if created, has that label applied. The resources that the ApiServerSource listens for can be
 changed by running the helm chart with `kubearchive.role.rules[0].resources` and `apiServerSource.resources` overridden.
-`kubearchive.role.rules[0].resources` expects that that the resource type(s) list are all lowercase and plural. If one
+`kubearchive.role.rules[0].resources` expects that the resource type(s) list are all lowercase and plural. If one
 or more of the resources in `kubearchive.role.rules[0].resources` is not in the kubernetes core API group, then
 `kubearchive.role.rules[0].apiGroups` must be overridden as well to include all API groups that contain all the 
 resources that you are interested in. `apiServerSource.resources` is a list where each item includes the `kind` and
-`apiVersion` of the resouce.
+`apiVersion` of the resource.
 
 ### kubearchive-sink
 An ApiServerSource requires a sink that it can send cloud events to. Right now, kubearchive-sink is
@@ -88,3 +93,59 @@ command:
 kubectl logs --namespace=kubearchive -l app=kubearchive-sink --tail=1000
 ```
 **`event-display` is just a placeholder. It needs to be replaced with a sink that is written for kubearchive.**
+
+### Create an event
+Run a pod to create an event and remove it to create another one:
+```bash
+kubectl run busybox --image=busybox --namespace=test --restart=Never -- ls
+kubectl --namespace delete pod busybox
+```
+
+Check the events in the logs of the sink:
+```bash
+kubectl logs --namespace=kubearchive -l app=kubearchive-sink --tail=100
+```
+
+### Watch other resources
+More resources can be watched appart from `Events`.
+Here is an example of the tweaks needed to add `Pods` and `ConfigMaps` to the watched resources:
+1. In the file `values.yaml` add the resources to be watched under `apiServerSource.resources`:
+    ```yaml
+    # ...
+    apiServerSource:
+      # ...
+      resources: 
+        - apiVersion: v1
+          kind: Event
+        - apiVersion: v1
+          kind: ConfigMap
+        - apiVersion: v1
+          kind: Pod      
+    ```
+2. In the same file, add the resources names in the rules for the role permissions:
+   ```yaml
+   # ...
+   kubearchive:
+      # ...
+      role:
+        rules:
+          - apiGroups:
+            resources:
+              - events
+              - configmaps
+              - pods
+            # ...
+   ```
+3. Apply the new changes with `helm`
+   ```bash
+   helm upgrade -n default --reuse-values -f charts/kubearchive/values.yaml [deployment name] charts/kubearchive --version 0.0.1
+   ```
+4. Test the new cloud events sent to the sink by creating and deleting a `configmap` and a `pod`
+   ```bash
+   kubectl -n test create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2
+   kubectl -n test run busybox --image busybox --restart=Never -- ls
+   kubectl -n test delete pod busybox
+   kubectl -n test delete configmap my-config
+   kubectl -n kubearchive logs -l app=kubearchive-sink --tail=10000 | grep -A4 "type: dev."
+   ```
+   

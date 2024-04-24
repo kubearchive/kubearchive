@@ -1,5 +1,20 @@
 # kubearchive
 
+## Overview
+KubeArchive is a utility that stores Kubernetes resources off of the
+Kubernetes cluster. This enables users to delete those resources from
+the cluster without losing the information contained in those resources.
+KubeArchive will provide an API so users can retrieve stored resources
+for inspection.
+
+The main users of KubeArchive are projects that use Kubernetes resources
+for one-shot operations and want to inspect those resources in the long-term.
+For example, users using Jobs on Kubernetes that want to track the success
+rate over time, but need to remove completed Jobs for performance/storage
+reasons, would benefit from KubeArchive. Another example would be users
+that run build systems on top of Kubernetes (Shipwright, Tekton) that use
+resources for one-shot builds and want to keep track of those builds over time.
+
 ## Requirements
 To deploy kubearchive locally you need to install the following:
 * podman
@@ -67,8 +82,8 @@ The kubearchive helm chart deploys the following:
 * Deployment and Service for `kubearchive-sink` in the `kubearchive` namespace
 * (optionally) Namespace named `test`
 
-The settings of each resource are the same as in 
-[Create an ApiServerSource object](https://knative.dev/docs/eventing/sources/apiserversource/getting-started/#create-an-apiserversource-object) 
+The settings of each resource are the same as in
+[Create an ApiServerSource object](https://knative.dev/docs/eventing/sources/apiserversource/getting-started/#create-an-apiserversource-object)
 tutorial of the knative docs.
 
 ### ApiServerSource Configuration
@@ -80,7 +95,7 @@ The `test` namespace, if created, has that label applied. The resources that the
 changed by running the helm chart with `kubearchive.role.rules[0].resources` and `apiServerSource.resources` overridden.
 `kubearchive.role.rules[0].resources` expects that the resource type(s) list are all lowercase and plural. If one
 or more of the resources in `kubearchive.role.rules[0].resources` is not in the kubernetes core API group, then
-`kubearchive.role.rules[0].apiGroups` must be overridden as well to include all API groups that contain all the 
+`kubearchive.role.rules[0].apiGroups` must be overridden as well to include all API groups that contain all the
 resources that you are interested in. `apiServerSource.resources` is a list where each item includes the `kind` and
 `apiVersion` of the resource.
 
@@ -114,13 +129,13 @@ Here is an example of the tweaks needed to add `Pods` and `ConfigMaps` to the wa
     # ...
     apiServerSource:
       # ...
-      resources: 
+      resources:
         - apiVersion: v1
           kind: Event
         - apiVersion: v1
           kind: ConfigMap
         - apiVersion: v1
-          kind: Pod      
+          kind: Pod
     ```
 2. In the same file, add the resources names in the rules for the role permissions:
    ```yaml
@@ -148,4 +163,3 @@ Here is an example of the tweaks needed to add `Pods` and `ConfigMaps` to the wa
    kubectl -n test delete configmap my-config
    kubectl -n kubearchive logs -l app=kubearchive-sink --tail=10000 | grep -A4 "type: dev."
    ```
-   

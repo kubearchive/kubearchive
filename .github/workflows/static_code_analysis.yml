@@ -3,7 +3,10 @@
 ---
 name: static_code_analysis
 run-name: Running static code analysis
-on: [push]
+on:
+    pull_request:
+        branches:
+            - main
 permissions:
     contents: read
     pull-requests: read
@@ -23,16 +26,16 @@ jobs:
                   yamllint_strict: false
                   yamllint_comment: false
     goftm:
-      name: "Golang format test"
-      runs-on: ubuntu-latest
-      steps:
-          - run: echo "Job triggered by ${{ github.actor }}."
-          - run: echo "Running on a ${{ runner.os }} server hosted by GitHub."
-          - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
-          - name: Check out repository code
-            uses: actions/checkout@v4
-          - name: Check Golang formatting (gofmt)
-            uses: Jerome1337/gofmt-action@v1.0.5
-            with:
-                gofmt-path: '.'
-                gofmt-flags: '-l -d'
+        name: "Golang format test"
+        runs-on: ubuntu-latest
+        steps:
+            - run: echo "Job triggered by ${{ github.actor }}."
+            - run: echo "Running on a ${{ runner.os }} server hosted by GitHub."
+            - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
+            - name: Check out repository code
+              uses: actions/checkout@v4
+            - name: Check Golang formatting (gofmt)
+              uses: Jerome1337/gofmt-action@v1.0.5
+              with:
+                  gofmt-path: '.'
+                  gofmt-flags: '-l -d'

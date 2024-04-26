@@ -5,8 +5,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/gin-gonic/gin"
+	"kubearchive/pkg/observability"
+	"log"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 // FIXME This will be taken from a shared pkg with sink based on the DB schema
@@ -26,17 +30,24 @@ func getAllResources(c *gin.Context) {
 		// FIXME The plural of the resource type can be different of adding an `s` to the kind
 		Kind:       pluralResourceType[:len(pluralResourceType)-1],
 		APIVersion: fmt.Sprintf("%s/%s", group, version),
-		Items:      []string{"resource1", "resource2"}}
+		Items:      []string{"resource1", "resource2"},
+	}
 	c.IndentedJSON(http.StatusOK, response)
 }
 
 func setupRouter() *gin.Engine {
 	router := gin.Default()
+	router.Use(otelgin.Middleware("kubearchive.api"))
 	router.GET("/apis/:group/:version/:resourceType", getAllResources)
 	return router
 }
 
 func main() {
+	err := observability.Start()
+	if err != nil {
+		log.Printf("Could not start opentelemetry: %s", err)
+	}
+
 	router := setupRouter()
 	router.Run("localhost:8081")
 }

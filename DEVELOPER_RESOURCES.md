@@ -47,8 +47,8 @@ performance and behavior.
 * [OpenTelemetry Go Documentation](https://opentelemetry.io/docs/languages/go/)
 * [OpenTelemetry Repository for Go Instrumentation](https://github.com/open-telemetry/opentelemetry-go-instrumentation)
 
-### Add-ons
-Add-ons that KubeArchive uses.
+### Tools
+Additional software that KubeArchive uses.
 
 * [Helm - Package Managment for Kubernetes](https://helm.sh/)
 

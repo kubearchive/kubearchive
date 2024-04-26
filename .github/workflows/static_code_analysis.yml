@@ -4,9 +4,12 @@
 name: static_code_analysis
 run-name: Running static code analysis
 on:
+    push:
+        branches-ignore:
+            - 'main'
     pull_request:
         branches:
-            - main
+            - 'main'
 permissions:
     contents: read
     pull-requests: read

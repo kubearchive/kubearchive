@@ -1,0 +1,28 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: gitleaks
+run-name: Running gitleaks check
+on:
+  pull_request:
+    branches:
+      - main
+permissions:
+    contents: read
+    pull-requests: read
+jobs:
+    scan:
+        name: "gitleaks"
+        runs-on: ubuntu-latest
+        steps:
+            - run: echo "Job triggered by ${{ github.actor }}."
+            - run: echo "Running on a ${{ runner.os }} server hosted by GitHub."
+            - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
+            - name: Check out repository code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+            - name: Run gitleaks
+              uses: gitleaks/gitleaks-action@v2
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

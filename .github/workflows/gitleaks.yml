@@ -28,8 +28,8 @@ jobs:
       - name: Testing secrets
         shell: bash
         env:
-          GITLEAKS_LICENSE: ${{ secrets.KUBEARCHIVE_TEST }}
-        run: echo "Testing secrets $KUBEARCHIVE_TEST (this should display as three stars)"
+          TEST_ENV: ${{ secrets.KUBEARCHIVE_TEST }}
+        run: echo "Testing secrets ${TEST_ENV} (this should display as three stars)"
 #      - name: Run gitleaks
 #        uses: gitleaks/gitleaks-action@v2
 #        env:

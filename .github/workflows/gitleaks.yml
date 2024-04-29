@@ -6,7 +6,7 @@ run-name: Running gitleaks check
 on:
   push:
     branches-ignore:
-      - 'main'
+      - main
   pull_request:
     branches:
       - main
@@ -15,7 +15,7 @@ permissions:
   pull-requests: read
 jobs:
   scan:
-    name: "gitleaks"
+    name: gitleaks
     runs-on: ubuntu-latest
     steps:
       - run: echo "Job triggered by ${{ github.actor }}."
@@ -29,4 +29,4 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}}

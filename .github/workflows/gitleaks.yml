@@ -3,18 +3,16 @@
 ---
 name: gitleaks
 run-name: Running gitleaks check
-on:
-  push:
-    branches-ignore:
-      - main
-  pull_request:
-    branches:
-      - main
+# According to the GitHub documentation on Action secrets:
+# "They are not passed to workflows that are triggered by a pull request from a fork."
+# So we can't use pull_requests here since gitleaks needs GITLEAKS_LICENSE.
+on: [push]
 permissions:
   contents: read
   pull-requests: read
 jobs:
   scan:
+    # From https://github.com/gitleaks/gitleaks
     name: gitleaks
     runs-on: ubuntu-latest
     steps:
@@ -25,14 +23,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Testing secrets
-        shell: bash
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
         env:
-          TEST_ENV: ${{ secrets.KUBEARCHIVE_TEST }}
-        run: echo "Testing secrets ${TEST_ENV} (this should display as three stars)"
-#      - name: Run gitleaks
-#        uses: gitleaks/gitleaks-action@v2
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: echo "Job triggered by ${{ github.actor }}."
-      - run: echo "Testing secret access ${{ secrets.KUBEARCHIVE_TEST }}."
+      - run: echo "Testing secret access KUBEARCHIVE_TEST ${{ secrets.KUBEARCHIVE_TEST }}."
       - run: echo "Running on a ${{ runner.os }} server hosted by GitHub."
       - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
       - name: Check out repository code
@@ -31,4 +31,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-

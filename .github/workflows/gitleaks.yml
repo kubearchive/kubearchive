@@ -8,11 +8,8 @@ run-name: Running gitleaks check
 # According to the GitHub documentation on Action secrets:
 # "They are not passed to workflows that are triggered by a pull request from a fork."
 # So we can't use pull_requests here since gitleaks needs GITLEAKS_LICENSE.
-# According to the GitHub documentation on pull_request_target,
-# that workflow can access secrets even when it is triggered from a fork.
 on:
-  pull_request_target:
-    types: [opened, edited]
+  push:
   schedule:
     - cron: "15 8 * * 1"  # Run once every Monday at ~8:15AM UTC
 permissions:

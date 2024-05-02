@@ -5,9 +5,10 @@ package main
 
 import (
 	"fmt"
-	"kubearchive/pkg/observability"
 	"log"
 	"net/http"
+
+	"github.com/kubearchive/kubearchive/pkg/observability"
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"

@@ -1,4 +1,4 @@
-module kubearchive
+module github.com/kubearchive/kubearchive
 
 go 1.21.9
 

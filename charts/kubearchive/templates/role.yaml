@@ -1,11 +1,13 @@
 # yamllint disable-file
+{{- range .Values.kubearchive.watchNamespaces }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
-  name: {{ .Values.kubearchive.role.name }}
+  name: {{ .role.name }}
+  namespace: {{ .name }}
 rules:
-  {{- range .Values.kubearchive.role.rules }}
+  {{- range .role.rules }}
   - apiGroups:
     {{- range .apiGroups }}
       {{- /* quote values in apiGroups so that if empty string is one of the values, helm doesn't remove it */}}
@@ -20,3 +22,4 @@ rules:
       - {{ . }}
     {{- end }}
   {{- end }}
+{{- end }}

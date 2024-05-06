@@ -7,34 +7,45 @@
 kubearchive:
   # the name of the namespace to deploy kubearchive into
   namespace: "kubearchive"
-  # configuration for a test namespace
-  testNamespace:
-    # if true, the test namespace will be created
-    create: true
-    name: test
-    # if true, ApiServerSource will watch for changes to resources in this namespace
-    watch: true
-  # values used to create the ClusterRole
-  role:
-    name: "kubearchive"
-    # rules give the service account used by ApiServerSource ability to watch specific resources
-    # on the cluster.
-    rules:
-      # the API group the resources are a part of. "" indicates the core API group
-      - apiGroups:
-        - ""       # yamllint disable-line rule:indentation
-        # resources that the role gives permission to
-        resources:
-          - events
-        # actions on the resource that the role gives permissions to
-        verbs:
-          - get
-          - list
-          - watch
-  # ClusterRoleBinding name
+  # RoleBinding name
   roleBinding: "kubearchive"
   # Name of Service Account
   serviceAccount: "kubearchive"
+  # namespaces that kubearchive will watch for archivable resources with their configuration
+  watchNamespaces:
+    - name: test
+      # if true, the namespace will be created
+      create: true
+      # values used to create the Role in the namespace
+      role:
+        name: "kubearchive"
+        # rules give the service account used by ApiServerSource ability to watch specific resources
+        # on the cluster.
+        rules:
+          # the API group the resources are a part of. "" indicates the core API group
+          - apiGroups:
+            - ""       # yamllint disable-line rule:indentation
+            # resources that the role gives permission to
+            resources:
+              - events
+            # actions on the resource that the role gives permissions to
+            verbs:
+              - get
+              - list
+              - watch
+      # values used to create a knative-eventing ApiServerSource
+      apiServerSource:
+        name: "api-server-source"
+        # can be Resource or Reference or Resource
+        # Reference means that a reference to the resource is include in the cloud event
+        # Resource means that the full resource is included in the cloud event
+        mode: "Resource"
+        resources:
+          # apiVersion and kind of the resource that ApiServerSource should watch.
+          # The list can contain more than one resource. Make sure that the Role provides
+          # appropriate perms for the resources here.
+          - apiVersion: v1
+            kind: Event
 
 # values used to create a sink
 sink:
@@ -46,17 +57,3 @@ sink:
   port: 80
   # 8080 is the port that the cloud events sdk uses by default when listening for events
   targetPort: 8080
-
-# values used to create a knative-eventing ApiServerSource
-apiServerSource:
-  name: "api-server-source"
-  # can be Resource or Reference or Resource
-  # Reference means that a reference to the resource is include in the cloud event
-  # Resource means that the full resource is included in the cloud event
-  mode: "Resource"
-  resources:
-    # apiVersion and kind of the resource that ApiServerSource should watch.
-    # The list can contain more than one resource. Make sure that the Role provides
-    # appropriate perms for the resources here.
-    - apiVersion: v1
-      kind: Event

@@ -1,23 +1,23 @@
 # yamllint disable-file
+{{- range .Values.kubearchive.watchNamespaces }}
 ---
 apiVersion: sources.knative.dev/v1
 kind: ApiServerSource
 metadata:
-  name: {{ .Values.apiServerSource.name }}
-  namespace: {{ .Values.kubearchive.namespace }}
+  name: {{ .apiServerSource.name }}
+  namespace: {{ .name }}
 spec:
-  serviceAccountName: {{ .Values.kubearchive.serviceAccount }}
-  mode: {{ .Values.apiServerSource.mode }}
+  serviceAccountName: {{ $.Values.kubearchive.serviceAccount }}
+  mode: {{ .apiServerSource.mode }}
   resources:
-    {{- range .Values.apiServerSource.resources }}
+    {{- range .apiServerSource.resources }}
     - apiVersion: {{ .apiVersion }}
       kind: {{ .kind }}
     {{- end }}
-  namespaceSelector:
-    matchLabels:
-      kubearchive: "watch"
   sink:
     ref:
       apiVersion: v1
       kind: Service
-      name: {{ .Values.sink.name }}
+      name: {{ $.Values.sink.name }}
+      namespace: {{ $.Values.kubearchive.namespace }}
+{{- end }}

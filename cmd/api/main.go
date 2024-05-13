@@ -5,41 +5,35 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"net/http"
-
+	"github.com/kubearchive/kubearchive/cmd/api/auth"
+	"github.com/kubearchive/kubearchive/cmd/api/routers"
 	"github.com/kubearchive/kubearchive/pkg/observability"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+	"log"
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
-// FIXME This will be taken from a shared pkg with sink based on the DB schema
-// Just for the first approach
-type resources struct {
-	Kind       string   `json:"kind"`
-	APIVersion string   `json:"apiVersion"`
-	Items      []string `json:"items"`
-}
-
-// getAllResources responds with the list of resources of a specific type across all namespaces
-func getAllResources(c *gin.Context) {
-	group := c.Param("group")
-	version := c.Param("version")
-	pluralResourceType := c.Param("resourceType")
-	response := resources{
-		// FIXME The plural of the resource type can be different of adding an `s` to the kind
-		Kind:       pluralResourceType[:len(pluralResourceType)-1],
-		APIVersion: fmt.Sprintf("%s/%s", group, version),
-		Items:      []string{"resource1", "resource2"},
+var k8sClient = func() *kubernetes.Clientset {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		panic(fmt.Sprintf("Error retrieving in-cluster k8s client config: %s", err.Error()))
 	}
-	c.IndentedJSON(http.StatusOK, response)
-}
+	client, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(fmt.Sprintf("Error instantiating k8s from host %s: %s", config.Host, err.Error()))
+	}
+	return client
+}()
 
 func setupRouter() *gin.Engine {
 	router := gin.Default()
 	router.Use(otelgin.Middleware("kubearchive.api"))
-	router.GET("/apis/:group/:version/:resourceType", getAllResources)
+	// TODO Add AuthN middleware
+	router.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews()))
+	router.GET("/apis/:group/:version/:resourceType", routers.GetAllResources)
 	return router
 }
 

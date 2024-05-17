@@ -5,18 +5,24 @@ package main
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/kubearchive/kubearchive/cmd/api/auth"
 	"github.com/kubearchive/kubearchive/cmd/api/routers"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"log"
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
-var k8sClient = func() *kubernetes.Clientset {
+type Server struct {
+	k8sClient kubernetes.Interface
+	router    *gin.Engine
+}
+
+func getKubernetesClient() *kubernetes.Clientset {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		panic(fmt.Sprintf("Error retrieving in-cluster k8s client config: %s", err.Error()))
@@ -26,15 +32,19 @@ var k8sClient = func() *kubernetes.Clientset {
 		panic(fmt.Sprintf("Error instantiating k8s from host %s: %s", config.Host, err.Error()))
 	}
 	return client
-}()
+}
 
-func setupRouter() *gin.Engine {
+func NewServer(k8sClient kubernetes.Interface) *Server {
 	router := gin.Default()
 	router.Use(otelgin.Middleware("kubearchive.api"))
 	// TODO Add AuthN middleware
 	router.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews()))
 	router.GET("/apis/:group/:version/:resourceType", routers.GetAllResources)
-	return router
+
+	return &Server{
+		router:    router,
+		k8sClient: k8sClient,
+	}
 }
 
 func main() {
@@ -43,6 +53,6 @@ func main() {
 		log.Printf("Could not start opentelemetry: %s", err)
 	}
 
-	router := setupRouter()
-	router.Run("localhost:8081")
+	server := NewServer(getKubernetesClient())
+	server.router.Run("localhost:8081")
 }

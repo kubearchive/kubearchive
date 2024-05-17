@@ -5,11 +5,13 @@ package auth
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	authzv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientAuthzv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
-	"net/http"
 )
 
 func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.HandlerFunc {
@@ -37,6 +39,7 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.Hand
 			},
 		}, metav1.CreateOptions{})
 		if err != nil {
+			log.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"message": "Unexpected error on SAR"})
 			c.Abort()
 			return

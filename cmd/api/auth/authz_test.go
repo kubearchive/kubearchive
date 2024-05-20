@@ -16,7 +16,8 @@ import (
 )
 
 const (
-	group    = "stable.example.com/v1"
+	group    = "stable.example.com"
+	version  = "v1"
 	resource = "crontabs"
 )
 
@@ -33,7 +34,7 @@ func (c *fakeSubjectAccessReviews) Create(ctx context.Context, subjectAccessRevi
 
 func testHTTPResponse(t *testing.T, router *gin.Engine, status int) {
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/%s", group, resource), nil)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/%s/%s", group, version, resource), nil)
 	router.ServeHTTP(res, req)
 	assert.Equal(t, status, res.Code)
 }
@@ -73,6 +74,7 @@ func TestAuthZMiddleware(t *testing.T) {
 			ra := fsar.sar.Spec.ResourceAttributes
 			assert.Equal(t, group, ra.Group)
 			assert.Equal(t, resource, ra.Resource)
+			assert.Equal(t, version, ra.Version)
 			assert.Equal(t, "get", ra.Verb)
 			assert.Equal(t, "", ra.Namespace)
 		})

@@ -47,6 +47,18 @@ kubearchive:
           - apiVersion: v1
             kind: Event
 
+# values used to create the api-server
+apiServer:
+  name: "kubearchive-api-server"
+  # NOTE - Helm does not resolve ko path. Needs to be set on `helm install` command, e.g:
+  # helm install -n default <chart-name> charts/kubearchive \
+  # --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api)
+  image: ko://github.com/kubearchive/kubearchive/cmd/api
+  # NOTE - To debug the apiServer the `ko build` command must be the following way:
+  # KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest ko build --disable-optimizations \
+  # github.com/kubearchive/kubearchive/cmd/api
+  debug: false
+
 # values used to create a sink
 sink:
   name: "kubearchive-sink"

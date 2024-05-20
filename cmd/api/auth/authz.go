@@ -4,7 +4,6 @@
 package auth
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -17,7 +16,7 @@ import (
 func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.HandlerFunc {
 	// FIXME Hardcoded credentials should be extracted from context when authN layer is in place
 	user := "user"
-	groups := []string{"system-authenticated"}
+	groups := []string{"system:masters", "system:authenticated"}
 
 	return func(c *gin.Context) {
 		group := c.Param("group")
@@ -32,7 +31,8 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.Hand
 				Groups: groups,
 				ResourceAttributes: &authzv1.ResourceAttributes{
 					Namespace: namespace,
-					Group:     fmt.Sprintf("%s/%s", group, version),
+					Group:     group,
+					Version:   version,
 					Resource:  resource,
 					Verb:      "get",
 				},

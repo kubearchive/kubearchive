@@ -28,7 +28,7 @@ On fedora, install podman, jq, and helm with this command:
 ```bash
 sudo dnf install podman jq helm
 ```
-Otherwise follow the [podman](https://podman.io/docs/installation), [jq](https://jqlang.github.io/jq/download/), and [helm](https://helm.sh/docs/intro/install/) install instructions.
+Otherwise, follow the [podman](https://podman.io/docs/installation), [jq](https://jqlang.github.io/jq/download/), and [helm](https://helm.sh/docs/intro/install/) install instructions.
 
 Follow the [kubernetes](https://kubernetes.io/docs/tasks/tools/#kubectl), [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation), and [cosign](https://docs.sigstore.dev/system_config/installation/) install instructions.
 
@@ -155,6 +155,9 @@ Here is an example of the tweaks needed to add `Pods` and `ConfigMaps` to the wa
    ```bash
    helm upgrade -n default --reuse-values -f charts/kubearchive/values.yaml [deployment name] charts/kubearchive --version 0.0.1
    ```
+   > **_NOTE:_**  A tweak is needed to this command for successfully deploying the api-server.
+   Check the section [Remote debugging API Server from the IDE](#remote-debugging-api-server-from-the-ide).
+
 4. Test the new cloud events sent to the sink by creating and deleting a `configmap` and a `pod`
    ```bash
    kubectl -n test create configmap my-config --from-literal=key1=config1 --from-literal=key2=config2
@@ -162,4 +165,98 @@ Here is an example of the tweaks needed to add `Pods` and `ConfigMaps` to the wa
    kubectl -n test delete pod busybox
    kubectl -n test delete configmap my-config
    kubectl -n kubearchive logs -l app=kubearchive-sink --tail=10000 | grep -A4 "type: dev."
+   ```
+
+### kubearchive-api-server
+
+The Chart also includes the deployment of an api-server.
+It can be deployed in debug mode when setting `.Values.apiServer.debug` to true (default to false).
+
+The image can be hardcoded in the Chart values or `ko` can be used to dynamically build and deploy
+the containers with the appropriate image.
+
+#### Build with `ko` and deploy with `helm`
+
+Install `ko` if needed:
+```bash
+go install github.com/google/ko@latest
+```
+Otherwise, follow the [ko](https://ko.build/install/) install instructions.
+
+To use `ko` with kind we need to set up the following environment variables:
+```bash
+export KO_DOCKER_REPO=kind.local
+export KIND_CLUSTER_NAME=<kind_cluster_name> # Defaults to "kind"
+```
+
+Then run the `helm install` command as follows:
+
+```bash
+helm install -n default [deployment name] charts/kubearchive \
+--set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api)
+```
+
+> **_NOTE_**: To upgrade the deployment instead of running it from scratch use:
+> ```bash
+> helm upgrade -n default --reuse-values -f charts/kubearchive/values.yaml \
+> --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
+> [deployment name] charts/kubearchive --version 0.0.1
+> ```
+> This is needed if changes are made to the code.
+
+To test the API expose the port:
+
+```bash
+kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081
+```
+
+To check the logs run:
+`kubectl logs -n kubearchive -l app=kubearchive-api-server -f`
+
+And do a query:
+
+```bash
+curl localhost:8081/apis/apps/v1/deployments
+```
+
+#### Remote debugging API Server from the IDE
+
+The api-server is meant to be run in a k8s cluster so this is needed also
+for debugging the code.
+
+We can use [delve](https://golangforall.com/en/post/go-docker-delve-remote-debug.html)
+to run the code and be able to debug it from an IDE (VSCode or Goland).
+
+These are the steps:
+
+1. Deploy the chart with `ko` and `helm` in debug mode using an image with `delve`:
+   ```bash
+   helm install -n default [deployment name] charts/kubearchive \ 
+   --set apiServer.debug=true \
+   --set-string apiServer.image=$(KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest \
+   ko build --disable-optimizations github.com/kubearchive/kubearchive/cmd/api) \
+   ```
+   > **_NOTE_**: To upgrade the deployment instead of running it from scratch use:
+   > ```bash
+   > helm upgrade -n default --reuse-values -f charts/kubearchive/values.yaml \
+   > --set apiServer.debug=true \
+   > --set-string apiServer.image=$(ko build --disable-optimizations \
+   > github.com/kubearchive/kubearchive/cmd/api) \
+   > [deployment name] charts/kubearchive --version 0.0.1
+   > ```
+   > This is needed if changes are made to the code.
+
+2. Forward the pod ports 8081 and 40000
+   ```bash
+   kubectl port-forward \
+   $(kubectl get pods --no-headers -o custom-columns=":metadata.name" | grep api-server) \
+   8081:8081 40000:40000
+   ```
+3. Enable breakpoints in the code using your preferred IDE
+4. Connect to the process using the port 40000 in your preferred IDE:
+   * [VSCode instructions](https://golangforall.com/en/post/go-docker-delve-remote-debug.html#visual-studio-code)
+   * [Goland instructions](https://golangforall.com/en/post/go-docker-delve-remote-debug.html#goland-ide)
+5. Query the API, e.g:
+   ```bash
+   curl localhost:8081/apis/apps/v1/deployments
    ```

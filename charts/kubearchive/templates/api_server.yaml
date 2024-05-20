@@ -1,0 +1,37 @@
+# yamllint disable-file
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.apiServer.name }}
+  namespace: {{ .Values.kubearchive.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: &labels
+      app: {{ .Values.apiServer.name}}
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      serviceAccountName: {{ .Values.apiServer.serviceAccount }}
+      containers:
+        - name: {{ .Values.apiServer.name }}
+          image: {{ .Values.apiServer.image }}
+          {{- if .Values.apiServer.debug }}
+          command: ["./go/bin/dlv"]
+          args: ["--listen=:40000", "--headless=true", "--api-version=2", "--log", "exec", "/ko-app/api"]
+          {{- end}}
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ .Values.apiServer.name }}
+  namespace: {{ .Values.kubearchive.namespace }}
+spec:
+  selector:
+    app: {{ .Values.apiServer.name }}
+  ports:
+    - protocol: TCP
+      port: 8081
+      targetPort: 8081

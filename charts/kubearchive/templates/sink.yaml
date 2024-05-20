@@ -6,7 +6,7 @@ metadata:
   name: {{ .Values.sink.name }}
   namespace: {{ .Values.kubearchive.namespace }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.sink.replicas }}
   selector:
     matchLabels: &labels
       app: {{ .Values.sink.name }}

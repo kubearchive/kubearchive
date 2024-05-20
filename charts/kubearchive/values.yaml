@@ -69,3 +69,5 @@ sink:
   port: 80
   # 8080 is the port that the cloud events sdk uses by default when listening for events
   targetPort: 8080
+  # number of kubearchive sink pods that should be deployed
+  replicas: 1

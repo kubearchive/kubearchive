@@ -50,7 +50,8 @@ kubearchive:
 # values used to create the api-server
 apiServer:
   name: "kubearchive-api-server"
-  # NOTE - Helm does not resolve ko path. Needs to be set on `helm install` command, e.g:
+  # NOTE - Helm does not resolve the `ko` path. The path needs to be set on the `helm install` command.
+  # For example:
   # helm install -n default <chart-name> charts/kubearchive \
   # --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api)
   image: ko://github.com/kubearchive/kubearchive/cmd/api
@@ -62,9 +63,11 @@ apiServer:
 # values used to create a sink
 sink:
   name: "kubearchive-sink"
-  # event_display is a place holder that prints cloud events to stdout but should be replaced with a
-  # component for kubearchive that can receive cloud events.
-  image: gcr.io/knative-releases/knative.dev/eventing/cmd/event_display
+  # NOTE - Helm does not resolve the `ko` path. The path needs to be set on the `helm install` command.
+  # For example:
+  # helm install -n default <chart-name> charts/kubearchive \
+  # --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink)
+  image: ko://github.com/kubearchive/kubearchive/cmd/sink
   protocol: TCP
   port: 80
   # 8080 is the port that the cloud events sdk uses by default when listening for events

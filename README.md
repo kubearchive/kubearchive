@@ -71,6 +71,39 @@ helm uninstall [deployment name] -n default
 ```
 **NOTE**: This assumes you installed the helm chart under the `default` namespace.
 
+### Build images with `ko`
+
+The following components of kubearchive have images that can be built locally with `ko`:
+* kubearchive-api-server
+* kubearchive-sink
+
+`ko` can be installed with the following command
+```bash
+go install github.com/google/ko@latest
+```
+or follow the [ko install instructions](https://ko.build/install).
+
+To use ko with kind we need to set up the following environment variables:
+```bash
+export KO_DOCKER_REPO=kind.local
+export KIND_CLUSTER_NAME=<kind_cluster_name> # Defaults to "kind"
+```
+Then run the `helm install` command as follows:
+```bash
+helm install -n default [deployment name] charts/kubearchive \
+--set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
+--set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink)
+```
+
+> **_NOTE_**: To upgrade the deployment instead of running it from scratch use:
+> ```bash
+> helm upgrade -n default --reuse-values -f charts/kubearchive/values.yaml \
+> --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
+> --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
+> [deployment name] charts/kubearchive --version 0.0.1
+> ```
+> This is needed if changes are made to the code.
+
 ## Kubearchive Helm Chart
 
 The kubearchive helm chart deploys the following:
@@ -100,14 +133,14 @@ resources that you are interested in. `apiServerSource.resources` is a list wher
 `apiVersion` of the resource.
 
 ### kubearchive-sink
-An ApiServerSource requires a sink that it can send cloud events to. Right now, kubearchive-sink is
-`https://github.com/knative-sample/event-display/` which is a simple sink written in go that prints
-all cloud events it receives to `stdout`. You can view cloud events it receives with the following
+An ApiServerSource requires a sink that it can send cloud events to. The image can be hardcoded or ko can be used to
+dynamically build and deploy the containers with the appropriate image.
+
+The kubearchive-sink logs are viewable with this command
 command:
 ```bash
 kubectl logs --namespace=kubearchive -l app=kubearchive-sink --tail=1000
 ```
-**`event-display` is just a placeholder. It needs to be replaced with a sink that is written for kubearchive.**
 
 ### Create an event
 Run a pod to create an event and remove it to create another one:
@@ -175,34 +208,7 @@ It can be deployed in debug mode when setting `.Values.apiServer.debug` to true 
 The image can be hardcoded in the Chart values or `ko` can be used to dynamically build and deploy
 the containers with the appropriate image.
 
-#### Build with `ko` and deploy with `helm`
-
-Install `ko` if needed:
-```bash
-go install github.com/google/ko@latest
-```
-Otherwise, follow the [ko](https://ko.build/install/) install instructions.
-
-To use `ko` with kind we need to set up the following environment variables:
-```bash
-export KO_DOCKER_REPO=kind.local
-export KIND_CLUSTER_NAME=<kind_cluster_name> # Defaults to "kind"
-```
-
-Then run the `helm install` command as follows:
-
-```bash
-helm install -n default [deployment name] charts/kubearchive \
---set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api)
-```
-
-> **_NOTE_**: To upgrade the deployment instead of running it from scratch use:
-> ```bash
-> helm upgrade -n default --reuse-values -f charts/kubearchive/values.yaml \
-> --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
-> [deployment name] charts/kubearchive --version 0.0.1
-> ```
-> This is needed if changes are made to the code.
+#### Test the API Server
 
 To test the API expose the port:
 
@@ -235,6 +241,7 @@ These are the steps:
    --set apiServer.debug=true \
    --set-string apiServer.image=$(KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest \
    ko build --disable-optimizations github.com/kubearchive/kubearchive/cmd/api) \
+   --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink)
    ```
    > **_NOTE_**: To upgrade the deployment instead of running it from scratch use:
    > ```bash
@@ -242,6 +249,7 @@ These are the steps:
    > --set apiServer.debug=true \
    > --set-string apiServer.image=$(ko build --disable-optimizations \
    > github.com/kubearchive/kubearchive/cmd/api) \
+   > --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
    > [deployment name] charts/kubearchive --version 0.0.1
    > ```
    > This is needed if changes are made to the code.

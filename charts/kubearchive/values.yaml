@@ -59,6 +59,8 @@ apiServer:
   # KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest ko build --disable-optimizations \
   # github.com/kubearchive/kubearchive/cmd/api
   debug: false
+  # If true, OpenTelemetry instrumention will be enabled for the api server
+  observability: false
 
 # values used to create a sink
 sink:

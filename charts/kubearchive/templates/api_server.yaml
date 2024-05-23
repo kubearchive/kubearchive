@@ -22,6 +22,8 @@ spec:
           command: ["./go/bin/dlv"]
           args: ["--listen=:40000", "--headless=true", "--api-version=2", "--log", "exec", "/ko-app/api"]
           {{- end}}
+          env:
+{{ include "kubearchive.v1.otel.env" .Values.apiServer | indent 12 }}
 ---
 kind: Service
 apiVersion: v1

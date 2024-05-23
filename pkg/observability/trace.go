@@ -6,6 +6,8 @@ package observability
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
@@ -14,11 +16,18 @@ import (
 	sdkTrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
+// the name of the environment variable that will determine if instrumentation needs to be started
+const OtelStartEnvVar = "KUBEARCHIVE_OTEL_ENABLED"
+
 var tp *sdkTrace.TracerProvider
 
 // Start creates a Span Processor and exporter, registers them with a TracerProvider, and sets the default
 // TracerProvider and SetTextMapPropagator
 func Start() error {
+	if canSkipInit() {
+		return nil
+	}
+
 	exporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
 	if err != nil {
 		return err
@@ -44,6 +53,13 @@ func Start() error {
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
 	return nil
+}
+
+// canSkipInit returns a bool representing if OtelStartEnvVar is set to false. This function is a helper for Start.
+// Instrumentation should *ONLY* be started if this function returns false
+func canSkipInit() bool {
+	startEnv := os.Getenv(OtelStartEnvVar)
+	return strings.ToLower(startEnv) == "false"
 }
 
 // FlushSpanBuffer exports all completed spans that have not been exported for all SpanProcessors registered with the

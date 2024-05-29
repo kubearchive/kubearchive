@@ -54,5 +54,8 @@ func main() {
 	}
 
 	server := NewServer(getKubernetesClient())
-	server.router.Run("localhost:8081")
+	err = server.router.Run("localhost:8081")
+	if err != nil {
+		log.Printf("Could not run server on localhost: %s", err)
+	}
 }

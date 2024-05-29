@@ -1,0 +1,39 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: golangci_lint
+run-name: Running golangci_lint security testing
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+permissions:
+  contents: read
+  pull-requests: read
+  checks: write
+jobs:
+  golangci:
+    # See https://github.com/golangci/golangci-lint-action
+    name: "golangci_lint security testing"
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Job triggered by ${{ github.actor }}."
+      - run: echo "Running on a ${{ runner.os }} server hosted by GitHub."
+      - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Display Go version
+        run: go version
+      - name: Test Go code
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          only-new-issues: true
+          args: --enable gosec

@@ -1,0 +1,8 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+run:
+  timeout: 10m
+linters:
+  enable:
+    - gosec

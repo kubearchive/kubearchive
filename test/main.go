@@ -21,7 +21,7 @@ const (
 func RandomString() string {
 	suffix := make([]byte, randSuffixLen)
 	for i := range suffix {
-		suffix[i] = letterBytes[rand.Intn(len(letterBytes))]
+		suffix[i] = letterBytes[rand.Intn(len(letterBytes))] // #nosec G404
 	}
 	return string(suffix)
 }
@@ -33,11 +33,14 @@ func CreateResources(resources ...string) error {
 			return err
 		}
 
-		f.Write([]byte(resource))
+		_, err = f.Write([]byte(resource))
+		if err != nil {
+			return err
+		}
 		f.Close()
 
 		log.Printf("running ko apply -f %s, file kept for inspection.", f.Name())
-		cmd := exec.Command("ko", "apply", "-f", f.Name())
+		cmd := exec.Command("ko", "apply", "-f", f.Name()) // #nosec G204
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			return errors.New(string(output))
@@ -54,11 +57,14 @@ func DeleteResources(resources ...string) error {
 			return err
 		}
 
-		f.Write([]byte(resource))
+		_, err = f.Write([]byte(resource))
+		if err != nil {
+			return err
+		}
 		f.Close()
 
 		log.Printf("running kubectl delete -f %s, file kept for inspection.", f.Name())
-		cmd := exec.Command("kubectl", "delete", "-f", f.Name())
+		cmd := exec.Command("kubectl", "delete", "-f", f.Name()) // #nosec G204
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			return errors.New(string(output))

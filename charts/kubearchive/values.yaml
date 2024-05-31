@@ -76,3 +76,5 @@ sink:
   targetPort: 8080
   # number of kubearchive sink pods that should be deployed
   replicas: 1
+  # If true, OpenTelemetry instrumention will be enabled for the sink
+  observability: false

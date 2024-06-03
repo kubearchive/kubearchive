@@ -1,4 +1,4 @@
-# yamllint disable rule:braces
+# yamllint disable-file
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -17,6 +17,8 @@ spec:
       containers:
         - name: {{ .Values.sink.name }}
           image: {{ .Values.sink.image }}
+          env:
+{{ include "kubearchive.v1.otel.env" .Values.sink | indent 12 }}
 ---
 kind: Service
 apiVersion: v1

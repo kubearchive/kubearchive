@@ -1,0 +1,54 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: go_test_integration
+run-name: Running go test with integration tests
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  integration:
+    name: Golang Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Job triggered by ${{ github.actor }}."
+      - run: echo "Running on a ${{ runner.os }} server hosted by GitHub."
+      - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21.9'
+      - name: Display Go version
+        run: go version
+      - name: Install KinD
+        run: |
+          set -x
+
+          # Disable swap otherwise memory enforcement doesn't work
+          # See: https://kubernetes.slack.com/archives/CEKK1KTN2/p1600009955324200
+          sudo swapoff -a
+          sudo rm -f /swapfile
+
+          curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.21.0/kind-$(uname)-amd64
+          chmod +x ./kind
+          sudo mv kind /usr/local/bin
+
+      - name: Install ko
+        uses: ko-build/setup-ko@v0.6
+
+      - name: Create KinD cluster
+        run: kind create cluster
+
+      - name: Test Go code
+        run: |
+          export KO_DOCKER_REPO="kind.local"
+          go test -v ./... -tags=integration

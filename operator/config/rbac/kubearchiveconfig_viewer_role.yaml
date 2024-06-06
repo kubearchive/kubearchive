@@ -1,0 +1,28 @@
+# permissions for end users to view kubearchiveconfigs.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: kubearchiveconfig-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: operator
+    app.kubernetes.io/part-of: operator
+    app.kubernetes.io/managed-by: kustomize
+  name: kubearchiveconfig-viewer-role
+rules:
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs/status
+    verbs:
+      - get

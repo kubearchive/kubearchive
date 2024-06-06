@@ -1,0 +1,5 @@
+## Append samples of your project ##
+---
+resources:
+  - kubearchive_v1alpha1_kubearchiveconfig.yaml
+  # +kubebuilder:scaffold:manifestskustomizesamples

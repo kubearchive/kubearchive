@@ -1,0 +1,19 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrolebinding
+    app.kubernetes.io/instance: {{ .Values.kubearchive.namespace }}-operator-rolebinding
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: {{ .Values.kubearchive.namespace }}-operator
+    app.kubernetes.io/part-of: {{ .Values.kubearchive.namespace }}-operator
+  name: {{ .Values.kubearchive.namespace }}-operator-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Values.kubearchive.namespace }}-operator
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.kubearchive.namespace }}-operator
+    namespace: {{ .Values.kubearchive.namespace }}

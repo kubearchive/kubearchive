@@ -21,3 +21,6 @@
 .idea/
 *.tmproj
 .vscode/
+
+# Operator files
+templates/operator/monitor.yaml

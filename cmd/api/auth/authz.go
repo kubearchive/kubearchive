@@ -4,49 +4,50 @@
 package auth
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	authzv1 "k8s.io/api/authorization/v1"
+	apiAuthnv1 "k8s.io/api/authentication/v1"
+	apiAuthzv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientAuthzv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
 func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.HandlerFunc {
-	// FIXME Hardcoded credentials should be extracted from context when authN layer is in place
-	user := "user"
-	groups := []string{"system:masters", "system:authenticated"}
 
 	return func(c *gin.Context) {
-		group := c.Param("group")
-		version := c.Param("version")
-		// FIXME Resource type should be extracted from context instead from the plural
-		resource := c.Param("resourceType")
-		namespace := c.Param("namespace")
+		usr, ok := c.Get("user")
+		if !ok {
+			abort(c, "user not found in context", http.StatusInternalServerError)
+			return
+		}
+		userInfo, ok := usr.(apiAuthnv1.UserInfo)
+		if !ok {
+			abort(c, fmt.Sprintf("unexpected user type in context: %T", usr), http.StatusInternalServerError)
+			return
+		}
 
-		sar, err := sari.Create(c, &authzv1.SubjectAccessReview{
-			Spec: authzv1.SubjectAccessReviewSpec{
-				User:   user,
-				Groups: groups,
-				ResourceAttributes: &authzv1.ResourceAttributes{
-					Namespace: namespace,
-					Group:     group,
-					Version:   version,
-					Resource:  resource,
+		sar, err := sari.Create(c, &apiAuthzv1.SubjectAccessReview{
+			Spec: apiAuthzv1.SubjectAccessReviewSpec{
+				User:   userInfo.Username,
+				Groups: userInfo.Groups,
+				ResourceAttributes: &apiAuthzv1.ResourceAttributes{
+					Namespace: c.Param("namespace"),
+					Group:     c.Param("group"),
+					Version:   c.Param("version"),
+					Resource:  c.Param("resourceType"),
 					Verb:      "get",
 				},
 			},
 		}, metav1.CreateOptions{})
+
 		if err != nil {
-			log.Println(err)
-			c.JSON(http.StatusInternalServerError, gin.H{"message": "Unexpected error on SAR"})
-			c.Abort()
+			abort(c, fmt.Sprintf("Unexpected error on SAR: %s", err.Error()), http.StatusInternalServerError)
 			return
 		}
 		if !sar.Status.Allowed {
-			c.JSON(http.StatusUnauthorized, gin.H{"message": "Unauthorized"})
-			c.Abort()
+			abort(c, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 		c.Next()

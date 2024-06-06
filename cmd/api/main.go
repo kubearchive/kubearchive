@@ -37,7 +37,7 @@ func getKubernetesClient() *kubernetes.Clientset {
 func NewServer(k8sClient kubernetes.Interface) *Server {
 	router := gin.Default()
 	router.Use(otelgin.Middleware("kubearchive.api"))
-	// TODO Add AuthN middleware
+	router.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews()))
 	router.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews()))
 	router.GET("/apis/:group/:version/:resourceType", routers.GetAllResources)
 

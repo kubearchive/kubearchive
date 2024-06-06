@@ -5,10 +5,10 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/authorization/v1"
+	apiAuthnv1 "k8s.io/api/authentication/v1"
+	apiAuthzv1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"net/http/httptest"
@@ -23,20 +23,13 @@ const (
 
 type fakeSubjectAccessReviews struct {
 	allowed bool
-	sar     *v1.SubjectAccessReview
+	sar     *apiAuthzv1.SubjectAccessReview
 }
 
-func (c *fakeSubjectAccessReviews) Create(ctx context.Context, subjectAccessReview *v1.SubjectAccessReview, opts metav1.CreateOptions) (*v1.SubjectAccessReview, error) {
+func (c *fakeSubjectAccessReviews) Create(ctx context.Context, subjectAccessReview *apiAuthzv1.SubjectAccessReview, opts metav1.CreateOptions) (*apiAuthzv1.SubjectAccessReview, error) {
 	subjectAccessReview.Status.Allowed = c.allowed
 	c.sar = subjectAccessReview
 	return subjectAccessReview, nil
-}
-
-func testHTTPResponse(t *testing.T, router *gin.Engine, status int) {
-	res := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", fmt.Sprintf("/%s/%s/%s", group, version, resource), nil)
-	router.ServeHTTP(res, req)
-	assert.Equal(t, status, res.Code)
 }
 
 func TestAuthZMiddleware(t *testing.T) {
@@ -61,16 +54,16 @@ func TestAuthZMiddleware(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			fsar := &fakeSubjectAccessReviews{allowed: tc.authorized}
-			router := gin.Default()
-			router.GET("/:group/:version/:resourceType", RBACAuthorization(fsar),
-				func(ctx *gin.Context) {
-					if tc.authorized {
-						ctx.Status(tc.expected)
-					} else {
-						t.Fail()
-					}
-				})
-			testHTTPResponse(t, router, tc.expected)
+			res := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(res)
+			c.Set("user", apiAuthnv1.UserInfo{Username: "fakesername", UID: "fake", Groups: []string{"fakeGroup1"}})
+			c.Params = gin.Params{
+				gin.Param{Key: "group", Value: group},
+				gin.Param{Key: "version", Value: version},
+				gin.Param{Key: "resourceType", Value: resource},
+			}
+			RBACAuthorization(fsar)(c)
+			assert.Equal(t, tc.expected, res.Code)
 			ra := fsar.sar.Spec.ResourceAttributes
 			assert.Equal(t, group, ra.Group)
 			assert.Equal(t, resource, ra.Resource)

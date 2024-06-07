@@ -6,6 +6,7 @@ require (
 	github.com/cloudevents/sdk-go/observability/opentelemetry/v2 v2.15.2
 	github.com/cloudevents/sdk-go/v2 v2.15.2
 	github.com/gin-gonic/gin v1.9.1
+	github.com/lib/pq v1.10.9
 	github.com/stretchr/testify v1.9.0
 	go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin v0.51.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.44.0

@@ -54,7 +54,7 @@ func main() {
 	}
 
 	server := NewServer(getKubernetesClient())
-	err = server.router.Run("localhost:8081")
+	err = server.router.RunTLS("localhost:8081", "/etc/kubearchive/ssl/tls.crt", "/etc/kubearchive/ssl/tls.key")
 	if err != nil {
 		log.Printf("Could not run server on localhost: %s", err)
 	}

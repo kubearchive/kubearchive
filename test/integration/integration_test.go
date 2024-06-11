@@ -51,7 +51,7 @@ spec:
     spec:
       containers:
       - name: kubearchive
-        image: ko://github.com/kubearchive/kubearchive/cmd/api/
+        image: ko://github.com/kubearchive/kubearchive/cmd/sink/
         ports:
         - containerPort: 8081
 `, namespaceName)

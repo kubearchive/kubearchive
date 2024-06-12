@@ -97,7 +97,7 @@ func TestAuthentication(t *testing.T) {
 			ftr := &fakeTokenReview{authenticated: tc.authenticated}
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
-			c.Request, _ = http.NewRequest("GET", "/", nil)
+			c.Request, _ = http.NewRequest(http.MethodGet, "/", nil)
 			c.Request.Header.Add("Authorization", "Bearer faketoken")
 			Authentication(ftr)(c)
 			assert.Equal(t, tc.expected, res.Code)

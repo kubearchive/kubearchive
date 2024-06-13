@@ -1,4 +1,3 @@
-# yamllint disable-file
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -14,7 +13,7 @@ spec:
     metadata:
       labels: *labels
     spec:
-      serviceAccountName: {{ .Values.apiServer.serviceAccount }}
+      serviceAccountName: {{ .Values.apiServer.name }}
       volumes:
         - name: tls-secret
           secret:

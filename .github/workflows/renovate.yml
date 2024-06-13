@@ -1,0 +1,32 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+# Renovate: https://github.com/renovatebot/github-action
+# Action based on: https://github.com/renovatebot/github-action?tab=readme-ov-file#example-with-github-app
+---
+name: Renovate
+on:
+  schedule:
+    - cron: "15 8 * * 1"  # Run weekly at 8:15 UTC on Monday
+
+jobs:
+  renovate:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
+      - name: Get kubearchive-renovate Github App Api Token
+        id: get_token
+        uses: actions/create-github-app-token@v1
+        with:
+          private-key: ${{ secrets.KUBEARCHIVE_RENOVATE_PRIVATE_KEY }}
+          app-id: ${{ secrets.KUBEARCHIVE_RENOVATE_APP_ID }}
+
+      - name: Checkout KubeArchive repository
+        uses: actions/checkout@v4
+
+      - name: Run Renovate
+        uses: renovatebot/github-action@v40.1.11
+        with:
+          token: '${{ steps.get_token.outputs.token }}'
+        env:
+          RENOVATE_PLATFORM_COMMIT: "true"

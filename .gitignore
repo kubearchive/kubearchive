@@ -19,3 +19,10 @@
 
 # Go workspace file
 go.work
+
+# Certificates and keys
+*.crt
+*.pem
+
+# Python environment for yamllint
+venv/

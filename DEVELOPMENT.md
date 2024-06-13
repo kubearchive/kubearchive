@@ -90,9 +90,13 @@ By default KubeArchive listens to `Event`s in the `test` namespace.
     ```bash
     kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081
     ```
+1. Get the Certificate Authority (CA) from the `kubearchive-api-server-tls` secret:
+    ```bash
+    kubectl get -n kubearchive secrets kubearchive-api-server-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
+    ```
 1. On a new terminal, use `curl` or your browser to perform a query:
     ```bash
-    curl localhost:8081/apis/apps/v1/deployments
+    curl --cacert ca.crt localhost:8081/apis/apps/v1/deployments
     ```
 1. Check the new logs on the KubeArchive API:
     ```bash

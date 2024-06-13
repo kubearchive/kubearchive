@@ -15,9 +15,17 @@ spec:
       labels: *labels
     spec:
       serviceAccountName: {{ .Values.apiServer.serviceAccount }}
+      volumes:
+        - name: tls-secret
+          secret:
+            secretName: {{ .Values.apiServer.name }}-tls
       containers:
         - name: {{ .Values.apiServer.name }}
           image: {{ .Values.apiServer.image }}
+          volumeMounts:
+            - name: tls-secret
+              readOnly: true
+              mountPath: /etc/kubearchive/ssl/
           {{- if .Values.apiServer.debug }}
           command: ["./go/bin/dlv"]
           args: ["--listen=:40000", "--headless=true", "--api-version=2", "--log", "exec", "/ko-app/api"]

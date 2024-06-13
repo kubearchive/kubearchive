@@ -34,13 +34,16 @@ func main() {
 			return otelhttp.NewHandler(next, "receive")
 		}),
 	)
+	if err != nil {
+		logger.Fatalf("failed to create HTTP client: %s\n", err.Error())
+	}
 	eventClient, err := cloudevents.NewClient(httpClient, ceClient.WithObservabilityService(ceOtelObs.NewOTelObservabilityService()))
 	if err != nil {
-		logger.Fatalf("failed to create CloudEvents HTTP client: %s", err.Error())
+		logger.Fatalf("failed to create CloudEvents HTTP client: %s\n", err.Error())
 	}
 
 	err = eventClient.StartReceiver(context.Background(), receive)
 	if err != nil {
-		logger.Fatalf("failed to start receiving CloudEvents: %s", err.Error())
+		logger.Fatalf("failed to start receiving CloudEvents: %s\n", err.Error())
 	}
 }

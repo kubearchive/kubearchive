@@ -24,7 +24,7 @@ func TestGetAllResources(t *testing.T) {
 	router := setupRouter()
 
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/apis/stable.example.com/v1/crontabs", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/crontabs", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)

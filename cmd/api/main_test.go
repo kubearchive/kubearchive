@@ -25,7 +25,7 @@ func TestOtelMiddlewareConfigured(t *testing.T) {
 	server := NewServer(k8sClient)
 	// Get the context for a new response recorder for inspection and set it to the router engine
 	c := gin.CreateTestContextOnly(httptest.NewRecorder(), server.router)
-	c.Request, _ = http.NewRequest("GET", "/", nil)
+	c.Request, _ = http.NewRequest(http.MethodGet, "/", nil)
 	server.router.HandleContext(c)
 	// Get the handler names from the context
 	names := c.HandlerNames()
@@ -48,7 +48,7 @@ func TestAuthMiddlewareConfigured(t *testing.T) {
 	server := NewServer(k8sClient)
 	// Make a correct request with an invalid token
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest("GET", "/", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Authorization", "Bearer token")
 	server.router.ServeHTTP(res, req)
 	// Assert unauthenticated request

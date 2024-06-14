@@ -1,0 +1,12 @@
+{
+  "devDependencies": {
+    "@antora/lunr-extension": "1.0.0-alpha.8",
+    "antora": "3.1.7",
+    "http-server": "14.1.1"
+  },
+  "scripts": {
+    "build": "antora antora-playbook.yaml",
+    "dev": "npm run build -- --url=http://localhost:8080 && npm run serve",
+    "serve": "http-server -a localhost build/site -c-1"
+  }
+}

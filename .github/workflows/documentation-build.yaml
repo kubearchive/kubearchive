@@ -1,0 +1,22 @@
+---
+name: Documentation build
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '21'
+      - name: Install Antora
+        working-directory: ./docs
+        run: npm ci
+      - name: Generate Site
+        working-directory: ./docs
+        run: npm run build

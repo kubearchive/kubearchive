@@ -1,0 +1,53 @@
+---
+name: Documentation release
+on:
+  push:
+    branches: [main]
+    tags: ["**"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+  # Allows you to POST to an endpoint to trigger this
+  # see https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#repository_dispatch
+  repository_dispatch:
+    types: [generate]
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Configure Pages
+        uses: actions/configure-pages@v3
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '21'
+      - name: Install Antora
+        working-directory: ./docs
+        run: npm ci
+      - name: Generate Site
+        working-directory: ./docs
+        run: npm run build
+      - name: Upload Artifacts
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: docs/build/site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2

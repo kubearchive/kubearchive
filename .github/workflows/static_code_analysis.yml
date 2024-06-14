@@ -23,6 +23,13 @@ jobs:
       - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
       - name: Check out repository code
         uses: actions/checkout@v4
+      - name: Install helm
+        uses: azure/setup-helm@v4.2.0
+        with:
+          version: latest
+        id: install
+      - name: Run helm and template locally
+        run: helm template charts/kubearchive/ --output-dir charts/generated
       - name: Run yamllint
         uses: karancode/yamllint-github-action@master
         with:

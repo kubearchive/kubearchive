@@ -1,4 +1,3 @@
-# yamllint disable-file
 {{- range .Values.kubearchive.watchNamespaces }}
 ---
 apiVersion: sources.knative.dev/v1

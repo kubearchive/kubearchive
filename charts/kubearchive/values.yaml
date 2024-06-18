@@ -78,3 +78,6 @@ sink:
   replicas: 1
   # If true, OpenTelemetry instrumention will be enabled for the sink
   observability: false
+
+operator:
+  image: "quay.io/kubearchive/kubearchive-operator:latest"

@@ -11,6 +11,7 @@ on:
 
 jobs:
   renovate:
+    if: github.repository == 'kubearchive/kubearchive'  # Don't run renovate on forks
     runs-on: ubuntu-latest
     steps:
       - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."

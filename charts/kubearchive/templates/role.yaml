@@ -21,4 +21,26 @@ rules:
       - {{ . }}
     {{- end }}
   {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $.Values.sink.name }}
+  namespace: {{ .name }}
+rules:
+  {{- range .role.rules }}
+  - apiGroups:
+    {{- range .apiGroups }}
+      {{- /* quote values in apiGroups so that if empty string is one of the values, helm doesn't remove it */}}
+      - {{ . | quote }}
+    {{- end }}
+    resources:
+    {{- range .resources }}
+      - {{ . }}
+    {{- end }}
+    verbs:
+      - get
+      - list
+      - delete
+  {{- end }}
 {{- end }}

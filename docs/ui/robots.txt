@@ -1,0 +1,4 @@
+# Focus on the main documentation page, don't index specific documentation
+User-agent: *
+Allow: /$
+Disallow: /

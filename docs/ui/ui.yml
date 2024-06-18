@@ -1,0 +1,5 @@
+---
+static_files:
+  - robots.txt
+  - .nojekyll
+  - lunr.js

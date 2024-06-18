@@ -1,0 +1,6 @@
+---
+name: ROOT  # make this the base component
+title: KubeArchive
+version: true  # get the version from the git refname
+nav:
+  - modules/ROOT/nav.adoc

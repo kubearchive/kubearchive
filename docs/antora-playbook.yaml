@@ -1,0 +1,34 @@
+---
+site:
+  title: KubeArchive
+  url: https://kubearchive.github.io/
+  start_page: ROOT::index.adoc
+
+content:
+  sources:
+    - url: ../
+      branches: [HEAD, v*]
+      tags: v*
+      start_path: docs
+      edit_url: false
+
+asciidoc:
+  attributes:
+    experimental: ''
+
+ui:
+  supplemental_files: ./ui
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+
+antora:
+  extensions:
+    - require: '@antora/lunr-extension'
+    - require: ./extensions/lunr-patch.js
+
+output:
+  clean: true
+
+runtime:
+  fetch: true

@@ -1,0 +1,61 @@
+= Contribution Guide
+
+Welcome to the KubeArchive project! We are happy that you find this project
+interesting and want to improve it. There are many ways to contribute:
+
+* Reporting a bug
+* Reporting a security issue
+* Submitting code for a fix or a feature
+* Proposing a new feature
+* Becoming a maintainer
+* Improving the current code
+* Improving the documentation
+
+== Bugs, Features and Security Issues
+
+To submit a bug report or a feature request, use our
+link:https://github.com/kubearchive/kubearchive/issues[Bug Tracker].
+For security reports, use the
+link:https://groups.google.com/g/kubearchive-security[Security Mailing List].
+
+When you submit any of these follow the templates provided by the Bug Tracker or
+otherwise provide:
+
+* A quick summary
+* Specific steps to reproduce the issue
+* What you expected to happen
+* What happened instead
+* Other information: what have you tested, opinions about why it happens, logs...
+
+== Code and Documentation
+
+Before submitting any code or documentation create a GitHub issue in our Bug Tracker,
+so we can discuss and accept or reject the idea.
+
+By contributing to KubeArchive you accept the Developer Certificate of
+Origin (DCO). Agreeing to the DCO means you wrote or otherwise have the right to
+submit the code you submitted. You can read the v1.1 DCO
+link:https://developercertificate.org/[here].
+
+To contribute code and documentation you need to follow the
+link:https://docs.github.com/en/get-started/using-github/github-flow[GitHub Flow]
+with a
+link:https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo[Forked repository].
+We expect you to:
+
+* Add a `Signed-off-by` line in your commits
+* Follow the style guides of the project
+* Add tests to cover your submitted code
+* Lint your code
+* Link the related GitHub issue from our Bug Tracker
+* Provide a Pull Request description
+
+== Important Links
+
+* link:https://github.com/kubearchive/kubearchive/issues[Bug Tracker]
+* link:https://github.com/kubearchive/community/blob/main/CODE_OF_CONDUCT.md[Code of Conduct]
+* link:https://github.com/orgs/kubearchive/discussions[Discussions]
+* link:https://groups.google.com/g/kubearchive[Mailing list]
+* link:https://groups.google.com/g/kubearchive-developers[Developers mailing list]
+* link:https://groups.google.com/g/kubearchive-coc[Code Of Conduct mailing list]
+* link:https://groups.google.com/g/kubearchive-security[Security mailing list]

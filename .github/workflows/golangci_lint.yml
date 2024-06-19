@@ -31,6 +31,8 @@ jobs:
           go-version: stable
       - name: Display Go version
         run: go version
+      - name: Generate operator code
+        run: cmd/operator/generate.sh
       - name: Test Go code
         uses: golangci/golangci-lint-action@v6
         with:

@@ -1,4 +1,3 @@
-# yamllint disable-file
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -7,7 +6,9 @@ metadata:
 rules:
   - apiGroups:
       - authorization.k8s.io
+      - authentication.k8s.io
     resources:
       - subjectaccessreviews
+      - tokenreviews
     verbs:
       - create

@@ -61,6 +61,7 @@ apiServer:
   debug: false
   # If true, OpenTelemetry instrumention will be enabled for the api server
   observability: false
+  testSA: "kubearchive-test-sa"
 
 # values used to create a sink
 sink:
@@ -78,3 +79,6 @@ sink:
   replicas: 1
   # If true, OpenTelemetry instrumention will be enabled for the sink
   observability: false
+
+operator:
+  image: "quay.io/kubearchive/kubearchive-operator:latest"

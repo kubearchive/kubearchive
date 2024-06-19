@@ -45,35 +45,40 @@ Install these tools:
 ## Install KubeArchive
 
 1. Use Helm to install KubeArchive:
-    ```bash
-    helm install kubearchive charts/kubearchive \
-        --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
-        --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink)
-    ```
+   ```bash
+   helm install kubearchive charts/kubearchive -n default \
+       --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
+       --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink)
+   ```
 1. Check that the KubeArchive deployments are Ready:
-    ```bash
-    kubectl get -n kubearchive deployments
-    ```
+   ```bash
+   kubectl get -n kubearchive deployments
+   ```
+   
+1. List the deployed helm chart
+   ```bash
+   helm list -n default  
+   ```
 
 ## Update KubeArchive
 
 After you make changes to the code use Helm to redeploy KubeArchive:
 
 ```bash
-helm upgrade kubearchive charts/kubearchive \
+helm upgrade kubearchive charts/kubearchive -n default \
     --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
     --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink)
 ```
 
-# Uninstall KubeArchive
+## Uninstall KubeArchive
 
 ```bash
-helm uninstall kubearchive
+helm uninstall -n default kubearchive
 ```
 
 ## Generate activity on the KubeArchive sink
 
-By default KubeArchive listens to `Event`s in the `test` namespace.
+By default, KubeArchive listens to `Event`s in the `test` namespace.
 
 1. Generate some activity creating a pod:
     ```bash
@@ -94,10 +99,17 @@ By default KubeArchive listens to `Event`s in the `test` namespace.
     ```bash
     kubectl get -n kubearchive secrets kubearchive-api-server-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
     ```
+   
+1. **[ Optional ]** Create a service account with a specific role to test the REST API.
+   This Helm chart already provides `kubearchive-test-sa` with `view` privileges for testing purposes.
+    
 1. On a new terminal, use `curl` or your browser to perform a query:
     ```bash
-    curl --cacert ca.crt localhost:8081/apis/apps/v1/deployments
+    curl --cacert ca.crt localhost:8081/apis/apps/v1/deployments \
+    -H "Authorization: Bearer $(kubectl create token kubearchive-test-sa)" \
+   https://localhost:8081/apis/apps/v1/deployments
     ```
+
 1. Check the new logs on the KubeArchive API:
     ```bash
     kubectl logs -n kubearchive -l app=kubearchive-api-server
@@ -150,3 +162,12 @@ to start a debugger to which attach from your IDE.
     ```bash
     systemd-run -p Delegate=yes --user --scope kind create cluster
     ```
+1. Using KinD and Podman Desktop. If you get this error:
+   ```
+   Error: failed to publish images: error publishing 
+   ko://github.com/kubearchive/kubearchive/cmd/api: no nodes found for cluster "kind"
+   ```
+   expose the `KIND_CLUSTER_NAME` env variable with the appropriate name of the kind cluster:
+   ```bash
+   export KIND_CLUSTER_NAME=$(kubectl config get-clusters | grep -P '(?<=kind-).*' -o)
+   ```

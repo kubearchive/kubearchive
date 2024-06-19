@@ -6,7 +6,9 @@ metadata:
 rules:
   - apiGroups:
       - authorization.k8s.io
+      - authentication.k8s.io
     resources:
       - subjectaccessreviews
+      - tokenreviews
     verbs:
       - create

@@ -11,3 +11,16 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: {{ .Values.apiServer.name }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.apiServer.testSA }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.apiServer.testSA }}
+    namespace: {{ .Values.kubearchive.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view

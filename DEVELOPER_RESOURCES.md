@@ -51,4 +51,6 @@ performance and behavior.
 Additional software that KubeArchive uses.
 
 * [Helm - Package Managment for Kubernetes](https://helm.sh/)
+* [Kind - Local Kubernetes Cluster](https://kind.sigs.k8s.io/)
+* [Podman Desktop - Includes Kind](https://podman-desktop.io/)
 

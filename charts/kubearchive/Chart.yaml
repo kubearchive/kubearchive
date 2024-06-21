@@ -2,6 +2,7 @@
 apiVersion: v2
 name: kubearchive
 description: A Helm chart that deploys kubearchive on a Kubernetes cluster
+icon: https://avatars.githubusercontent.com/u/153536228?s=48&v=4
 
 # A chart can be either an 'application' or a 'library' chart.
 #

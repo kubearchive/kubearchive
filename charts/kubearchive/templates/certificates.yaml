@@ -4,7 +4,6 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: kubearchive-ca-issuer
-  namespace: {{ .Values.kubearchive.namespace }}
 spec:
   selfSigned: {}
 
@@ -13,7 +12,6 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: kubearchive-ca-certificate
-  namespace: {{ .Values.kubearchive.namespace }}
 spec:
   isCA: true
   commonName: kubearchive-ca-certificate
@@ -31,7 +29,6 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: kubearchive-cert-issuer
-  namespace: {{ .Values.kubearchive.namespace }}
 spec:
   ca:
     secretName: kubearchive-ca-secret
@@ -41,7 +38,6 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: "{{ .Values.apiServer.name }}-certificate"
-  namespace: {{ .Values.kubearchive.namespace }}
 spec:
   isCA: false
   commonName: {{ .Values.apiServer.name }}

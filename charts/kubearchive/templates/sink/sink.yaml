@@ -3,7 +3,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Values.sink.name }}
-  namespace: {{ .Values.kubearchive.namespace }}
 spec:
   replicas: {{ .Values.sink.replicas }}
   selector:

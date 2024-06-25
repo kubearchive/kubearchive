@@ -10,7 +10,6 @@ metadata:
     app.kubernetes.io/created-by: {{ .Values.kubearchive.namespace }}-operator
     app.kubernetes.io/part-of: {{ .Values.kubearchive.namespace }}-operator
   name: {{ .Values.kubearchive.namespace }}-operator-leader-election
-  namespace: {{ .Values.kubearchive.namespace }}
 rules:
   - apiGroups:
       - ""

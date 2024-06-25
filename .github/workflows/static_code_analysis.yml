@@ -14,8 +14,8 @@ permissions:
   contents: read
   pull-requests: read
 jobs:
-  yamllint:
-    name: "YAML lint"
+  helm-lint:
+    name: "Helm lint"
     runs-on: ubuntu-latest
     steps:
       - run: echo "Job triggered by ${{ github.actor }}."
@@ -23,12 +23,15 @@ jobs:
       - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
       - name: Check out repository code
         uses: actions/checkout@v4
-      - name: Install helm
+      - name: Set up Helm
         uses: azure/setup-helm@v4.2.0
         with:
           version: latest
-        id: install
-      - name: Run helm and template locally
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@main
+      - name: Run chart-testing (lint)
+        run: ct lint --charts charts/kubearchive --config ct.yaml
+      - name: Run helm template
         run: helm template charts/kubearchive/ --output-dir charts/generated
       - name: Run yamllint
         uses: karancode/yamllint-github-action@master

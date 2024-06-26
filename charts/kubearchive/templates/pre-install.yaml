@@ -1,0 +1,77 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pre-install-view
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-delete-policy: hook-succeeded
+    helm.sh/hook-weight: "-10"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pre-install-view
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-delete-policy: hook-succeeded
+    helm.sh/hook-weight: "-10"
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: pre-install-view
+  annotations:
+    helm.sh/hook: pre-install
+    helm.sh/hook-delete-policy: hook-succeeded
+    helm.sh/hook-weight: "-10"
+subjects:
+  - kind: ServiceAccount
+    name: pre-install-view
+    namespace: "{{ .Release.Namespace }}"
+    roleRef:
+      kind: ClusterRole
+      name: pre-install-view
+      apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ .Release.Name }}"
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+    app.kubernetes.io/instance: {{ .Release.Name | quote }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+  annotations:
+    # This is what defines this resource as a hook. Without this line, the
+    # job is considered part of the release.
+    helm.sh/hook: pre-install
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: hook-succeeded
+spec:
+  template:
+    metadata:
+      name: "{{ .Release.Name }}"
+      labels:
+        app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
+        app.kubernetes.io/instance: {{ .Release.Name | quote }}
+        helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    spec:
+      serviceAccount: pre-install-view
+      restartPolicy: Never
+      containers:
+        - name: pre-install-cert-manager
+          image: "k8s.gcr.io/hyperkube:v1.18.20"
+          command: ["kubectl", "wait", "pod", "--all", "--for=condition=Ready", "--namespace=cert-manager", "--timeout=30s"]
+        - name: pre-install-knative-eventing
+          image: "k8s.gcr.io/hyperkube:v1.18.20"
+          command: ["kubectl", "wait", "pod", "--all", "--for=condition=Ready", "--namespace=knative-eventing", "--timeout=30s"]

@@ -1,0 +1,20 @@
+= Configuring KubeArchive to Monitor a Namespace
+
+A user can configure KubeArchive to monitor a specific namespace using `ApiServerSource` by creating
+a `KubeArchiveConfig` custom resource similar to the following:
+[source,yaml]
+----
+---
+apiVersion: kubearchive.kubearchive.org/v1alpha1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+  namespace: ns
+spec:
+  resources:
+    - apiVersion: v1
+      kind: Events
+----
+The configuration of `ApiServerSource` is done using the `resources` key of the KubeArchiveConfig custom
+resource. The format of the `resources` key can be found in the `ApiServerSource`
+link:https://knative.dev/docs/eventing/sources/apiserversource/reference/#resources-parameter[reference documentation].

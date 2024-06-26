@@ -10,7 +10,6 @@ metadata:
     app.kubernetes.io/created-by: {{ .Values.kubearchive.namespace }}-operator
     app.kubernetes.io/part-of: {{ .Values.kubearchive.namespace }}-operator
   name: {{ .Values.kubearchive.namespace }}-operator-metrics-service
-  namespace: {{ .Values.kubearchive.namespace }}
 spec:
   ports:
     - name: https

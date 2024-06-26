@@ -3,7 +3,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Values.apiServer.name }}
-  namespace: {{ .Values.kubearchive.namespace }}
 spec:
   replicas: 1
   selector:
@@ -36,7 +35,6 @@ kind: Service
 apiVersion: v1
 metadata:
   name: {{ .Values.apiServer.name }}
-  namespace: {{ .Values.kubearchive.namespace }}
 spec:
   selector:
     app: {{ .Values.apiServer.name }}

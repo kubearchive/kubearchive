@@ -10,7 +10,6 @@ metadata:
     app.kubernetes.io/part-of: {{ .Values.kubearchive.namespace }}-operator
     control-plane: controller-manager
   name: {{ .Values.kubearchive.namespace }}-operator
-  namespace: {{ .Values.kubearchive.namespace }}
 spec:
   replicas: 1
   selector:

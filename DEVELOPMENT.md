@@ -46,7 +46,7 @@ Install these tools:
 
 1. Use Helm to install KubeArchive:
    ```bash
-   helm install kubearchive charts/kubearchive -n default \
+   helm install kubearchive charts/kubearchive --create-namespace -n kubearchive \
        --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
        --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink)
    ```
@@ -57,7 +57,7 @@ Install these tools:
    
 1. List the deployed helm chart
    ```bash
-   helm list -n default  
+   helm list -n kubearchive  
    ```
 
 ## Update KubeArchive
@@ -65,7 +65,7 @@ Install these tools:
 After you make changes to the code use Helm to redeploy KubeArchive:
 
 ```bash
-helm upgrade kubearchive charts/kubearchive -n default \
+helm upgrade kubearchive charts/kubearchive -n kubearchive \
     --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
     --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink)
 ```
@@ -73,7 +73,7 @@ helm upgrade kubearchive charts/kubearchive -n default \
 ## Uninstall KubeArchive
 
 ```bash
-helm uninstall -n default kubearchive
+helm uninstall -n kubearchive kubearchive
 ```
 
 ## Generate activity on the KubeArchive sink

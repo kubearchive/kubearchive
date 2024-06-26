@@ -147,16 +147,16 @@ func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfi
 }
 
 func (r *KubeArchiveConfigReconciler) desiredRole(kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.Role, error) {
+	var rules []rbacv1.PolicyRule
+	for _, resource := range kaconfig.Spec.Resources {
+		rules = append(rules, rbacv1.PolicyRule{APIGroups: []string{resource.APIVersion}, Resources: []string{resource.Kind}, Verbs: []string{"get", "list", "watch"}})
+	}
 	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kaconfig.Name,
 			Namespace: kaconfig.Namespace,
 		},
-		Rules: []rbacv1.PolicyRule{{
-			APIGroups: []string{""},
-			Resources: []string{"events"},
-			Verbs:     []string{"get", "list", "watch"},
-		}},
+		Rules: rules,
 	}
 
 	if err := ctrl.SetControllerReference(kaconfig, role, r.Scheme); err != nil {
@@ -230,8 +230,10 @@ func (r *KubeArchiveConfigReconciler) reconcileApiServerSource(ctx context.Conte
 		return source, err
 	}
 
-	err = r.Get(ctx, types.NamespacedName{Name: kaconfig.Name, Namespace: kaconfig.Namespace}, &sourcesv1.ApiServerSource{})
+	existing := &sourcesv1.ApiServerSource{}
+	err = r.Get(ctx, types.NamespacedName{Name: kaconfig.Name, Namespace: kaconfig.Namespace}, existing)
 	if err == nil {
+		source.SetResourceVersion(existing.GetResourceVersion())
 		err = r.Update(ctx, source)
 		if err != nil {
 			log.Error(err, "Failed to update ApiServerSource")
@@ -264,10 +266,7 @@ func (r *KubeArchiveConfigReconciler) desiredApiServerSource(kaconfig *kubearchi
 		Spec: sourcesv1.ApiServerSourceSpec{
 			EventMode:          "Resource",
 			ServiceAccountName: kaconfig.Name,
-			Resources: []sourcesv1.APIVersionKindSelector{{
-				APIVersion: "v1",
-				Kind:       "Event",
-			}},
+			Resources:          kaconfig.Spec.Resources,
 			SourceSpec: duckv1.SourceSpec{
 				Sink: duckv1.Destination{
 					Ref: &duckv1.KReference{

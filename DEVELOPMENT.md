@@ -59,7 +59,8 @@ Install these tools:
    ```bash
    helm install kubearchive charts/kubearchive --create-namespace -n kubearchive \
        --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
-       --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink)
+       --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
+       --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator)
    ```
 1. Check that the KubeArchive deployments are Ready:
    ```bash
@@ -78,7 +79,8 @@ After you make changes to the code use Helm to redeploy KubeArchive:
 ```bash
 helm upgrade kubearchive charts/kubearchive -n kubearchive \
     --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
-    --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink)
+    --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
+    --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator)
 ```
 
 ## Uninstall KubeArchive
@@ -156,7 +158,8 @@ to start a debugger to which attach from your IDE.
    --set apiServer.debug=true \
    --set-string apiServer.image=$(KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest \
    ko build --disable-optimizations github.com/kubearchive/kubearchive/cmd/api) \
-   --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink)
+   --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
+   --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator)
    ```
 
 1. Forward the ports 8081 and 40000 from the Pod directly:

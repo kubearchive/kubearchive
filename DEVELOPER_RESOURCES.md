@@ -54,3 +54,17 @@ Additional software that KubeArchive uses.
 * [Kind - Local Kubernetes Cluster](https://kind.sigs.k8s.io/)
 * [Podman Desktop - Includes Kind](https://podman-desktop.io/)
 
+To interact directly with the database:
+* psql
+    ```bash
+    $ sudo dnf install postgresql
+    $ psql --version
+    psql (PostgreSQL) 15.6
+    ```
+
+A SQL client is recommended to interact easily with the database. For example [DBeaver Community](https://dbeaver.io/). To configure DBeaver, check these 
+[instructions](https://github.com/kubearchive/kubearchive/blob/main/database/README.md).
+
+If you use a Professional version of a Jetbrains IDE like `Goland` it already provides a built-in 
+[SQL client](https://www.jetbrains.com/help/go/relational-databases.html).
+

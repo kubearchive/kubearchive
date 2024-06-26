@@ -5,24 +5,40 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
 	_ "github.com/lib/pq"
 	"os"
 )
 
+type flags struct {
+	DatabaseName     string
+	DatabaseUser     string
+	DatabasePassword string
+}
+
+var defaultValues = &flags{
+	DatabaseName:     "postgresdb",
+	DatabaseUser:     "ps_user",
+	DatabasePassword: "P0stgr3sdbP@ssword", // notsecret
+}
+
 const (
-	host     = "localhost"
-	port     = 5432
-	user     = "" // the db_user from postgres-secret.yaml, ie: "admin", "ps_user".
-	password = "" // the db_password from postgres-secret.yaml
-	dbname   = "" // the db_name from postgres-secret.yaml, ie: "postgres", "test_db".
+	host = "localhost"
+	port = 5432
 )
 
 func main() {
+	var flagValues flags
+	flag.StringVar(&flagValues.DatabaseName, "database-name", defaultValues.DatabaseName, "PostgreSQL database name")
+	flag.StringVar(&flagValues.DatabaseUser, "database-user", defaultValues.DatabaseUser, "PostgreSQL database user")
+	flag.StringVar(&flagValues.DatabasePassword, "database-password", defaultValues.DatabasePassword, "PostgreSQL database password")
+	flag.Parse()
+
 	// connect to the DB.
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname)
+		host, port, flagValues.DatabaseUser, flagValues.DatabasePassword, flagValues.DatabaseName)
 
 	// postgres is the driver type.
 	db, err := sql.Open("postgres", psqlInfo)
@@ -34,7 +50,7 @@ func main() {
 
 	// SQL instruction to create a table.
 	sqlStatement := `
-	CREATE TABLE public.test_objects (
+	CREATE TABLE IF NOT EXISTS public.test_objects (
 		"id" serial PRIMARY KEY,
 		"api_version" varchar NOT NULL,
 		"kind" varchar NOT NULL,

@@ -59,7 +59,7 @@ apiServer:
   # KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest ko build --disable-optimizations \
   # github.com/kubearchive/kubearchive/cmd/api
   debug: false
-  # If true, OpenTelemetry instrumention will be enabled for the api server
+  # If true, OpenTelemetry instrumentation will be enabled for the api server
   observability: false
   testSA: "kubearchive-test-sa"
 
@@ -77,8 +77,35 @@ sink:
   targetPort: 8080
   # number of kubearchive sink pods that should be deployed
   replicas: 1
-  # If true, OpenTelemetry instrumention will be enabled for the sink
+  # If true, OpenTelemetry instrumentation will be enabled for the sink
   observability: false
 
 operator:
   image: "quay.io/kubearchive/kubearchive-operator:latest"
+
+# values used to create a PostgreSQL database
+database:
+  name: "postgresql"
+  # number of database pods that should be deployed
+  replicaCount: 1
+  # database container image
+  image:
+    repository: postgres
+    pullPolicy: IfNotPresent
+    tag: "16"
+  # database volumes
+  volumes:
+    name: ""
+    storage: "5Gi"
+  # database service
+  service:
+    type: NodePort
+    port: 5432
+  # database basic configuration
+  postgresData:
+    # database name
+    dbName: ""
+    # database user
+    dbUser: ""
+    # database password
+    dbPassword: ""

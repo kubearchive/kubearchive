@@ -151,6 +151,20 @@ to start a debugger to which attach from your IDE.
    curl localhost:8081/apis/apps/v1/deployments
    ```
 
+## Database
+
+### Create a Table and Populate the Database
+
+1.  Create a port-forward in a new terminal tab.
+    ```bash
+    kubectl port-forward -n kubearchive svc/postgres 5432:5432
+     ```
+1.  Populate the database with test objects.
+    ```bash
+    cd database
+    go run init_db.go
+    ```
+
 ## Known issues
 
 1. Using KinD and podman. If you get this error:

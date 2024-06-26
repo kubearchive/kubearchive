@@ -32,32 +32,3 @@ metadata:
 spec:
   ca:
     secretName: kubearchive-ca-secret
-
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: "{{ .Values.apiServer.name }}-certificate"
-spec:
-  isCA: false
-  commonName: {{ .Values.apiServer.name }}
-  secretName: "{{ .Values.apiServer.name }}-tls"
-  duration: 720h  # 30 days
-  renewBefore: 360h  # 15 days
-  subject:
-    organizations:
-      - kubearchive
-  privateKey:
-    algorithm: ECDSA
-    size: 256
-  usages:
-    - digital signature
-    - key encipherment
-  dnsNames:
-    - localhost
-    - {{ .Values.apiServer.name }}
-    - "{{ .Values.apiServer.name }}.{{ .Values.kubearchive.namespace }}.svc"
-  issuerRef:
-    name: kubearchive-cert-issuer
-    kind: Issuer
-    group: cert-manager.io

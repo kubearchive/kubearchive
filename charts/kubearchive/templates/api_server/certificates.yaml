@@ -1,0 +1,28 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "{{ tpl .Values.apiServer.cert . }}"
+spec:
+  isCA: false
+  commonName: {{ tpl .Values.apiServer.name . }}
+  secretName: "{{ tpl .Values.apiServer.secret . }}"
+  duration: 720h  # 30 days
+  renewBefore: 360h  # 15 days
+  subject:
+    organizations:
+      - {{ .Release.Name }}
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  usages:
+    - digital signature
+    - key encipherment
+  dnsNames:
+    - localhost
+    - {{ tpl .Values.apiServer.name . }}
+    - "{{ tpl .Values.apiServer.name . }}.{{ .Release.Namespace }}.svc"
+  issuerRef:
+    name: {{ .Release.Name }}
+    kind: Issuer
+    group: cert-manager.io

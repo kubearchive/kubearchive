@@ -2,24 +2,24 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ .Values.apiServer.name }}
+  name: {{ tpl .Values.apiServer.name . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ .Values.apiServer.name }}
-    namespace: {{ .Values.kubearchive.namespace }}
+    name: {{ tpl .Values.apiServer.name . }}
+    namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ .Values.apiServer.name }}
+  name: {{ tpl .Values.apiServer.name . }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ .Values.apiServer.testSA }}
+  name: {{ tpl .Values.apiServer.testSA . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ .Values.apiServer.testSA }}
-    namespace: {{ .Values.kubearchive.namespace }}
+    name: {{ tpl .Values.apiServer.testSA . }}
+    namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole

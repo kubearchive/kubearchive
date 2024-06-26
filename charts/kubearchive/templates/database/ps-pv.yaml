@@ -1,0 +1,18 @@
+# yamllint disable rule:braces
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  labels:
+    type: local
+    app: {{ .Values.database.name | default "postgresql" }}
+  name: {{ .Values.database.name | default "postgresql" }}-volume
+  namespace: {{ .Values.kubearchive.namespace }}
+spec:
+  storageClassName: manual
+  capacity:
+    storage: {{ .Values.database.volumes.storage | default "5Gi" }}
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: /data/postgresql

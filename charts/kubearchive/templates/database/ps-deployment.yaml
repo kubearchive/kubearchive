@@ -1,0 +1,35 @@
+# yamllint disable rule:braces
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ .Values.database.name | default "postgresql" }}
+  name: {{ .Values.database.name | default "postgresql" }}-deployment
+  namespace: {{ .Values.kubearchive.namespace }}
+spec:
+  replicas: {{ .Values.database.replicaCount | default 1}}
+  selector:
+    matchLabels:
+      app: {{ .Values.database.name | default "postgresql"}}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.database.name | default "postgresql" }}
+    spec:
+      containers:
+        - name: {{ .Values.database.name | default "postgresql" }}
+          image: "{{ .Values.database.image.repository }}:{{ .Values.database.image.tag }}"
+          imagePullPolicy: {{ .Values.database.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.database.service.port }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.database.name | default "postgresql" }}-secret
+          volumeMounts:
+            - mountPath: "/var/lib/postgresql/data"
+              name: {{ .Values.database.volumes.name | default "postgresdata" }}
+      volumes:
+        - name: {{ .Values.database.volumes.name | default "postgresdata" }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.database.name | default "postgresql" }}-volume-claim

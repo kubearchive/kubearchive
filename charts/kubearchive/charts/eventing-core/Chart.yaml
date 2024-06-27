@@ -1,0 +1,5 @@
+---
+apiVersion: v2
+name: eventing-core
+description: A Helm chart that deploys eventing-core
+version: 1.0.0

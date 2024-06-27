@@ -47,9 +47,10 @@ kubearchive:
           - apiVersion: v1
             kind: Event
 
+
 # values used to create the api-server
 apiServer:
-  name: "kubearchive-api-server"
+  name: "{{ .Release.Name }}-api-server"
   # NOTE - Helm does not resolve the `ko` path. The path needs to be set on the `helm install` command.
   # For example:
   # helm install -n default <chart-name> charts/kubearchive \
@@ -61,7 +62,11 @@ apiServer:
   debug: false
   # If true, OpenTelemetry instrumentation will be enabled for the api server
   observability: false
-  testSA: "kubearchive-test-sa"
+  # NOTE - This resource must include the certificate suffix to work
+  cert: "{{ tpl .Values.apiServer.name . }}-certificate"
+  secret: "{{ tpl .Values.apiServer.name . }}-tls"
+  port: 8081
+  testSA: "{{ .Release.Name }}-test"
 
 # values used to create a sink
 sink:

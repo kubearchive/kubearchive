@@ -106,7 +106,7 @@ By default, KubeArchive listens to `Event`s in the `test` namespace.
 1. On a new terminal, use `curl` or your browser to perform a query:
     ```bash
     curl --cacert ca.crt localhost:8081/apis/apps/v1/deployments \
-    -H "Authorization: Bearer $(kubectl create token kubearchive-test-sa)" \
+    -H "Authorization: Bearer $(kubectl create token kubearchive-test)" \
    https://localhost:8081/apis/apps/v1/deployments
     ```
 

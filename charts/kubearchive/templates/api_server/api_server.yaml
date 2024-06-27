@@ -2,23 +2,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.apiServer.name }}
+  name: {{ tpl .Values.apiServer.name . }}
 spec:
   replicas: 1
   selector:
     matchLabels: &labels
-      app: {{ .Values.apiServer.name}}
+      app: {{ tpl .Values.apiServer.name . }}
   template:
     metadata:
       labels: *labels
     spec:
-      serviceAccountName: {{ .Values.apiServer.name }}
+      serviceAccountName: {{ tpl .Values.apiServer.name . }}
       volumes:
         - name: tls-secret
           secret:
-            secretName: {{ .Values.apiServer.name }}-tls
+            secretName: {{ tpl .Values.apiServer.secret . }}
       containers:
-        - name: {{ .Values.apiServer.name }}
+        - name: {{ tpl .Values.apiServer.name . }}
           image: {{ .Values.apiServer.image }}
           volumeMounts:
             - name: tls-secret
@@ -34,11 +34,11 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: {{ .Values.apiServer.name }}
+  name: {{ tpl .Values.apiServer.name . }}
 spec:
   selector:
-    app: {{ .Values.apiServer.name }}
+    app: {{ tpl .Values.apiServer.name . }}
   ports:
     - protocol: TCP
-      port: 8081
-      targetPort: 8081
+      port: {{ .Values.apiServer.port }}
+      targetPort: {{ .Values.apiServer.port }}

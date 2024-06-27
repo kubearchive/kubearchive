@@ -76,6 +76,18 @@ helm upgrade kubearchive charts/kubearchive -n kubearchive \
 helm uninstall -n kubearchive kubearchive
 ```
 
+## Initialize the database
+
+1.  Create a port-forward in a new terminal tab.
+    ```bash
+    kubectl port-forward -n kubearchive svc/postgresql 5432:5432
+    ```
+2.  Populate the database with test objects.
+    ```bash
+    cd database
+    go run init_db.go
+    ```
+
 ## Generate activity on the KubeArchive sink
 
 By default, KubeArchive listens to `Event`s in the `test` namespace.
@@ -106,7 +118,7 @@ By default, KubeArchive listens to `Event`s in the `test` namespace.
 1. On a new terminal, use `curl` or your browser to perform a query:
     ```bash
     curl --cacert ca.crt localhost:8081/apis/apps/v1/deployments \
-    -H "Authorization: Bearer $(kubectl create token kubearchive-test)" \
+    -H "Authorization: Bearer $(kubectl create token kubearchive-test -n kubearchive)" \
    https://localhost:8081/apis/apps/v1/deployments
     ```
 
@@ -155,20 +167,6 @@ to start a debugger to which attach from your IDE.
    ```bash
    curl localhost:8081/apis/apps/v1/deployments
    ```
-
-## Database
-
-### Create a Table and Populate the Database
-
-1.  Create a port-forward in a new terminal tab.
-    ```bash
-    kubectl port-forward -n kubearchive svc/postgres 5432:5432
-     ```
-1.  Populate the database with test objects.
-    ```bash
-    cd database
-    go run init_db.go
-    ```
 
 ## Known issues
 

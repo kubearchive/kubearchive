@@ -23,6 +23,6 @@ spec:
     - {{ tpl .Values.apiServer.name . }}
     - "{{ tpl .Values.apiServer.name . }}.{{ .Release.Namespace }}.svc"
   issuerRef:
-    name: {{ .Release.Name }}
+    name: kubearchive-cert-issuer
     kind: Issuer
     group: cert-manager.io

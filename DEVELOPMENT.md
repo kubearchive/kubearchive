@@ -139,11 +139,6 @@ go test -v ./... -tags=integration
 Use [delve](https://golangforall.com/en/post/go-docker-delve-remote-debug.html)
 to start a debugger to which attach from your IDE.
 
-1. Build the dependencies of the chart
-   ```bash
-   helm dependency build charts/kubearchive
-   ```
-
 1. Deploy the chart with `ko` and `helm` in debug mode using an image with `delve`:
    ```bash
    helm install -n default [deployment name] charts/kubearchive \ 

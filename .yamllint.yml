@@ -4,7 +4,6 @@
 extends: default
 ignore:
   - charts/kubearchive/
-  - charts/generated/kubearchive/charts/
 rules:
   line-length: disable
   truthy: disable

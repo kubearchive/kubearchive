@@ -31,4 +31,14 @@ jobs:
         with:
           token: '${{ steps.get_token.outputs.token }}'
         env:
+          # run renovate on this repo
+          RENOVATE_REPOSITORIES: ${{ github.repository }}
+          # renovate will generate an onboarding PR after the first run
+          RENOVATE_ONBOARDING: "true"
+          # username needed for Github auth (Github app name + "[bot]")
+          RENOVATE_USERNAME: "kubearchive-renovate[bot]"
+          # git commit author. Format is: Github app name <id+RENOVATE_USERNAME@users.noreply.github.com>
+          # id can be retreived from https://api.github.com/users/kubearchive-renovate[bot]
+          RENOVATE_GIT_AUTHOR: "kubearchive-renovate <171263778+kubearchive-renovate[bot]@users.noreply.github.com>"
+          # renovate will create signed commits
           RENOVATE_PLATFORM_COMMIT: "true"

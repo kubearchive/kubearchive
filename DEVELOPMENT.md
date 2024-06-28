@@ -41,6 +41,16 @@ Install these tools:
     ```bash
     export KO_DOCKER_REPO="kind.local"
     ```
+   
+1. Install knative-events and cert-manager operators
+   ```bash
+   export CERT_MANAGER_VERSION=v1.9.1
+   export KNATIVE_EVENTING_VERSION=v1.14.3
+  
+   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml 
+   kubectl apply -f https://github.com/knative/eventing/releases/download/knative-${KNATIVE_EVENTING_VERSION}/eventing-crds.yaml
+   kubectl apply -f https://github.com/knative/eventing/releases/download/knative-${KNATIVE_EVENTING_VERSION}/eventing-core.yaml
+   ```
 
 ## Install KubeArchive
 
@@ -127,11 +137,6 @@ go test -v ./... -tags=integration
 Use [delve](https://golangforall.com/en/post/go-docker-delve-remote-debug.html)
 to start a debugger to which attach from your IDE.
 
-1. Build the dependencies of the chart
-   ```bash
-   helm dependency build charts/kubearchive
-   ```
-
 1. Deploy the chart with `ko` and `helm` in debug mode using an image with `delve`:
    ```bash
    helm install -n default [deployment name] charts/kubearchive \ 
@@ -172,16 +177,18 @@ to start a debugger to which attach from your IDE.
 
 ## Known issues
 
-1. Using KinD and podman. If you get this error:
-    ```
-    ERROR: failed to create cluster: running kind with rootless provider requires
-    setting systemd property "Delegate=yes", see https://kind.sigs.k8s.io/docs/user/rootless/
-    ```
-    try creating the cluster with this command:
-    ```bash
-    systemd-run -p Delegate=yes --user --scope kind create cluster
-    ```
-1. Using KinD and Podman Desktop. If you get this error:
+* ### Using KinD and podman. If you get this error:
+   ```
+   ERROR: failed to create cluster: running kind with rootless provider requires
+   setting systemd property "Delegate=yes", see https://kind.sigs.k8s.io/docs/user/rootless/
+   ```
+   try creating the cluster with this command:
+
+   ```bash
+   systemd-run -p Delegate=yes --user --scope kind create cluster
+   ```
+
+* ### Using KinD and Podman Desktop. If you get this error:
    ```
    Error: failed to publish images: error publishing 
    ko://github.com/kubearchive/kubearchive/cmd/api: no nodes found for cluster "kind"
@@ -190,3 +197,18 @@ to start a debugger to which attach from your IDE.
    ```bash
    export KIND_CLUSTER_NAME=$(kubectl config get-clusters | grep -P '(?<=kind-).*' -o)
    ```
+* ### Installing kubearchive helm chart just after `cert-manager` operator resources are applied
+   ```
+   Error: INSTALLATION FAILED: Internal error occurred: 
+   failed calling webhook "webhook.cert-manager.io": 
+   failed to call webhook: Post "https://cert-manager-webhook.cert-manager.svc:443/validate?timeout=30s": 
+   dial tcp 10.96.43.29:443: connect: connection refused
+   ```
+   wait until the cert-manager-webhook deployment successfully rolled out before installing kubearchive helm chart:
+   ```bash
+   kubectl rollout -n cert-manager status deployment cert-manager-webhook
+   ```
+   **[NOTE]**: Waiting for the pods with 
+   `kubectl wait pod --all --for=condition=Ready --namespace=cert-manager`
+   works too, but you may face an error if the command is run before the pods are created.
+  

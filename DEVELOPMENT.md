@@ -42,6 +42,17 @@ Install these tools:
     export KO_DOCKER_REPO="kind.local"
     ```
 
+1. Install knative-eventing core and cert-manager and wait for them to be ready:
+    ```bash
+    export CERT_MANAGER_VERSION=v1.9.1
+    export KNATIVE_EVENTING_VERSION=v1.14.3
+
+    kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml
+    kubectl apply -f https://github.com/knative/eventing/releases/download/knative-${KNATIVE_EVENTING_VERSION}/eventing-core.yaml
+    kubectl rollout status deployment --namespace=cert-manager --timeout=30s
+    kubectl rollout status deployment --namespace=knative-eventing --timeout=30s
+    ```
+
 ## Install KubeArchive
 
 1. Use Helm to install KubeArchive:

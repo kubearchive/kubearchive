@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -21,11 +22,20 @@ import (
 )
 
 const (
-	connStr             = "user=kubearchive password=kubearchive dbname=kubearchive-db host=postgres.database.svc.cluster.local port=5432 sslmode=disable"
+	connStrTpl = "user=%s password=%s dbname=%s host=%s port=%s sslmode=disable"
+
 	apiVersionExtension = "apiversion"
 	kindExtension       = "kind"
 	nameExtension       = "name"
 	namespaceExtension  = "namespace"
+
+	DbNameEnvVar     = "POSTGRES_DB"
+	DbUserEnvVar     = "POSTGRES_USER"
+	DbPasswordEnvVar = "POSTGRES_PASSWORD"
+	DbUrlEnvVar      = "POSTGRES_URL"
+	DbPortEnvVar     = "POSTGRES_PORT"
+
+	dbConnectionErrStr = "Could not create database connection string: %s must be set"
 )
 
 var (
@@ -43,6 +53,21 @@ type ResourceData struct {
 	Created     string           `json:"firstTimestamp"`
 	LastUpdated string           `json:"lastTimestamp"`
 	Metadata    ResourceMetadata `json:"metadata"`
+}
+
+// reads database connection info from the following environment variables: POSTGRES_DB, POSTGRES_USER,
+// POSTGRES_PASSWORD, POSTGRES_URL, and POSTGRES_PORT. Then returns an SQL database connection string. If any of these
+// environment variable were not set, it returns an error.
+func dbConnectionStr() (string, error) {
+	dbName, exists := os.LookupEnv(DbNameEnvVar)
+	if !exists {
+		return "", fmt.Errorf(dbConnectionErrStr, DbNameEnvVar)
+	}
+	dbUser, exists := os.LookupEnv(DbUserEnvVar)
+	if !exists {
+		return "", fmt.Errorf(dbConnectionErrStr, DbUserEnvVar)
+	}
+	return fmt.Sprintf(connStrTpl, dbUser, dbPassword, dbName, dbUrl, dbPort), nil
 }
 
 // checks that the cloudevents has the appropriate extensions set and have values that are the right type. Additionally

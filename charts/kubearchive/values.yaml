@@ -114,3 +114,4 @@ database:
     dbUser: ""
     # database password
     dbPassword: ""
+  secretName: {{ .Values.database.name | default "postgresql"}}-secret

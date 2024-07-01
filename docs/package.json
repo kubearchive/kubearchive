@@ -1,7 +1,7 @@
 {
   "devDependencies": {
     "@antora/lunr-extension": "1.0.0-alpha.8",
-    "antora": "3.1.7",
+    "antora": "3.1.8",
     "http-server": "14.1.1"
   },
   "scripts": {

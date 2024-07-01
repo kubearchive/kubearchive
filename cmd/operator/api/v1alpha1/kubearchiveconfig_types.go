@@ -5,11 +5,12 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
 // KubeArchiveConfigSpec defines the desired state of KubeArchiveConfig
 type KubeArchiveConfigSpec struct {
-	Filter string `json:"filter,omitempty"`
+	Resources []sourcesv1.APIVersionKindSelector `json:"resources,omitempty"`
 }
 
 // KubeArchiveConfigStatus defines the observed state of KubeArchiveConfig

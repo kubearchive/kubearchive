@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -149,7 +150,12 @@ func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfi
 func (r *KubeArchiveConfigReconciler) desiredRole(kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.Role, error) {
 	var rules []rbacv1.PolicyRule
 	for _, resource := range kaconfig.Spec.Resources {
-		rules = append(rules, rbacv1.PolicyRule{APIGroups: []string{resource.APIVersion}, Resources: []string{resource.Kind}, Verbs: []string{"get", "list", "watch"}})
+		apiGroup := ""
+		slash := strings.Index(resource.APIVersion, "/")
+		if slash > -1 {
+			apiGroup = resource.APIVersion[:slash]
+		}
+		rules = append(rules, rbacv1.PolicyRule{APIGroups: []string{apiGroup}, Resources: []string{strings.ToLower(resource.Kind)}, Verbs: []string{"get", "list", "watch"}})
 	}
 	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{

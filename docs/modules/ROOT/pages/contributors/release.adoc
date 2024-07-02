@@ -1,0 +1,103 @@
+= Release Process
+
+This document explains things related to the KubeArchive release.
+
+== Commits
+
+The KubeArchive release process scans commits from the latest tag up to the current
+commit. The commits must mention the GitHub Pull Requests they come from on their
+title (first line). A commit merged from the Pull Request with ID 100 should have
+this title:
+
+[source,text]
+----
+Add feature A (#100)
+----
+
+The Pull Request mention is added by default when the commits are squashed on
+Pull Request merge.
+
+== Pull Request Labels
+
+KubeArchive follows the
+link:https://semver.org/[Semantic Versioning]
+system with a leading `v`: `vMAJOR.MINOR.PATCH`. To summarize, `MAJOR` releases
+break user-facing interfaces, `MINOR` releases introduce new features and `PATCH`
+versions introduce bugfixes or documentation changes.
+
+To decide the next version the KubeArchive release process relies on the labels
+on the GitHub Pull Requests since the latest release. The following labels impact
+which number is assigned to the next release:
+
+* `kind/breaking`: next release is a MAJOR version. MINOR and PATCH numbers are reset to 0.
+* `kind/feature`: if `kind/breaking` is not present, next release is a MINOR version.
+PATCH number is reset to 0.
+* `kind/documentation` and `kind/bug`: if `kind/breaking` and `kind/feature` are
+not present, next release is a PATCH version.
+
+Pull Request require at least one of these labels.
+
+== Release Notes
+
+The KubeArchive release process creates release notes for users. These notes are
+generated from the GitHub Pull Requests that contain a code block annotated with
+`release-note`:
+
+[source,text]
+----
+```release-note
+Introduced new feature called `feature-a`. To enable it, set to `true` the
+`feature-a` flag in the `feature-flags` ConfigMap in the `kubearchive` namespace.
+```
+----
+
+To skip the Pull Request for release notes the block must contain the string `NONE`:
+
+[source,text]
+----
+```release-note
+NONE
+```
+----
+
+== Steps
+
+. Merge the changes needed into `main`.
+. Make sure the latest commit in `main` has passed every test.
+. Go to the Actions tab on the KubeArchive repository.
+. Trigger the "Release" workflow.
+
+== Side-effects
+
+. A release commit is created adding the `VERSION` and `charts/kubearchive/Chart.yaml` files.
+. A release tag is created from the release commit.
+. A GitHub release is created from the release tag.
+. Images are pushed with the `latest` and `<version>` tags to https://quay.io/kubearchive.
+. The Helm chart is pushed to https://quay.io/kubearchive.
+
+== Testing
+
+The release workflow is prepared to be run within forks. First you need to set the
+following variables in your fork:
+
+* `OCI_REPOSITORY`: string exported as `KO_DOCKER_REPO` to upload images and used
+in the `helm push` step as `oci://${OCI_REPOSITORY}`.
+
+And the following secrets:
+
+* `OCI_USERNAME`: username to authenticate with `ko login` and `helm registry login`
+* `OCI_PASSWORD`: password to authenticate with `ko login` and `helm registry login`
+
+To revert the effects of testing:
+
+. Delete the tag and release it creates from the GitHub web interface.
+
+== Notes
+
+. The release process uses the Kubernetes tool
+link:https://github.com/kubernetes/release/tree/master/cmd/release-notes[release-notes].
+Using this tool delegates complexity but makes us follow certain practices such as using
+`kind/*` labels on GitHub Pull Requests.
+. The Helm chart version uses the same version as the application. This reduces
+the complexity of the release version calculation, as the automation does not need
+to differentiate between chart and application changes.

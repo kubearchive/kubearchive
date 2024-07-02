@@ -1,0 +1,81 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: Release
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Install tools
+        run: |
+          go install k8s.io/release/cmd/release-notes@latest
+          go install github.com/mikefarah/yq/v4@latest
+      - name: Generate notes
+        run: |
+          export ORG=kubearchive
+          export REPO=kubearchive
+          export BRANCH=main
+          export CURR_VERSION=$(cat ./VERSION)
+
+          export START_SHA=$(git rev-list -n1 ${CURR_VERSION})
+          export END_SHA=$(git rev-list -n1 ${BRANCH})
+
+          release-notes generate --required-author="" --format json --output ./release-notes.json
+          release-notes generate--required-author="" --output ./release-notes.md --dependencies=false
+
+          go run hack/get-next-version.go --release-notes-file ./release-notes.json --current-version ${CURR_VERSION} > ./VERSION
+
+          export NEXT_VERSION=$(cat ./VERSION)
+
+          echo -e "# Release notes for ${NEXT_VERSION}\n" >> ./release-notes/${NEXT_VERSION}.md
+          cat ./release-notes.md >> ./release-notes/${NEXT_VERSION}.md
+          rm ./release-notes.md
+
+          echo "NEXT_VERSION=${NEXT_VERSION}" >> ${GITHUB_ENV}
+      - name: Update Helm chart versions
+        run: |
+          ./bin/yq e -i '.appVersion=env(NEXT_VERSION)' charts/kubearchive/Chart.yaml
+          ./bin/yq e -i '.version=env(NEXT_VERSION)' charts/kubearchive/Chart.yaml
+      - name: Add and commit files
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          git add VERSION charts/kubearchive/Chart.yaml
+          git commit -s -m "Release ${NEXT_VERSION}"
+          git tag -a "${NEXT_VERSION}" -m "Release ${NEXT_VERSION}"
+          git push
+          git push --tags
+      - name: Build and push images
+        run: |
+          export KO_DOCKER_REPO="${{ vars.OCI_REPOSITORY }}"
+
+          bash cmd/operator/generate.sh
+
+          ko login ${{ vars.OCI_REPOSITORY }} --username ${{ secrets.OCI_USERNAME }} --password ${{ secrets.OCI_PASSWORD }}
+          ko build github.com/kubearchive/kubearchive/cmd/sink --tags=${NEXT_VERSION}
+          ko build github.com/kubearchive/kubearchive/cmd/api --tags=${NEXT_VERSION}
+          ko build github.com/kubearchive/kubearchive/operator/cmd/ --tags=${NEXT_VERSION}
+      - name: Build and push the Helm chart
+        run: |
+          helm registry login --username ${{ vars.OCI_REPOSITORY }} ${{ secrets.OCI_USERNAME }} --password ${{ secrets.OCI_PASSWORD }}
+          helm package charts/kubearchive
+          helm push kubearchive-helm-${NEXT_VERSION}.tgz oci://${{ vars.OCI_REPOSITORY }}
+      - name: Create release
+        run: |
+          gh release create "${NEXT_VERSION}" --notes-file ./release-notes/${NEXT_VERSION}.md --title "Release ${NEXT_VERSION}"
+        env:
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

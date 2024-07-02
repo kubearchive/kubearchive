@@ -14,6 +14,20 @@ permissions:
   contents: read
   pull-requests: read
 jobs:
+  pr-check:
+    name: Pull Request Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install 'release-notes'
+        run: |
+          mkdir bin
+          GOBIN=${PWD}/bin go install k8s.io/release/cmd/release-notes@latest
+      - name: Check PR
+        run: |
+          export ORG=kubearchive
+          export REPO=kubearchive
+
+          ./bin/release-notes check --pr ${{ github.event.number }}
   helm-lint:
     name: "Helm lint"
     runs-on: ubuntu-latest

@@ -38,4 +38,6 @@ build/
 charts/kubearchive/crds/kubearchive.kubearchive.org_kubearchiveconfigs.yaml
 charts/kubearchive/templates/operator/role.yaml
 zz_generated.*
-cmd/operator/bin
+bin/
+release-notes.md
+release-notes.json

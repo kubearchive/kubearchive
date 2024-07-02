@@ -51,8 +51,8 @@ spec:
             - --metrics-bind-address=127.0.0.1:8080
             - --leader-elect
           command:
-            - /manager
-          image: quay.io/kubearchive/operator/0.0.1:latest
+            - /ko-app/operator
+          image: {{ .Values.operator.image }}
           livenessProbe:
             httpGet:
               path: /healthz

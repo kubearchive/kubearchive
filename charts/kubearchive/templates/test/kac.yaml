@@ -1,0 +1,10 @@
+---
+apiVersion: kubearchive.kubearchive.org/v1alpha1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+  namespace: test
+spec:
+  resources:
+    - apiVersion: v1
+      kind: Events

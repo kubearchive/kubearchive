@@ -11,42 +11,6 @@ kubearchive:
   roleBinding: "kubearchive"
   # Name of Service Account
   serviceAccount: "kubearchive"
-  # namespaces that kubearchive will watch for archivable resources with their configuration
-  watchNamespaces:
-    - name: test
-      # if true, the namespace will be created
-      create: true
-      # values used to create the Role in the namespace
-      role:
-        name: "kubearchive"
-        # rules give the service account used by ApiServerSource ability to watch specific resources
-        # on the cluster.
-        rules:
-          # the API group the resources are a part of. "" indicates the core API group
-          - apiGroups:
-            - ""       # yamllint disable-line rule:indentation
-            # resources that the role gives permission to
-            resources:
-              - events
-            # actions on the resource that the role gives permissions to
-            verbs:
-              - get
-              - list
-              - watch
-      # values used to create a knative-eventing ApiServerSource
-      apiServerSource:
-        name: "api-server-source"
-        # can be Resource or Reference or Resource
-        # Reference means that a reference to the resource is include in the cloud event
-        # Resource means that the full resource is included in the cloud event
-        mode: "Resource"
-        resources:
-          # apiVersion and kind of the resource that ApiServerSource should watch.
-          # The list can contain more than one resource. Make sure that the Role provides
-          # appropriate perms for the resources here.
-          - apiVersion: v1
-            kind: Event
-
 
 # values used to create the api-server
 apiServer:
@@ -86,7 +50,11 @@ sink:
   observability: false
 
 operator:
-  image: "quay.io/kubearchive/kubearchive-operator:latest"
+  # NOTE - Helm does not resolve the `ko` path. The path needs to be set on the `helm install` command.
+  # For example:
+  # helm install -n default <chart-name> charts/kubearchive \
+  # --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator)
+  image: ko://github.com/kubearchive/kubearchive/cmd/operator
 
 # values used to create a PostgreSQL database
 database:

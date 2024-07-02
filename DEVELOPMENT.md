@@ -53,6 +53,11 @@ Install these tools:
     kubectl rollout status deployment --namespace=knative-eventing --timeout=30s
     ```
 
+1. Generate operator code:
+    ```bash
+    cmd/operator/generate.sh
+    ```
+
 ## Install KubeArchive
 
 1. Use Helm to install KubeArchive:

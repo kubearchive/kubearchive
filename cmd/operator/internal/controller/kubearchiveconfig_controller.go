@@ -155,7 +155,10 @@ func (r *KubeArchiveConfigReconciler) desiredRole(kaconfig *kubearchivev1alpha1.
 		if slash > -1 {
 			apiGroup = resource.APIVersion[:slash]
 		}
-		rules = append(rules, rbacv1.PolicyRule{APIGroups: []string{apiGroup}, Resources: []string{strings.ToLower(resource.Kind)}, Verbs: []string{"get", "list", "watch"}})
+		rules = append(rules, rbacv1.PolicyRule{
+			APIGroups: []string{apiGroup},
+			Resources: []string{strings.ToLower(resource.Kind) + "s"},
+			Verbs:     []string{"get", "list", "watch"}})
 	}
 	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{

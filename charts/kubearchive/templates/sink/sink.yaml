@@ -2,18 +2,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.sink.name }}
+  name: {{ tpl .Values.sink.name . }}
 spec:
   replicas: {{ .Values.sink.replicas }}
   selector:
     matchLabels: &labels
-      app: {{ .Values.sink.name }}
+      app: {{ tpl .Values.sink.name . }}
   template:
     metadata:
       labels: *labels
     spec:
       containers:
-        - name: {{ .Values.sink.name }}
+        - name: {{ tpl .Values.sink.name . }}
           image: {{ .Values.sink.image }}
           env:
 {{ include "kubearchive.v1.otel.env" .Values.sink | indent 12 }}
@@ -21,11 +21,11 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: {{ .Values.sink.name }}
+  name: {{ tpl .Values.sink.name . }}
   namespace: {{ .Values.kubearchive.namespace }}
 spec:
   selector:
-    app: {{ .Values.sink.name }}
+    app: {{ tpl .Values.sink.name . }}
   ports:
     - protocol: {{ .Values.sink.protocol }}
       port: {{ .Values.sink.port }}

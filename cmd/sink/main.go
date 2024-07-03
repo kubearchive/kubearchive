@@ -20,43 +20,21 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
-var (
-	logger         = log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds|log.LUTC)
-	db     *sql.DB = nil
-)
-
-// Processes incoming cloudevents and writes them to the database
-func receive(event cloudevents.Event) {
-	logger.Println("received CloudEvent: ", event.ID())
-	archiveEntry, err := NewArchiveEntry(event)
-	if err != nil {
-		logger.Printf("cloudevent %s is malformed and will not be processed: %s\n", event.ID(), err)
-		return
-	}
-	logger.Printf("cloudevent %s contains all required fields. Attempting to write it to the database\n", event.ID())
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer cancel()
-	err = archiveEntry.WriteToDatabase(ctx, db)
-	if err != nil {
-		logger.Printf("failed to write cloudevent %s to the database: %s\n", event.ID(), err)
-		return
-	}
-	logger.Printf("successfully wrote cloudevent %s to the database\n", event.ID())
+type Sink struct {
+	Db          *sql.DB
+	EventClient ceClient.Client
+	Logger      *log.Logger
 }
 
-func main() {
-	err := kaObservability.Start()
-	if err != nil {
-		logger.Printf("Could not start tracing: %s\n", err.Error())
+func NewSink(db *sql.DB, logger *log.Logger) *Sink {
+	if logger == nil {
+		logger = log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds|log.LUTC)
+		logger.Println("sink was provided a nil logger, falling back to defualt logger")
 	}
-	connStr, err := kaDatabase.ConnectionStr()
-	if err != nil {
-		logger.Fatalf("Could not determine a database to connect to: %s\n", err)
+	if db == nil {
+		logger.Fatalln("cannot start sink when db connection is nil")
 	}
-	db, err = sql.Open("postgres", connStr)
-	if err != nil {
-		logger.Fatalf("Could not connect to the database: %s\n", err)
-	}
+
 	httpClient, err := cloudevents.NewHTTP(
 		cloudevents.WithRoundTripper(otelhttp.NewTransport(http.DefaultTransport)),
 		cloudevents.WithMiddleware(func(next http.Handler) http.Handler {
@@ -71,7 +49,48 @@ func main() {
 		logger.Fatalf("failed to create CloudEvents HTTP client: %s\n", err.Error())
 	}
 
-	err = eventClient.StartReceiver(context.Background(), receive)
+	return &Sink{
+		Db:          db,
+		EventClient: eventClient,
+		Logger:      logger,
+	}
+}
+
+// Processes incoming cloudevents and writes them to the database
+func (sink Sink) Receive(event cloudevents.Event) {
+	sink.Logger.Println("received CloudEvent: ", event.ID())
+	archiveEntry, err := NewArchiveEntry(event)
+	if err != nil {
+		sink.Logger.Printf("cloudevent %s is malformed and will not be processed: %s\n", event.ID(), err)
+		return
+	}
+	sink.Logger.Printf("cloudevent %s contains all required fields. Attempting to write it to the database\n", event.ID())
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	err = archiveEntry.WriteToDatabase(ctx, sink.Db)
+	if err != nil {
+		sink.Logger.Printf("failed to write cloudevent %s to the database: %s\n", event.ID(), err)
+		return
+	}
+	sink.Logger.Printf("successfully wrote cloudevent %s to the database\n", event.ID())
+}
+
+func main() {
+	logger := log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds|log.LUTC)
+	err := kaObservability.Start()
+	if err != nil {
+		logger.Printf("Could not start tracing: %s\n", err.Error())
+	}
+	connStr, err := kaDatabase.ConnectionStr()
+	if err != nil {
+		logger.Fatalf("Could not determine a database to connect to: %s\n", err)
+	}
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		logger.Fatalf("Could not connect to the database: %s\n", err)
+	}
+	sink := NewSink(db, logger)
+	err = sink.EventClient.StartReceiver(context.Background(), sink.Receive)
 	if err != nil {
 		logger.Fatalf("failed to start receiving CloudEvents: %s\n", err.Error())
 	}

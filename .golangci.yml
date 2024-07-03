@@ -15,4 +15,4 @@ linters:
     - wastedassign
 issues:
   exclude-files:
-    - cmd/operator/internal/controller/kubearchiveconfig_controller.go # errcheck fails on lines 55-58. I tried to fix it but that caused tests to fail. TODO: fix file and remove this line
+    - cmd/operator/internal/controller/kubearchiveconfig_controller.go  # errcheck fails on lines 55-58. I tried to fix it but that caused tests to fail. TODO: fix file and remove this line

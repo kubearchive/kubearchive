@@ -25,7 +25,7 @@ var (
 	db     *sql.DB = nil
 )
 
-// Processes incoming cloudevents and
+// Processes incoming cloudevents and writes them to the database
 func receive(event cloudevents.Event) {
 	logger.Println("received CloudEvent: ", event.ID())
 	archiveEntry, err := NewArchiveEntry(event)
@@ -33,7 +33,7 @@ func receive(event cloudevents.Event) {
 		logger.Printf("cloudevent %s is malformed and will not be processed: %s\n", event.ID(), err)
 		return
 	}
-	logger.Printf("cloudevent %s contains all required fields. Attempting to write to it to the database\n", event.ID())
+	logger.Printf("cloudevent %s contains all required fields. Attempting to write it to the database\n", event.ID())
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	err = archiveEntry.WriteToDatabase(ctx, db)

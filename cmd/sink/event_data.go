@@ -21,7 +21,7 @@ const (
 	writeQuery = "INSERT INTO ArchiveMeta (api_version, kind, name, namespace, resource_version, data, created_ts, updated_ts) Values ($1, $2, $3, $4, $5, $6, $7, $8)"
 )
 
-// Represents the fields in a resource's metadata that are need to write a resource into the database
+// Represents the fields in a resource's metadata that are needed to write a resource into the database
 type ResourceMetadata struct {
 	ResourceVersion string `json:"resourceVersion"`
 }
@@ -63,8 +63,8 @@ func (entry *ArchiveEntry) ResourceVersion() string {
 	return entry.Data.Metadata.ResourceVersion
 }
 
-// checks that the cloudevents has the appropriate extensions set and have values that are the right type. Additionally
-// it checks that the cloudevent's data has the necessary fields. If all conditions are not met, it returns an error
+// checks that the cloudevent has the appropriate extensions set and has values that are the right type. Additionally
+// it checks that the cloudevent's data has all the necessary fields. If all conditions are not met, it returns an error
 func NewArchiveEntry(event cloudevents.Event) (*ArchiveEntry, error) {
 	eventExtensions := event.Extensions()
 	apiVersion, err := types.ToString(eventExtensions[apiVersionExtension])
@@ -100,7 +100,7 @@ func NewArchiveEntry(event cloudevents.Event) (*ArchiveEntry, error) {
 		nil
 }
 
-// Writes the kubernetes resource held by entry to the database using the provided connection string. Timeouts and
+// Writes the kubernetes resource held by entry to the database using the provided DB connection. Timeouts and
 // deadlines for writing to the database are handled by ctx. If the database transaction fails, it will return an
 // error and attempt to rollback the transaction
 func (entry ArchiveEntry) WriteToDatabase(ctx context.Context, dbConn *sql.DB) error {
@@ -122,7 +122,7 @@ func (entry ArchiveEntry) WriteToDatabase(ctx context.Context, dbConn *sql.DB) e
 	if execErr != nil {
 		rollbackErr := tx.Rollback()
 		if rollbackErr != nil {
-			return fmt.Errorf("write to database failed: %s and unable to rollback transaction: %s", execErr, rollbackErr)
+			return fmt.Errorf("write to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
 		}
 		return fmt.Errorf("write to database failed: %s", execErr)
 	}
@@ -130,9 +130,9 @@ func (entry ArchiveEntry) WriteToDatabase(ctx context.Context, dbConn *sql.DB) e
 	if execErr != nil {
 		rollbackErr := tx.Rollback()
 		if rollbackErr != nil {
-			return fmt.Errorf("write to database failed: %s and unable to rollback transaction: %s", execErr, rollbackErr)
+			return fmt.Errorf("commit to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
 		}
-		return fmt.Errorf("write to database failed: %s", execErr)
+		return fmt.Errorf("commit to database failed and the transactions was rolled back: %s", execErr)
 	}
 	return nil
 }

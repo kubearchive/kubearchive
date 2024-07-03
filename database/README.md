@@ -32,11 +32,11 @@ Connect to the database.
 $ kubectl exec -it [postgres_pod] -n [namespace] -- psql -h localhost -U [db_user] --password -p 5432 [db_name]
 ```
 ```sql
-SELECT * FROM test_objects;
+SELECT * FROM resource;
 ```
 ```sql
-SELECT * FROM test_objects WHERE kind='Job';
+SELECT * FROM resource WHERE kind='Job';
 ```
 ```sql
-SELECT * FROM test_objects WHERE data::jsonb->>'kind'='Job';
+SELECT * FROM resource WHERE data::jsonb->>'kind'='Job';
 ```

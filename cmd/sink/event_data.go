@@ -18,7 +18,7 @@ const (
 	nameExtension       = "name"
 	namespaceExtension  = "namespace"
 
-	writeQuery = "INSERT INTO ArchiveMeta (api_version, kind, name, namespace, resource_version, data, created_ts, updated_ts) Values ($1, $2, $3, $4, $5, $6, $7, $8)"
+	writeQuery = "INSERT INTO resource (api_version, kind, name, namespace, resource_version, data, created_ts, updated_ts) Values ($1, $2, $3, $4, $5, $6, $7, $8)"
 )
 
 // Represents the fields in a resource's metadata that are needed to write a resource into the database

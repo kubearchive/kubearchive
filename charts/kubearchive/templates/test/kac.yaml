@@ -7,4 +7,4 @@ metadata:
 spec:
   resources:
     - apiVersion: v1
-      kind: Events
+      kind: Event

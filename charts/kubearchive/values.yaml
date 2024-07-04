@@ -34,7 +34,7 @@ apiServer:
 
 # values used to create a sink
 sink:
-  name: "kubearchive-sink"
+  name: "{{ .Release.Name }}-sink"
   # NOTE - Helm does not resolve the `ko` path. The path needs to be set on the `helm install` command.
   # For example:
   # helm install -n default <chart-name> charts/kubearchive \

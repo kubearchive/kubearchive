@@ -5,6 +5,8 @@ package routers
 
 import (
 	"encoding/json"
+	"github.com/kubearchive/kubearchive/pkg/database/fake"
+	"github.com/kubearchive/kubearchive/pkg/models"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,9 +16,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var testResources = []models.Resource{
+	{Kind: "Crontab", ApiVersion: "stable.example.com/v1", Status: nil, Spec: nil, Metadata: nil},
+}
+
 func setupRouter() *gin.Engine {
 	router := gin.Default()
-	router.GET("/apis/:group/:version/:resourceType", GetAllResources)
+	ctrl := Controller{Database: fake.NewFakeDatabase(testResources)}
+	router.GET("/apis/:group/:version/:resourceType", ctrl.GetAllResources)
 	return router
 }
 
@@ -28,11 +35,9 @@ func TestGetAllResources(t *testing.T) {
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
-	resources := resources{}
+	var resources []models.Resource
 	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
 		t.Fail()
 	}
-	assert.Equal(t, "crontabs", resources.Kind)
-	assert.Equal(t, "stable.example.com/v1", resources.APIVersion)
-	assert.Greater(t, len(resources.Items), 0)
+	assert.Equal(t, resources, testResources)
 }

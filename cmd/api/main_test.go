@@ -4,25 +4,35 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/kubearchive/kubearchive/cmd/api/routers"
+	fakeDB "github.com/kubearchive/kubearchive/pkg/database/fake"
+	"k8s.io/client-go/kubernetes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/client-go/kubernetes/fake"
+	fakeK8s "k8s.io/client-go/kubernetes/fake"
 )
 
+func fakeServer(k8sClient kubernetes.Interface) *Server {
+	if k8sClient == nil {
+		k8sClient = fakeK8s.NewSimpleClientset()
+	}
+	controller := routers.Controller{Database: fakeDB.NewFakeDatabase(nil)}
+	return NewServer(k8sClient, controller)
+}
+
 func TestNewServer(t *testing.T) {
-	k8sClient := fake.NewSimpleClientset()
-	server := NewServer(k8sClient)
+	k8sClient := fakeK8s.NewSimpleClientset()
+	server := fakeServer(k8sClient)
 	assert.NotNil(t, server.router)
 	assert.Equal(t, server.k8sClient, k8sClient)
 }
 
 func TestOtelMiddlewareConfigured(t *testing.T) {
 	// Set up server
-	k8sClient := fake.NewSimpleClientset()
-	server := NewServer(k8sClient)
+	server := fakeServer(nil)
 	// Get the context for a new response recorder for inspection and set it to the router engine
 	c := gin.CreateTestContextOnly(httptest.NewRecorder(), server.router)
 	c.Request, _ = http.NewRequest(http.MethodGet, "/", nil)
@@ -44,8 +54,7 @@ func TestOtelMiddlewareConfigured(t *testing.T) {
 
 func TestAuthMiddlewareConfigured(t *testing.T) {
 	// Set up server
-	k8sClient := fake.NewSimpleClientset()
-	server := NewServer(k8sClient)
+	server := fakeServer(nil)
 	// Make a correct request with an invalid token
 	res := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/", nil)

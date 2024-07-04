@@ -29,6 +29,25 @@ spec:
           args: ["--listen=:40000", "--headless=true", "--api-version=2", "--log", "exec", "/ko-app/api"]
           {{- end}}
           env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubearchive.v1.database.secret.name" . }}
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubearchive.v1.database.secret.name" . }}
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "kubearchive.v1.database.secret.name" . }}
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_URL
+              value: {{ .Values.database.name }}.{{ .Values.kubearchive.namespace }}.svc.cluster.local
+            - name: POSTGRES_PORT
+              value: "{{ .Values.database.service.port }}"
 {{ include "kubearchive.v1.otel.env" .Values.apiServer | indent 12 }}
 ---
 kind: Service
@@ -42,3 +61,10 @@ spec:
     - protocol: TCP
       port: {{ .Values.apiServer.port }}
       targetPort: {{ .Values.apiServer.port }}
+      name: server
+    {{- if .Values.apiServer.debug }}
+    - protocol: TCP
+      port: 40000
+      targetPort: 40000
+      name: debug
+    {{- end}}

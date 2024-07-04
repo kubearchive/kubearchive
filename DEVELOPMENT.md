@@ -149,7 +149,7 @@ By default, KubeArchive listens to `Event`s in the `test` namespace.
 
 Use `go test` to run the integration test suite:
 ```bash
-go test -v ./... -tags=integration
+go test -v ./test/integration -tags=integration
 ```
 
 ## Remote IDE debugging

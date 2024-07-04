@@ -2,7 +2,7 @@ module github.com/kubearchive/kubearchive
 
 go 1.22.0
 
-toolchain go1.22.4
+toolchain go1.22.5
 
 require (
 	github.com/cloudevents/sdk-go/observability/opentelemetry/v2 v2.15.2

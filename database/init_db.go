@@ -50,7 +50,7 @@ func main() {
 
 	// SQL instruction to create a table.
 	sqlStatement := `
-	CREATE TABLE IF NOT EXISTS public.test_objects (
+	CREATE TABLE IF NOT EXISTS public.resource (
 		"id" serial PRIMARY KEY,
 		"api_version" varchar NOT NULL,
 		"kind" varchar NOT NULL,
@@ -66,7 +66,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("table test_objects created in the DB.")
+	fmt.Println("table resource created in the DB.")
 
 	// load the test data from file
 	testData := "test_objects.sql"

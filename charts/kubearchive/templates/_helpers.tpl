@@ -16,3 +16,10 @@ This tells the OpenTelemtry instrumentation if it should start or not.
   value: "false"
 {{- end -}}
 {{- end -}}
+
+{{/*
+Generate name for database secret
+*/}}
+{{- define "kubearchive.v1.database.secret.name" -}}
+{{- printf "%s-secret" .Values.database.name -}}
+{{- end -}}

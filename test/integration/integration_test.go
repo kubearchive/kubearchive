@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -21,71 +22,42 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestSomething(t *testing.T) {
-	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
-	namespace := fmt.Sprintf(`
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: %s
-`, namespaceName)
-
-	deployment := fmt.Sprintf(`
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: kubearchive
-  namespace: %s
-  labels:
-    app.kubernetes.io/name: kubearchive
-spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: kubearchive
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/name: kubearchive
-    spec:
-      containers:
-      - name: kubearchive
-        image: ko://github.com/kubearchive/kubearchive/cmd/sink/
-        ports:
-        - containerPort: 8081
-`, namespaceName)
-
-	err := test.CreateResources(namespace, deployment)
+// This test is redundant with the kubectl rollout status from the hack/quick-install.sh
+// but it serves as a valid integration test, not a dummy that is not testing anything real.
+func TestKubeArchiveDeployments(t *testing.T) {
+	client, err := test.GetKubernetesClient()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	client, err := test.GetKubernetesClient()
-
 	acc := 0.0
 	for {
 		if acc >= 30 {
-			t.Fatal("Timed out waiting for deployment to be ready.")
+			t.Fatal(fmt.Sprintf("Timed out waiting for deployment to be ready %f.", acc))
 		}
 
-		deploymentResource, err := client.AppsV1().Deployments(namespaceName).Get(context.Background(), "kubearchive", metav1.GetOptions{})
+		deployments, err := client.AppsV1().Deployments("kubearchive").List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if deploymentResource.Status.AvailableReplicas == 1 {
-			break
-		} else {
-			time.Sleep(3 * time.Second)
-			acc += 3
+		if len(deployments.Items) == 0 {
+			t.Fatal("No deployments found in the 'kubearchive' namespace, something went wrong.")
 		}
-	}
 
-	t.Cleanup(func() {
-		err := test.DeleteResources(namespace)
-		if err != nil {
-			panic(err)
+		areAllReady := true
+		for _, deployment := range deployments.Items {
+			log.Printf("Deployment '%s' has '%d' ready replicas", deployment.Name, deployment.Status.ReadyReplicas)
+			areAllReady = areAllReady && deployment.Status.ReadyReplicas == 1
 		}
-	})
+
+		if areAllReady {
+			log.Printf("All deployments ready.")
+			break
+		}
+
+		log.Printf("Not all deployments are ready, waiting 5 seconds...")
+		time.Sleep(5 * time.Second)
+		acc += 5
+	}
 }

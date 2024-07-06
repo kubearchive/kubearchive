@@ -20,7 +20,7 @@ require (
 	k8s.io/api v0.30.1
 	k8s.io/apimachinery v0.30.1
 	k8s.io/client-go v0.30.1
-	knative.dev/eventing v0.41.2
+	knative.dev/eventing v0.41.4
 	knative.dev/pkg v0.0.0-20240704013837-7ecd5485cbc6
 	sigs.k8s.io/controller-runtime v0.18.3
 )

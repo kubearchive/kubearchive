@@ -16,13 +16,14 @@ import (
 )
 
 var testResources = []models.Resource{
-	{Kind: "Crontab", ApiVersion: "stable.example.com/v1", Status: nil, Spec: nil, Metadata: nil},
+	{Kind: "Crontab", ApiVersion: "stable.example.com/v1", Status: nil, Spec: nil, Metadata: map[string]interface{}{"namespace": "test"}},
 }
 
 func setupRouter() *gin.Engine {
 	router := gin.Default()
 	ctrl := Controller{Database: fake.NewFakeDatabase(testResources)}
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetAllResources)
+	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType", ctrl.GetAllResources)
 	return router
 }
 
@@ -31,6 +32,21 @@ func TestGetAllResources(t *testing.T) {
 
 	res := httptest.NewRecorder()
 	req, _ := http.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/crontabs", nil)
+	router.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusOK, res.Code)
+	var resources []models.Resource
+	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
+		t.Fail()
+	}
+	assert.Equal(t, resources, testResources)
+}
+
+func TestGetNamespacedResources(t *testing.T) {
+	router := setupRouter()
+
+	res := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/ns/crontabs", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)

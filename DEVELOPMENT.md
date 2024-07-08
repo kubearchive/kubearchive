@@ -102,7 +102,7 @@ helm uninstall -n kubearchive kubearchive
     ```
 2.  Populate the database with test objects.
     ```bash
-    go run init_db.go
+    go run database/init_db.go
     ```
 
 ## Generate activity on the KubeArchive sink

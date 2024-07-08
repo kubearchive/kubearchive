@@ -72,7 +72,7 @@ func main() {
 	fmt.Println("table resource created in the DB.")
 
 	// load the test data from file
-	testData := "resource.sql"
+	testData := "database/resource.sql"
 	//fmt.Println(testData)
 	query, err := os.ReadFile(testData)
 	if err != nil {

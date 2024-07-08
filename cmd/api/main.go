@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/kubearchive/kubearchive/pkg/database"
 	"log"
 
 	"github.com/kubearchive/kubearchive/cmd/api/auth"
@@ -34,12 +35,13 @@ func getKubernetesClient() *kubernetes.Clientset {
 	return client
 }
 
-func NewServer(k8sClient kubernetes.Interface) *Server {
+func NewServer(k8sClient kubernetes.Interface, controller routers.Controller) *Server {
 	router := gin.Default()
 	router.Use(otelgin.Middleware("kubearchive.api"))
 	router.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews()))
 	router.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews()))
-	router.GET("/apis/:group/:version/:resourceType", routers.GetAllResources)
+	// TODO Add middleware for the db connection
+	router.GET("/apis/:group/:version/:resourceType", controller.GetAllResources)
 
 	return &Server{
 		router:    router,
@@ -52,8 +54,12 @@ func main() {
 	if err != nil {
 		log.Printf("Could not start opentelemetry: %s", err)
 	}
-
-	server := NewServer(getKubernetesClient())
+	db, err := database.NewDatabase()
+	if err != nil {
+		log.Fatalf("Could not connect to database: %s", err)
+	}
+	controller := routers.Controller{Database: db}
+	server := NewServer(getKubernetesClient(), controller)
 	err = server.router.RunTLS("localhost:8081", "/etc/kubearchive/ssl/tls.crt", "/etc/kubearchive/ssl/tls.key")
 	if err != nil {
 		log.Printf("Could not run server on localhost: %s", err)

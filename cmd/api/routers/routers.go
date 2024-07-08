@@ -4,28 +4,27 @@
 package routers
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/kubearchive/kubearchive/pkg/database"
 	"net/http"
+	"strings"
 )
 
-// FIXME This will be taken from a shared pkg with sink based on the DB schema
-// Just for the first approach
-type resources struct {
-	Kind       string   `json:"kind"`
-	APIVersion string   `json:"apiVersion"`
-	Items      []string `json:"items"`
+type Controller struct {
+	Database database.DBInterface
 }
 
 // GetAllResources responds with the list of resources of a specific type across all namespaces
-func GetAllResources(c *gin.Context) {
-	group := c.Param("group")
-	version := c.Param("version")
-	resource := c.Param("resourceType")
-	response := resources{
-		Kind:       resource,
-		APIVersion: fmt.Sprintf("%s/%s", group, version),
-		Items:      []string{"resource1", "resource2"},
+func (c *Controller) GetAllResources(context *gin.Context) {
+	group := context.Param("group")
+	version := context.Param("version")
+	// FIXME - Title is deprecated and this conversion must be done in a different way
+	resource := strings.Title(context.Param("resourceType")) //nolint:staticcheck
+	resources, err := c.Database.QueryResources(context, resource[:len(resource)-1], group, version)
+
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, err.Error())
 	}
-	c.JSON(http.StatusOK, response)
+
+	context.JSON(http.StatusOK, resources)
 }

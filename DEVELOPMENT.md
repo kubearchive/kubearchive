@@ -102,7 +102,6 @@ helm uninstall -n kubearchive kubearchive
     ```
 2.  Populate the database with test objects.
     ```bash
-    cd database
     go run init_db.go
     ```
 
@@ -135,9 +134,8 @@ By default, KubeArchive listens to `Event`s in the `test` namespace.
     
 1. On a new terminal, use `curl` or your browser to perform a query:
     ```bash
-    curl --cacert ca.crt localhost:8081/apis/apps/v1/deployments \
-    -H "Authorization: Bearer $(kubectl create token kubearchive-test -n kubearchive)" \
-   https://localhost:8081/apis/apps/v1/deployments
+    curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create token kubearchive-test -n kubearchive)" \
+   https://localhost:8081/apis/batch/v1/jobs | jq
     ```
 
 1. Check the new logs on the KubeArchive API:
@@ -159,19 +157,16 @@ to start a debugger to which attach from your IDE.
 
 1. Deploy the chart with `ko` and `helm` in debug mode using an image with `delve`:
    ```bash
-   helm install -n default [deployment name] charts/kubearchive \ 
+   helm install kubearchive charts/kubearchive --create-namespace -n kubearchive \ 
    --set apiServer.debug=true \
-   --set-string apiServer.image=$(KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest \
-   ko build --disable-optimizations github.com/kubearchive/kubearchive/cmd/api) \
+   --set-string apiServer.image=$(KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest ko build --disable-optimizations github.com/kubearchive/kubearchive/cmd/api) \
    --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
    --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator)
    ```
 
 1. Forward the ports 8081 and 40000 from the Pod directly:
    ```bash
-   kubectl port-forward \
-   $(kubectl get -n kubearchive pods --no-headers -o custom-columns=":metadata.name" | grep api-server) \
-   8081:8081 40000:40000
+   kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081 40000:40000
    ```
 1. Enable breakpoints in your IDE.
 1. Connect to the process using the port 40000:
@@ -179,7 +174,8 @@ to start a debugger to which attach from your IDE.
    * [Goland instructions](https://golangforall.com/en/post/go-docker-delve-remote-debug.html#goland-ide)
 1. Query the API using `curl` or your browser:
    ```bash
-   curl localhost:8081/apis/apps/v1/deployments
+   curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create token kubearchive-test -n kubearchive)" \
+   https://localhost:8081/apis/batch/v1/jobs | jq
    ```
 
 ## Known issues

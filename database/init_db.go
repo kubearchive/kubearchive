@@ -53,12 +53,15 @@ func main() {
 	CREATE TABLE IF NOT EXISTS public.resource (
 		"id" serial PRIMARY KEY,
 		"api_version" varchar NOT NULL,
+		"cluster" varchar NOT NULL,
+		"cluster_uid" uuid NOT NULL,
 		"kind" varchar NOT NULL,
 		"name" varchar NOT NULL,
 		"namespace" varchar NOT NULL,
 		"resource_version" varchar NULL,
 		"created_ts" timestamp NOT NULL,
 		"updated_ts" timestamp NOT NULL,
+		"cluster_deleted_ts" timestamp NULL,
 		"data" jsonb NOT NULL
 	);
 	`
@@ -69,7 +72,7 @@ func main() {
 	fmt.Println("table resource created in the DB.")
 
 	// load the test data from file
-	testData := "test_objects.sql"
+	testData := "resource.sql"
 	//fmt.Println(testData)
 	query, err := os.ReadFile(testData)
 	if err != nil {
@@ -81,5 +84,5 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("testdata from test_objects.sql inserted in the DB.")
+	fmt.Println("testdata from resource.sql inserted in the DB.")
 }

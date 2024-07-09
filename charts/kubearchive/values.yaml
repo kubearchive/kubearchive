@@ -48,6 +48,8 @@ sink:
   replicas: 1
   # If true, OpenTelemetry instrumentation will be enabled for the sink
   observability: false
+  # name of the kubernetes cluster
+  clusterName: "default-cluster-name"
 
 operator:
   # NOTE - Helm does not resolve the `ko` path. The path needs to be set on the `helm install` command.

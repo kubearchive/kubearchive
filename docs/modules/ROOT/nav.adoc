@@ -2,3 +2,6 @@
 ** xref:configuration/kubearchiveconfig.adoc[Configuration]
 * Contributors
 ** xref:contributors/guide.adoc[Guide]
+
+* Reference
+** xref:reference/database.adoc[]

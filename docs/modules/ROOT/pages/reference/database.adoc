@@ -1,0 +1,60 @@
+= Database Schema
+
+This document lists and details the database schema used by KubeArchive.
+
+== Table `public.resource`
+
+[%header, cols="2m,2m,3"]
+|===
+|Name
+|Type
+|Description
+
+|id
+|serial primary key
+|Primary key
+
+|api_version
+|varchar not null
+|API Version + API Group (`apiVersion`). "batch/v1" for Jobs, "apps/v1" for Deployments, "build.openshift.io/v1" for OpenShift Builds, "v1" for Services or Pods, ...
+
+|cluster
+|varchar not null
+|Friendly cluster name.
+
+|cluster_uid
+|uuid not null
+|Cluster unique identifier.
+
+|kind
+|varchar not null
+|Kind of the resource (`kind`). For example "Job", "Deployment", "Service"...
+
+|name
+|varchar not null
+|Name of the resource (`metadata.name`).
+
+|namespace
+|varchar not null
+|Namespace of the resource (`metadata.namespace`).
+
+|resource_version
+|varchar not null
+|Version of the resource (`metadata.resourceVersion`).
+
+|created_ts
+|timestamp not null
+|Time when KubeArchive received the resource for the first time.
+
+|updated_ts
+|timestamp not null
+|Last time KubeArchive received an update for the resource.
+
+|cluster_deleted_ts
+|timestamp not null
+|Timestamp when KubeArchive deleted the resource from the cluster.
+
+|data
+|jsonb not null
+|Resource definition in JSON format.
+|===

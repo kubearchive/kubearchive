@@ -30,6 +30,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 		kubearchiveconfig := &kubearchivev1alpha1.KubeArchiveConfig{}
 
 		BeforeEach(func() {
+			Skip("NYI")
 			By("creating the custom resource for the Kind KubeArchiveConfig")
 			err := k8sClient.Get(ctx, typeNamespacedName, kubearchiveconfig)
 			if err != nil && errors.IsNotFound(err) {

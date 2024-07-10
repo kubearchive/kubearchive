@@ -52,10 +52,25 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	r.reconcileServiceAccount(ctx, kaconfig)
-	r.reconcileRole(ctx, kaconfig)
-	r.reconcileRoleBinding(ctx, kaconfig)
-	r.reconcileApiServerSource(ctx, kaconfig)
+	_, err = r.reconcileServiceAccount(ctx, kaconfig)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	_, err = r.reconcileRole(ctx, kaconfig)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	_, err = r.reconcileRoleBinding(ctx, kaconfig)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	_, err = r.reconcileApiServerSource(ctx, kaconfig)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }

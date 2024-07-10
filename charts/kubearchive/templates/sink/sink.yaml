@@ -19,20 +19,20 @@ spec:
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kubearchive.v1.database.secret.name" . }}
+                  name: {{ tpl .Values.database.secret . }}
                   key: POSTGRES_DB
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kubearchive.v1.database.secret.name" . }}
+                  name: {{ tpl .Values.database.secret . }}
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "kubearchive.v1.database.secret.name" . }}
+                  name: {{ tpl .Values.database.secret . }}
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_URL
-              value: {{ .Values.database.name }}.{{ .Values.kubearchive.namespace }}.svc.cluster.local
+              value: {{ tpl .Values.database.name . }}.{{ .Values.kubearchive.namespace }}.svc.cluster.local
             - name: POSTGRES_PORT
               value: "{{ .Values.database.service.port }}"
 {{ include "kubearchive.v1.otel.env" .Values.sink | indent 12 }}

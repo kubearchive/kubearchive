@@ -6,6 +6,7 @@ The kubearchive helm chart deploys the following:
 * Service Account named `kubearchive-api-server` in the `kubearchive` namespace
 * Deployment and Service for `kubearchive-sink` in the `kubearchive` namespace
 * Deployment and Service for `kubearchive-api-server` in the `kubearchive` namespace
+* Deployment, Service, Persistent Volume and Persistent Volume Claim for `kubearchive-database` in the `kubearchive` namespace
 * (optionally) Namespace named `test`
 * (optionally) Role named `kubearchive` in the `test` namespace
 * (optionally) RoleBinding named `kubearchive` in the `test` namespace

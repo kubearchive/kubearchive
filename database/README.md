@@ -7,7 +7,7 @@ Install [DBeaver Community](https://dbeaver.io/).
 ### Configure DBeaver
 1. Create a port-forward in a new terminal tab.
   ```bash
-  $ kubectl port-forward -n [namespace] svc/postgres 5432:5432
+  $ kubectl port-forward -n kubearchive svc/kubearchive-database 5432:5432
   ```
 1. DBeaver settings.
   * Go to `Database` > `New Database Connection`. Select `PostgreSQL`.
@@ -29,7 +29,7 @@ Install [DBeaver Community](https://dbeaver.io/).
 These queries can be executed from the database.
 Connect to the database.
 ```bash
-$ kubectl exec -it [postgres_pod] -n [namespace] -- psql -h localhost -U [db_user] --password -p 5432 [db_name]
+kubectl exec -it  $(kubectl get -n kubearchive pods --no-headers -o custom-columns=":metadata.name" | grep database) -n kubearchive -- psql -h localhost -U ps_user --password -p 5432 postgresdb
 ```
 ```sql
 SELECT * FROM resource;

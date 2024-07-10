@@ -4,32 +4,31 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: {{ .Values.database.name | default "postgresql" }}
-  name: {{ .Values.database.name | default "postgresql" }}-deployment
-  namespace: {{ .Values.kubearchive.namespace }}
+    app: {{ tpl .Values.database.name . }}
+  name: {{ tpl .Values.database.name . }}
 spec:
-  replicas: {{ .Values.database.replicaCount | default 1}}
+  replicas: {{ .Values.database.replicaCount }}
   selector:
     matchLabels:
-      app: {{ .Values.database.name | default "postgresql"}}
+      app: {{ tpl .Values.database.name . }}
   template:
     metadata:
       labels:
-        app: {{ .Values.database.name | default "postgresql" }}
+        app: {{ tpl .Values.database.name . }}
     spec:
       containers:
-        - name: {{ .Values.database.name | default "postgresql" }}
+        - name: {{ tpl .Values.database.name . }}
           image: "{{ .Values.database.image.repository }}:{{ .Values.database.image.tag }}"
           imagePullPolicy: {{ .Values.database.image.pullPolicy }}
           ports:
             - containerPort: {{ .Values.database.service.port }}
           envFrom:
             - secretRef:
-                name: {{ .Values.database.name | default "postgresql" }}-secret
+                name: {{ tpl .Values.database.secret . }}
           volumeMounts:
             - mountPath: "/var/lib/postgresql/data"
-              name: {{ .Values.database.volumes.name | default "postgresdata" }}
+              name: {{ .Values.database.volumes.name }}
       volumes:
-        - name: {{ .Values.database.volumes.name | default "postgresdata" }}
+        - name: {{ .Values.database.volumes.name }}
           persistentVolumeClaim:
-            claimName: {{ .Values.database.name | default "postgresql" }}-volume-claim
+            claimName: {{ tpl .Values.database.name . }}

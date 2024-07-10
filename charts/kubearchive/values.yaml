@@ -58,8 +58,14 @@ operator:
 
 # values used to create a PostgreSQL database
 database:
+  # Controls if the database is deployed or not. The secret with the credentials
+  # is deployed always, as the sink and the api-server need to connect somewhere.
+  # Provde the proper `url` and credentials if you provide your database
+  # TODO: set 'enabled' to 'false' when we start distributing the chart for production installation
+  enabled: true
+
   name: "{{ .Release.Name }}-database"
-  #name: "postgresql"
+  url: "{{ tpl .Values.database.name . }}.{{ .Release.Namespace }}.svc.cluster.local"
   # number of database pods that should be deployed
   replicaCount: 1
   # database container image
@@ -80,8 +86,8 @@ database:
   # database basic configuration
   postgresData:
     # database name
-    dbName: ""
+    dbName: "postgresdb"
     # database user
-    dbUser: ""
+    dbUser: "ps_user"
     # database password
-    dbPassword: ""
+    dbPassword: "P0stgr3sdbP@ssword"  # notsecret

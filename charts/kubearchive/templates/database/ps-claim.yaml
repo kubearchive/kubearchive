@@ -4,13 +4,12 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   labels:
-    app: {{ .Values.database.name }}
-  name: {{ .Values.database.name | default "postgresql" }}-volume-claim
-  namespace: {{ .Values.kubearchive.namespace }}
+    app: {{ tpl .Values.database.name . }}
+  name: {{ tpl .Values.database.name . }}
 spec:
   storageClassName: manual
   accessModes:
     - ReadWriteMany
   resources:
     requests:
-      storage: {{ .Values.database.volumes.storage | default "5Gi" }}
+      storage: {{ .Values.database.volumes.storage }}

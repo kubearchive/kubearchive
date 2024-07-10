@@ -5,13 +5,12 @@ kind: PersistentVolume
 metadata:
   labels:
     type: local
-    app: {{ .Values.database.name | default "postgresql" }}
-  name: {{ .Values.database.name | default "postgresql" }}-volume
-  namespace: {{ .Values.kubearchive.namespace }}
+    app: {{ tpl .Values.database.name . }}
+  name: {{ tpl .Values.database.name . }}
 spec:
   storageClassName: manual
   capacity:
-    storage: {{ .Values.database.volumes.storage | default "5Gi" }}
+    storage: {{ .Values.database.volumes.storage }}
   accessModes:
     - ReadWriteMany
   hostPath:

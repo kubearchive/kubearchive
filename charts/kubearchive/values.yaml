@@ -58,7 +58,8 @@ operator:
 
 # values used to create a PostgreSQL database
 database:
-  name: "postgresql"
+  name: "{{ .Release.Name }}-database"
+  #name: "postgresql"
   # number of database pods that should be deployed
   replicaCount: 1
   # database container image
@@ -68,12 +69,14 @@ database:
     tag: "16"
   # database volumes
   volumes:
-    name: ""
+    name: "postgresdata"
     storage: "5Gi"
   # database service
   service:
     type: NodePort
     port: 5432
+  # database secret
+  secret: "{{ tpl .Values.database.name . }}-credentials"
   # database basic configuration
   postgresData:
     # database name

@@ -96,9 +96,9 @@ helm uninstall -n kubearchive kubearchive
 
 ## Initialize the database
 
-1.  Create a port-forward in a new terminal tab.
+1.  In a new terminal tab create a port-forward.
     ```bash
-    kubectl port-forward -n kubearchive svc/postgresql 5432:5432
+    kubectl port-forward -n kubearchive svc/kubearchive-database 5432:5432
     ```
 2.  Populate the database with test objects.
     ```bash

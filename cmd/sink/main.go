@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	ceOtelObs "github.com/cloudevents/sdk-go/observability/opentelemetry/v2/client"
@@ -31,7 +30,6 @@ type Sink struct {
 	Db          database.DBInterface
 	EventClient ceClient.Client
 	Logger      *log.Logger
-	Lock        sync.Locker
 }
 
 func NewSink(db database.DBInterface, logger *log.Logger) *Sink {
@@ -65,7 +63,6 @@ func NewSink(db database.DBInterface, logger *log.Logger) *Sink {
 		Db:          db,
 		EventClient: eventClient,
 		Logger:      logger,
-		Lock:        &sync.Mutex{},
 	}
 }
 

@@ -8,7 +8,7 @@ linters:
     - bodyclose
     - containedctx
     - fatcontext
-    - gofmt
+    - goimports
     - gosec
     - nilerr
     - usestdlibvars

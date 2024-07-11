@@ -3,15 +3,15 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/cmd/api/routers"
-	fakeDB "github.com/kubearchive/kubearchive/pkg/database/fake"
-	"k8s.io/client-go/kubernetes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+	"github.com/kubearchive/kubearchive/cmd/api/routers"
+	fakeDB "github.com/kubearchive/kubearchive/pkg/database/fake"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/client-go/kubernetes"
 	fakeK8s "k8s.io/client-go/kubernetes/fake"
 )
 

@@ -5,14 +5,13 @@ package routers
 
 import (
 	"encoding/json"
-	"github.com/kubearchive/kubearchive/pkg/database/fake"
-	"github.com/kubearchive/kubearchive/pkg/models"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
-
+	"github.com/kubearchive/kubearchive/pkg/database/fake"
+	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/stretchr/testify/assert"
 )
 

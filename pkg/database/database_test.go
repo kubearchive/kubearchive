@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/stretchr/testify/assert"
 	"log"
 	"testing"
 	"time"
+
+	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/stretchr/testify/assert"
 )
 
 func NewMock() (*sql.DB, sqlmock.Sqlmock) {

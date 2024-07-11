@@ -5,17 +5,16 @@ package main
 
 import (
 	"fmt"
-	"github.com/kubearchive/kubearchive/pkg/database"
 	"log"
 
+	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/auth"
 	"github.com/kubearchive/kubearchive/cmd/api/routers"
+	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/observability"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-
-	"github.com/gin-gonic/gin"
-	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 type Server struct {

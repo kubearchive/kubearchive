@@ -4,10 +4,11 @@
 package routers
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/pkg/database"
 	"net/http"
 	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/kubearchive/kubearchive/pkg/database"
 )
 
 type Controller struct {

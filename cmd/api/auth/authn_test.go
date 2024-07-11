@@ -5,13 +5,14 @@ package auth
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	apiAuthnv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 var (

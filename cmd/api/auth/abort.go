@@ -4,8 +4,9 @@
 package auth
 
 import (
-	"github.com/gin-gonic/gin"
 	"log"
+
+	"github.com/gin-gonic/gin"
 )
 
 func abort(c *gin.Context, msg string, code int) {

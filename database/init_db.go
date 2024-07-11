@@ -7,8 +7,9 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	_ "github.com/lib/pq"
 	"os"
+
+	_ "github.com/lib/pq"
 )
 
 type flags struct {

@@ -2,10 +2,11 @@ package fake
 
 import (
 	"context"
-	"github.com/kubearchive/kubearchive/pkg/models"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/kubearchive/kubearchive/pkg/models"
+	"github.com/stretchr/testify/assert"
 )
 
 var testResources = []models.Resource{

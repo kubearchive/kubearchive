@@ -37,7 +37,7 @@ func (r *Resource) Scan(value interface{}) error {
 // Represents the fields in an event's metadata that need to be written to the database
 type EventMetadata struct {
 	ResourceVersion   string `json:"resourceVersion"`
-	ClusterUid        string `json:"uid"`
+	Uid               string `json:"uid"`
 	CreationTimestamp string `json:"creationTimestamp"`
 	DeletionTimestamp string `json:"deletionTimestamp,omitempty"`
 }
@@ -60,12 +60,13 @@ type ResourceEntry struct {
 	Name            string
 	Namespace       string
 	ResourceVersion string
+	Uuid            string
 }
 
 // checks that the cloudevent has the appropriate extensions set and has values that are the right type. Additionally
 // it checks that the cloudevent's data has all the necessary fields and returns a models.ResourceEntry. If all
 // conditions are not met, it returns an error
-func ResourceEntryFromCloudevent(event cloudevents.Event, cluster string) (*ResourceEntry, error) {
+func ResourceEntryFromCloudevent(event cloudevents.Event, cluster, clusterUid string) (*ResourceEntry, error) {
 	eventExtensions := event.Extensions()
 	apiVersion, err := types.ToString(eventExtensions[apiVersionExtension])
 	if err != nil {
@@ -93,7 +94,7 @@ func ResourceEntryFromCloudevent(event cloudevents.Event, cluster string) (*Reso
 	return &ResourceEntry{
 			ApiVersion: apiVersion,
 			Cluster:    cluster,
-			ClusterUid: eventData.Metadata.ClusterUid,
+			ClusterUid: clusterUid,
 			Created:    eventData.Metadata.CreationTimestamp,
 			Data:       event.Data(),
 			Deleted: sql.NullString{
@@ -105,6 +106,7 @@ func ResourceEntryFromCloudevent(event cloudevents.Event, cluster string) (*Reso
 			Name:            name,
 			Namespace:       namespace,
 			ResourceVersion: eventData.Metadata.ResourceVersion,
+			Uuid:            eventData.Metadata.Uid,
 		},
 		nil
 }

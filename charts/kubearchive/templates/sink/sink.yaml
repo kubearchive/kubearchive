@@ -35,8 +35,6 @@ spec:
               value: {{ tpl .Values.database.url . }}
             - name: POSTGRES_PORT
               value: "{{ .Values.database.service.port }}"
-            - name: KUBEARCHIVE_CLUSTER_NAME
-              value: "{{ .Values.sink.clusterName }}"
 {{ include "kubearchive.v1.otel.env" .Values.sink | indent 12 }}
 ---
 kind: Service

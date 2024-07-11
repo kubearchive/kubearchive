@@ -68,7 +68,7 @@ func (db *Database) WriteResource(ctx context.Context, entry *models.ResourceEnt
 	query := fmt.Sprintf(writeResource, db.resourceTableName)
 	tx, err := db.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("could not begin transaction: %s", err)
+		return fmt.Errorf("could not begin transaction for resource %s: %s", entry.Uuid, err)
 	}
 	_, execErr := tx.ExecContext(
 		ctx,

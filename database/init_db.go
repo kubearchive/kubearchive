@@ -52,7 +52,7 @@ func main() {
 	// SQL instruction to create a table.
 	sqlStatement := `
 	CREATE TABLE IF NOT EXISTS public.resource (
-		"id" serial PRIMARY KEY,
+		"uuid" uuid PRIMARY KEY,
 		"api_version" varchar NOT NULL,
 		"cluster" varchar NOT NULL,
 		"cluster_uid" uuid NOT NULL,

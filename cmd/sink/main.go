@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"net/http"
 	"os"
@@ -14,19 +13,26 @@ import (
 	ceOtelObs "github.com/cloudevents/sdk-go/observability/opentelemetry/v2/client"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	ceClient "github.com/cloudevents/sdk-go/v2/client"
-	kaDatabase "github.com/kubearchive/kubearchive/pkg/database"
+	"github.com/kubearchive/kubearchive/pkg/database"
+	"github.com/kubearchive/kubearchive/pkg/models"
 	kaObservability "github.com/kubearchive/kubearchive/pkg/observability"
 	_ "github.com/lib/pq"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
+const (
+	ClusterNameEnvVar = "KUBEARCHIVE_CLUSTER_NAME"
+)
+
 type Sink struct {
-	Db          *sql.DB
+	ClusterName string
+	ClusterUid  string
+	Db          database.DBInterface
 	EventClient ceClient.Client
 	Logger      *log.Logger
 }
 
-func NewSink(db *sql.DB, logger *log.Logger) *Sink {
+func NewSink(db database.DBInterface, logger *log.Logger) *Sink {
 	if logger == nil {
 		logger = log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds|log.LUTC)
 		logger.Println("sink was provided a nil logger, falling back to defualt logger")
@@ -50,6 +56,10 @@ func NewSink(db *sql.DB, logger *log.Logger) *Sink {
 	}
 
 	return &Sink{
+		// TODO: cluster name should be set by the user for multicluster support
+		ClusterName: "",
+		// TODO: clusterUid should be set by the user for multicluster support
+		ClusterUid:  "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Db:          db,
 		EventClient: eventClient,
 		Logger:      logger,
@@ -57,17 +67,18 @@ func NewSink(db *sql.DB, logger *log.Logger) *Sink {
 }
 
 // Processes incoming cloudevents and writes them to the database
-func (sink Sink) Receive(event cloudevents.Event) {
+func (sink *Sink) Receive(event cloudevents.Event) {
 	sink.Logger.Println("received CloudEvent: ", event.ID())
-	archiveEntry, err := NewArchiveEntry(event)
+	archiveEntry, err := models.ResourceEntryFromCloudevent(event, sink.ClusterName, sink.ClusterUid)
 	if err != nil {
 		sink.Logger.Printf("cloudevent %s is malformed and will not be processed: %s\n", event.ID(), err)
 		return
 	}
 	sink.Logger.Printf("cloudevent %s contains all required fields. Attempting to write it to the database\n", event.ID())
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	sink.Logger.Printf("writing resource from cloudevent %s into the database\n", event.ID())
+	err = sink.Db.WriteResource(ctx, archiveEntry)
 	defer cancel()
-	err = archiveEntry.WriteToDatabase(ctx, sink.Db)
 	if err != nil {
 		sink.Logger.Printf("failed to write cloudevent %s to the database: %s\n", event.ID(), err)
 		return
@@ -81,11 +92,7 @@ func main() {
 	if err != nil {
 		logger.Printf("Could not start tracing: %s\n", err.Error())
 	}
-	connStr, err := kaDatabase.ConnectionStr()
-	if err != nil {
-		logger.Fatalf("Could not determine a database to connect to: %s\n", err)
-	}
-	db, err := sql.Open("postgres", connStr)
+	db, err := database.NewDatabase()
 	if err != nil {
 		logger.Fatalf("Could not connect to the database: %s\n", err)
 	}

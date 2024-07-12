@@ -9,10 +9,11 @@ import (
 
 type Database struct {
 	resources []models.Resource
+	entries   []models.ResourceEntry
 }
 
 func NewFakeDatabase(testResources []models.Resource) *Database {
-	return &Database{testResources}
+	return &Database{testResources, []models.ResourceEntry{}}
 }
 
 func (f *Database) QueryResources(ctx context.Context, kind, group, version string) ([]models.Resource, error) {
@@ -23,4 +24,9 @@ func (f *Database) QueryResources(ctx context.Context, kind, group, version stri
 		}
 	}
 	return filteredResources, nil
+}
+
+func (f *Database) WriteResource(ctx context.Context, entry *models.ResourceEntry) error {
+	f.entries = append(f.entries, *entry)
+	return nil
 }

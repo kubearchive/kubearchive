@@ -13,8 +13,10 @@ import (
 	duckv1 "knative.dev/pkg/apis/duck/v1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,6 +29,7 @@ import (
 type KubeArchiveConfigReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Mapper meta.RESTMapper
 }
 
 //+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs,verbs=get;list;watch;create;update;patch;delete
@@ -135,7 +138,7 @@ func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfi
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileRole")
-	role, err := r.desiredRole(kaconfig)
+	role, err := r.desiredRole(ctx, kaconfig)
 	if err != nil {
 		log.Error(err, "Unable to get desired Role")
 		return role, err
@@ -162,18 +165,28 @@ func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfi
 	return role, nil
 }
 
-func (r *KubeArchiveConfigReconciler) desiredRole(kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.Role, error) {
+func (r *KubeArchiveConfigReconciler) desiredRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.Role, error) {
+	log := log.FromContext(ctx)
 	var rules []rbacv1.PolicyRule
 	for _, resource := range kaconfig.Spec.Resources {
 		apiGroup := ""
-		slash := strings.Index(resource.APIVersion, "/")
-		if slash > -1 {
-			apiGroup = resource.APIVersion[:slash]
+		apiVersion := resource.APIVersion
+		data := strings.Split(resource.APIVersion, "/")
+		if len(data) > 1 {
+			apiGroup = data[0]
+			apiVersion = data[1]
 		}
-		rules = append(rules, rbacv1.PolicyRule{
-			APIGroups: []string{apiGroup},
-			Resources: []string{strings.ToLower(resource.Kind) + "s"},
-			Verbs:     []string{"get", "list", "watch"}})
+		// The resource field in the GVR contains the plural version of the resource, and
+		// the kubernetes Role expects this lower-cased plural version.
+		gvr, err := r.Mapper.RESTMapping(schema.GroupKind{Group: apiGroup, Kind: resource.Kind}, apiVersion)
+		if err == nil {
+			rules = append(rules, rbacv1.PolicyRule{
+				APIGroups: []string{apiGroup},
+				Resources: []string{strings.ToLower(gvr.Resource.Resource)},
+				Verbs:     []string{"get", "list", "watch"}})
+		} else {
+			log.Error(err, "Failed to get GVR for "+resource.APIVersion)
+		}
 	}
 	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{

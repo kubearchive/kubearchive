@@ -13,7 +13,7 @@ metadata:
 spec:
   resources:
     - apiVersion: v1
-      kind: Events
+      kind: Event
 ----
 The configuration of `ApiServerSource` is done using the `resources` key of the KubeArchiveConfig custom
 resource. The format of the `resources` key can be found in the `ApiServerSource`

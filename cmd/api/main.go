@@ -39,8 +39,8 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller) *S
 	router.Use(otelgin.Middleware("kubearchive.api"))
 	router.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews()))
 	router.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews()))
-	// TODO Add middleware for the db connection
 	router.GET("/apis/:group/:version/:resourceType", controller.GetAllResources)
+	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedResources)
 
 	return &Server{
 		router:    router,

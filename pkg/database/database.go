@@ -15,11 +15,13 @@ import (
 const (
 	resourceTableName = "resource"
 	resourcesQuery    = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2"
+	namespacedResourcesQuery = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2 AND namespace=$3"
 	writeResource     = `INSERT INTO %s (uuid, api_version, cluster, cluster_uid, kind, name, namespace, resource_version, created_ts, updated_ts, cluster_deleted_ts, data) Values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT(uuid) DO UPDATE SET name=$6, namespace=$7, resource_version=$8, updated_ts=$10, cluster_deleted_ts=$11, data=$12`
 )
 
 type DBInterface interface {
 	QueryResources(ctx context.Context, kind, group, version string) ([]models.Resource, error)
+	QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]models.Resource, error)
 	WriteResource(ctx context.Context, entry *models.ResourceEntry) error
 }
 
@@ -46,14 +48,28 @@ func NewDatabase() (*Database, error) {
 func (db *Database) QueryResources(ctx context.Context, kind, group, version string) ([]models.Resource, error) {
 	query := fmt.Sprintf(resourcesQuery, db.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	rows, err := db.db.QueryContext(ctx, query, kind, apiVersion)
+	return db.performResourceQuery(ctx, query, kind, apiVersion)
+}
+
+func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]models.Resource, error) {
+	query := fmt.Sprintf(namespacedResourcesQuery, db.resourceTableName) //nolint:gosec
+	apiVersion := fmt.Sprintf("%s/%s", group, version)
+	return db.performResourceQuery(ctx, query, kind, apiVersion, namespace)
+}
+
+func (db *Database) performResourceQuery(ctx context.Context, query string, args ...string) ([]models.Resource, error) {
+	castedArgs := make([]interface{}, len(args))
+	for i, v := range args {
+		castedArgs[i] = v
+	}
+	rows, err := db.db.QueryContext(ctx, query, castedArgs...)
 	defer func(rows *sql.Rows) {
 		err = rows.Close()
 	}(rows)
-	if err != nil {
-		return nil, err
-	}
 	var resources []models.Resource
+	if err != nil {
+		return resources, err
+	}
 	for rows.Next() {
 		var r models.Resource
 		if err := rows.Scan(&r); err != nil {

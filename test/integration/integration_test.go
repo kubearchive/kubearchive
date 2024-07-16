@@ -61,3 +61,12 @@ func TestKubeArchiveDeployments(t *testing.T) {
 		acc += 5
 	}
 }
+
+func TestKubeArchiveOperator(t *testing.T) {
+	// client, err := test.GetKubernetesClient()
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	log.Printf("fake test")
+}

@@ -12,14 +12,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/kubearchive/kubearchive/pkg/database/fake"
-	"github.com/kubearchive/kubearchive/pkg/models"
 )
 
-var testResources = []models.Resource{
-	{Kind: "Crontab", ApiVersion: "stable.example.com/v1", Status: nil, Spec: nil, Metadata: map[string]interface{}{"namespace": "test"}},
-}
+var testResources = fake.CreateTestResources()
 var testAPIResource = metav1.APIResource{
 	Kind:         "Crontab",
 	Name:         "crontabs",
@@ -48,7 +46,7 @@ func TestGetAllResources(t *testing.T) {
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
-	var resources []models.Resource
+	var resources []*unstructured.Unstructured
 	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
 		t.Fail()
 	}
@@ -63,7 +61,7 @@ func TestGetNamespacedResources(t *testing.T) {
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
-	var resources []models.Resource
+	var resources []*unstructured.Unstructured
 	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
 		t.Fail()
 	}

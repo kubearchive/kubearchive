@@ -69,7 +69,7 @@ func NewSink(db database.DBInterface, logger *log.Logger) *Sink {
 // Processes incoming cloudevents and writes them to the database
 func (sink *Sink) Receive(event cloudevents.Event) {
 	sink.Logger.Println("received CloudEvent: ", event.ID())
-	archiveEntry, err := models.ResourceEntryFromCloudevent(event, sink.ClusterName, sink.ClusterUid)
+	k8sObj, err := models.UnstructuredFromByteSlice(event.Data())
 	if err != nil {
 		sink.Logger.Printf("cloudevent %s is malformed and will not be processed: %s\n", event.ID(), err)
 		return
@@ -77,7 +77,7 @@ func (sink *Sink) Receive(event cloudevents.Event) {
 	sink.Logger.Printf("cloudevent %s contains all required fields. Attempting to write it to the database\n", event.ID())
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	sink.Logger.Printf("writing resource from cloudevent %s into the database\n", event.ID())
-	err = sink.Db.WriteResource(ctx, archiveEntry)
+	err = sink.Db.WriteResource(ctx, k8sObj, event.Data(), sink.ClusterName, sink.ClusterUid)
 	defer cancel()
 	if err != nil {
 		sink.Logger.Printf("failed to write cloudevent %s to the database: %s\n", event.ID(), err)

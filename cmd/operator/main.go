@@ -115,6 +115,7 @@ func main() {
 	if err = (&controller.KubeArchiveConfigReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Mapper: mgr.GetRESTMapper(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KubeArchiveConfig")
 		os.Exit(1)

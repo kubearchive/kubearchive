@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/kubearchive/kubearchive/cmd/api/abort"
+
 	"github.com/gin-gonic/gin"
 	apiAuthnv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +35,7 @@ func Authentication(tri clientAuthnv1.TokenReviewInterface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := extractBearerToken(c.GetHeader("Authorization"))
 		if err != nil {
-			abort(c, err.Error(), http.StatusBadRequest)
+			abort.Abort(c, err.Error(), http.StatusBadRequest)
 			return
 		}
 		tr, err := tri.Create(c, &apiAuthnv1.TokenReview{
@@ -42,11 +44,11 @@ func Authentication(tri clientAuthnv1.TokenReviewInterface) gin.HandlerFunc {
 			},
 		}, metav1.CreateOptions{})
 		if err != nil {
-			abort(c, fmt.Sprintf("Unexpected error on TokenReview: %s", err.Error()), http.StatusInternalServerError)
+			abort.Abort(c, fmt.Sprintf("Unexpected error on TokenReview: %s", err.Error()), http.StatusInternalServerError)
 			return
 		}
 		if !tr.Status.Authenticated {
-			abort(c, "Authentication failed", http.StatusUnauthorized)
+			abort.Abort(c, "Authentication failed", http.StatusUnauthorized)
 			return
 		}
 		c.Set("user", tr.Status.User)

@@ -10,18 +10,31 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/kubearchive/kubearchive/pkg/database/fake"
 	"github.com/kubearchive/kubearchive/pkg/models"
-	"github.com/stretchr/testify/assert"
 )
 
 var testResources = []models.Resource{
 	{Kind: "Crontab", ApiVersion: "stable.example.com/v1", Status: nil, Spec: nil, Metadata: map[string]interface{}{"namespace": "test"}},
 }
+var testAPIResource = metav1.APIResource{
+	Kind:         "Crontab",
+	Name:         "crontabs",
+	Group:        "stable.example.com",
+	Version:      "v1",
+	SingularName: "crontab",
+	Namespaced:   true}
 
 func setupRouter() *gin.Engine {
 	router := gin.Default()
 	ctrl := Controller{Database: fake.NewFakeDatabase(testResources)}
+	router.Use(func(c *gin.Context) {
+		c.Set("apiResource", testAPIResource)
+		c.Next()
+	})
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetAllResources)
 	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType", ctrl.GetAllResources)
 	return router

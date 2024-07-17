@@ -4,11 +4,15 @@
 package routers
 
 import (
+	"fmt"
+
+	"github.com/kubearchive/kubearchive/cmd/api/abort"
+
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/pkg/database"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Controller struct {
@@ -19,8 +23,8 @@ type Controller struct {
 func (c *Controller) GetAllResources(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
-	resource := getResourceKindFromPlural(context.Param("resourceType"))
-	resources, err := c.Database.QueryResources(context, resource, group, version)
+	kind := getAPIResourceKind(context)
+	resources, err := c.Database.QueryResources(context, kind, group, version)
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, err.Error())
@@ -33,8 +37,8 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
 	namespace := context.Param("namespace")
-	resource := getResourceKindFromPlural(context.Param("resourceType")) + "/" + context.Param("namespace")
-	resources, err := c.Database.QueryNamespacedResources(context, resource, group, version, namespace)
+	kind := getAPIResourceKind(context)
+	resources, err := c.Database.QueryNamespacedResources(context, kind, group, version, namespace)
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, err.Error())
@@ -43,8 +47,15 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 	context.JSON(http.StatusOK, resources)
 }
 
-func getResourceKindFromPlural(plural string) string {
-	// FIXME - Title is deprecated and this conversion must be done in a different way
-	capitalized := strings.Title(plural) //nolint:staticcheck
-	return capitalized[:len(plural)-1]
+func getAPIResourceKind(context *gin.Context) string {
+	resource, ok := context.Get("apiResource")
+	if !ok {
+		abort.Abort(context, "API resource not found", http.StatusInternalServerError)
+	}
+	apiResource, ok := resource.(metav1.APIResource)
+	if !ok {
+		abort.Abort(context, fmt.Sprintf("unexpected API resource type in context: %T", resource),
+			http.StatusInternalServerError)
+	}
+	return apiResource.Kind
 }

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/kubearchive/kubearchive/cmd/api/abort"
+
 	"github.com/gin-gonic/gin"
 	apiAuthnv1 "k8s.io/api/authentication/v1"
 	apiAuthzv1 "k8s.io/api/authorization/v1"
@@ -19,12 +21,12 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.Hand
 	return func(c *gin.Context) {
 		usr, ok := c.Get("user")
 		if !ok {
-			abort(c, "user not found in context", http.StatusInternalServerError)
+			abort.Abort(c, "user not found in context", http.StatusInternalServerError)
 			return
 		}
 		userInfo, ok := usr.(apiAuthnv1.UserInfo)
 		if !ok {
-			abort(c, fmt.Sprintf("unexpected user type in context: %T", usr), http.StatusInternalServerError)
+			abort.Abort(c, fmt.Sprintf("unexpected user type in context: %T", usr), http.StatusInternalServerError)
 			return
 		}
 
@@ -43,11 +45,11 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.Hand
 		}, metav1.CreateOptions{})
 
 		if err != nil {
-			abort(c, fmt.Sprintf("Unexpected error on SAR: %s", err.Error()), http.StatusInternalServerError)
+			abort.Abort(c, fmt.Sprintf("Unexpected error on SAR: %s", err.Error()), http.StatusInternalServerError)
 			return
 		}
 		if !sar.Status.Allowed {
-			abort(c, "Unauthorized", http.StatusUnauthorized)
+			abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 		c.Next()

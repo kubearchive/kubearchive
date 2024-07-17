@@ -8,11 +8,12 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/cmd/api/routers"
-	fakeDB "github.com/kubearchive/kubearchive/pkg/database/fake"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes"
 	fakeK8s "k8s.io/client-go/kubernetes/fake"
+
+	"github.com/kubearchive/kubearchive/cmd/api/routers"
+	fakeDB "github.com/kubearchive/kubearchive/pkg/database/fake"
 )
 
 func fakeServer(k8sClient kubernetes.Interface) *Server {
@@ -45,6 +46,7 @@ func TestOtelMiddlewareConfigured(t *testing.T) {
 		"otelgin.Middleware",
 		"Authentication",
 		"RBACAuthorization",
+		"GetAPIResource",
 	}
 	for idx, name := range names[len(names)-len(expectedNames):] {
 		assert.Contains(t, name, expectedNames[idx])

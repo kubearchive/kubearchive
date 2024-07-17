@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/auth"
+	"github.com/kubearchive/kubearchive/cmd/api/discovery"
 	"github.com/kubearchive/kubearchive/cmd/api/routers"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/observability"
@@ -39,6 +40,9 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller) *S
 	router.Use(otelgin.Middleware("kubearchive.api"))
 	router.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews()))
 	router.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews()))
+	// TODO - Probably want to use cache for the discovery client
+	// See https://pkg.go.dev/k8s.io/client-go/discovery/cached/disk#NewCachedDiscoveryClientForConfig
+	router.Use(discovery.GetAPIResource(k8sClient.Discovery()))
 	router.GET("/apis/:group/:version/:resourceType", controller.GetAllResources)
 	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedResources)
 

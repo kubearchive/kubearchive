@@ -196,5 +196,6 @@ to start a debugger to which attach from your IDE.
    ```
    expose the `KIND_CLUSTER_NAME` env variable with the appropriate name of the kind cluster:
    ```bash
-   export KIND_CLUSTER_NAME=$(kubectl config get-clusters | grep -P '(?<=kind-).*' -o)
+   export KIND_CLUSTER_NAME=$(kind -q get clusters)
    ```
+   **NOTE**: In case you have more than one kind cluster running, manually set the proper one

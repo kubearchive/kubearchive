@@ -1,0 +1,45 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: Release
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      # Checkout 'fetch-tags' does not work properly, see https://github.com/actions/checkout/issues/701
+      - name: Fecth tags
+        run: git fetch --tags origin
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Setup Helm
+        uses: azure/setup-helm@v4.2.0
+        with:
+          version: latest
+      - name: Install ko
+        uses: ko-build/setup-ko@v0.6
+      - name: Install 'release-notes'
+        run: |
+          curl -Lo ./release-notes https://github.com/kubernetes/release/releases/download/v0.17.1/release-notes-amd64-linux
+          chmod +x release-notes
+          sudo mv release-notes /usr/local/bin/release-notes
+      - name: Generate notes
+        env:
+          OCI_REPOSITORY: ${{ vars.OCI_REPOSITORY }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # For the 'gh' tool
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # For the 'release-notes' tool
+        run: |
+          ko login ${{ vars.OCI_REGISTRY }} --username ${{ secrets.OCI_USERNAME }} --password ${{ secrets.OCI_PASSWORD }}
+          helm registry login ${{ vars.OCI_REGISTRY }} --username ${{ secrets.OCI_USERNAME }} --password ${{ secrets.OCI_PASSWORD }}
+
+          bash hack/release.sh

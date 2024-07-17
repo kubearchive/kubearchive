@@ -1,7 +1,10 @@
 * KubeArchive Configuration
 ** xref:configuration/kubearchiveconfig.adoc[Configuration]
+
 * Contributors
 ** xref:contributors/guide.adoc[Guide]
+** xref:contributors/release.adoc[]
+** xref:contributors/secret-rotation.adoc[]
 
 * Reference
 ** xref:reference/database.adoc[]

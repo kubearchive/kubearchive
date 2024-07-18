@@ -8,7 +8,6 @@ mkdir -p ${LOCALBIN}
 
 test -s ${LOCALBIN}/controller-gen && ${LOCALBIN}/controller-gen --version | grep -q ${CONTROLLER_TOOLS_VERSION} || \
     GOBIN=${LOCALBIN} go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_TOOLS_VERSION}
-test -s ${LOCALBIN}/setup-envtest || GOBIN=${LOCALBIN} go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
 cd ${SCRIPT_DIR}
 

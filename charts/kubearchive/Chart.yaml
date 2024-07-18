@@ -1,6 +1,8 @@
 ---
 apiVersion: v2
-name: kubearchive
+# 'name' impacts the location on the OCI repository. It maps to
+# 'quay.io/kubearchive/<name>'.
+name: kubearchive-helm
 description: A Helm chart that deploys kubearchive on a Kubernetes cluster
 icon: https://avatars.githubusercontent.com/u/153536228?s=48&v=4
 

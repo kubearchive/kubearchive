@@ -1,0 +1,158 @@
+= Release Process
+
+This document explains the process of a KubeArchive release and its requirements.
+
+== Commits
+
+The KubeArchive release process scans commits from the latest tag up to the current
+commit. The commits must mention the GitHub Pull Requests they come from on their
+title (first line). A commit merged from the Pull Request with ID 100 should have
+this title:
+
+[source,text]
+----
+Add feature A (#100)
+----
+
+The Pull Request mention is added by default when the commits are squashed on
+Pull Request merge.
+
+== Pull Request Labels
+
+KubeArchive follows the
+link:https://semver.org/[Semantic Versioning]
+system with a leading `v`: `vMAJOR.MINOR.PATCH`. To summarize, `MAJOR` releases
+break user-facing interfaces, `MINOR` releases introduce new features and `PATCH`
+versions introduce bug fixes or documentation changes.
+
+The KubeArchive release process relies on the labels on the GitHub Pull Requests
+when determining the next version number for the release. The following labels
+impact which number is updated in the next release:
+
+* `kind/breaking`: next release is a MAJOR version. MINOR and PATCH numbers are reset to 0.
+* `kind/feature`: if `kind/breaking` is not present, next release is a MINOR version.
+PATCH number is reset to 0.
+* `kind/documentation` and `kind/bug`: if `kind/breaking` and `kind/feature` are
+not present, next release is a PATCH version.
+
+A Pull Request requires at least one of these labels.
+
+== Release Notes
+
+The KubeArchive release process creates release notes for users. Changes
+that have user-visible impact are required to provide release notes.
+
+Some examples of changes that would require release notes are:
+
+* Optimized the code increasing the overall speed by a signifcant amount.
+* Fixed bug where some configuration option was ignored.
+* Introduced a new configuration option.
+* Rewrote a whole documentation page that is relevant to users.
+* Added a documentation page covering a topic relevant to users.
+
+Some examples of changes that would **not** require release notes are:
+
+* Fixed typos on a documentation page.
+* Improvements on contributor relevant topics such as test coverage, maintainability,
+naming conventions...
+* Reduced time to perform integration testing.
+* Added missing tests.
+
+The notes are generated from the GitHub Pull Requests that contain a code block
+annotated with `release-note`. An example of a `release-note` code block:
+
+[source,text]
+----
+```release-note
+Introduced new feature called `feature-a`. To enable it, set to `true` the
+`feature-a` flag in the `feature-flags` ConfigMap in the `kubearchive` namespace.
+```
+----
+
+To not include release notes from the Pull Request the release-note block must
+contain the string `NONE`:
+
+[source,text]
+----
+```release-note
+NONE
+```
+----
+
+This code block is included in KubeArchive's Pull Request template.
+
+== Steps
+
+. Merge the changes needed into `main`.
+. Make sure the latest commit in `main` has passed every test.
+. Go to the Actions tab on the KubeArchive repository.
+. Trigger the "Release" workflow.
+
+== Release Results
+
+. A release commit is created adding the `VERSION` files.
+. A release tag is created from the release commit.
+. A GitHub release is created from the release tag.
+. Images are pushed with the `<version>` tag to https://quay.io/kubearchive.
+. The Helm chart is pushed to https://quay.io/kubearchive (version is set by a
+command line option).
+
+== Testing
+
+The release workflow is prepared to be run within forks. You can run it locally
+or on your fork Actions.
+
+=== Testing Locally
+
+Read the top of the script and install the tools listed there. Export
+the "externally provided variables" listed on the script with proper values.
+These variables provide authentication for some of the tools, login manually with
+the rest of the tools. Then run the script:
+
+[source,bash]
+----
+bash hack/release.sh
+----
+
+To cleanup the results of the release, complete the following steps:
+
+* Delete the different artifacts created on the OCI repository.
+* Delete the release and the tag using the GitHub UI.
+* Execute the following commands from your repository:
++
+[source,bash]
+----
+git reset --hard HEAD~1  # go back to previous commit
+git push --force  # rewrite fork history to delete the release commit
+----
+
+=== Testing from Fork
+
+Add the following secrets to your fork:
+
+* `OCI_USERNAME`
+* `OCI_PASSWORD`
+
+Add the following variables to your fork:
+
+* `OCI_REGISTRY`: used to login with Helm and Ko (e.g. "quay.io").
+* `OCI_REPOSITORY`: used to push content (e.g. "quay.io/username")
+
+Then execute the release workflow from the branch you are making changes to.
+
+To cleanup the results of the release, complete the following steps.
+
+* Delete the different artifacts created on the OCI repository.
+* Delete the release and the tag using the GitHub UI.
+* From your local git repository run `git push --force` to delete the commit
+  introduced by the workflow on the remote repository.
+
+== Notes
+
+. The release process uses the Kubernetes tool
+link:https://github.com/kubernetes/release/tree/master/cmd/release-notes[release-notes].
+Using this tool delegates complexity but makes us follow certain practices such as using
+`kind/*` labels on GitHub Pull Requests.
+. The Helm chart version uses the same version as the application. This reduces
+the complexity of the release version calculation, as the automation does not need
+to differentiate between chart and application changes.

@@ -5,18 +5,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-var testResources = []models.Resource{
-	{Kind: "Crontab", ApiVersion: "stable.example.com/v1", Status: nil, Spec: nil, Metadata: map[string]interface{}{"namespace": "test", "name": "test"}},
-}
+var testResources = CreateTestResources()
 
 func TestNewFakeDatabase(t *testing.T) {
 	tests := []struct {
 		name      string
-		resources []models.Resource
+		resources []*unstructured.Unstructured
 	}{
 		{
 			name:      "the database is created with no resources",
@@ -34,16 +32,16 @@ func TestNewFakeDatabase(t *testing.T) {
 
 func TestQueryResources(t *testing.T) {
 
-	existingKind := testResources[0].Kind
-	existingGroup := strings.Split(testResources[0].ApiVersion, "/")[0]
-	existingVersion := strings.Split(testResources[0].ApiVersion, "/")[1]
+	existingKind := testResources[0].GetKind()
+	existingGroup := strings.Split(testResources[0].GetAPIVersion(), "/")[0]
+	existingVersion := strings.Split(testResources[0].GetAPIVersion(), "/")[1]
 
 	tests := []struct {
 		name     string
 		kind     string
 		group    string
 		version  string
-		expected []models.Resource
+		expected []*unstructured.Unstructured
 	}{
 		{
 			name:     "No matching resources by kind",
@@ -85,10 +83,10 @@ func TestQueryResources(t *testing.T) {
 
 func TestQueryNamespacedResources(t *testing.T) {
 
-	existingKind := testResources[0].Kind
-	existingGroup := strings.Split(testResources[0].ApiVersion, "/")[0]
-	existingVersion := strings.Split(testResources[0].ApiVersion, "/")[1]
-	existingNamespace := (testResources[0].Metadata["namespace"]).(string)
+	existingKind := testResources[0].GetKind()
+	existingGroup := strings.Split(testResources[0].GetAPIVersion(), "/")[0]
+	existingVersion := strings.Split(testResources[0].GetAPIVersion(), "/")[1]
+	existingNamespace := testResources[0].GetNamespace()
 
 	tests := []struct {
 		name      string
@@ -96,7 +94,7 @@ func TestQueryNamespacedResources(t *testing.T) {
 		group     string
 		version   string
 		namespace string
-		expected  []models.Resource
+		expected  []*unstructured.Unstructured
 	}{
 		{
 			name:      "No matching resources by kind",

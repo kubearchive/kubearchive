@@ -4,39 +4,49 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kubearchive/kubearchive/pkg/models"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+func CreateTestResources() []*unstructured.Unstructured {
+	ret := []*unstructured.Unstructured{}
+	obj := &unstructured.Unstructured{}
+	obj.SetKind("Crontab")
+	obj.SetAPIVersion("stable.example.com/v1")
+	obj.SetName("test")
+	obj.SetNamespace("test")
+	ret = append(ret, obj)
+	return ret
+}
+
 type Database struct {
-	resources []models.Resource
-	entries   []models.ResourceEntry
+	resources []*unstructured.Unstructured
 }
 
-func NewFakeDatabase(testResources []models.Resource) *Database {
-	return &Database{testResources, []models.ResourceEntry{}}
+func NewFakeDatabase(testResources []*unstructured.Unstructured) *Database {
+	return &Database{testResources}
 }
 
-func (f *Database) QueryResources(ctx context.Context, kind, group, version string) ([]models.Resource, error) {
-	var filteredResources []models.Resource
+func (f *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
+	var filteredResources []*unstructured.Unstructured
 	for _, resource := range f.resources {
-		if resource.Kind == kind && resource.ApiVersion == fmt.Sprintf("%s/%s", group, version) {
+		if resource.GetKind() == kind && resource.GetAPIVersion() == fmt.Sprintf("%s/%s", group, version) {
 			filteredResources = append(filteredResources, resource)
 		}
 	}
 	return filteredResources, nil
 }
 
-func (f *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]models.Resource, error) {
-	var filteredResources []models.Resource
+func (f *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
+	var filteredResources []*unstructured.Unstructured
 	for _, resource := range f.resources {
-		if resource.Kind == kind && resource.ApiVersion == fmt.Sprintf("%s/%s", group, version) && resource.Metadata["namespace"] == namespace {
+		if resource.GetKind() == kind && resource.GetAPIVersion() == fmt.Sprintf("%s/%s", group, version) && resource.GetNamespace() == namespace {
 			filteredResources = append(filteredResources, resource)
 		}
 	}
 	return filteredResources, nil
 }
 
-func (f *Database) WriteResource(ctx context.Context, entry *models.ResourceEntry) error {
-	f.entries = append(f.entries, *entry)
+func (f *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, _, _ string) error {
+	f.resources = append(f.resources, k8sObj)
 	return nil
 }

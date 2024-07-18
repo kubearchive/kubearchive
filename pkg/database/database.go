@@ -7,22 +7,24 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/kubearchive/kubearchive/pkg/models"
 	_ "github.com/lib/pq"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
-	resourceTableName = "resource"
-	resourcesQuery    = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2"
+	resourceTableName        = "resource"
+	resourcesQuery           = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2"
 	namespacedResourcesQuery = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2 AND namespace=$3"
-	writeResource     = `INSERT INTO %s (uuid, api_version, cluster, cluster_uid, kind, name, namespace, resource_version, created_ts, updated_ts, cluster_deleted_ts, data) Values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT(uuid) DO UPDATE SET name=$6, namespace=$7, resource_version=$8, updated_ts=$10, cluster_deleted_ts=$11, data=$12`
+	writeResource            = `INSERT INTO %s (uuid, api_version, cluster, cluster_uid, kind, name, namespace, resource_version, created_ts, updated_ts, cluster_deleted_ts, data) Values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT(uuid) DO UPDATE SET name=$6, namespace=$7, resource_version=$8, updated_ts=$10, cluster_deleted_ts=$11, data=$12`
 )
 
 type DBInterface interface {
-	QueryResources(ctx context.Context, kind, group, version string) ([]models.Resource, error)
-	QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]models.Resource, error)
-	WriteResource(ctx context.Context, entry *models.ResourceEntry) error
+	QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error)
+	QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error)
+	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, cluster, cluster_uid string) error
 }
 
 type Database struct {
@@ -45,19 +47,19 @@ func NewDatabase() (*Database, error) {
 	return &Database{db, resourceTableName}, nil
 }
 
-func (db *Database) QueryResources(ctx context.Context, kind, group, version string) ([]models.Resource, error) {
+func (db *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
 	query := fmt.Sprintf(resourcesQuery, db.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return db.performResourceQuery(ctx, query, kind, apiVersion)
 }
 
-func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]models.Resource, error) {
+func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
 	query := fmt.Sprintf(namespacedResourcesQuery, db.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return db.performResourceQuery(ctx, query, kind, apiVersion, namespace)
 }
 
-func (db *Database) performResourceQuery(ctx context.Context, query string, args ...string) ([]models.Resource, error) {
+func (db *Database) performResourceQuery(ctx context.Context, query string, args ...string) ([]*unstructured.Unstructured, error) {
 	castedArgs := make([]interface{}, len(args))
 	for i, v := range args {
 		castedArgs[i] = v
@@ -66,13 +68,17 @@ func (db *Database) performResourceQuery(ctx context.Context, query string, args
 	defer func(rows *sql.Rows) {
 		err = rows.Close()
 	}(rows)
-	var resources []models.Resource
+	var resources []*unstructured.Unstructured
 	if err != nil {
 		return resources, err
 	}
 	for rows.Next() {
-		var r models.Resource
-		if err := rows.Scan(&r); err != nil {
+		var b sql.RawBytes
+		var r *unstructured.Unstructured
+		if err := rows.Scan(&b); err != nil {
+			return resources, err
+		}
+		if r, err = models.UnstructuredFromByteSlice([]byte(b)); err != nil {
 			return resources, err
 		}
 		resources = append(resources, r)
@@ -80,27 +86,27 @@ func (db *Database) performResourceQuery(ctx context.Context, query string, args
 	return resources, err
 }
 
-func (db *Database) WriteResource(ctx context.Context, entry *models.ResourceEntry) error {
+func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, cluster, clusterUid string) error {
 	query := fmt.Sprintf(writeResource, db.resourceTableName)
 	tx, err := db.db.BeginTx(ctx, nil)
 	if err != nil {
-		return fmt.Errorf("could not begin transaction for resource %s: %s", entry.Uuid, err)
+		return fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)
 	}
 	_, execErr := tx.ExecContext(
 		ctx,
 		query,
-		entry.Uuid,
-		entry.ApiVersion,
-		entry.Cluster,
-		entry.ClusterUid,
-		entry.Kind,
-		entry.Name,
-		entry.Namespace,
-		entry.ResourceVersion,
-		entry.Created,
-		entry.LastUpdated,
-		entry.Deleted,
-		entry.Data,
+		k8sObj.GetUID(),
+		k8sObj.GetAPIVersion(),
+		cluster,
+		clusterUid,
+		k8sObj.GetKind(),
+		k8sObj.GetName(),
+		k8sObj.GetNamespace(),
+		k8sObj.GetResourceVersion(),
+		models.FormatTimestamp(k8sObj.GetCreationTimestamp().Time),
+		models.FormatTimestamp(time.Now()),
+		models.OptionalTimestamp(k8sObj.GetDeletionTimestamp()),
+		data,
 	)
 	if execErr != nil {
 		rollbackErr := tx.Rollback()

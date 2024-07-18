@@ -63,10 +63,31 @@ func TestKubeArchiveDeployments(t *testing.T) {
 }
 
 func TestKubeArchiveOperator(t *testing.T) {
-	// client, err := test.GetKubernetesClient()
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
+	client, err := test.GetKubernetesClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// clientset, err := kubernetes.NewForConfig(config)
+	// 	if err != nil {
+    // 		panic(err)
+	// 	}
+
+	// create a namespace
+	nsName := &corev1.Namespace{
+    	ObjectMeta: metav1.ObjectMeta{
+        	Name: "test-1234",
+    	},
+	}
+	client.CoreV1().Namespaces().Create(context.Background(), nsName, metav1.CreateOptions{})
+	//client.CoreV1().Namespaces().Create(context.Background(), nsName, metav1.CreateOptions{})
+
+	
+	// deploy the operator 
+	// check that in the test namespace the KA config was created.
+	
 
 	log.Printf("fake test")
 }
+
+

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 ---
 name: golangci-lint
-run-name: Running golangci-lint security testing
+run-name: Linting Tests (golangci-lint)
 on:
   push:
     branches:
@@ -20,9 +20,10 @@ jobs:
     name: "golangci-lint security testing"
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Job triggered by ${{ github.actor }}."
-      - run: echo "Running on a ${{ runner.os }} server hosted by GitHub."
-      - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
+      - run: |
+          echo "Job triggered by ${{ github.actor }}."
+          echo "Running on a ${{ runner.os }} server hosted by GitHub."
+          echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
       - name: Check out repository code
         uses: actions/checkout@v4
       - name: Setup Go
@@ -33,7 +34,7 @@ jobs:
         run: go version
       - name: Generate operator code
         run: cmd/operator/generate.sh
-      - name: Test Go code
+      - name: Lint testing Go code
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest

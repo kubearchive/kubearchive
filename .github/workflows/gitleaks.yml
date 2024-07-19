@@ -4,7 +4,7 @@
 # GitLeaks: https://github.com/gitleaks/gitleaks
 ---
 name: gitleaks
-run-name: Running gitleaks check
+run-name: Gitleaks Check
 # According to the GitHub documentation on Action secrets:
 # "They are not passed to workflows that are triggered by a pull request from a fork."
 # So we can't use pull_requests here since gitleaks needs GITLEAKS_LICENSE.
@@ -21,9 +21,10 @@ jobs:
     name: gitleaks
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Job triggered by ${{ github.actor }}."
-      - run: echo "Running on a ${{ runner.os }} server hosted by GitHub."
-      - run: echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
+      - run: |
+          echo "Job triggered by ${{ github.actor }}."
+          echo "Running on a ${{ runner.os }} server hosted by GitHub."
+          echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
       - name: Check out repository code
         uses: actions/checkout@v4
         with:

@@ -1,19 +1,40 @@
 # Copyright KubeArchive Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
-name: static_code_analysis
-run-name: Running static code analysis
+name: Static Code Analysis
+run-name: Static Code Analysis
 on:
   push:
     branches-ignore:
-      - 'main'
+      - main
   pull_request:
     branches:
-      - 'main'
+      - main
 permissions:
   contents: read
   pull-requests: read
 jobs:
+  go-mod-tidy:
+    name: go mod tidy
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Job triggered by ${{ github.actor }}."
+          echo "Running on a ${{ runner.os }} server hosted by GitHub."
+          echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Run 'go mod tidy'
+        run: |
+          go mod tidy
+      - name: Fail if there are any changes
+        run: |
+          git diff --exit-code go.sum
+          git diff --exit-code go.mod
   helm-lint:
     name: "Helm lint"
     runs-on: ubuntu-latest

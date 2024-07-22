@@ -12,6 +12,7 @@ spec:
     metadata:
       labels: *labels
     spec:
+      serviceAccountName: {{ tpl .Values.sink.name . }}
       containers:
         - name: {{ tpl .Values.sink.name . }}
           image: {{ .Values.sink.image }}
@@ -35,6 +36,8 @@ spec:
               value: {{ tpl .Values.database.url . }}
             - name: POSTGRES_PORT
               value: "{{ .Values.database.service.port }}"
+            - name: DELETE_WHEN
+              value: "{{ .Values.sink.deleteWhen }}"
 {{ include "kubearchive.v1.otel.env" .Values.sink | indent 12 }}
 ---
 kind: Service

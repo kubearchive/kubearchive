@@ -183,7 +183,7 @@ func (r *KubeArchiveConfigReconciler) desiredRole(ctx context.Context, kaconfig 
 			rules = append(rules, rbacv1.PolicyRule{
 				APIGroups: []string{apiGroup},
 				Resources: []string{strings.ToLower(gvr.Resource.Resource)},
-				Verbs:     []string{"get", "list", "watch"}})
+				Verbs:     []string{"delete", "get", "list", "watch"}})
 		} else {
 			log.Error(err, "Failed to get GVR for "+resource.APIVersion)
 		}
@@ -244,11 +244,18 @@ func (r *KubeArchiveConfigReconciler) desiredRoleBinding(kaconfig *kubearchivev1
 			Kind:     "Role",
 			Name:     kaconfig.Name,
 		},
-		Subjects: []rbacv1.Subject{{
-			Kind:      "ServiceAccount",
-			Name:      kaconfig.Name,
-			Namespace: kaconfig.Namespace,
-		}},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      kaconfig.Name,
+				Namespace: kaconfig.Namespace,
+			},
+			{
+				Kind:      "ServiceAccount",
+				Name:      "kubearchive-sink",
+				Namespace: "kubearchive",
+			},
+		},
 	}
 
 	if err := ctrl.SetControllerReference(kaconfig, binding, r.Scheme); err != nil {

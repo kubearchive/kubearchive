@@ -1,9 +1,10 @@
 # yamllint disable rule:braces
+{{- $caName := tpl "{{ .Release.Name }}-ca" . -}}
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: kubearchive-ca-issuer
+  name: "{{ .Release.Name }}-ca"
 spec:
   selfSigned: {}
 
@@ -11,16 +12,16 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: kubearchive-ca-certificate
+  name: "{{ $caName }}"
 spec:
   isCA: true
   commonName: kubearchive-ca-certificate
-  secretName: kubearchive-ca-secret
+  secretName: "{{ $caName }}"
   privateKey:
     algorithm: ECDSA
     size: 256
   issuerRef:
-    name: kubearchive-ca-issuer
+    name: "{{ $caName }}"
     kind: Issuer
     group: cert-manager.io
 
@@ -28,7 +29,7 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: kubearchive-cert-issuer
+  name: "{{ .Release.Name }}"
 spec:
   ca:
-    secretName: kubearchive-ca-secret
+    secretName: "{{ $caName }}"

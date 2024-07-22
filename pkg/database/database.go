@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/XSAM/otelsql"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	_ "github.com/lib/pq"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,7 +38,7 @@ func NewDatabase() (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := sql.Open("postgres", dataSource)
+	db, err := otelsql.Open("postgres", dataSource)
 	if err != nil {
 		return nil, err
 	}

@@ -19,9 +19,9 @@ Install these tools:
 ## Creating a fork repository
 
 1. Create your fork of [KubeArchive](https://github.com/kubearchive/kubearchive)
-  following [this guide](https://help.github.com/articles/fork-a-repo/).
+   following [this guide](https://help.github.com/articles/fork-a-repo/).
 1. Clone it to your computer:
-  
+
     ```bash
     git clone git@github.com:${YOUR_GITHUB_USERNAME}/kubearchive.git
     cd kubearchive
@@ -37,7 +37,7 @@ Install these tools:
     ```
 
 1. Set up `ko` to upload images to the KinD cluster, or any other registry you
-  want to use:
+   want to use:
     ```bash
     export KO_DOCKER_REPO="kind.local"
     ```
@@ -71,10 +71,10 @@ Install these tools:
    ```bash
    kubectl get -n kubearchive deployments
    ```
-   
+
 1. List the deployed helm chart
    ```bash
-   helm list -n kubearchive  
+   helm list -n kubearchive
    ```
 
 ## Update KubeArchive
@@ -96,14 +96,14 @@ helm uninstall -n kubearchive kubearchive
 
 ## Initialize the database
 
-1.  In a new terminal tab create a port-forward.
-    ```bash
-    kubectl port-forward -n kubearchive svc/kubearchive-database 5432:5432
-    ```
-2.  Populate the database with test objects.
-    ```bash
-    go run database/init_db.go
-    ```
+1. In a new terminal tab create a port-forward.
+   ```bash
+   kubectl port-forward -n kubearchive svc/kubearchive-database 5432:5432
+   ```
+2. Populate the database with test objects.
+   ```bash
+   go run database/init_db.go
+   ```
 
 ## Generate activity on the KubeArchive sink
 
@@ -128,10 +128,10 @@ By default, KubeArchive listens to `Event`s in the `test` namespace.
     ```bash
     kubectl get -n kubearchive secrets kubearchive-api-server-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
     ```
-   
+
 1. **[ Optional ]** Create a service account with a specific role to test the REST API.
    This Helm chart already provides `kubearchive-test-sa` with `view` privileges for testing purposes.
-    
+
 1. On a new terminal, use `curl` or your browser to perform a query:
     ```bash
     curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create token kubearchive-test -n kubearchive)" \
@@ -146,6 +146,7 @@ By default, KubeArchive listens to `Event`s in the `test` namespace.
 ## Running integration tests
 
 Use `go test` to run the integration test suite:
+
 ```bash
 go test -v ./test/integration -tags=integration
 ```
@@ -157,7 +158,7 @@ to start a debugger to which attach from your IDE.
 
 1. Deploy the chart with `ko` and `helm` in debug mode using an image with `delve`:
    ```bash
-   helm install kubearchive charts/kubearchive --create-namespace -n kubearchive \ 
+   helm install kubearchive charts/kubearchive --create-namespace -n kubearchive \
    --set apiServer.debug=true \
    --set-string apiServer.image=$(KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest ko build --disable-optimizations github.com/kubearchive/kubearchive/cmd/api) \
    --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
@@ -170,8 +171,8 @@ to start a debugger to which attach from your IDE.
    ```
 1. Enable breakpoints in your IDE.
 1. Connect to the process using the port 40000:
-   * [VSCode instructions](https://golangforall.com/en/post/go-docker-delve-remote-debug.html#visual-studio-code)
-   * [Goland instructions](https://golangforall.com/en/post/go-docker-delve-remote-debug.html#goland-ide)
+    * [VSCode instructions](https://golangforall.com/en/post/go-docker-delve-remote-debug.html#visual-studio-code)
+    * [Goland instructions](https://golangforall.com/en/post/go-docker-delve-remote-debug.html#goland-ide)
 1. Query the API using `curl` or your browser:
    ```bash
    curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create token kubearchive-test -n kubearchive)" \
@@ -185,13 +186,13 @@ to start a debugger to which attach from your IDE.
     ERROR: failed to create cluster: running kind with rootless provider requires
     setting systemd property "Delegate=yes", see https://kind.sigs.k8s.io/docs/user/rootless/
     ```
-    try creating the cluster with this command:
+   try creating the cluster with this command:
     ```bash
     systemd-run -p Delegate=yes --user --scope kind create cluster
     ```
 1. Using KinD and Podman Desktop. If you get this error:
    ```
-   Error: failed to publish images: error publishing 
+   Error: failed to publish images: error publishing
    ko://github.com/kubearchive/kubearchive/cmd/api: no nodes found for cluster "kind"
    ```
    expose the `KIND_CLUSTER_NAME` env variable with the appropriate name of the kind cluster:

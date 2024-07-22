@@ -3,15 +3,6 @@
 # Declare variables to be passed into your templates.
 
 ---
-# template values relevant to all of kubearchive
-kubearchive:
-  # the name of the namespace to deploy kubearchive into
-  namespace: "kubearchive"
-  # RoleBinding name
-  roleBinding: "kubearchive"
-  # Name of Service Account
-  serviceAccount: "kubearchive"
-
 # values used to create the api-server
 apiServer:
   name: "{{ .Release.Name }}-api-server"
@@ -47,7 +38,9 @@ sink:
   # the path that the sink will mount the KubeArchive ConfigMap
   mountPath: "/data/sink-filters"
 
+# values used to create the operator
 operator:
+  name: "{{ .Release.Name }}-operator"
   # NOTE - Helm does not resolve the `ko` path. The path needs to be set on the `helm install` command.
   # For example:
   # helm install -n default <chart-name> charts/kubearchive \

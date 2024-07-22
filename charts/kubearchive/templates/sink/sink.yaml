@@ -52,7 +52,6 @@ kind: Service
 apiVersion: v1
 metadata:
   name: {{ tpl .Values.sink.name . }}
-  namespace: {{ .Values.kubearchive.namespace }}
 spec:
   selector:
     app: {{ tpl .Values.sink.name . }}

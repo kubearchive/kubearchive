@@ -1,19 +1,20 @@
+{{- $leaderElection := tpl "{{ tpl .Values.operator.name . }}-leader-election" . -}}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   labels:
     app.kubernetes.io/name: rolebinding
-    app.kubernetes.io/instance: {{ .Values.kubearchive.namespace }}-operator-leader-election
+    app.kubernetes.io/instance: {{ $leaderElection }}
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: {{ .Values.kubearchive.namespace }}-operator
-    app.kubernetes.io/part-of: {{ .Values.kubearchive.namespace }}-operator
+    app.kubernetes.io/created-by: {{ tpl .Values.operator.name . }}
+    app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
     app.kubernetes.io/managed-by: kustomize
-  name: {{ .Values.kubearchive.namespace }}-operator-leader-election
+  name: {{ $leaderElection }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ .Values.kubearchive.namespace }}-operator-leader-election
+  name: {{ $leaderElection }}
 subjects:
   - kind: ServiceAccount
-    name: {{ .Values.kubearchive.namespace }}-operator
-    namespace: {{ .Values.kubearchive.namespace }}
+    name: {{ tpl .Values.operator.name . }}
+    namespace: {{ .Release.Namespace }}

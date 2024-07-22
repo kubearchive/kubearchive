@@ -1,26 +1,28 @@
+{{- $controlPlane := "controller-manager" -}}
+{{- $port := 8081 -}}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
     app.kubernetes.io/component: operator
-    app.kubernetes.io/created-by: {{ .Values.kubearchive.namespace }}-operator
-    app.kubernetes.io/instance: {{ .Values.kubearchive.namespace }}-operator
-    app.kubernetes.io/name: deployment
-    app.kubernetes.io/part-of: {{ .Values.kubearchive.namespace }}-operator
-    control-plane: controller-manager
-  name: {{ .Values.kubearchive.namespace }}-operator
+    app.kubernetes.io/created-by: {{ tpl .Values.operator.name . }}
+    app.kubernetes.io/instance: {{ tpl .Values.operator.name . }}
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
+    control-plane: {{ $controlPlane }}
+  name: {{ tpl .Values.operator.name . }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      control-plane: controller-manager
+      control-plane: {{ $controlPlane }}
   template:
     metadata:
       annotations:
         kubectl.kubernetes.io/default-container: manager
       labels:
-        control-plane: controller-manager
+        control-plane: {{ $controlPlane }}
     spec:
       containers:
         - args:
@@ -61,14 +63,14 @@ spec:
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 8081
+              port: {{ $port }}
             initialDelaySeconds: 15
             periodSeconds: 20
           name: manager
           readinessProbe:
             httpGet:
               path: /readyz
-              port: 8081
+              port: {{ $port }}
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:
@@ -85,5 +87,5 @@ spec:
                 - ALL
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: {{ .Values.kubearchive.namespace }}-operator
+      serviceAccountName: {{ tpl .Values.operator.name . }}
       terminationGracePeriodSeconds: 10

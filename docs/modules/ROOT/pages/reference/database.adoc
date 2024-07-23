@@ -10,9 +10,9 @@ This document lists and details the database schema used by KubeArchive.
 |Type
 |Description
 
-|id
-|serial primary key
-|Primary key
+|uuid
+|uuid primary key
+|The UUID of the Kubernetes resource used as primary key.
 
 |api_version
 |varchar not null
@@ -42,13 +42,13 @@ This document lists and details the database schema used by KubeArchive.
 |varchar not null
 |Version of the resource (`metadata.resourceVersion`).
 
-|created_ts
+|created_at
 |timestamp not null
-|Time when KubeArchive received the resource for the first time.
+|Timestamp when the record is inserted in this table.
 
-|updated_ts
+|updated_at
 |timestamp not null
-|Last time KubeArchive received an update for the resource.
+|Last time this record was updated.
 
 |cluster_deleted_ts
 |timestamp not null

@@ -5,6 +5,7 @@
 ** xref:contributors/guide.adoc[Guide]
 ** xref:contributors/release.adoc[]
 ** xref:contributors/secret-rotation.adoc[]
+** xref:contributors/naming-conventions.adoc[]
 
 * Reference
 ** xref:reference/database.adoc[]

@@ -1,5 +1,6 @@
 ---
-name: Documentation release
+name: Documentation Release
+run-name: Documentation Release
 on:
   push:
     branches: [main]
@@ -16,8 +17,8 @@ on:
 concurrency:
   group: github-pages
   cancel-in-progress: false
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
   pages: write
@@ -30,6 +31,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - run: |
+          echo "Job triggered by ${{ github.actor }}."
+          echo "Running on a ${{ runner.os }} server hosted by GitHub."
+          echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Configure Pages

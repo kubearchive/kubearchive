@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 ---
 name: go_test_integration
-run-name: Running go test with integration tests
+run-name: Integration Tests (go)
 on:
   push:
     branches:
@@ -27,7 +27,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21.9'
+          go-version: stable
       - name: Display Go version
         run: go version
       - name: Install KinD

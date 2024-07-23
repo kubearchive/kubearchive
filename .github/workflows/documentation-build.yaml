@@ -1,5 +1,6 @@
 ---
-name: Documentation build
+name: Documentation Build
+run-name: Documentation Build
 on:
   pull_request:
     branches: [main]
@@ -8,6 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - run: |
+          echo "Job triggered by ${{ github.actor }}."
+          echo "Running on a ${{ runner.os }} server hosted by GitHub."
+          echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install Node.js

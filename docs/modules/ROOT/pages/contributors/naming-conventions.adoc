@@ -1,0 +1,126 @@
+= Naming Conventions
+
+This document lists the naming conventions to be applied in the different parts
+of KubeArchive codebase.
+
+== Helm Chart
+
+The Helm Chart templates are located into different directories that match the different
+components of kubearchive:
+
+* Sink
+* API Server
+* Operator
+* Database
+
+The common resources are outside these folders.
+
+The templated variables are located in [filename]`kubearchive/chars/kubearchive/values.yaml`
+following the same categories.
+
+=== Conventions
+
+* Follow the DRY (Don't Repeat Yourself) principle.
+When a value is reused extract it and reference it.
+If a part of the value is reused (like a prefix with the app name) also
+reuse it.
++
+There are 4 possibilities for referencing variables and not repeat them:
+
+** Direct reference to a variable in [filename]`values.yaml`.
++
+.values.yaml
+[source,yaml]
+----
+apiServer:
+  port: 8081
+----
++
+.template-example.yaml
+[source,yaml]
+----
+kind: Service
+apiVersion: v1
+spec:
+  ports:
+    - protocol: TCP
+      port: {{ .Values.apiServer.port }}
+      targetPort: {{ .Values.apiServer.port }}
+      name: server
+----
++
+** Build the value by referencing a template with the
+link:[tpl function].
++
+.values.yaml
+[source,yaml]
+----
+sink:
+  name: {{ .Release.Name }}-sink
+----
++
+.template-example.yaml
+[source,yaml]
+----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ tpl .Values.sink.name . }}
+----
++
+** Build the value by referencing a nested template with the
+link:[tpl function].
++
+.values.yaml
+[source,yaml]
+----
+database:
+  name: "{{ .Release.Name }}-database"
+  url: "{{ tpl .Values.database.name . }}.{{ .Release.Namespace }}.svc.cluster.local"
+----
++
+.template-example.yaml
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+        - env:
+          - name: POSTGRES_URL
+            value: {{ tpl .Values.database.url . }}
+----
++
+** Create a variable in the template to reuse it.
+This is the recommended approach for variables that are not meant
+to be exposed to the user.
++
+.template-example.yaml
+[source,yaml]
+----
+{{- $caName := tpl "{{ .Release.Name }}-ca" . -}}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "{{ $caName }}"
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "{{ .Release.Name }}"
+spec:
+  ca:
+    secretName: "{{ $caName }}"
+----
+
+* Do not add the `Kind` of the resource as part of the `name`.
+We encourage short non-redundant readable names.
+
+* Do not create variables with the same value, rename the variable if needed
+and reuse it.
+We want to keep the list of variables as short as possible.

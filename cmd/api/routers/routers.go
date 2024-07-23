@@ -24,7 +24,7 @@ func (c *Controller) GetAllResources(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
 	kind := getAPIResourceKind(context)
-	resources, err := c.Database.QueryResources(context, kind, group, version)
+	resources, err := c.Database.QueryResources(context.Request.Context(), kind, group, version)
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, err.Error())
@@ -38,7 +38,7 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 	version := context.Param("version")
 	namespace := context.Param("namespace")
 	kind := getAPIResourceKind(context)
-	resources, err := c.Database.QueryNamespacedResources(context, kind, group, version, namespace)
+	resources, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, group, version, namespace)
 
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, err.Error())

@@ -48,6 +48,8 @@ sink:
   replicas: 1
   # If true, OpenTelemetry instrumentation will be enabled for the sink
   observability: false
+  # a json path that if it returns a value, will cause the sink to delete the resource
+  deleteWhen: ".status.completionTime"
 
 operator:
   # NOTE - Helm does not resolve the `ko` path. The path needs to be set on the `helm install` command.

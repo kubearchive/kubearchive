@@ -7,7 +7,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
 
 	"github.com/XSAM/otelsql"
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -19,7 +18,7 @@ const (
 	resourceTableName        = "resource"
 	resourcesQuery           = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2"
 	namespacedResourcesQuery = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2 AND namespace=$3"
-	writeResource            = `INSERT INTO %s (uuid, api_version, cluster, cluster_uid, kind, name, namespace, resource_version, created_ts, updated_ts, cluster_deleted_ts, data) Values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT(uuid) DO UPDATE SET name=$6, namespace=$7, resource_version=$8, updated_ts=$10, cluster_deleted_ts=$11, data=$12`
+	writeResource            = `INSERT INTO %s (uuid, api_version, cluster, cluster_uid, kind, name, namespace, resource_version, cluster_deleted_ts, data) Values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT(uuid) DO UPDATE SET name=$6, namespace=$7, resource_version=$8, cluster_deleted_ts=$9, data=$10`
 )
 
 type DBInterface interface {
@@ -104,8 +103,6 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 		k8sObj.GetName(),
 		k8sObj.GetNamespace(),
 		k8sObj.GetResourceVersion(),
-		models.FormatTimestamp(k8sObj.GetCreationTimestamp().Time),
-		models.FormatTimestamp(time.Now()),
 		models.OptionalTimestamp(k8sObj.GetDeletionTimestamp()),
 		data,
 	)

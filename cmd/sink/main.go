@@ -13,6 +13,7 @@ import (
 	ceOtelObs "github.com/cloudevents/sdk-go/observability/opentelemetry/v2/client"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	ceClient "github.com/cloudevents/sdk-go/v2/client"
+	"github.com/kubearchive/kubearchive/cmd/sink/events"
 	jsonpath "github.com/kubearchive/kubearchive/cmd/sink/jsonPath"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -104,6 +105,10 @@ func (sink *Sink) Receive(ctx context.Context, event cloudevents.Event) {
 	}
 	sink.Logger.Printf("successfully wrote cloudevent %s to the database\n", event.ID())
 	sink.Logger.Printf("checking if resource from cloudevent %s needs to be deleted\n", event.ID())
+	if events.IsDeleteType(event) {
+		sink.Logger.Printf("resource from cloudevent %s is already deleted\n", event.ID())
+		return
+	}
 	mustDelete, err := jsonpath.PathExists(sink.DeleteWhen, k8sObj.UnstructuredContent())
 	if err != nil {
 		sink.Logger.Printf(

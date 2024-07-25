@@ -6,5 +6,8 @@ metadata:
   namespace: test
 spec:
   resources:
-    - apiVersion: v1
-      kind: Event
+    - selector:
+        apiVersion: v1
+        kind: Event
+      archive-when: .status != 'Completed'
+      delete-when: .status == 'Completed'

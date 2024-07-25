@@ -110,7 +110,7 @@ func (r *KubeArchiveConfigReconciler) reconcileServiceAccount(ctx context.Contex
 		return sa, err
 	}
 
-	err = r.Get(ctx, types.NamespacedName{Name: kaconfig.Name, Namespace: kaconfig.Namespace}, &corev1.ServiceAccount{})
+	err = r.Get(ctx, types.NamespacedName{Name: "kubearchive-operator", Namespace: kaconfig.Namespace}, &corev1.ServiceAccount{})
 	if err == nil {
 		err = r.Update(ctx, sa)
 		if err != nil {
@@ -182,22 +182,22 @@ func (r *KubeArchiveConfigReconciler) desiredRole(ctx context.Context, kaconfig 
 	var rules []rbacv1.PolicyRule
 	for _, resource := range kaconfig.Spec.Resources {
 		apiGroup := ""
-		apiVersion := resource.APIVersion
-		data := strings.Split(resource.APIVersion, "/")
+		apiVersion := resource.Selector.APIVersion
+		data := strings.Split(resource.Selector.APIVersion, "/")
 		if len(data) > 1 {
 			apiGroup = data[0]
 			apiVersion = data[1]
 		}
 		// The resource field in the GVR contains the plural version of the resource, and
 		// the kubernetes Role expects this lower-cased plural version.
-		gvr, err := r.Mapper.RESTMapping(schema.GroupKind{Group: apiGroup, Kind: resource.Kind}, apiVersion)
+		gvr, err := r.Mapper.RESTMapping(schema.GroupKind{Group: apiGroup, Kind: resource.Selector.Kind}, apiVersion)
 		if err == nil {
 			rules = append(rules, rbacv1.PolicyRule{
 				APIGroups: []string{apiGroup},
 				Resources: []string{strings.ToLower(gvr.Resource.Resource)},
 				Verbs:     verbs})
 		} else {
-			log.Error(err, "Failed to get GVR for "+resource.APIVersion)
+			log.Error(err, "Failed to get GVR for "+resource.Selector.APIVersion)
 		}
 	}
 	role := &rbacv1.Role{
@@ -304,6 +304,11 @@ func (r *KubeArchiveConfigReconciler) reconcileApiServerSource(ctx context.Conte
 }
 
 func (r *KubeArchiveConfigReconciler) desiredApiServerSource(kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*sourcesv1.ApiServerSource, error) {
+
+	resources := make([]sourcesv1.APIVersionKindSelector, 0)
+	for _, resource := range kaconfig.Spec.Resources {
+		resources = append(resources, resource.Selector)
+	}
 	source := &sourcesv1.ApiServerSource{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ApiServerSource",
@@ -316,7 +321,7 @@ func (r *KubeArchiveConfigReconciler) desiredApiServerSource(kaconfig *kubearchi
 		Spec: sourcesv1.ApiServerSourceSpec{
 			EventMode:          "Resource",
 			ServiceAccountName: "kubearchive-operator",
-			Resources:          kaconfig.Spec.Resources,
+			Resources:          resources,
 			SourceSpec: duckv1.SourceSpec{
 				Sink: duckv1.Destination{
 					Ref: &duckv1.KReference{

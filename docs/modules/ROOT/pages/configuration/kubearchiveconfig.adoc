@@ -12,9 +12,14 @@ metadata:
   namespace: ns
 spec:
   resources:
-    - apiVersion: v1
-      kind: Event
+    - selector:
+        apiVersion: v1
+        kind: Event
+      archive-when: .status != 'Completed'
+      delete-when: .status == 'Completed'
 ----
-The configuration of `ApiServerSource` is done using the `resources` key of the KubeArchiveConfig custom
-resource. The format of the `resources` key can be found in the `ApiServerSource`
+The configuration of `ApiServerSource` is done using the `selector` keys of the KubeArchiveConfig custom
+resource. The format of the `selectors` key can be found in the `ApiServerSource`
 link:https://knative.dev/docs/eventing/sources/apiserversource/reference/#resources-parameter[reference documentation].
+
+The `archive-when` and `delete-when` keys contain expressions that determine when resources of that kind are archived or deleted.

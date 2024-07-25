@@ -51,12 +51,12 @@ func main() {
 
 	// pgSQL instruction to create the triggers for CREATED_AT and UPDATED_AT
 	pgSQLTriggerTSFunction := `
-	CREATE OR REPLACE FUNCTION trigger_set_timestamp() 
-	RETURNS TRIGGER AS $$ 
-	BEGIN 
-	  NEW.updated_at = NOW(); 
-	  RETURN NEW; 
-	  END; 
+	CREATE OR REPLACE FUNCTION trigger_set_timestamp()
+	RETURNS TRIGGER AS $$
+	BEGIN
+	  NEW.updated_at = NOW();
+	  RETURN NEW;
+	  END;
 	$$ LANGUAGE plpgsql;
 	`
 	_, err = db.Exec(pgSQLTriggerTSFunction)
@@ -70,8 +70,6 @@ func main() {
 	CREATE TABLE IF NOT EXISTS public.resource (
 		"uuid" uuid PRIMARY KEY,
 		"api_version" varchar NOT NULL,
-		"cluster" varchar NOT NULL,
-		"cluster_uid" uuid NOT NULL,
 		"kind" varchar NOT NULL,
 		"name" varchar NOT NULL,
 		"namespace" varchar NOT NULL,
@@ -90,9 +88,9 @@ func main() {
 
 	// SQL instruction to create the trigger of the table
 	sqlTrigger := `
-	CREATE OR REPLACE TRIGGER set_timestamp 
-	BEFORE UPDATE ON public.resource 
-	FOR EACH ROW 
+	CREATE OR REPLACE TRIGGER set_timestamp
+	BEFORE UPDATE ON public.resource
+	FOR EACH ROW
 	EXECUTE PROCEDURE trigger_set_timestamp();
 	`
 	_, err = db.Exec(sqlTrigger)

@@ -8,9 +8,15 @@ import (
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
+type KubeArchiveConfigResource struct {
+	Selector    sourcesv1.APIVersionKindSelector `json:"selector,omitempty"`
+	ArchiveWhen string                           `json:"archive-when,omitempty"`
+	DeleteWhen  string                           `json:"delete-when,omitempty"`
+}
+
 // KubeArchiveConfigSpec defines the desired state of KubeArchiveConfig
 type KubeArchiveConfigSpec struct {
-	Resources []sourcesv1.APIVersionKindSelector `json:"resources,omitempty"`
+	Resources []KubeArchiveConfigResource `json:"resources,omitempty"`
 }
 
 // KubeArchiveConfigStatus defines the observed state of KubeArchiveConfig

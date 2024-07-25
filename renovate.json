@@ -1,5 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "osvVulnerabilityAlerts": true,
-  "semanticCommits": "disabled"
+  "semanticCommits": "disabled",
+  "postUpdateOptions": [
+    "gomodTidy"
+  ]
 }

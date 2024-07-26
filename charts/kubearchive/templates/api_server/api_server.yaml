@@ -19,7 +19,7 @@ spec:
             secretName: {{ tpl .Values.apiServer.secret . }}
       containers:
         - name: {{ tpl .Values.apiServer.name . }}
-          image: {{ .Values.apiServer.image }}
+          image: {{ required "An API Server container image is required" .Values.apiServer.image }}
           volumeMounts:
             - name: tls-secret
               readOnly: true
@@ -47,7 +47,7 @@ spec:
             - name: POSTGRES_URL
               value: {{ tpl .Values.database.url . }}
             - name: POSTGRES_PORT
-              value: "{{ .Values.database.service.port }}"
+              value: "{{ required "A Postgres port must be specified" .Values.database.service.port }}"
 {{ include "kubearchive.v1.otel.env" .Values.apiServer | indent 12 }}
 ---
 kind: Service
@@ -59,8 +59,8 @@ spec:
     app: {{ tpl .Values.apiServer.name . }}
   ports:
     - protocol: TCP
-      port: {{ .Values.apiServer.port }}
-      targetPort: {{ .Values.apiServer.port }}
+      port: {{ required "An API Server port must be specified" .Values.apiServer.port }}
+      targetPort: {{ required "An API Server targetPort must be specified" .Values.apiServer.port }}
       name: server
     {{- if .Values.apiServer.debug }}
     - protocol: TCP

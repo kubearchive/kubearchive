@@ -11,7 +11,7 @@ spec:
   renewBefore: 360h  # 15 days
   subject:
     organizations:
-      - {{ .Release.Name }}
+      - {{ required "An organization in the API Server certificate must be specified" .Release.Name }}
   privateKey:
     algorithm: ECDSA
     size: 256

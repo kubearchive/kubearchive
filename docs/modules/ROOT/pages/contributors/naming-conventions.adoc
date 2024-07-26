@@ -1,0 +1,211 @@
+= Naming Conventions
+
+This document lists the naming conventions applied in different parts
+of the KubeArchive codebase.
+
+== Helm Chart
+
+The Helm Chart templates are located in different directories that match the different
+components of KubeArchive:
+
+* Sink
+* API Server
+* Operator
+* Database
+
+The common resources are outside these folders.
+
+The templated variables are located in [filename]`kubearchive/chars/kubearchive/values.yaml`
+following the same categories.
+
+=== Conventions
+
+* Use the
+link:https://helm.sh/docs/chart_template_guide/builtin_objects/[Helm builtin variables]
+when possible.
++
+.template-example.yaml
+[source,yaml]
+----
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  # BAD - name: kubearchive-proxy
+  name: {{ .Release.Name }}-proxy
+subjects:
+  - kind: ServiceAccount
+    # BAD - name: kubearchive-operator
+    name: {{ .Release.Name }}-operator
+    # BAD - namespace: kubearchive
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  # BAD - name: kubearchive-proxy
+  name: {{ .Release.Name }}-proxy
+----
+
+* Do not add the `Kind` of the resource as part of the `name`.
+We encourage short non-redundant readable names.
++
+.template-example.yaml
+[source,yaml]
+----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  # BAD - name: {{ .Release.Name }}-test-service-account
+  name: {{ .Release.Name }}-test
+----
+
+* Do not create variables with the same value, rename the variable if needed
+and reuse it.
+We want to keep the list of variables as short as possible.
++
+.Bad
+.values.yaml
+[source,yaml]
+----
+apiServer:
+  # BAD:
+  # deployment: {{ .Release.Name }}-api-server
+  # serviceAccount: {{ .Release.Name}}-api-server
+  # service: {{ .Release.Name }}-api-server
+  # role: {{ .Release.Name }}-api-server
+  # roleBinding: {{ .Release.Name }}-api-server
+  # GOOD:
+  name: {{ .Release.Name }}-api-server
+----
+
+* Do not set the `namespace` metadata field if it's going to have the same
+value as `{{ .Release.Namespace }}`. It's redundant and may introduce an error.
++
+.template-example.yaml
+[source,yaml]
+----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-test
+  # BAD - namespace: {{ .Release.Namespace }}
+----
+
+* Extract the variables that the user may want to change to the [filename]`values.yaml`
+file.
++
+.values.yaml
+[source,yaml]
+----
+apiServer:
+  port: 8081
+----
++
+.template-example.yaml
+[source,yaml]
+----
+kind: Service
+apiVersion: v1
+spec:
+  ports:
+    - protocol: TCP
+      # BAD:
+      # port: 8081
+      # targetPort: 8081
+      # GOOD:
+      port: {{ .Values.apiServer.port }}
+      targetPort: {{ .Values.apiServer.port }}
+      name: server
+----
++
+* Create a variable in the template to reuse it.
+This is the recommended approach for variables that are not meant
+to be exposed to the user.
++
+.template-example.yaml
+[source,yaml]
+----
+{{- $caName := tpl "{{ .Release.Name }}-ca" . -}}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "{{ $caName }}"
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "{{ .Release.Name }}"
+spec:
+  ca:
+    secretName: "{{ $caName }}"
+----
+
+* Take advantage of the
+link:[tpl function]
+for variables exposed in [filename]`values.yaml` that contain a repeated part
+extracted in another variable.
+
++
+.values.yaml
+[source,yaml]
+----
+sink:
+  name: {{ .Release.Name }}-sink
+----
++
+.template-example.yaml
+[source,yaml]
+----
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ tpl .Values.sink.name . }}
+----
++
+[NOTE]
+====
+The tpl function also allows nested templating:
+
+.values.yaml
+[source,yaml]
+----
+database:
+  name: "{{ .Release.Name }}-database" # <1>
+  url: "{{ tpl .Values.database.name . }}.{{ .Release.Namespace }}.svc.cluster.local" # <2>
+----
+.template-example.yaml
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+        - env:
+          - name: POSTGRES_URL
+            value: {{ tpl .Values.database.url . }} # <3>
+----
+<1> The database name includes the release name as a prefix, so the variable is templated.
+<2> The URL contains the database name, since this is a templated variable we need to use tpl
+to compile its value at runtime.
+<3> We need a second usage (nested) of the tpl function to extract the value of the url into
+the template, as it is not a static value.
+====
+
+* Add template partials in [filename]`_helpers.tpl` templates partials (see more information in
+link:https://helm.sh/docs/chart_template_guide/named_templates/[docs]
+). This is the recommended approach for reusing a piece of a template.
++
+._helpers.tpl
+[source,yaml]
+----
+{{- define "kubearchive.v1.otel.env" -}}
+- name: KUBEARCHIVE_OTEL_ENABLED
+  value: '{{ ternary "false" "true" (eq .Values.observability.endpoint "") }}'
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: "{{ tpl .Values.observability.endpoint . }}"
+{{- end -}}
+----

@@ -18,13 +18,13 @@ const (
 	resourceTableName        = "resource"
 	resourcesQuery           = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2"
 	namespacedResourcesQuery = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2 AND namespace=$3"
-	writeResource            = `INSERT INTO %s (uuid, api_version, cluster, cluster_uid, kind, name, namespace, resource_version, cluster_deleted_ts, data) Values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT(uuid) DO UPDATE SET name=$6, namespace=$7, resource_version=$8, cluster_deleted_ts=$9, data=$10`
+	writeResource            = `INSERT INTO %s (uuid, api_version, kind, name, namespace, resource_version, cluster_deleted_ts, data) Values ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT(uuid) DO UPDATE SET name=$4, namespace=$5, resource_version=$6, cluster_deleted_ts=$7, data=$8`
 )
 
 type DBInterface interface {
 	QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error)
 	QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error)
-	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, cluster, cluster_uid string) error
+	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
 }
 
 type Database struct {
@@ -86,7 +86,7 @@ func (db *Database) performResourceQuery(ctx context.Context, query string, args
 	return resources, err
 }
 
-func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, cluster, clusterUid string) error {
+func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
 	query := fmt.Sprintf(writeResource, db.resourceTableName)
 	tx, err := db.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -97,8 +97,6 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 		query,
 		k8sObj.GetUID(),
 		k8sObj.GetAPIVersion(),
-		cluster,
-		clusterUid,
 		k8sObj.GetKind(),
 		k8sObj.GetName(),
 		k8sObj.GetNamespace(),

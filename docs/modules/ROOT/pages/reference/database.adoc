@@ -18,14 +18,6 @@ This document lists and details the database schema used by KubeArchive.
 |varchar not null
 |API Version + API Group (`apiVersion`). "batch/v1" for Jobs, "apps/v1" for Deployments, "build.openshift.io/v1" for OpenShift Builds, "v1" for Services or Pods, ...
 
-|cluster
-|varchar not null
-|Friendly cluster name.
-
-|cluster_uid
-|uuid not null
-|Cluster unique identifier.
-
 |kind
 |varchar not null
 |Kind of the resource (`kind`). For example "Job", "Deployment", "Service"...

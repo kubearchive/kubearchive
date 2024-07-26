@@ -29,8 +29,6 @@ const (
 )
 
 type Sink struct {
-	ClusterName string
-	ClusterUid  string
 	Db          database.DBInterface
 	DeleteWhen  string
 	EventClient ceClient.Client
@@ -73,10 +71,6 @@ func NewSink(db database.DBInterface, logger *log.Logger) *Sink {
 	}
 
 	return &Sink{
-		// TODO: cluster name should be set by the user for multicluster support
-		ClusterName: "",
-		// TODO: clusterUid should be set by the user for multicluster support
-		ClusterUid:  "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
 		Db:          db,
 		DeleteWhen:  deleteWhen,
 		EventClient: eventClient,
@@ -96,7 +90,7 @@ func (sink *Sink) Receive(ctx context.Context, event cloudevents.Event) {
 	sink.Logger.Printf("cloudevent %s contains all required fields. Attempting to write it to the database\n", event.ID())
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	sink.Logger.Printf("writing resource from cloudevent %s into the database\n", event.ID())
-	err = sink.Db.WriteResource(ctx, k8sObj, event.Data(), sink.ClusterName, sink.ClusterUid)
+	err = sink.Db.WriteResource(ctx, k8sObj, event.Data())
 	defer cancel()
 	if err != nil {
 		sink.Logger.Printf("failed to write cloudevent %s to the database: %s\n", event.ID(), err)

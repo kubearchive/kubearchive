@@ -46,7 +46,7 @@ func (f *Database) QueryNamespacedResources(ctx context.Context, kind, group, ve
 	return filteredResources, nil
 }
 
-func (f *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, _, _ string) error {
+func (f *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
 	f.resources = append(f.resources, k8sObj)
 	return nil
 }

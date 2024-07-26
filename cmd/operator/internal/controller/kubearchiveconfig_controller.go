@@ -15,6 +15,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	eventingv1 "knative.dev/eventing/pkg/apis/eventing/v1"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 	duckv1 "knative.dev/pkg/apis/duck/v1"
 
@@ -388,6 +389,11 @@ func (r *KubeArchiveConfigReconciler) desiredA14e(kaconfig *kubearchivev1alpha1.
 						Name:       k9eSinkName,
 						Namespace:  k9eNs,
 					},
+				},
+			},
+			Filters: []eventingv1.SubscriptionsAPIFilter{
+				{
+					CESQL: "type NOT LIKE '%delete'", // a14e SHOULD NOT send delete cloudevents
 				},
 			},
 		},

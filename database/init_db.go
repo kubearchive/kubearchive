@@ -49,58 +49,21 @@ func main() {
 
 	defer db.Close()
 
-	// pgSQL instruction to create the triggers for CREATED_AT and UPDATED_AT
-	pgSQLTriggerTSFunction := `
-	CREATE OR REPLACE FUNCTION trigger_set_timestamp()
-	RETURNS TRIGGER AS $$
-	BEGIN
-	  NEW.updated_at = NOW();
-	  RETURN NEW;
-	  END;
-	$$ LANGUAGE plpgsql;
-	`
-	_, err = db.Exec(pgSQLTriggerTSFunction)
+	// load the DDL schema from file
+	ddlFile, err := os.ReadFile("database/ddl.sql")
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("trigger_set_timestamp() function created in db")
 
-	// SQL instruction to create a table.
-	sqlStatement := `
-	CREATE TABLE IF NOT EXISTS public.resource (
-		"uuid" uuid PRIMARY KEY,
-		"api_version" varchar NOT NULL,
-		"kind" varchar NOT NULL,
-		"name" varchar NOT NULL,
-		"namespace" varchar NOT NULL,
-		"resource_version" varchar NULL,
-		"created_at" timestamp NOT NULL DEFAULT now(),
-		"updated_at" timestamp NOT NULL DEFAULT now(),
-		"cluster_deleted_ts" timestamp NULL,
-		"data" jsonb NOT NULL
-	);
-	`
-	_, err = db.Exec(sqlStatement)
+	// run the DDL instructions
+	_, err = db.Exec(string(ddlFile))
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("table resource created in the DB.")
-
-	// SQL instruction to create the trigger of the table
-	sqlTrigger := `
-	CREATE OR REPLACE TRIGGER set_timestamp
-	BEFORE UPDATE ON public.resource
-	FOR EACH ROW
-	EXECUTE PROCEDURE trigger_set_timestamp();
-	`
-	_, err = db.Exec(sqlTrigger)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("trigger created in the DB.")
+	fmt.Println("Schema from ddl.sql set in the DB")
 
 	// load the test data from file
-	testData := "database/resource.sql"
+	testData := "database/dml-example.sql"
 	//fmt.Println(testData)
 	query, err := os.ReadFile(testData)
 	if err != nil {
@@ -112,5 +75,5 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("testdata from resource.sql inserted in the DB.")
+	fmt.Println("testdata from dml-example.sql inserted in the DB.")
 }

@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	resourceTableName        = "resource"
+	resourceTableName        = "kubearchive.resource"
 	resourcesQuery           = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2"
 	namespacedResourcesQuery = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2 AND namespace=$3"
 	writeResource            = `INSERT INTO %s (uuid, api_version, kind, name, namespace, resource_version, cluster_deleted_ts, data) Values ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT(uuid) DO UPDATE SET name=$4, namespace=$5, resource_version=$6, cluster_deleted_ts=$7, data=$8`

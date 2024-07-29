@@ -1,7 +1,7 @@
 ---
 site:
   title: KubeArchive
-  url: https://kubearchive.github.io/
+  url: https://kubearchive.github.io/kubearchive
   start_page: ROOT::index.adoc
 
 content:

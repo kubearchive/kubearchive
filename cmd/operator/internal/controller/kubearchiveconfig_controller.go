@@ -11,6 +11,8 @@ import (
 	"os"
 	"strings"
 
+	"gopkg.in/yaml.v3"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
@@ -24,10 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 )
+
+const SinkFilterConfigMapName = "sink-filters"
 
 var k9eNs = os.Getenv("KUBEARCHIVE_NAMESPACE")
 var a14eName = k9eNs + "-a14e"
@@ -46,6 +51,7 @@ type KubeArchiveConfigReconciler struct {
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=bind;create;delete;escalate;get;list;update;watch
 //+kubebuilder:rbac:groups=sources.knative.dev,resources=apiserversources,verbs=create;delete;get;list;update;watch
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=create;delete;get;list;update;watch
 
 func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
@@ -53,17 +59,43 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	log.Info("KubeArchiveConfig reconciling.")
 
 	kaconfig := &kubearchivev1alpha1.KubeArchiveConfig{}
-	err := r.Get(ctx, req.NamespacedName, kaconfig)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Info("KubeArchiveConfig resource not found. Ignoring since object must have been deleted.")
-			return ctrl.Result{}, nil
-		}
-		log.Error(err, "Failed to get KubeArchiveConfig, requeuing the request.")
-		return ctrl.Result{}, err
+	if err := r.Get(ctx, req.NamespacedName, kaconfig); err != nil {
+		// Ignore not-found errors, since they can't be fixed by an immediate requeue (we need
+		// to wait for a new notification), and we can get them on deleted requests.
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	_, err = r.reconcileA14eServiceAccount(ctx, kaconfig)
+	finalizerName := "kubearchive.org/finalizer"
+
+	if kaconfig.ObjectMeta.DeletionTimestamp.IsZero() {
+		// The object is not being deleted, add the finalizer if necessary.
+		if !controllerutil.ContainsFinalizer(kaconfig, finalizerName) {
+			controllerutil.AddFinalizer(kaconfig, finalizerName)
+			if err := r.Update(ctx, kaconfig); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// The object is being deleted.
+		if controllerutil.ContainsFinalizer(kaconfig, finalizerName) {
+			// Finalizer is present, clean up filters from ConfigMap.
+			if err := r.removeFilters(ctx, kaconfig); err != nil {
+				// If filter deletion fails, return with error so that it can be retried.
+				return ctrl.Result{}, err
+			}
+
+			// Remove the finalizer from the list and update it.
+			controllerutil.RemoveFinalizer(kaconfig, finalizerName)
+			if err := r.Update(ctx, kaconfig); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+
+		// Stop reconciliation as the resource is being deleted.
+		return ctrl.Result{}, nil
+	}
+
+	_, err := r.reconcileA14eServiceAccount(ctx, kaconfig)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -89,6 +121,11 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	_, err = r.reconcileSinkRoleBinding(ctx, kaconfig)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	_, err = r.reconcileFilterConfigMap(ctx, kaconfig)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -357,4 +394,94 @@ func (r *KubeArchiveConfigReconciler) desiredA14e(kaconfig *kubearchivev1alpha1.
 	}
 
 	return source, nil
+}
+
+func (r *KubeArchiveConfigReconciler) reconcileFilterConfigMap(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.ConfigMap, error) {
+	log := log.FromContext(ctx)
+
+	log.Info("in reconcileFilterConfigMap")
+
+	cm := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: k9eNs}, cm)
+	if err == nil {
+		cm, err := r.desiredFilterConfigMap(ctx, kaconfig, cm)
+		if err != nil {
+			log.Error(err, "Unable to get desired ConfigMap "+SinkFilterConfigMapName)
+			return cm, err
+		}
+		err = r.Update(ctx, cm)
+		if err != nil {
+			log.Error(err, "Failed to update filter ConfigMap "+SinkFilterConfigMapName)
+			return cm, err
+		}
+	} else if errors.IsNotFound(err) {
+		cm, err := r.desiredFilterConfigMap(ctx, kaconfig, nil)
+		if err != nil {
+			log.Error(err, "Unable to get desired filter ConfigMap "+SinkFilterConfigMapName)
+			return cm, err
+		}
+		err = r.Create(ctx, cm)
+		if err != nil {
+			log.Error(err, "Failed to create filter ConfigMap "+SinkFilterConfigMapName)
+			return cm, err
+		}
+	} else {
+		log.Error(err, "Failed to reconcile filter ConfigMap "+SinkFilterConfigMapName)
+		return cm, err
+	}
+
+	return cm, nil
+}
+
+func (r *KubeArchiveConfigReconciler) desiredFilterConfigMap(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+	log := log.FromContext(ctx)
+
+	if cm == nil {
+		cm = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      SinkFilterConfigMapName,
+				Namespace: k9eNs,
+			},
+			Data: map[string]string{},
+		}
+	}
+
+	yamlBytes, err := yaml.Marshal(kaconfig.Spec.Resources)
+	if err != nil {
+		log.Error(err, "Failed to convert KubeArchiveConfig resources to JSON")
+		return cm, err
+	}
+
+	if cm.Data == nil {
+		cm.Data = make(map[string]string)
+	}
+
+	cm.Data[kaconfig.Namespace] = string(yamlBytes)
+
+	// Note that the owner reference is NOT set on the ConfigMap.  It should not be deleted when
+	// the KubeArchiveConfig object is deleted.
+	return cm, nil
+}
+
+func (r *KubeArchiveConfigReconciler) removeFilters(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) error {
+	log := log.FromContext(ctx)
+
+	log.Info("in removeFilters")
+
+	cm := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: k9eNs}, cm)
+	if err != nil {
+		log.Error(err, "Unable to get desired ConfigMap "+SinkFilterConfigMapName)
+		return err
+	}
+
+	delete(cm.Data, kaconfig.Namespace)
+
+	err = r.Update(ctx, cm)
+	if err != nil {
+		log.Error(err, "Failed to update filter ConfigMap "+SinkFilterConfigMapName)
+		return err
+	}
+
+	return nil
 }

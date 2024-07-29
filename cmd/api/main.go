@@ -18,6 +18,8 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+const otelServiceName = "kubearchive.api"
+
 type Server struct {
 	k8sClient kubernetes.Interface
 	router    *gin.Engine
@@ -37,7 +39,7 @@ func getKubernetesClient() *kubernetes.Clientset {
 
 func NewServer(k8sClient kubernetes.Interface, controller routers.Controller) *Server {
 	router := gin.Default()
-	router.Use(otelgin.Middleware("kubearchive.api"))
+	router.Use(otelgin.Middleware("")) // Empty string so the library sets the proper server
 	router.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews()))
 	router.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews()))
 	// TODO - Probably want to use cache for the discovery client
@@ -53,7 +55,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller) *S
 }
 
 func main() {
-	err := observability.Start()
+	err := observability.Start(otelServiceName)
 	if err != nil {
 		log.Printf("Could not start opentelemetry: %s", err)
 	}

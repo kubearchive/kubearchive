@@ -24,8 +24,6 @@ apiServer:
   # KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest ko build --disable-optimizations \
   # github.com/kubearchive/kubearchive/cmd/api
   debug: false
-  # If true, OpenTelemetry instrumentation will be enabled for the api server
-  observability: false
   # NOTE - This resource must include the certificate suffix to work
   cert: "{{ tpl .Values.apiServer.name . }}-certificate"
   secret: "{{ tpl .Values.apiServer.name . }}-tls"
@@ -46,9 +44,6 @@ sink:
   targetPort: 8080
   # number of kubearchive sink pods that should be deployed
   replicas: 1
-  # If true, OpenTelemetry instrumentation will be enabled for the sink
-  observability: false
-  # a json path that if it returns a value, will cause the sink to delete the resource
   deleteWhen: ".status.completionTime"
 
 operator:
@@ -93,3 +88,14 @@ database:
     dbUser: "ps_user"
     # database password
     dbPassword: "P0stgr3sdbP@ssword"  # notsecret
+
+integrations:
+  observability:
+    # If "true" a Jaeger all-in-one Deployment is created in the '{{ .Release.Namespace }}' namespace
+    enabled: false
+    # Jaeger all-in-one image tag used for the Deploy if 'enabled' is true
+    imageTag: 1.57.0
+    # Value to which OTEL_EXPORTER_OTLP_ENDPOINT is set. If it is set KubeArchive tries to send telemetry data
+    # If you set `enabled` to true, this is set to the deployed Jaeger all-in-one instance
+    # see `_helpers.tpl` for more information.
+    endpoint: ""

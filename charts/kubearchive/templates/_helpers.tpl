@@ -3,17 +3,19 @@ Copyright KubeArchive Authors
 SPDX-License-Identifier: Apache-2.0
 */}}
 
-{{/*
-Create environment variables for OpenTelemetry if .observability is set to true. Otherwise set KUBEARCHIVE_OTEL_ENABLED=false.
-This tells the OpenTelemtry instrumentation if it should start or not.
-*/}}
+
+{{/* Create environment variables for OpenTelemetry */}}
 {{- define "kubearchive.v1.otel.env" -}}
-{{- if .observability -}}
-- name: KUBEARCHIVE_OTEL_ENABLED
-  value: "true"
-{{- else -}}
-- name: KUBEARCHIVE_OTEL_ENABLED
-  value: "false"
-{{- end -}}
+{{- $enabled := .Values.integrations.observability.enabled -}}
+{{- $endpoint := .Values.integrations.observability.endpoint -}}
+
+{{/* If 'enabled' we deploy a traces collector, so override the endpoint to use it */}}
+{{- if (eq $enabled true) -}}
+    {{- $endpoint = tpl "traces-collector.{{ .Release.Namespace }}.svc.cluster.local:4318" . -}}
 {{- end -}}
 
+- name: KUBEARCHIVE_OTEL_ENABLED
+  value: '{{ ternary "false" "true" (eq $endpoint "") }}'
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: "{{ $endpoint }}"
+{{- end -}}

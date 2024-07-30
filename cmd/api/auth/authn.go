@@ -38,7 +38,7 @@ func Authentication(tri clientAuthnv1.TokenReviewInterface) gin.HandlerFunc {
 			abort.Abort(c, err.Error(), http.StatusBadRequest)
 			return
 		}
-		tr, err := tri.Create(c, &apiAuthnv1.TokenReview{
+		tr, err := tri.Create(c.Request.Context(), &apiAuthnv1.TokenReview{
 			Spec: apiAuthnv1.TokenReviewSpec{
 				Token: token,
 			},

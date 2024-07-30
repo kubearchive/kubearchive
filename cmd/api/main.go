@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/auth"
@@ -14,6 +15,7 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -28,6 +30,8 @@ func getKubernetesClient() *kubernetes.Clientset {
 	if err != nil {
 		panic(fmt.Sprintf("Error retrieving in-cluster k8s client config: %s", err.Error()))
 	}
+
+	config.Wrap(func(rt http.RoundTripper) http.RoundTripper { return otelhttp.NewTransport(rt) })
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(fmt.Sprintf("Error instantiating k8s from host %s: %s", config.Host, err.Error()))
@@ -42,7 +46,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller) *S
 	router.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews()))
 	// TODO - Probably want to use cache for the discovery client
 	// See https://pkg.go.dev/k8s.io/client-go/discovery/cached/disk#NewCachedDiscoveryClientForConfig
-	router.Use(discovery.GetAPIResource(k8sClient.Discovery()))
+	router.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient()))
 	router.GET("/apis/:group/:version/:resourceType", controller.GetAllResources)
 	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedResources)
 

@@ -87,8 +87,8 @@ spec:
     - selector:
         apiVersion: v1
         kind: Event
-      archive-when: .status != 'Completed'
-      delete-when: .status == 'Completed'
+      archiveWhen: .status != 'Completed'
+      deleteWhen: .status == 'Completed'
 `, namespaceName)
 
 	// create the test namespace and KubeArchiveConfig

@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdkTrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
 // the name of the environment variable that will determine if instrumentation needs to be started
@@ -23,7 +24,7 @@ var tp *sdkTrace.TracerProvider
 
 // Start creates a Span Processor and exporter, registers them with a TracerProvider, and sets the default
 // TracerProvider and SetTextMapPropagator
-func Start() error {
+func Start(serviceName string) error {
 	if canSkipInit() {
 		return nil
 	}
@@ -39,6 +40,9 @@ func Start() error {
 		resource.WithProcessRuntimeName(),
 		resource.WithProcessRuntimeVersion(),
 		resource.WithFromEnv(),
+		resource.WithAttributes(
+			semconv.ServiceName(serviceName),
+		),
 	)
 	if err != nil {
 		return err

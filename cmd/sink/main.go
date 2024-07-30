@@ -26,6 +26,7 @@ import (
 
 const (
 	DeleteWhenEnvVar = "DELETE_WHEN"
+	otelServiceName  = "kubearchive.sink"
 )
 
 type Sink struct {
@@ -124,7 +125,7 @@ func (sink *Sink) Receive(ctx context.Context, event cloudevents.Event) {
 
 func main() {
 	logger := log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds|log.LUTC)
-	err := kaObservability.Start()
+	err := kaObservability.Start(otelServiceName)
 	if err != nil {
 		logger.Printf("Could not start tracing: %s\n", err.Error())
 	}

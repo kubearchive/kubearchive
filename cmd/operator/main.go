@@ -6,6 +6,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"log"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -23,10 +24,13 @@ import (
 
 	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/cmd/operator/internal/controller"
+	"github.com/kubearchive/kubearchive/pkg/observability"
 
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 	//+kubebuilder:scaffold:imports
 )
+
+const otelServiceName = "kubearchive.operator"
 
 var (
 	scheme   = runtime.NewScheme()
@@ -42,6 +46,11 @@ func init() {
 }
 
 func main() {
+	err := observability.Start(otelServiceName)
+	if err != nil {
+		log.Printf("Could not start OpenTelemetry: %s\n", err)
+	}
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string

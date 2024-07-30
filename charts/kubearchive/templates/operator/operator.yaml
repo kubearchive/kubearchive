@@ -59,6 +59,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            {{- include "kubearchive.v1.otel.env" . | nindent 12 }}
           image: {{ .Values.operator.image }}
           livenessProbe:
             httpGet:

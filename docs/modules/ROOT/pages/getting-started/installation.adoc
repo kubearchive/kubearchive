@@ -1,0 +1,45 @@
+= Installation
+
+This document explains how to install and configure KubeArchive in your Kubernetes cluster.
+
+== Prerequisites
+
+* The `helm` CLI
+* A PostgreSQL instance
+* CertManager is installed on the Kubernetes cluster (+v1.9.1)
+* Knative Eventing is installed on the Kubernetes cluster (+v1.14.3)
+
+== Prepare the Database
+
+1. Create a user and a password for KubeArchive to use.
+1. Create a database for the user to use.
+1. As the user, execute the `ddl.sql` we provide in the database, located at:
++
+[source,bash]
+----
+https://github.com/kubearchive/kubearchive/blob/<VERSION>/database/ddl.sql
+----
++
+This file creates a PostgreSQL schema, a table for KubeArchive and other stuff KubeArchive
+requires.
+
+== Install KubeArchive
+
+1. Create a [filename]`values.yml` file and add the database information:
++
+[source,yaml]
+----
+---
+database:
+  url: "<postresql.example.com>"
+  postgresData:
+    dbName: <example-db>
+    dbUser: <example-user>
+    dbPassword: <example-password>
+----
+
+1. Install KubeArchive using `helm`:
+[source,bash]
+----
+helm install kubearchive -n kubearchive quay.io/kubearchive/kubearchive-helm:<VERSION> -f values.yml --create-namespace
+----

@@ -2,7 +2,7 @@
 
 This document lists and details the database schema used by KubeArchive.
 
-== Table `public.resource`
+== Table `kubearchive.resource`
 
 [%header, cols="2m,2m,3"]
 |===

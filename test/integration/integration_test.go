@@ -84,8 +84,11 @@ metadata:
   namespace: %s
 spec:
   resources:
-    - apiVersion: batch/v1
-      kind: Deployment
+    - selector:
+        apiVersion: v1
+        kind: Event
+      archive-when: .status != 'Completed'
+      delete-when: .status == 'Completed'
 `, namespaceName)
 
 	// create the test namespace and KubeArchiveConfig

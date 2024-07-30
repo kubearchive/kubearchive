@@ -63,6 +63,7 @@ func TestAuthZMiddleware(t *testing.T) {
 				gin.Param{Key: "version", Value: version},
 				gin.Param{Key: "resourceType", Value: resource},
 			}
+			c.Request, _ = http.NewRequest(http.MethodGet, "", nil)
 			RBACAuthorization(fsar)(c)
 			assert.Equal(t, tc.expected, res.Code)
 			ra := fsar.sar.Spec.ResourceAttributes

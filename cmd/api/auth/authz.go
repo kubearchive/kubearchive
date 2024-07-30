@@ -30,7 +30,7 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.Hand
 			return
 		}
 
-		sar, err := sari.Create(c, &apiAuthzv1.SubjectAccessReview{
+		sar, err := sari.Create(c.Request.Context(), &apiAuthzv1.SubjectAccessReview{
 			Spec: apiAuthzv1.SubjectAccessReviewSpec{
 				User:   userInfo.Username,
 				Groups: userInfo.Groups,

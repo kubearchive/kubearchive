@@ -48,7 +48,7 @@ spec:
               value: {{ tpl .Values.database.url . }}
             - name: POSTGRES_PORT
               value: "{{ required "A Postgres port must be specified" .Values.database.service.port }}"
-{{ include "kubearchive.v1.otel.env" .Values.apiServer | indent 12 }}
+            {{- include "kubearchive.v1.otel.env" . | nindent 12 }}
 ---
 kind: Service
 apiVersion: v1

@@ -109,17 +109,28 @@ func (sink *Sink) Receive(ctx context.Context, event cloudevents.Event) {
 		)
 	}
 	if mustDelete {
-		sink.Logger.Println("attempting to delete kubernetes object:", k8sObj.GetUID())
+		sink.Logger.Println("requesting to delete kubernetes object:", k8sObj.GetUID())
 		kind := k8sObj.GetObjectKind().GroupVersionKind()
 		resource, _ := meta.UnsafeGuessKindToResource(kind) // we only need the plural resource
 		k8sCtx, k8sCancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer k8sCancel()
 		err = sink.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).Delete(k8sCtx, k8sObj.GetName(), metav1.DeleteOptions{})
 		if err != nil {
-			sink.Logger.Printf("could not delete resource %s: %s\n", k8sObj.GetUID(), err)
+			sink.Logger.Printf("failed to request resource %s be deleted: %s\n", k8sObj.GetUID(), err)
 			return
 		}
-		sink.Logger.Println("successfully deleted kubernetes object:", k8sObj.GetUID())
+		sink.Logger.Printf("successfully requested kubernetes object %s be deleted\n", k8sObj.GetUID())
+		deleteTs := metav1.Now()
+		k8sObj.SetDeletionTimestamp(&deleteTs)
+		sink.Logger.Println("updating cluster_deleted_ts for kubernetes object:", k8sObj.GetUID())
+		updateCtx, updateCancel := context.WithTimeout(context.Background(), time.Second*5)
+		err = sink.Db.WriteResource(updateCtx, k8sObj, event.Data())
+		defer updateCancel()
+		if err != nil {
+			sink.Logger.Println("failed to update cluster_deleted_ts for kubernetes object:", k8sObj.GetUID())
+			return
+		}
+		sink.Logger.Println("updated cluster_deleted_ts for kubernetes object:", k8sObj.GetUID())
 	}
 }
 

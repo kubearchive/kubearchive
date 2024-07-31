@@ -21,7 +21,6 @@ Install these tools:
 1. Create your fork of [KubeArchive](https://github.com/kubearchive/kubearchive)
    following [this guide](https://help.github.com/articles/fork-a-repo/).
 1. Clone it to your computer:
-
     ```bash
     git clone git@github.com:${YOUR_GITHUB_USERNAME}/kubearchive.git
     cd kubearchive
@@ -130,17 +129,40 @@ By default, KubeArchive listens to `Event`s in the `test` namespace.
     ```
 
 1. **[ Optional ]** Create a service account with a specific role to test the REST API.
-   This Helm chart already provides `kubearchive-test-sa` with `view` privileges for testing purposes.
+    This Helm chart already provides `kubearchive-test-sa` with `view` privileges for testing purposes.
 
 1. On a new terminal, use `curl` or your browser to perform a query:
     ```bash
     curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create token kubearchive-test -n kubearchive)" \
-   https://localhost:8081/apis/batch/v1/jobs | jq
+    https://localhost:8081/apis/batch/v1/jobs | jq
     ```
 
 1. Check the new logs on the KubeArchive API:
     ```bash
     kubectl logs -n kubearchive -l app=kubearchive-api-server
+    ```
+
+## Use the KubeArchive CLI
+
+1. Use `kubectl` to port forward, this will keep the terminal occupied:
+    ```bash
+    kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081
+    ```
+
+1. Get the Certificate Authority (CA) from the `kubearchive-api-server-tls` secret:
+    ```bash
+    kubectl get -n kubearchive secrets kubearchive-api-server-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
+    ```
+
+1. Run the CLI:
+    ```bash
+    go run cmd/kubectl-archive/main.go get batch/v1/jobs --token $(kubectl -n kubearchive create token kubearchive-test)
+    ```
+
+1. Generate a new job, and run again:
+    ```bash
+    kubectl create job my-job --image=busybox
+    go run cmd/kubectl-archive/main.go get batch/v1/jobs --token $(kubectl -n kubearchive create token kubearchive-test)
     ```
 
 ## Running integration tests

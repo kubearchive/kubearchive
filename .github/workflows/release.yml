@@ -7,7 +7,6 @@ on:
 
 jobs:
   setup:
-    name: Log run details
     uses: ./.github/workflows/log_run_details.yml
   release:
     runs-on: ubuntu-latest

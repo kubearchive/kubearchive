@@ -16,7 +16,6 @@ permissions:
   checks: write
 jobs:
   setup:
-    name: Log run details
     uses: ./.github/workflows/log_run_details.yml
   golangci:
     # See https://github.com/golangci/golangci-lint-action

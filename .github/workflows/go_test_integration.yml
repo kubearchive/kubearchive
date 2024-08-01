@@ -15,7 +15,6 @@ permissions:
   pull-requests: read
 jobs:
   setup:
-    name: Log run details
     uses: ./.github/workflows/log_run_details.yml
   integration:
     name: KubeArchive Integration Tests

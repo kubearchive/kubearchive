@@ -15,8 +15,8 @@ spec:
     - selector:
         apiVersion: v1
         kind: Event
-      archiveWhen: .status != 'Completed'
-      deleteWhen: .status == 'Completed'
+      archiveWhen: status.state != 'Completed'
+      deleteWhen: status.state == 'Completed'
 ----
 The configuration of `ApiServerSource` is done using the `selector` keys of the KubeArchiveConfig custom
 resource. The format of the `selectors` key can be found in the `ApiServerSource`

@@ -15,8 +15,8 @@ permissions:
   pull-requests: read
 jobs:
   setup:
-    name: test callikng reusable workflows
-    uses: ./.github/workflows/inital_logging.yml
+    name: Log run details
+    uses: ./.github/workflows/log_run_details.yml
   go-mod-tidy:
     name: go mod tidy
     runs-on: ubuntu-latest

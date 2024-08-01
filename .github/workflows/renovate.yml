@@ -11,14 +11,13 @@ on:
     - cron: "15 8 * * *"  # Run daily at 8:15 UTC
 
 jobs:
+  setup:
+    name: Log run details
+    uses: ./.github/workflows/log_run_details.yml
   renovate:
     if: github.repository == 'kubearchive/kubearchive'  # Don't run renovate on forks
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          echo "Job triggered by ${{ github.actor }}."
-          echo "Running on a ${{ runner.os }} server hosted by GitHub."
-          echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
       - name: Get kubearchive-renovate Github App Api Token
         id: get_token
         uses: actions/create-github-app-token@v1

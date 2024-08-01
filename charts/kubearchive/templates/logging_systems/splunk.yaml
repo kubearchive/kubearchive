@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: splunk
+  namespace: kubearchive
+  labels:
+    app: splunk
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: splunk
+  revisionHistoryLimit: 10
+  template:
+    metadata:
+      labels:
+        app: splunk
+    spec:
+      containers:
+        - name: splunk
+          image: splunk/splunk:latest
+          env:
+            - name: SPLUNK_START_ARGS
+              value: "--accept-license"
+            - name: SPLUNK_PASSWORD
+              value: "Admin123!"
+          ports:
+            - name: splunk-api
+              containerPort: 8089
+              protocol: TCP
+            - name: splunk-web
+              containerPort: 8000
+              protocol: TCP
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: splunk
+  namespace: kubearchive
+spec:
+  selector:
+    app: splunk
+  ports:
+    - protocol: TCP
+      port: 8089
+      targetPort: 8089
+      name: api
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      name: web
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: random-logger
+  namespace: kubearchive
+spec:
+  securityContext:
+    runAsUser: 0
+    runAsGroup: 0
+  containers:
+    - name: splunk-uf
+      image: splunk/universalforwarder:latest
+      env:
+        - name: SPLUNK_START_ARGS
+          value: --accept-license
+        - name: SPLUNK_USER
+          value: root
+        - name: SPLUNK_GROUP
+          value: root
+        - name: SPLUNK_PASSWORD
+          value: "Admin123!"
+        - name: SPLUNK_CMD
+          value: add monitor /var/log/
+        - name: SPLUNK_STANDALONE_URL
+          value: splunk.kubearchive.svc.cluster.local:8089
+      volumeMounts:
+        - name: shared-data
+          mountPath: /var/log
+    - name: random-logger
+      image: chentex/random-logger:latest
+      volumeMounts:
+        - name: shared-data
+          mountPath: /app/logs/
+  volumes:
+    - name: shared-data
+      emptyDir: {}

@@ -14,12 +14,13 @@ permissions:
   contents: read
   pull-requests: read
 jobs:
+  setup:
+    name: test callikng reusable workflows
+    uses: ./.github/workflows/inital_logging.yml
   go-mod-tidy:
     name: go mod tidy
     runs-on: ubuntu-latest
     steps:
-      - name: initial logging
-        uses: ./.github/workflows/inital_logging.yml
       - name: Check out repository code
         uses: actions/checkout@v4
       - name: Setup Go
@@ -37,8 +38,6 @@ jobs:
     name: "Helm lint"
     runs-on: ubuntu-latest
     steps:
-      - name: initial logging
-        uses: ./.github/workflows/inital_logging.yml
       - name: Check out repository code
         uses: actions/checkout@v4
       - name: Setup Helm

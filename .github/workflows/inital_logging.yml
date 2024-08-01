@@ -5,6 +5,7 @@ name: Initial Logging
 run-name: Initial Logging
 on:
   workflow_call:
+
 jobs:
   initial-logging:
     name: initial logging

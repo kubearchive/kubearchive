@@ -13,9 +13,17 @@ spec:
       labels: *labels
     spec:
       serviceAccountName: {{ tpl .Values.sink.name . }}
+      volumes:
+        - name: sink-filters
+          configMap:
+            name: sink-filters
       containers:
         - name: {{ tpl .Values.sink.name . }}
           image: {{ .Values.sink.image }}
+          volumeMounts:
+            - mountPath: "{{ .Values.sink.mountPath }}"
+              name: "sink-filters"
+              readOnly: true
           env:
             - name: POSTGRES_DB
               valueFrom:
@@ -36,8 +44,8 @@ spec:
               value: {{ tpl .Values.database.url . }}
             - name: POSTGRES_PORT
               value: "{{ .Values.database.service.port }}"
-            - name: DELETE_WHEN
-              value: "{{ .Values.sink.deleteWhen }}"
+            - name: MOUNT_PATH
+              value: "{{ .Values.sink.mountPath }}"
             {{- include "kubearchive.v1.otel.env" . | nindent 12 }}
 ---
 kind: Service

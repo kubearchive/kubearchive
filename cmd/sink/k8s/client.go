@@ -1,6 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
-package main
+
+package k8s
 
 import (
 	"fmt"

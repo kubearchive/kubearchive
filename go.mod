@@ -29,7 +29,7 @@ require (
 	k8s.io/cli-runtime v0.30.3
 	k8s.io/client-go v0.30.3
 	knative.dev/eventing v0.42.0
-	knative.dev/pkg v0.0.0-20240730131544-0e7ffe491d5e
+	knative.dev/pkg v0.0.0-20240805063731-c88d5dad9653
 	sigs.k8s.io/controller-runtime v0.18.4
 )
 
@@ -128,7 +128,7 @@ require (
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
 	golang.org/x/net v0.27.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
-	golang.org/x/sync v0.7.0 // indirect
+	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.22.0 // indirect
 	golang.org/x/term v0.22.0 // indirect
 	golang.org/x/text v0.16.0 // indirect

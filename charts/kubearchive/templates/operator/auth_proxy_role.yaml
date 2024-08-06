@@ -1,14 +1,15 @@
+{{- $proxy := tpl "{{ tpl .Values.operator.name . }}-proxy" . -}}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    app.kubernetes.io/name: clusterrole
-    app.kubernetes.io/instance: {{ .Values.kubearchive.namespace }}-proxy-role
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ $proxy }}
     app.kubernetes.io/component: kube-rbac-proxy
-    app.kubernetes.io/created-by: {{ .Values.kubearchive.namespace }}-operator
-    app.kubernetes.io/part-of: {{ .Values.kubearchive.namespace }}-operator
-  name: {{ .Values.kubearchive.namespace }}-proxy-role
+    app.kubernetes.io/created-by: {{ tpl .Values.operator.name . }}
+    app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
+  name: {{ $proxy }}
 rules:
   - apiGroups:
       - authentication.k8s.io

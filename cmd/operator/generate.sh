@@ -18,10 +18,10 @@ ${LOCALBIN}/controller-gen crd paths="./..." output:dir=../../charts/kubearchive
 
 # Generate role.
 echo "Generating role."
-${LOCALBIN}/controller-gen rbac:roleName="replaceme-operator" \
+${LOCALBIN}/controller-gen rbac:roleName="replaceme" \
     paths="./..." output:stdout | \
     sed -e 's/---/---\n# yamllint disable rule:indentation/' | \
-    sed -e 's/replaceme/{{ .Values.kubearchive.namespace }}/' > ../../charts/kubearchive/templates/operator/role.yaml
+    sed -e 's/replaceme/{{ tpl .Values.operator.name . }}/' > ../../charts/kubearchive/templates/operator/role.yaml
 
 echo "Generating deep copy code."
 # Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.

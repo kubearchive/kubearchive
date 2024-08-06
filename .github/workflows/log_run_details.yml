@@ -1,0 +1,18 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: Log Run Details
+run-name: Log Run Details
+on:
+  workflow_call:
+
+jobs:
+  log-run-details:
+    name: Log run details
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Logging run details."
+          echo "Job triggered by ${{ github.actor }}."
+          echo "Running on a ${{ runner.os }} server."
+          echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."

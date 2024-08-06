@@ -6,15 +6,13 @@ on:
   workflow_dispatch:
 
 jobs:
+  setup:
+    uses: ./.github/workflows/log_run_details.yml
   release:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - run: |
-          echo "Job triggered by ${{ github.actor }}."
-          echo "Running on a ${{ runner.os }} server hosted by GitHub."
-          echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
       - name: Check out repository code
         uses: actions/checkout@v4
       # Checkout 'fetch-tags' does not work properly, see https://github.com/actions/checkout/issues/701

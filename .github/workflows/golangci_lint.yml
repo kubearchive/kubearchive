@@ -15,15 +15,13 @@ permissions:
   pull-requests: read
   checks: write
 jobs:
+  setup:
+    uses: ./.github/workflows/log_run_details.yml
   golangci:
     # See https://github.com/golangci/golangci-lint-action
     name: "golangci-lint security testing"
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          echo "Job triggered by ${{ github.actor }}."
-          echo "Running on a ${{ runner.os }} server hosted by GitHub."
-          echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
       - name: Check out repository code
         uses: actions/checkout@v4
       - name: Setup Go

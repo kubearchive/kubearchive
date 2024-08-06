@@ -14,14 +14,12 @@ permissions:
   contents: read
   pull-requests: read
 jobs:
+  setup:
+    uses: ./.github/workflows/log_run_details.yml
   integration:
     name: KubeArchive Integration Tests
     runs-on: ubuntu-latest
     steps:
-      - run: |
-          echo "Job triggered by ${{ github.actor }}."
-          echo "Running on a ${{ runner.os }} server hosted by GitHub."
-          echo "Branch ${{ github.ref }} of repository ${{ github.repository }}."
       - name: Check out repository code
         uses: actions/checkout@v4
       - name: Setup Go

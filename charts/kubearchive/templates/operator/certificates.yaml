@@ -1,0 +1,20 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  labels:
+    app.kubernetes.io/name: certificate
+    app.kubernetes.io/instance: serving-cert
+    app.kubernetes.io/component: certificate
+    app.kubernetes.io/created-by: operator
+    app.kubernetes.io/part-of: operator
+    app.kubernetes.io/managed-by: kustomize
+  name: "{{ tpl .Values.operator.cert . }}"
+spec:
+  dnsNames:
+    - "{{ tpl .Values.operator.name . }}-webhooks.{{ .Release.Namespace }}.svc"
+    - "{{ tpl .Values.operator.name . }}-webhooks.{{ .Release.Namespace }}.svc.cluster.local"
+  issuerRef:
+    kind: Issuer
+    name: {{ .Release.Name }}
+  secretName: {{ tpl .Values.operator.secret . }}

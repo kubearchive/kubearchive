@@ -1,0 +1,69 @@
+{{- $webhooksServiceName := tpl "{{ tpl .Values.operator.name . }}-webhooks" . -}}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/name: mutatingwebhookconfiguration
+    app.kubernetes.io/instance: mutating-webhook-configuration
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/created-by: {{ tpl .Values.operator.name . }}
+    app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
+  name: kubearchive-mutating-webhook-configuration
+  annotations:
+    cert-manager.io/inject-ca-from: kubearchive/kubearchive-operator-certificate
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: {{ $webhooksServiceName }}
+        namespace: {{ .Release.Name }}
+        path: /mutate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
+    failurePolicy: Fail
+    name: mkubearchiveconfig.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - kubearchiveconfigs
+    sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  labels:
+    app.kubernetes.io/name: validatingwebhookconfiguration
+    app.kubernetes.io/instance: validating-webhook-configuration
+    app.kubernetes.io/component: webhook
+    app.kubernetes.io/created-by: {{ tpl .Values.operator.name . }}
+    app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
+  name: kubearchive-validating-webhook-configuration
+  annotations:
+    cert-manager.io/inject-ca-from: kubearchive/kubearchive-operator-certificate
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: {{ $webhooksServiceName }}
+        namespace: {{ .Release.Name }}
+        path: /validate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
+    failurePolicy: Fail
+    name: vkubearchiveconfig.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - kubearchiveconfigs
+    sideEffects: None

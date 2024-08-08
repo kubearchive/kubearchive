@@ -29,7 +29,7 @@ require (
 	k8s.io/cli-runtime v0.30.3
 	k8s.io/client-go v0.30.3
 	knative.dev/eventing v0.42.0
-	knative.dev/pkg v0.0.0-20240805063731-c88d5dad9653
+	knative.dev/pkg v0.0.0-20240808013630-0991b2f920f4
 	sigs.k8s.io/controller-runtime v0.18.4
 )
 

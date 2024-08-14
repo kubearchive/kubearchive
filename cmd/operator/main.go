@@ -22,7 +22,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/cmd/operator/internal/controller"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 
@@ -40,7 +40,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(kubearchivev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(kubearchiveapi.AddToScheme(scheme))
 	utilruntime.Must(sourcesv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }

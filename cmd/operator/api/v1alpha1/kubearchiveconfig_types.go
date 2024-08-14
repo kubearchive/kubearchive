@@ -4,6 +4,9 @@
 package v1alpha1
 
 import (
+	"os"
+
+	"gopkg.in/yaml.v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
@@ -43,6 +46,16 @@ type KubeArchiveConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []KubeArchiveConfig `json:"items"`
+}
+
+func LoadFromFile(path string) ([]KubeArchiveConfigResource, error) {
+	resources := []KubeArchiveConfigResource{}
+	resourcesBytes, err := os.ReadFile(path)
+	if err != nil {
+		return resources, err
+	}
+	err = yaml.Unmarshal(resourcesBytes, &resources)
+	return resources, err
 }
 
 func init() {

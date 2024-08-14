@@ -13,7 +13,7 @@ import (
 	ceOtelObs "github.com/cloudevents/sdk-go/observability/opentelemetry/v2/client"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	ceClient "github.com/cloudevents/sdk-go/v2/client"
-	"github.com/kubearchive/kubearchive/cmd/sink/expr"
+	"github.com/kubearchive/kubearchive/cmd/sink/filters"
 	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/files"
@@ -33,12 +33,12 @@ const (
 type Sink struct {
 	Db          database.DBInterface
 	EventClient ceClient.Client
-	Filters     *expr.Filters
+	Filters     *filters.Filters
 	K8sClient   *dynamic.DynamicClient
 	Logger      *log.Logger
 }
 
-func NewSink(db database.DBInterface, logger *log.Logger, filters *expr.Filters) *Sink {
+func NewSink(db database.DBInterface, logger *log.Logger, filters *filters.Filters) *Sink {
 	if logger == nil {
 		logger = log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds|log.LUTC)
 		logger.Println("Sink was provided a nil logger, falling back to default logger")
@@ -149,7 +149,7 @@ func main() {
 	if err != nil {
 		logger.Fatalf("Could not connect to the database: %s\n", err)
 	}
-	filters, err := expr.NewFilters()
+	filters, err := filters.NewFilters()
 	if err != nil {
 		logger.Printf(
 			"Not all filters could be created from the ConfigMap. Some archive and delete operations will not execute until the errors are resolved: %s\n",

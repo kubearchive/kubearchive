@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package expr
+package cel
 
 import (
 	"context"
@@ -68,7 +68,7 @@ func FormatCelExprs(exprs ...string) []string {
 // executeCel executes the cel program with obj as the input. If the program returns and error or if the program returns
 // a value that cannot be converted to bool, false is returned. Otherwise the bool returned by the cel program is
 // returned.
-func executeCel(ctx context.Context, program cel.Program, obj *unstructured.Unstructured) bool {
+func ExecuteCel(ctx context.Context, program cel.Program, obj *unstructured.Unstructured) bool {
 	val, _, err := program.ContextEval(ctx, obj.Object)
 	if err != nil {
 		return false

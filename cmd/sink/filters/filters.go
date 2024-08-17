@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package expr
+package filters
 
 import (
 	"context"
@@ -15,7 +15,8 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/cel-go/cel"
-	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	ocel "github.com/kubearchive/kubearchive/pkg/cel"
 	"github.com/kubearchive/kubearchive/pkg/files"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -88,7 +89,7 @@ func getGlobalCelExprs(filterFiles map[string]string) (map[string]string, map[st
 	if !exists {
 		return archiveExprs, deleteExprs, ErrNoGlobal
 	}
-	resources, err := k8s.KACResourceSliceFromFile(globalFile)
+	resources, err := kubearchiveapi.LoadFromFile(globalFile)
 	if err != nil {
 		return archiveExprs, deleteExprs, err
 	}
@@ -146,7 +147,7 @@ func (f *Filters) createFilters(
 ) (map[NamespaceGroupVersionKind]cel.Program, map[NamespaceGroupVersionKind]cel.Program, error) {
 	archiveMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	deleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
-	resources, err := k8s.KACResourceSliceFromFile(file)
+	resources, err := kubearchiveapi.LoadFromFile(file)
 	if err != nil {
 		return archiveMap, deleteMap, err
 	}
@@ -154,13 +155,13 @@ func (f *Filters) createFilters(
 	for _, resource := range resources {
 		gvk := schema.FromAPIVersionAndKind(resource.Selector.APIVersion, resource.Selector.Kind)
 		namespaceGvk := NamespaceGVKFromNamespaceAndGvk(namespace, gvk)
-		archiveExpr, err := CreateCelExprOr(resource.ArchiveWhen, globalArchive[gvk.String()])
+		archiveExpr, err := ocel.CreateCelExprOr(resource.ArchiveWhen, globalArchive[gvk.String()])
 		if err != nil {
 			errList = append(errList, err)
 		} else {
 			archiveMap[namespaceGvk] = *archiveExpr
 		}
-		deleteExpr, err := CreateCelExprOr(resource.DeleteWhen, globalDelete[gvk.String()])
+		deleteExpr, err := ocel.CreateCelExprOr(resource.DeleteWhen, globalDelete[gvk.String()])
 		if err != nil {
 			errList = append(errList, err)
 		} else {
@@ -305,7 +306,7 @@ func (f *Filters) MustArchive(ctx context.Context, obj *unstructured.Unstructure
 	defer f.RUnlock()
 	ngvk := NamespaceGVKFromObject(obj)
 	program, exists := f.archive[ngvk]
-	return f.mustDelete(ctx, obj) || (exists && executeCel(ctx, program, obj))
+	return f.mustDelete(ctx, obj) || (exists && ocel.ExecuteCel(ctx, program, obj))
 }
 
 // MustDelete returns whether obj needs to be deleted. Obj needs to be deleted if the cel program in delete that matches
@@ -328,7 +329,7 @@ func (f *Filters) mustDelete(ctx context.Context, obj *unstructured.Unstructured
 	}
 	ngvk := NamespaceGVKFromObject(obj)
 	program, exists := f.delete[ngvk]
-	return exists && executeCel(ctx, program, obj)
+	return exists && ocel.ExecuteCel(ctx, program, obj)
 }
 
 // Path returns f.path, which is the directory where the ConfigMap is mounted.

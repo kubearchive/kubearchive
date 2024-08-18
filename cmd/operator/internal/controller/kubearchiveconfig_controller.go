@@ -3,12 +3,13 @@
 
 package controller
 
-// a14e => shorthand for ApiServerSource
+// a13e => shorthand for ApiServerSource
 // k9e  => shorthand for KubeArchive
 
 import (
 	"context"
 	"os"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -33,10 +34,14 @@ import (
 	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 )
 
-const SinkFilterConfigMapName = "sink-filters"
+const (
+	SinkFilterConfigMapName   = "sink-filters"
+	ApiServerSourceLabelName  = "kubearchive.org/enabled"
+	ApiServerSourceLabelValue = "true"
+)
 
 var k9eNs = os.Getenv("KUBEARCHIVE_NAMESPACE")
-var a14eName = k9eNs + "-a14e"
+var a13eName = k9eNs + "-a13e"
 var k9eSinkName = k9eNs + "-sink"
 
 // KubeArchiveConfigReconciler reconciles a KubeArchiveConfig object
@@ -50,9 +55,10 @@ type KubeArchiveConfigReconciler struct {
 //+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=create;delete;get;list;update;watch
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=bind;create;delete;escalate;get;list;update;watch
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;roles;rolebindings,verbs=bind;create;delete;escalate;get;list;update;watch
 //+kubebuilder:rbac:groups=sources.knative.dev,resources=apiserversources,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=create;delete;get;list;update;watch
+//+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;update;watch
 
 func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
@@ -79,9 +85,14 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	} else {
 		// The object is being deleted.
 		if controllerutil.ContainsFinalizer(kaconfig, finalizerName) {
-			// Finalizer is present, clean up filters from ConfigMap.
+			// Finalizer is present, clean up filters from ConfigMap and remove Namespace label.
 			if err := r.removeFilters(ctx, kaconfig); err != nil {
 				// If filter deletion fails, return with error so that it can be retried.
+				return ctrl.Result{}, err
+			}
+
+			if err := r.removeNamespaceLabel(ctx, kaconfig); err != nil {
+				// If label removal fails, return with error so that it can be retried.
 				return ctrl.Result{}, err
 			}
 
@@ -96,37 +107,43 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, nil
 	}
 
-	_, err := r.reconcileA14eServiceAccount(ctx, kaconfig)
+	cm, err := r.reconcileFilterConfigMap(ctx, kaconfig)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	resources := r.parseConfigMap(ctx, cm)
+
+	_, err = r.reconcileA13eServiceAccount(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	_, err = r.reconcileA14eRole(ctx, kaconfig)
+	clusterrole, err := r.reconcileA13eRole(ctx, resources)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	_, err = r.reconcileA14eRoleBinding(ctx, kaconfig)
+	_, err = r.reconcileA13eRoleBinding(ctx, kaconfig, clusterrole)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	_, err = r.reconcileA14e(ctx, kaconfig)
+	_, err = r.reconcileA13e(ctx, resources)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	_, err = r.reconcileSinkRole(ctx, kaconfig)
+	role, err := r.reconcileSinkRole(ctx, kaconfig)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	_, err = r.reconcileSinkRoleBinding(ctx, kaconfig)
+	_, err = r.reconcileSinkRoleBinding(ctx, kaconfig, role)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	_, err = r.reconcileFilterConfigMap(ctx, kaconfig)
+	_, err = r.reconcileNamespace(ctx, kaconfig)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -138,24 +155,18 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 func (r *KubeArchiveConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kubearchivev1alpha1.KubeArchiveConfig{}).
-		Owns(&corev1.ServiceAccount{}).
-		Owns(&rbacv1.Role{}).
+		//Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
-		Owns(&sourcesv1.ApiServerSource{}).
 		Complete(r)
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileA14eServiceAccount(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.ServiceAccount, error) {
+func (r *KubeArchiveConfigReconciler) reconcileA13eServiceAccount(ctx context.Context) (*corev1.ServiceAccount, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileServiceAccount")
-	sa, err := r.desiredA14eServiceAccount(kaconfig)
-	if err != nil {
-		log.Error(err, "Unable to get desired ServiceAccount")
-		return sa, err
-	}
+	sa := r.desiredA13eServiceAccount()
 
-	err = r.Get(ctx, types.NamespacedName{Name: a14eName, Namespace: kaconfig.Namespace}, &corev1.ServiceAccount{})
+	err := r.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: k9eNs}, &corev1.ServiceAccount{})
 	if err == nil {
 		err = r.Update(ctx, sa)
 		if err != nil {
@@ -176,33 +187,34 @@ func (r *KubeArchiveConfigReconciler) reconcileA14eServiceAccount(ctx context.Co
 	return sa, nil
 }
 
-func (r *KubeArchiveConfigReconciler) desiredA14eServiceAccount(kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.ServiceAccount, error) {
+func (r *KubeArchiveConfigReconciler) desiredA13eServiceAccount() *corev1.ServiceAccount {
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      a14eName,
-			Namespace: kaconfig.Namespace,
+			Name:      a13eName,
+			Namespace: k9eNs,
 		},
 	}
-
-	if err := ctrl.SetControllerReference(kaconfig, sa, r.Scheme); err != nil {
-		return nil, err
-	}
-	return sa, nil
+	return sa
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileA14eRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.Role, error) {
-	return r.reconcileRole(ctx, kaconfig, a14eName, []string{"get", "list", "watch"})
+func (r *KubeArchiveConfigReconciler) reconcileA13eRole(ctx context.Context, resources []sourcesv1.APIVersionKindSelector) (*rbacv1.ClusterRole, error) {
+	return r.reconcileClusterRole(ctx, a13eName, r.getRules(ctx, resources, []string{"get", "list", "watch"}))
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.Role, error) {
-	return r.reconcileRole(ctx, kaconfig, k9eSinkName, []string{"delete"})
+	resources := make([]sourcesv1.APIVersionKindSelector, 0)
+	for _, kar := range kaconfig.Spec.Resources {
+		resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
+		resources = append(resources, resource)
+	}
+	return r.reconcileRole(ctx, kaconfig, k9eSinkName, r.getRules(ctx, resources, []string{"delete"}))
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string, verbs []string) (*rbacv1.Role, error) {
+func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileRole " + roleName)
-	role, err := r.desiredRole(ctx, kaconfig, roleName, verbs)
+	role, err := r.desiredRole(kaconfig, roleName, rules)
 	if err != nil {
 		log.Error(err, "Unable to get desired Role "+roleName)
 		return role, err
@@ -229,29 +241,7 @@ func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfi
 	return role, nil
 }
 
-func (r *KubeArchiveConfigReconciler) desiredRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string, verbs []string) (*rbacv1.Role, error) {
-	log := log.FromContext(ctx)
-	var rules []rbacv1.PolicyRule
-	for _, resource := range kaconfig.Spec.Resources {
-		apiGroup := ""
-		apiVersion := resource.Selector.APIVersion
-		data := strings.Split(resource.Selector.APIVersion, "/")
-		if len(data) > 1 {
-			apiGroup = data[0]
-			apiVersion = data[1]
-		}
-		// The resource field in the GVR contains the plural version of the resource, and
-		// the kubernetes Role expects this lower-cased plural version.
-		gvr, err := r.Mapper.RESTMapping(schema.GroupKind{Group: apiGroup, Kind: resource.Selector.Kind}, apiVersion)
-		if err == nil {
-			rules = append(rules, rbacv1.PolicyRule{
-				APIGroups: []string{apiGroup},
-				Resources: []string{strings.ToLower(gvr.Resource.Resource)},
-				Verbs:     verbs})
-		} else {
-			log.Error(err, "Failed to get GVR for "+resource.Selector.APIVersion)
-		}
-	}
+func (r *KubeArchiveConfigReconciler) desiredRole(kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {
 	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roleName,
@@ -266,60 +256,134 @@ func (r *KubeArchiveConfigReconciler) desiredRole(ctx context.Context, kaconfig 
 	return role, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileA14eRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.RoleBinding, error) {
-	return r.reconcileRoleBinding(ctx, kaconfig, a14eName, a14eName, kaconfig.Namespace)
-}
-
-func (r *KubeArchiveConfigReconciler) reconcileSinkRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.RoleBinding, error) {
-	return r.reconcileRoleBinding(ctx, kaconfig, k9eSinkName, k9eSinkName, k9eNs)
-}
-
-func (r *KubeArchiveConfigReconciler) reconcileRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string, subjectName string, subjectNamespace string) (*rbacv1.RoleBinding, error) {
+func (r *KubeArchiveConfigReconciler) reconcileClusterRole(ctx context.Context, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
 	log := log.FromContext(ctx)
 
-	log.Info("in reconcileRoleBinding " + roleName)
-	binding, err := r.desiredRoleBinding(kaconfig, roleName, subjectName, subjectNamespace)
+	log.Info("in reconcileClusterRole " + roleName)
+	role := r.desiredClusterRole(roleName, rules)
+
+	err := r.Get(ctx, types.NamespacedName{Name: roleName}, &rbacv1.ClusterRole{})
+	if err == nil {
+		err = r.Update(ctx, role)
+		if err != nil {
+			log.Error(err, "Failed to update ClusterRole "+roleName)
+			return role, err
+		}
+	} else if errors.IsNotFound(err) {
+		err = r.Create(ctx, role)
+		if err != nil {
+			log.Error(err, "Failed to create ClusterRole "+roleName)
+			return role, err
+		}
+	} else {
+		log.Error(err, "Failed to reconcile ClusterRole "+roleName)
+		return role, err
+	}
+
+	return role, nil
+}
+
+func (r *KubeArchiveConfigReconciler) desiredClusterRole(roleName string, rules []rbacv1.PolicyRule) *rbacv1.ClusterRole {
+	role := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: roleName,
+		},
+		Rules: rules,
+	}
+
+	return role
+}
+
+func (r *KubeArchiveConfigReconciler) getRules(ctx context.Context, resources []sourcesv1.APIVersionKindSelector, verbs []string) []rbacv1.PolicyRule {
+	log := log.FromContext(ctx)
+	groups := make(map[string][]string)
+
+	for _, resource := range resources {
+		apiGroup := ""
+		apiVersion := resource.APIVersion
+		data := strings.Split(apiVersion, "/")
+		if len(data) > 1 {
+			apiGroup = data[0]
+			apiVersion = data[1]
+		}
+		// The resource field in the GVR contains the plural version of the resource, and
+		// the kubernetes Role expects this lower-cased plural version.
+		gvr, err := r.Mapper.RESTMapping(schema.GroupKind{Group: apiGroup, Kind: resource.Kind}, apiVersion)
+		if err == nil {
+			if _, exists := groups[apiGroup]; !exists {
+				groups[apiGroup] = make([]string, 0)
+			}
+			groups[apiGroup] = append(groups[apiGroup], strings.ToLower(gvr.Resource.Resource))
+		} else {
+			log.Error(err, "Failed to get GVR for "+resource.APIVersion)
+		}
+	}
+
+	var rules []rbacv1.PolicyRule
+	for group, resList := range groups {
+		rules = append(rules, rbacv1.PolicyRule{
+			APIGroups: []string{group},
+			Resources: resList,
+			Verbs:     verbs})
+	}
+
+	return rules
+}
+
+func (r *KubeArchiveConfigReconciler) reconcileA13eRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, role *rbacv1.ClusterRole) (*rbacv1.RoleBinding, error) {
+	return r.reconcileRoleBinding(ctx, kaconfig, role.Name, "ClusterRole")
+}
+
+func (r *KubeArchiveConfigReconciler) reconcileSinkRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, role *rbacv1.Role) (*rbacv1.RoleBinding, error) {
+	return r.reconcileRoleBinding(ctx, kaconfig, role.Name, "Role")
+}
+
+func (r *KubeArchiveConfigReconciler) reconcileRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, name string, kind string) (*rbacv1.RoleBinding, error) {
+	log := log.FromContext(ctx)
+
+	log.Info("in reconcileRoleBinding " + name)
+	binding, err := r.desiredRoleBinding(kaconfig, name, kind)
 	if err != nil {
-		log.Error(err, "Unable to get desired RoleBinding "+roleName)
+		log.Error(err, "Unable to get desired RoleBinding "+name)
 		return binding, err
 	}
 
-	err = r.Get(ctx, types.NamespacedName{Name: roleName, Namespace: kaconfig.Namespace}, &rbacv1.RoleBinding{})
+	err = r.Get(ctx, types.NamespacedName{Name: name, Namespace: kaconfig.Namespace}, &rbacv1.RoleBinding{})
 	if err == nil {
 		err = r.Update(ctx, binding)
 		if err != nil {
-			log.Error(err, "Failed to update RoleBinding "+roleName)
+			log.Error(err, "Failed to update RoleBinding "+name)
 			return binding, err
 		}
 	} else if errors.IsNotFound(err) {
 		err = r.Create(ctx, binding)
 		if err != nil {
-			log.Error(err, "Failed to create RoleBinding "+roleName)
+			log.Error(err, "Failed to create RoleBinding "+name)
 			return binding, err
 		}
 	} else {
-		log.Error(err, "Failed to reconcile RoleBinding "+roleName)
+		log.Error(err, "Failed to reconcile RoleBinding "+name)
 		return binding, err
 	}
 
 	return binding, nil
 }
 
-func (r *KubeArchiveConfigReconciler) desiredRoleBinding(kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string, subjectName string, subjectNamespace string) (*rbacv1.RoleBinding, error) {
+func (r *KubeArchiveConfigReconciler) desiredRoleBinding(kaconfig *kubearchivev1alpha1.KubeArchiveConfig, name string, kind string) (*rbacv1.RoleBinding, error) {
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      roleName,
+			Name:      name,
 			Namespace: kaconfig.Namespace,
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "Role",
-			Name:     roleName,
+			Kind:     kind,
+			Name:     name,
 		},
 		Subjects: []rbacv1.Subject{{
 			Kind:      "ServiceAccount",
-			Name:      subjectName,
-			Namespace: subjectNamespace,
+			Name:      name,
+			Namespace: k9eNs,
 		}},
 	}
 
@@ -329,18 +393,14 @@ func (r *KubeArchiveConfigReconciler) desiredRoleBinding(kaconfig *kubearchivev1
 	return binding, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileA14e(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*sourcesv1.ApiServerSource, error) {
+func (r *KubeArchiveConfigReconciler) reconcileA13e(ctx context.Context, resources []sourcesv1.APIVersionKindSelector) (*sourcesv1.ApiServerSource, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileApiServerSource")
-	source, err := r.desiredA14e(kaconfig)
-	if err != nil {
-		log.Error(err, "Unable to get desired ApiServerSource")
-		return source, err
-	}
+	source := r.desiredA13e(resources)
 
 	existing := &sourcesv1.ApiServerSource{}
-	err = r.Get(ctx, types.NamespacedName{Name: a14eName, Namespace: kaconfig.Namespace}, existing)
+	err := r.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: k9eNs}, existing)
 	if err == nil {
 		source.SetResourceVersion(existing.GetResourceVersion())
 		err = r.Update(ctx, source)
@@ -362,24 +422,49 @@ func (r *KubeArchiveConfigReconciler) reconcileA14e(ctx context.Context, kaconfi
 	return source, nil
 }
 
-func (r *KubeArchiveConfigReconciler) desiredA14e(kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*sourcesv1.ApiServerSource, error) {
+func (r *KubeArchiveConfigReconciler) parseConfigMap(ctx context.Context, cm *corev1.ConfigMap) []sourcesv1.APIVersionKindSelector {
+	log := log.FromContext(ctx)
 
-	resources := make([]sourcesv1.APIVersionKindSelector, 0)
-	for _, resource := range kaconfig.Spec.Resources {
-		resources = append(resources, resource.Selector)
+	resourceMap := map[string]sourcesv1.APIVersionKindSelector{}
+	resourceKeys := make([]string, 0)
+	for namespace, yaml := range cm.Data {
+		kars, err := kubearchivev1alpha1.LoadFromString(yaml)
+		if err != nil {
+			log.Error(err, "Failed to load KubeArchiveConfigResource for namespace "+namespace)
+			continue
+		}
+		for _, kar := range kars {
+			key := kar.Selector.Kind + "-" + kar.Selector.APIVersion
+			if _, ok := resourceMap[key]; !ok {
+				// One include kind and apiVersion, ignore all other filter information.
+				resourceMap[key] = sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
+				resourceKeys = append(resourceKeys, key)
+			}
+		}
 	}
+	sort.Strings(resourceKeys)
+
+	resources := make([]sourcesv1.APIVersionKindSelector, 0, len(resourceMap))
+	for _, key := range resourceKeys {
+		resources = append(resources, resourceMap[key])
+	}
+	return resources
+}
+
+func (r *KubeArchiveConfigReconciler) desiredA13e(resources []sourcesv1.APIVersionKindSelector) *sourcesv1.ApiServerSource {
+
 	source := &sourcesv1.ApiServerSource{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "ApiServerSource",
 			APIVersion: "sources.knative.dev/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      a14eName,
-			Namespace: kaconfig.Namespace,
+			Name:      a13eName,
+			Namespace: k9eNs,
 		},
 		Spec: sourcesv1.ApiServerSourceSpec{
 			EventMode:          "Resource",
-			ServiceAccountName: a14eName,
+			ServiceAccountName: a13eName,
 			Resources:          resources,
 			SourceSpec: duckv1.SourceSpec{
 				Sink: duckv1.Destination{
@@ -391,15 +476,18 @@ func (r *KubeArchiveConfigReconciler) desiredA14e(kaconfig *kubearchivev1alpha1.
 					},
 				},
 			},
+			NamespaceSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{ApiServerSourceLabelName: ApiServerSourceLabelValue},
+			},
 			Filters: []eventingv1.SubscriptionsAPIFilter{
 				{
-					CESQL: "type NOT LIKE '%delete'", // a14e SHOULD NOT send delete cloudevents
+					CESQL: "type NOT LIKE '%delete'", // a13e SHOULD NOT send delete cloudevents
 				},
 			},
 		},
 	}
 
-	return source, nil
+	return source
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileFilterConfigMap(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.ConfigMap, error) {
@@ -486,6 +574,51 @@ func (r *KubeArchiveConfigReconciler) removeFilters(ctx context.Context, kaconfi
 	err = r.Update(ctx, cm)
 	if err != nil {
 		log.Error(err, "Failed to update filter ConfigMap "+SinkFilterConfigMapName)
+		return err
+	}
+
+	return nil
+}
+
+func (r *KubeArchiveConfigReconciler) reconcileNamespace(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.Namespace, error) {
+	log := log.FromContext(ctx)
+
+	log.Info("in reconcileNamespace")
+
+	ns := &corev1.Namespace{}
+	err := r.Get(ctx, types.NamespacedName{Name: kaconfig.Namespace}, ns)
+	if err != nil {
+		log.Error(err, "Failed to get Namespace "+kaconfig.Namespace)
+		return ns, err
+	}
+
+	ns.ObjectMeta.Labels[ApiServerSourceLabelName] = ApiServerSourceLabelValue
+	err = r.Update(ctx, ns)
+	if err != nil {
+		log.Error(err, "Failed to update Namespace "+kaconfig.Namespace)
+		return ns, err
+	}
+
+	return ns, nil
+}
+
+func (r *KubeArchiveConfigReconciler) removeNamespaceLabel(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) error {
+	log := log.FromContext(ctx)
+
+	log.Info("in removeNamespaceLabel")
+
+	ns := &corev1.Namespace{}
+	err := r.Get(ctx, types.NamespacedName{Name: kaconfig.Namespace}, ns)
+	if err != nil {
+		log.Error(err, "Failed to get Namespace "+kaconfig.Namespace)
+		return err
+	}
+
+	delete(ns.ObjectMeta.Labels, ApiServerSourceLabelName)
+
+	err = r.Update(ctx, ns)
+	if err != nil {
+		log.Error(err, "Failed to update Namespace "+kaconfig.Namespace)
 		return err
 	}
 

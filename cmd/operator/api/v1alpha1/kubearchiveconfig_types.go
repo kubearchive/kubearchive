@@ -49,12 +49,16 @@ type KubeArchiveConfigList struct {
 }
 
 func LoadFromFile(path string) ([]KubeArchiveConfigResource, error) {
-	resources := []KubeArchiveConfigResource{}
-	resourcesBytes, err := os.ReadFile(path)
+	yamlBytes, err := os.ReadFile(path)
 	if err != nil {
-		return resources, err
+		return []KubeArchiveConfigResource{}, err
 	}
-	err = yaml.Unmarshal(resourcesBytes, &resources)
+	return LoadFromString(string(yamlBytes))
+}
+
+func LoadFromString(yamlString string) ([]KubeArchiveConfigResource, error) {
+	resources := []KubeArchiveConfigResource{}
+	err := yaml.Unmarshal([]byte(yamlString), &resources)
 	return resources, err
 }
 

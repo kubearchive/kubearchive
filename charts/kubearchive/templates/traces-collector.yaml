@@ -24,6 +24,8 @@ spec:
           value: "false"
         - name: COLLECTOR_OTLP_ENABLED
           value: "true"
+        - name: COLLECTOR_ZIPKIN_HOST_PORT
+          value: ":9411"
         image: "jaegertracing/all-in-one:{{ .Values.integrations.observability.imageTag }}"
         imagePullPolicy: IfNotPresent
         livenessProbe:
@@ -43,6 +45,9 @@ spec:
           protocol: TCP
         - containerPort: 4318
           name: http-otlp
+          protocol: TCP
+        - containerPort: 9411
+          name: zipkin
           protocol: TCP
         readinessProbe:
           failureThreshold: 3
@@ -74,4 +79,8 @@ spec:
     port: 16686
     protocol: TCP
     targetPort: 16686
+  - name: zipkin
+    port: 9411
+    protocol: TCP
+    targetPort: 9411
 {{- end }}

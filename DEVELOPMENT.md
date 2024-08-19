@@ -215,6 +215,39 @@ to start a debugger to which attach from your IDE.
    https://localhost:8081/apis/batch/v1/jobs | jq
    ```
 
+## Enabling Telemetry
+
+We use Jaeger for tracing on development. As some dependencies use the Zipkin format
+to send traces, we are using the zipkin-compatible endpoint of Jaeger.
+
+1. Create the following ConfigMap to enable Telemetry for Knative Eventing.
+    ```bash
+    kubectl apply -f - <<EOF
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: config-tracing
+      namespace: knative-eventing
+    data:
+      backend: "zipkin"
+      zipkin-endpoint: "http://traces-collector.kubearchive.svc.cluster.local:9411/api/v2/spans"
+      sample-rate: "1"
+    EOF
+    ```
+    **Note**: Knative's APIServerSource created before applying this change do not emit traces. Recreate
+    the KubeArchiveConfig to trigger the recreation of the APIServerSource.
+1. Install or upgrade KubeArchive adding the following option to the Helm command:
+    ```bash
+    --set "integrations.observability.enabled=true"
+    ```
+    This extra flag makes Helm deploy a traces collector and sets the appropiate environment
+    variables for the KubeArchive deployments.
+1. Forward the traces collector port to localhost:
+    ```bash
+    kubectl port-forward -n kubearchive svc/traces-collector 16686:16686 &
+    ```
+1. Open [http://localhost:16686](http://localhost:16686) in your browser.
+
 ## Known issues
 
 1. Using KinD and podman. If you get this error:

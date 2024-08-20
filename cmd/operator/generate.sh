@@ -16,6 +16,24 @@ cd ${SCRIPT_DIR}
 echo "Generating CRD."
 ${LOCALBIN}/controller-gen crd paths="./..." output:dir=../../charts/kubearchive/crds
 
+patch="/tmp/crd.$$"
+cat << EOF > $patch
+strategy: Webhook
+webhook:
+  clientConfig:
+    service:
+      namespace: kubearchive
+      name: webhook-service
+      path: /convert
+  conversionReviewVersions:
+  - v1
+EOF
+CRD="../../charts/kubearchive/crds/kubearchive.kubearchive.org_kubearchiveconfigs.yaml"
+yq -i '.metadata.annotations."cert-manager.io/inject-ca-from"="kubearchive/kubearchive-operator-certificate"' ${CRD}
+yq -i ".spec.conversion = load(\"$patch\")" ${CRD}
+
+rm -f $patch
+
 # Generate role.
 echo "Generating role."
 ${LOCALBIN}/controller-gen rbac:roleName="replaceme" \

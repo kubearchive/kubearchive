@@ -46,6 +46,8 @@ operator:
   # helm install -n default <chart-name> charts/kubearchive \
   # --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator)
   image: ko://github.com/kubearchive/kubearchive/cmd/operator
+  cert: "{{ tpl .Values.operator.name . }}-certificate"
+  secret: "{{ tpl .Values.operator.name . }}-tls"
 
 # values used to create a PostgreSQL database
 database:

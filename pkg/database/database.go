@@ -7,8 +7,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"time"
 
 	"github.com/XSAM/otelsql"
+	"github.com/avast/retry-go/v4"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	_ "github.com/lib/pq"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,13 +40,28 @@ func NewDatabase() (*Database, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := otelsql.Open("postgres", dataSource)
-	if err != nil {
-		return nil, err
+	var db *sql.DB
+	configs := []retry.Option{
+		retry.Attempts(10),
+		retry.OnRetry(func(n uint, err error) {
+			log.Printf("Retry request %d, get error: %v", n+1, err)
+		}),
+		retry.Delay(time.Second),
 	}
-	if err = db.Ping(); err != nil {
-		return nil, err
+
+	errRetry := retry.Do(
+		func() error {
+			db, err = otelsql.Open("postgres", dataSource)
+			if err != nil {
+				return err
+			}
+			return db.Ping()
+		},
+		configs...)
+	if errRetry != nil {
+		return nil, errRetry
 	}
+	log.Println("Successfully connected to the database")
 	return &Database{db, resourceTableName}, nil
 }
 

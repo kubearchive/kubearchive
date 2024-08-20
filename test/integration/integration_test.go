@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/kubearchive/kubearchive/test"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -206,4 +208,105 @@ func IsObjectReady(resource string, namespace string, jsonPath string) (bool, er
 		kaStatus = true
 	}
 	return kaStatus, err
+}
+
+// This test verifies the database connection retries using the Sink component.
+func TestDatabaseConnection(t *testing.T) {
+	clientset, err := test.GetKubernetesClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// database deployment
+	deploymentScaleDatabase, err := clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-database", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// database replicas = 0
+	scaleDatabase := *deploymentScaleDatabase
+	scaleDatabase.Spec.Replicas = 0
+	usDatabase, err := clientset.AppsV1().Deployments("kubearchive").UpdateScale(context.Background(), "kubearchive-database", &scaleDatabase, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Printf("Changing database to %d replicas", scaleDatabase.Spec.Replicas)
+	log.Println(*usDatabase)
+
+	// restart sink pod - replicas = 0
+	deploymentScaleSink, err := clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scaleSink := *deploymentScaleSink
+	scaleSink.Spec.Replicas = 0
+	usSink, err := clientset.AppsV1().Deployments("kubearchive").UpdateScale(context.Background(), "kubearchive-sink", &scaleSink, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Printf("Changing sink to %d replicas", scaleSink.Spec.Replicas)
+	log.Println(*usSink)
+
+	// restart sink pod - replicas = 1
+	deploymentScaleSink, err = clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scaleSink = *deploymentScaleSink
+	scaleSink.Spec.Replicas = 1
+	usSink, err = clientset.AppsV1().Deployments("kubearchive").UpdateScale(context.Background(), "kubearchive-sink", &scaleSink, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Printf("Changing sink to %d replicas", scaleSink.Spec.Replicas)
+	log.Println(*usSink)
+
+	// wait to sink pod ready and generate connection retries with the database
+	log.Printf("Waiting for sink to be up, and to generate retries with the database")
+	time.Sleep(150 * time.Second)
+
+	// wake-up database -> replicas = 1
+	deploymentScaleDatabase, err = clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-database", metav1.GetOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	scaleDatabase = *deploymentScaleDatabase
+	scaleDatabase.Spec.Replicas = 1
+	usDatabase, err = clientset.AppsV1().Deployments("kubearchive").UpdateScale(context.Background(), "kubearchive-database", &scaleDatabase, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Printf("Changing database to %d replicas", scaleDatabase.Spec.Replicas)
+	log.Println(*usDatabase)
+
+	// wait to have the database up
+	time.Sleep(30 * time.Second)
+
+	// get sink logs
+	pods, err := clientset.CoreV1().Pods("kubearchive").List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var sinkPodName string
+	for _, pod := range pods.Items {
+		if strings.Contains(pod.Name, "kubearchive-sink") {
+			sinkPodName = pod.Name
+		}
+	}
+	podLogOpts := corev1.PodLogOptions{}
+	req := clientset.CoreV1().Pods("kubearchive").GetLogs(sinkPodName, &podLogOpts)
+	sinkLogs, err := req.Stream(context.TODO())
+	if err != nil {
+		t.Fatal(err)
+	}
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(sinkLogs)
+	respBytes := buf.Bytes()
+	respString := string(respBytes)
+	if strings.Contains(respString, "Successfully connected to the database") {
+		log.Printf(respString)
+	} else {
+		t.Fatal(fmt.Sprintf("Sink could not be connected to the database after the retries: %s", respString))
+	}
 }

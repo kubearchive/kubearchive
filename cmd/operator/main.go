@@ -33,6 +33,9 @@ import (
 const otelServiceName = "kubearchive.operator"
 
 var (
+	version  = "main"
+	commit   = ""
+	date     = ""
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
@@ -140,7 +143,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting operator")
+	setupLog.Info("starting operator", "version", version, "commit", commit, "date", date)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running operator")
 		os.Exit(1)

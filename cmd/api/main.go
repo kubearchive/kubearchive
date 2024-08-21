@@ -20,6 +20,12 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+var (
+	version = "main"
+	commit  = ""
+	date    = ""
+)
+
 const otelServiceName = "kubearchive.api"
 
 type Server struct {
@@ -59,6 +65,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller) *S
 }
 
 func main() {
+	log.Printf("Starting KubeArchive API with version '%s', commit SHA '%s', built '%s'", version, commit, date)
 	err := observability.Start(otelServiceName)
 	if err != nil {
 		log.Printf("Could not start opentelemetry: %s", err)

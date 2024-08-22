@@ -15,6 +15,7 @@ Install these tools:
 1. [`helm`](https://helm.sh/docs/intro/install/)
 1. [`podman`](https://podman.io/docs/installation)
 1. [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/)
+1. [`yq`](https://github.com/mikefarah/yq/)
 
 ## Creating a fork repository
 

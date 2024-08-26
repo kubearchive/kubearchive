@@ -25,6 +25,12 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+var (
+	version = "main"
+	commit  = ""
+	date    = ""
+)
+
 const (
 	otelServiceName = "kubearchive.sink"
 	mountPathEnvVar = "MOUNT_PATH"
@@ -141,6 +147,8 @@ func (sink *Sink) Receive(ctx context.Context, event cloudevents.Event) {
 
 func main() {
 	logger := log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds|log.LUTC)
+	logger.Printf("Starting KubeArchive Sink with version '%s', commit SHA '%s', built '%s'", version, commit, date)
+
 	err := kaObservability.Start(otelServiceName)
 	if err != nil {
 		logger.Printf("Could not start tracing: %s\n", err.Error())

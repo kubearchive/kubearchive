@@ -106,6 +106,7 @@ helm upgrade kubearchive charts/kubearchive -n kubearchive \
 
 ```bash
 helm uninstall -n kubearchive kubearchive
+kubectl delete ns kubearchive
 ```
 
 ## Initialize the database

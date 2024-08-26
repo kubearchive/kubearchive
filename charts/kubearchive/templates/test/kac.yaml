@@ -1,3 +1,4 @@
+{{- if eq .Values.global.production false -}}
 ---
 apiVersion: kubearchive.kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
@@ -11,3 +12,4 @@ spec:
         kind: Event
       archiveWhen: status.state != 'Completed'
       deleteWhen: status.state == 'Completed'
+{{- end -}}

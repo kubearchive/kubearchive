@@ -57,12 +57,12 @@ git tag -a "${NEXT_VERSION}" -m "Release ${NEXT_VERSION}"
 
 # Build and push
 bash cmd/operator/generate.sh
-ko build github.com/kubearchive/kubearchive/cmd/sink --base-import-paths --tags=${NEXT_VERSION}
-ko build github.com/kubearchive/kubearchive/cmd/api --base-import-paths --tags=${NEXT_VERSION}
-ko build github.com/kubearchive/kubearchive/cmd/operator/ --base-import-paths --tags=${NEXT_VERSION}
 
-helm package charts/kubearchive --app-version ${NEXT_VERSION} --version ${NEXT_VERSION}
-helm push kubearchive-helm-${NEXT_VERSION}.tgz oci://${OCI_REPOSITORY}
+helm template kubearchive charts/kubearchive -n kubearchive \
+    --include-crds \
+    --set "global.production=true" \
+    --set "database.enabled=false" > /tmp/kubearchive-not-resolved.yaml
+ko resolve -f /tmp/kubearchive-not-resolved.yaml --base-import-paths --tags=${NEXT_VERSION} > kubearchive.yaml
 
 git push
 git push --tags
@@ -70,5 +70,8 @@ git push --tags
 gh release create "${NEXT_VERSION}" \
     --notes-file ./release-notes.md \
     --title "Release ${NEXT_VERSION}" \
-    --repo ${RELEASE_REPOSITORY}
+    --repo ${RELEASE_REPOSITORY} \
+    kubearchive.yaml \
+    database/ddl.sql
 rm ./release-notes.md
+rm ./kubearchive.yaml

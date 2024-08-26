@@ -1,4 +1,3 @@
-# yamllint disable rule:braces
 {{- $caName := tpl "{{ .Release.Name }}-ca" . -}}
 ---
 apiVersion: cert-manager.io/v1

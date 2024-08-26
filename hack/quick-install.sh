@@ -1,7 +1,11 @@
 #!/bin/bash
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
 
 set -o errexit
 set -o xtrace
+
+bash hack/install-database.sh
 
 export CERT_MANAGER_VERSION=v1.9.1
 export KNATIVE_EVENTING_VERSION=v1.15.0
@@ -26,12 +30,21 @@ data:
 EOF
 
 bash cmd/operator/generate.sh
+helm template kubearchive charts/kubearchive -n kubearchive \
+    --include-crds \
+    --set "global.production=true" \
+    --set "database.enabled=false" > /tmp/kubearchive-not-resolved.yaml
+ko resolve -f /tmp/kubearchive-not-resolved.yaml --base-import-paths > /tmp/kubearchive.yaml
+kubectl apply -n kubearchive -f /tmp/kubearchive.yaml
 
-helm install kubearchive charts/kubearchive --create-namespace -n kubearchive \
-    --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
-    --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
-    --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator)
+cat <<EOF > /tmp/patch.yaml
+stringData:
+  POSTGRES_URL: postgresql.databases.svc.cluster.local
+  POSTGRES_USER: kubearchive
+  POSTGRES_DB: kubearchive
+  POSTGRES_PASSWORD: 'P0stgr3sdbP@ssword'  # notsecret
+EOF
+kubectl patch -n kubearchive secrets kubearchive-database-credentials --patch-file /tmp/patch.yaml
 
 kubectl rollout status deployment --namespace=kubearchive --timeout=60s
-helm list -n kubearchive
 kubectl get -n kubearchive deployments

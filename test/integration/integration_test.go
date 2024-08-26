@@ -215,14 +215,14 @@ func TestDatabaseConnection(t *testing.T) {
 	}
 
 	// database deployment
-	deploymentScaleDatabase, err := clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-database", metav1.GetOptions{})
+	deploymentScaleDatabase, err := clientset.AppsV1().Deployments("databases").GetScale(context.Background(), "postgresql", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// database replicas = 0
 	scaleDatabase := *deploymentScaleDatabase
 	scaleDatabase.Spec.Replicas = 0
-	usDatabase, err := clientset.AppsV1().Deployments("kubearchive").UpdateScale(context.Background(), "kubearchive-database", &scaleDatabase, metav1.UpdateOptions{})
+	usDatabase, err := clientset.AppsV1().Deployments("databases").UpdateScale(context.Background(), "postgresql", &scaleDatabase, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,13 +282,13 @@ func TestDatabaseConnection(t *testing.T) {
 	}
 
 	// wake-up database -> replicas = 1
-	deploymentScaleDatabase, err = clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-database", metav1.GetOptions{})
+	deploymentScaleDatabase, err = clientset.AppsV1().Deployments("databases").GetScale(context.Background(), "postgresql", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	scaleDatabase = *deploymentScaleDatabase
 	scaleDatabase.Spec.Replicas = 1
-	usDatabase, err = clientset.AppsV1().Deployments("kubearchive").UpdateScale(context.Background(), "kubearchive-database", &scaleDatabase, metav1.UpdateOptions{})
+	usDatabase, err = clientset.AppsV1().Deployments("databases").UpdateScale(context.Background(), "postgresql", &scaleDatabase, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

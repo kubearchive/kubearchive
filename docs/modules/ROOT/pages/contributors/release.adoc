@@ -94,8 +94,6 @@ This code block is included in KubeArchive's Pull Request template.
 . A release tag is created from the release commit.
 . A GitHub release is created from the release tag.
 . Images are pushed with the `<version>` tag to https://quay.io/kubearchive.
-. The Helm chart is pushed to https://quay.io/kubearchive (version is set by a
-command line option).
 
 == Testing
 
@@ -116,8 +114,9 @@ bash hack/release.sh
 
 To cleanup the results of the release, complete the following steps:
 
-* Delete the different artifacts created on the OCI repository.
+* Delete the images created on the OCI repository.
 * Delete the release and the tag using the GitHub UI.
+* Delete the new tag in your local repository.
 * Execute the following commands from your repository:
 +
 [source,bash]
@@ -135,8 +134,8 @@ Add the following secrets to your fork:
 
 Add the following variables to your fork:
 
-* `OCI_REGISTRY`: used to login with Helm and Ko (e.g. "quay.io").
-* `OCI_REPOSITORY`: used to push content (e.g. "quay.io/username")
+* `OCI_REGISTRY`: used to login with Ko (e.g. "quay.io").
+* `OCI_REPOSITORY`: used to push images (e.g. "quay.io/username")
 
 Then execute the release workflow from the branch you are making changes to.
 
@@ -153,6 +152,3 @@ To cleanup the results of the release, complete the following steps.
 link:https://github.com/kubernetes/release/tree/master/cmd/release-notes[release-notes].
 Using this tool delegates complexity but makes us follow certain practices such as using
 `kind/*` labels on GitHub Pull Requests.
-. The Helm chart version uses the same version as the application. This reduces
-the complexity of the release version calculation, as the automation does not need
-to differentiate between chart and application changes.

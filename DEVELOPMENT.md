@@ -10,7 +10,7 @@ Install these tools:
 
 1. [`go`](https://golang.org/doc/install)
 1. [`git`](https://help.github.com/articles/set-up-git/)
-1. [`ko`](https://github.com/google/ko)
+1. [`ko`](https://github.com/google/ko) ( >v0.16 if using `dlv` for interactive debugging )
 1. [`kubectl`](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
 1. [`helm`](https://helm.sh/docs/intro/install/)
 1. [`podman`](https://podman.io/docs/installation)
@@ -188,33 +188,68 @@ Use `go test` to run the integration test suite:
 go test -v ./test/integration -tags=integration
 ```
 
+## Running ko builds with extra debugging tools
+By default `ko` uses a lightweight image to run go programs.
+The image can be [overridden](https://ko.build/configuration/#overriding-base-images) with
+the `defaultBaseImage` parameter of the `.ko.yaml` configuration file or through the
+environment variable  `KO_DEFAULTBASEIMAGE`.
+
+An example of an image with a set of debugging tools already installed that can be used is
+`registry.redhat.io/rhel9/support-tools`
+
+```bash
+export KO_DEFAULTBASEIMAGE=registry.redhat.io/rhel9/support-tools
+```
+
+**[NOTE]**: Using this images usually needs the pod property `runAsNonRoot` set to `false`.
+
 ## Remote IDE debugging
 
 Use [delve](https://golangforall.com/en/post/go-docker-delve-remote-debug.html)
 to start a debugger to which attach from your IDE.
 
 1. Deploy the chart with `ko` and `helm` in debug mode using an image with `delve`:
+   Specify the [component].debug variable to `true` and update the image accordingly.
+
+   * Deployment to debug the API:
    ```bash
    helm install kubearchive charts/kubearchive --create-namespace -n kubearchive \
-   --set apiServer.debug=true \
-   --set-string apiServer.image=$(KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest ko build --disable-optimizations github.com/kubearchive/kubearchive/cmd/api) \
-   --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
-   --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator)
+     --set apiServer.debug=true \
+     --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api --debug) \
+     --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
+     --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator)
+   ```
+   * Deployment to debug the Operator:
+   ```bash
+   helm install kubearchive charts/kubearchive --create-namespace -n kubearchive \
+     --set operator.debug=true \
+     --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
+     --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
+     --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator --debug)
    ```
 
-1. Forward the ports 8081 and 40000 from the Pod directly:
+1. Forward the port 40000 from the service that you want to debug:
+
+   * To debug the API we also need the 8081 port for exposing the API Server:
    ```bash
    kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081 40000:40000
    ```
+   * Debug the operator webhooks:
+   ```bash
+   kubectl port-forward -n kubearchive svc/kubearchive-operator-webhooks 40000:40000
+   ```
+
 1. Enable breakpoints in your IDE.
 1. Connect to the process using the port 40000:
     * [VSCode instructions](https://golangforall.com/en/post/go-docker-delve-remote-debug.html#visual-studio-code)
     * [Goland instructions](https://golangforall.com/en/post/go-docker-delve-remote-debug.html#goland-ide)
-1. Query the API using `curl` or your browser:
+1. Generate traffic:
+    * API: Query the API using `curl` or your browser:
    ```bash
    curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create token kubearchive-test -n kubearchive)" \
    https://localhost:8081/apis/batch/v1/jobs | jq
    ```
+   * Operator: Deploy the test resources that already include a KubeArchiveConfig Custom Resource
 
 ## Enabling Telemetry
 

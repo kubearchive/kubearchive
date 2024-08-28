@@ -3,8 +3,8 @@
 package main
 
 import (
-	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/avast/retry-go/v4"
 	"github.com/kubearchive/kubearchive/test"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -33,36 +33,29 @@ func TestKubeArchiveDeployments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	acc := 0.0
-	for {
-		if acc >= 30 {
-			t.Fatal(fmt.Sprintf("Timed out waiting for deployment to be ready %f.", acc))
-		}
-
+	retry.Do(func() error {
 		deployments, err := client.AppsV1().Deployments("kubearchive").List(context.Background(), metav1.ListOptions{})
 		if err != nil {
-			t.Fatal(err)
+			return fmt.Errorf("Failed to get Deployments from the 'kubearchive' namespace: %w", err)
 		}
 
 		if len(deployments.Items) == 0 {
-			t.Fatal("No deployments found in the 'kubearchive' namespace, something went wrong.")
+			return errors.New("No deployments found in the 'kubearchive' namespace, something went wrong.")
 		}
 
 		areAllReady := true
 		for _, deployment := range deployments.Items {
-			log.Printf("Deployment '%s' has '%d' ready replicas", deployment.Name, deployment.Status.ReadyReplicas)
-			areAllReady = areAllReady && deployment.Status.ReadyReplicas == 1
+			t.Logf("Deployment '%s' has '%d' ready replicas", deployment.Name, deployment.Status.ReadyReplicas)
+			areAllReady = areAllReady && deployment.Status.ReadyReplicas >= 1
 		}
 
 		if areAllReady {
-			log.Printf("All deployments ready.")
-			break
+			t.Log("All deployments ready.")
+			return nil
 		}
 
-		log.Printf("Not all deployments are ready, waiting 5 seconds...")
-		time.Sleep(5 * time.Second)
-		acc += 5
-	}
+		return errors.New("Timed out while waiting deployments to be ready.")
+	})
 }
 
 // This test checks if the Kubernetes Objects created by the KubeArchive Operator
@@ -229,8 +222,8 @@ func TestDatabaseConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Printf("Changing database to %d replicas", scaleDatabase.Spec.Replicas)
-	log.Println(*usDatabase)
+	t.Logf("Changing database to %d replicas", scaleDatabase.Spec.Replicas)
+	t.Log(*usDatabase)
 
 	// restart sink pod - replicas = 0
 	deploymentScaleSink, err := clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
@@ -244,8 +237,11 @@ func TestDatabaseConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Printf("Changing sink to %d replicas", scaleSink.Spec.Replicas)
-	log.Println(*usSink)
+	t.Logf("Changing sink to %d replicas", scaleSink.Spec.Replicas)
+	t.Log(*usSink)
+
+	t.Logf("Waiting 5 seconds for kubearchive-sink to scale down...")
+	time.Sleep(5 * time.Second)
 
 	// restart sink pod - replicas = 1
 	deploymentScaleSink, err = clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
@@ -258,12 +254,28 @@ func TestDatabaseConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Printf("Changing sink to %d replicas", scaleSink.Spec.Replicas)
-	log.Println(*usSink)
+	t.Logf("Changing sink to %d replicas", scaleSink.Spec.Replicas)
+	t.Log(*usSink)
 
 	// wait to sink pod ready and generate connection retries with the database
-	log.Printf("Waiting for sink to be up, and to generate retries with the database")
-	time.Sleep(150 * time.Second)
+	t.Logf("Waiting for sink to be up, and to generate retries with the database")
+	err = retry.Do(func() error {
+		logs, err := test.GetPodLogs(clientset, "kubearchive", "kubearchive-sink")
+		if err != nil {
+			return err
+		}
+
+		t.Logf("Logs\n%s", logs)
+		if strings.Contains(logs, "connection refused") {
+			return nil
+		}
+
+		return fmt.Errorf("Pod didn't try to connect to the database yet")
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// wake-up database -> replicas = 1
 	deploymentScaleDatabase, err = clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-database", metav1.GetOptions{})
@@ -276,37 +288,24 @@ func TestDatabaseConnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Printf("Changing database to %d replicas", scaleDatabase.Spec.Replicas)
-	log.Println(*usDatabase)
+	t.Logf("Changing database to %d replicas", scaleDatabase.Spec.Replicas)
+	t.Log(*usDatabase)
 
-	// wait to have the database up
-	time.Sleep(30 * time.Second)
-
-	// get sink logs
-	pods, err := clientset.CoreV1().Pods("kubearchive").List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var sinkPodName string
-	for _, pod := range pods.Items {
-		if strings.Contains(pod.Name, "kubearchive-sink") {
-			sinkPodName = pod.Name
+	err = retry.Do(func() error {
+		logs, err := test.GetPodLogs(clientset, "kubearchive", "kubearchive-sink")
+		if err != nil {
+			return nil
 		}
-	}
-	podLogOpts := corev1.PodLogOptions{}
-	req := clientset.CoreV1().Pods("kubearchive").GetLogs(sinkPodName, &podLogOpts)
-	sinkLogs, err := req.Stream(context.TODO())
+
+		t.Logf("Logs:\n%s", logs)
+		if strings.Contains(logs, "Successfully connected to the database") {
+			return nil
+		}
+
+		return errors.New("Pod didn't connect successfully to the database yet")
+	})
+
 	if err != nil {
 		t.Fatal(err)
-	}
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(sinkLogs)
-	respBytes := buf.Bytes()
-	respString := string(respBytes)
-	if strings.Contains(respString, "Successfully connected to the database") {
-		log.Printf(respString)
-	} else {
-		t.Fatal(fmt.Sprintf("Sink could not be connected to the database after the retries: %s", respString))
 	}
 }

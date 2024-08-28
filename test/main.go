@@ -1,16 +1,23 @@
 package test
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -90,4 +97,34 @@ func GetKubernetesClient() (*kubernetes.Clientset, error) {
 		return nil, err
 	}
 	return client, nil
+}
+
+func GetPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (logs string, err error) {
+	pods, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		return "", fmt.Errorf("Couldn't get pods for '%s' namespace: %w", namespace, err)
+	}
+
+	var realPodName string
+	for _, pod := range pods.Items {
+		if strings.Contains(pod.Name, podName) {
+			realPodName = pod.Name
+		}
+	}
+
+	req := clientset.CoreV1().Pods("kubearchive").GetLogs(realPodName, &corev1.PodLogOptions{})
+	logStream, err := req.Stream(context.TODO())
+	if err != nil {
+		return "", fmt.Errorf("Couldn't get logs for pod '%s' in the '%s' namespace: %w", realPodName, namespace, err)
+	}
+
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(logStream)
+	if err != nil {
+		return "", fmt.Errorf("Couldn't process ReadFrom the stream: %w", err)
+	}
+	logBytes := buf.Bytes()
+	logs = string(logBytes)
+
+	return logs, nil
 }

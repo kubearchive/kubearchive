@@ -26,7 +26,9 @@ const (
 
 type DBInterface interface {
 	QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error)
+	QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error)
 	QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error)
+	QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error)
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
 }
 
@@ -71,10 +73,20 @@ func (db *Database) QueryResources(ctx context.Context, kind, group, version str
 	return db.performResourceQuery(ctx, query, kind, apiVersion)
 }
 
+func (db *Database) QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error) {
+	query := fmt.Sprintf(resourcesQuery, db.resourceTableName) //nolint:gosec
+	return db.performResourceQuery(ctx, query, kind, version)
+}
+
 func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
 	query := fmt.Sprintf(namespacedResourcesQuery, db.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return db.performResourceQuery(ctx, query, kind, apiVersion, namespace)
+}
+
+func (db *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
+	query := fmt.Sprintf(namespacedResourcesQuery, db.resourceTableName) //nolint:gosec
+	return db.performResourceQuery(ctx, query, kind, version, namespace)
 }
 
 func (db *Database) performResourceQuery(ctx context.Context, query string, args ...string) ([]*unstructured.Unstructured, error) {

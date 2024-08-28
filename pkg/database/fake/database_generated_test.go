@@ -69,7 +69,7 @@ func TestQueryResources(t *testing.T) {
 			kind:     existingKind,
 			group:    existingGroup,
 			version:  existingVersion,
-			expected: testResources,
+			expected: testResources[:1],
 		},
 	}
 
@@ -134,13 +134,102 @@ func TestQueryNamespacedResources(t *testing.T) {
 			group:     existingGroup,
 			version:   existingVersion,
 			namespace: existingNamespace,
-			expected:  testResources,
+			expected:  testResources[:1],
 		},
 	}
 	db := NewFakeDatabase(testResources)
 
 	for _, tt := range tests {
 		filteredResources, _ := db.QueryNamespacedResources(context.TODO(), tt.kind, tt.group, tt.version, tt.namespace)
+		assert.Equal(t, tt.expected, filteredResources)
+	}
+}
+
+func TestQueryCoreResources(t *testing.T) {
+
+	existingKind := testResources[1].GetKind()
+	existingVersion := testResources[1].GetAPIVersion()
+
+	tests := []struct {
+		name     string
+		kind     string
+		version  string
+		expected []*unstructured.Unstructured
+	}{
+		{
+			name:     "No matching resources by kind",
+			kind:     "NotFound",
+			version:  existingVersion,
+			expected: nil,
+		},
+		{
+			name:     "No matching resources by version",
+			kind:     existingKind,
+			version:  "v2",
+			expected: nil,
+		},
+		{
+			name:     "Matching resources",
+			kind:     existingKind,
+			version:  existingVersion,
+			expected: testResources[1:2],
+		},
+	}
+
+	db := NewFakeDatabase(testResources)
+
+	for _, tt := range tests {
+		filteredResources, _ := db.QueryCoreResources(context.TODO(), tt.kind, tt.version)
+		assert.Equal(t, tt.expected, filteredResources)
+	}
+}
+
+func TestQueryNamespacedCoreResources(t *testing.T) {
+
+	existingKind := testResources[1].GetKind()
+	existingVersion := testResources[1].GetAPIVersion()
+	existingNamespace := testResources[1].GetNamespace()
+
+	tests := []struct {
+		name      string
+		kind      string
+		version   string
+		namespace string
+		expected  []*unstructured.Unstructured
+	}{
+		{
+			name:      "No matching resources by kind",
+			kind:      "NotFound",
+			version:   existingVersion,
+			namespace: existingNamespace,
+			expected:  nil,
+		},
+		{
+			name:      "No matching resources by version",
+			kind:      existingKind,
+			version:   "v2",
+			namespace: existingNamespace,
+			expected:  nil,
+		},
+		{
+			name:      "No matching resources by namespace",
+			kind:      existingKind,
+			version:   existingVersion,
+			namespace: "notfound",
+			expected:  nil,
+		},
+		{
+			name:      "Matching resources",
+			kind:      existingKind,
+			version:   existingVersion,
+			namespace: existingNamespace,
+			expected:  testResources[1:2],
+		},
+	}
+	db := NewFakeDatabase(testResources)
+
+	for _, tt := range tests {
+		filteredResources, _ := db.QueryNamespacedCoreResources(context.TODO(), tt.kind, tt.version, tt.namespace)
 		assert.Equal(t, tt.expected, filteredResources)
 	}
 }

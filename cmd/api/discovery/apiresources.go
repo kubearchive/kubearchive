@@ -45,7 +45,6 @@ func GetAPIResource(client rest.Interface) gin.HandlerFunc {
 		for _, resource := range resources.APIResources {
 			if resource.Name == resourceName {
 				c.Set("apiResource", resource)
-				c.Next()
 				return
 			}
 		}

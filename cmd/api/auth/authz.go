@@ -52,6 +52,5 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.Hand
 			abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		c.Next()
 	}
 }

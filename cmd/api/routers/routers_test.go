@@ -31,7 +31,6 @@ func setupRouter() *gin.Engine {
 	ctrl := Controller{Database: fake.NewFakeDatabase(testResources)}
 	router.Use(func(c *gin.Context) {
 		c.Set("apiResource", testAPIResource)
-		c.Next()
 	})
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetAllResources)
 	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType", ctrl.GetAllResources)

@@ -52,6 +52,5 @@ func Authentication(tri clientAuthnv1.TokenReviewInterface) gin.HandlerFunc {
 			return
 		}
 		c.Set("user", tr.Status.User)
-		c.Next()
 	}
 }

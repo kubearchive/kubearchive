@@ -86,8 +86,7 @@ func (o *GetOptions) Complete(args []string) error {
 	return nil
 }
 
-// TODO: when our API returns a List resource, we can remove the decode parameter
-func (o *GetOptions) getResources(host string, decode func([]byte) ([]unstructured.Unstructured, error)) ([]unstructured.Unstructured, error) {
+func (o *GetOptions) getResources(host string) ([]unstructured.Unstructured, error) {
 	url := fmt.Sprintf("%s%s", host, o.APIPath)
 
 	client, err := rest.HTTPClientFor(o.RESTConfig)
@@ -109,19 +108,13 @@ func (o *GetOptions) getResources(host string, decode func([]byte) ([]unstructur
 		return nil, fmt.Errorf("GET to '%s' returned with code '%d' and body: %s", url, response.StatusCode, string(bodyBytes))
 	}
 
-	return decode(bodyBytes)
-}
+	var list unstructured.UnstructuredList
+	err = json.Unmarshal(bodyBytes, &list)
+	if err != nil {
+		return nil, fmt.Errorf("error deserializing the body into unstructured.UnstructuredList: %w", err)
+	}
 
-func (o *GetOptions) getClusterResources() ([]unstructured.Unstructured, error) {
-	// TODO: when our API returns a List resource, we can remove the inlined function below
-	return o.getResources(o.RESTConfig.Host, func(bodyBytes []byte) ([]unstructured.Unstructured, error) {
-		var list unstructured.UnstructuredList
-		err := json.Unmarshal(bodyBytes, &list)
-		if err != nil {
-			return nil, fmt.Errorf("error deserializing the body into unstructured.UnstructuredList: %w", err)
-		}
-		return list.Items, nil
-	})
+	return list.Items, nil
 }
 
 func (o *GetOptions) getKubeArchiveResources() ([]unstructured.Unstructured, error) {
@@ -129,19 +122,11 @@ func (o *GetOptions) getKubeArchiveResources() ([]unstructured.Unstructured, err
 	o.RESTConfig.CAFile = "ca.crt" // This expects you to have extracted the CA, see DEVELOPMENT.md
 	o.RESTConfig.BearerToken = *o.kubeFlags.BearerToken
 
-	// TODO: when our API returns a List resource, we can remove the inlined function below
-	return o.getResources(o.KubeArchiveHost, func(bodyBytes []byte) ([]unstructured.Unstructured, error) {
-		var list []unstructured.Unstructured
-		err := json.Unmarshal(bodyBytes, &list)
-		if err != nil {
-			return nil, fmt.Errorf("error deserializing the body into []unstructured.Unstructured: %w", err)
-		}
-		return list, nil
-	})
+	return o.getResources(o.KubeArchiveHost)
 }
 
 func (o *GetOptions) Run() error {
-	clusterResources, err := o.getClusterResources()
+	clusterResources, err := o.getResources(o.RESTConfig.Host)
 	if err != nil {
 		return fmt.Errorf("error retrieving resources from the cluster: %w", err)
 	}

@@ -32,7 +32,6 @@ func setupRouter(db database.DBInterface) *gin.Engine {
 	ctrl := Controller{Database: db}
 	router.Use(func(c *gin.Context) {
 		c.Set("apiResource", testAPIResource)
-		c.Next()
 	})
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetAllResources)
 	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType", ctrl.GetAllResources)

@@ -20,6 +20,9 @@ apiServer:
   secret: "{{ tpl .Values.apiServer.name . }}-tls"
   port: 8081
   testSA: "{{ .Release.Name }}-test"
+  cache:
+    expirationAuthenticated: "10m"
+    expirationUnauthenticated: "1m"
 
 # values used to create a sink
 sink:

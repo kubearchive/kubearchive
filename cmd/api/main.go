@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/auth"
 	"github.com/kubearchive/kubearchive/cmd/api/discovery"
 	"github.com/kubearchive/kubearchive/cmd/api/routers"
+	"github.com/kubearchive/kubearchive/pkg/cache"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
@@ -20,17 +23,26 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+const (
+	otelServiceName                   = "kubearchive.api"
+	cacheExpirationAuthorizedEnvVar   = "CACHE_EXPIRATION_AUTHORIZED"
+	cacheExpirationUnauthorizedEnvVar = "CACHE_EXPIRATION_UNAUTHORIZED"
+)
+
 var (
 	version = "main"
 	commit  = ""
 	date    = ""
 )
 
-const otelServiceName = "kubearchive.api"
-
 type Server struct {
 	k8sClient kubernetes.Interface
 	router    *gin.Engine
+}
+
+type cacheExpirations struct {
+	Authorized   time.Duration
+	Unauthorized time.Duration
 }
 
 func getKubernetesClient() *kubernetes.Clientset {
@@ -47,11 +59,11 @@ func getKubernetesClient() *kubernetes.Clientset {
 	return client
 }
 
-func NewServer(k8sClient kubernetes.Interface, controller routers.Controller) *Server {
+func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, cache *cache.Cache, cacheExpirations *cacheExpirations) *Server {
 	router := gin.Default()
 	router.Use(otelgin.Middleware("")) // Empty string so the library sets the proper server
-	router.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews()))
-	router.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews()))
+	router.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews(), cache, cacheExpirations.Authorized, cacheExpirations.Unauthorized))
+	router.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache, cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 	// TODO - Probably want to use cache for the discovery client
 	// See https://pkg.go.dev/k8s.io/client-go/discovery/cached/disk#NewCachedDiscoveryClientForConfig
 	router.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient()))
@@ -70,14 +82,49 @@ func main() {
 	if err != nil {
 		log.Printf("Could not start opentelemetry: %s", err)
 	}
+
 	db, err := database.NewDatabase()
 	if err != nil {
 		log.Fatalf("Could not connect to database: %s", err)
 	}
 	controller := routers.Controller{Database: db}
-	server := NewServer(getKubernetesClient(), controller)
+
+	cacheExpirations, err := getCacheExpirations()
+	if err != nil {
+		log.Fatal(err)
+	}
+	cache := cache.New()
+
+	server := NewServer(getKubernetesClient(), controller, cache, cacheExpirations)
 	err = server.router.RunTLS("localhost:8081", "/etc/kubearchive/ssl/tls.crt", "/etc/kubearchive/ssl/tls.key")
 	if err != nil {
 		log.Printf("Could not run server on localhost: %s", err)
 	}
+}
+
+func getCacheExpirations() (*cacheExpirations, error) {
+	expirationAuthorizedString := os.Getenv(cacheExpirationAuthorizedEnvVar)
+	if expirationAuthorizedString == "" {
+		return nil, fmt.Errorf("The environment variable '%s' should be set.", cacheExpirationAuthorizedEnvVar)
+	}
+
+	expirationAuthorized, err := time.ParseDuration(expirationAuthorizedString)
+	if err != nil {
+		return nil, fmt.Errorf("'%s': '%s' could not be parsed into a duration: %s", cacheExpirationAuthorizedEnvVar, expirationAuthorizedString, err)
+	}
+
+	expirationUnauthorizedString := os.Getenv(cacheExpirationUnauthorizedEnvVar)
+	if expirationUnauthorizedString == "" {
+		return nil, fmt.Errorf("The environment variable '%s' should be set.", cacheExpirationUnauthorizedEnvVar)
+	}
+
+	expirationUnauthorized, err := time.ParseDuration(expirationUnauthorizedString)
+	if err != nil {
+		return nil, fmt.Errorf("'%s': '%s' could not be parsed into a duration: %s", cacheExpirationUnauthorizedEnvVar, expirationUnauthorizedString, err)
+	}
+
+	return &cacheExpirations{
+		Authorized:   expirationAuthorized,
+		Unauthorized: expirationUnauthorized,
+	}, nil
 }

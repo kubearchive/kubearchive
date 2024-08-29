@@ -1,5 +1,7 @@
-* KubeArchive Configuration
-** xref:configuration/kubearchiveconfig.adoc[Configuration]
+
+* Configuration
+** xref:configuration/kubearchiveconfig.adoc[KubeArchiveConfig CRD]
+** xref:configuration/cache-expiration-time.adoc[Cache Expiration Time]
 
 * Contributors
 ** xref:contributors/guide.adoc[Guide]

@@ -24,10 +24,6 @@ spec:
             - name: tls-secret
               readOnly: true
               mountPath: /etc/kubearchive/ssl/
-          {{- if .Values.apiServer.debug }}
-          command: ["./go/bin/dlv"]
-          args: ["--listen=:40000", "--headless=true", "--api-version=2", "--log", "exec", "/ko-app/api"]
-          {{- end}}
           env:
             - name: POSTGRES_DB
               valueFrom:

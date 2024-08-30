@@ -51,6 +51,10 @@ operator:
   image: ko://github.com/kubearchive/kubearchive/cmd/operator
   cert: "{{ tpl .Values.operator.name . }}-certificate"
   secret: "{{ tpl .Values.operator.name . }}-tls"
+  # NOTE - To debug the operator the `ko build` command must be the following way:
+  # KO_DEFAULTBASEIMAGE=gcr.io/k8s-skaffold/skaffold-debug-support/go:latest ko build --disable-optimizations \
+  # github.com/kubearchive/kubearchive/cmd/operator
+  debug: false
 
 # values used to create a PostgreSQL database
 database:

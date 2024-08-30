@@ -25,13 +25,13 @@ spec:
         control-plane: {{ $controlPlane }}
     spec:
       containers:
-        - args:
+        - name: kube-rbac-proxy
+          args:
             - --secure-listen-address=0.0.0.0:8443
             - --upstream=http://127.0.0.1:8080/
             - --logtostderr=true
             - --v=0
           image: gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
-          name: kube-rbac-proxy
           ports:
             - containerPort: 8443
               name: https
@@ -48,12 +48,14 @@ spec:
             capabilities:
               drop:
                 - ALL
-        - args:
+        - name: manager
+          args:
+          {{- if .Values.operator.debug }}
+            - --
+          {{- end }}
             - --health-probe-bind-address=:8081
             - --metrics-bind-address=127.0.0.1:8080
             - --leader-elect
-          command:
-            - /ko-app/operator
           env:
             - name: KUBEARCHIVE_NAMESPACE
               valueFrom:
@@ -61,13 +63,14 @@ spec:
                   fieldPath: metadata.namespace
             {{- include "kubearchive.v1.otel.env" . | nindent 12 }}
           image: {{ .Values.operator.image }}
+          {{- if not .Values.operator.debug }}
           livenessProbe:
             httpGet:
               path: /healthz
               port: {{ $port }}
             initialDelaySeconds: 15
             periodSeconds: 20
-          name: manager
+          {{- end }}
           ports:
             - containerPort: 9443
               name: webhook-server
@@ -76,6 +79,7 @@ spec:
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
               readOnly: true
+          {{- if not .Values.operator.debug }}
           readinessProbe:
             httpGet:
               path: /readyz
@@ -94,8 +98,11 @@ spec:
             capabilities:
               drop:
                 - ALL
+          {{- end }}
+      {{- if not .Values.operator.debug }}
       securityContext:
         runAsNonRoot: true
+      {{- end }}
       serviceAccountName: {{ tpl .Values.operator.name . }}
       terminationGracePeriodSeconds: 10
       volumes:
@@ -103,4 +110,4 @@ spec:
           secret:
             defaultMode: 420
             secretName: {{ tpl .Values.operator.secret . }}
-  
+

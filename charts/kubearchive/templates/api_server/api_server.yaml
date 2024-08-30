@@ -49,6 +49,10 @@ spec:
             - name: POSTGRES_PORT
               value: "{{ required "A Postgres port must be specified" .Values.database.service.port }}"
             {{- include "kubearchive.v1.otel.env" . | nindent 12 }}
+            - name: CACHE_EXPIRATION_AUTHENTICATED
+              value: "{{ .Values.apiServer.cache.expirationAuthenticated }}"
+            - name: CACHE_EXPIRATION_UNAUTHENTICATED
+              value: "{{ .Values.apiServer.cache.expirationUnauthenticated }}"
 ---
 kind: Service
 apiVersion: v1

@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/kubearchive/kubearchive/cmd/api/abort"
+	"github.com/kubearchive/kubearchive/pkg/cache"
 
 	"github.com/gin-gonic/gin"
 	apiAuthnv1 "k8s.io/api/authentication/v1"
@@ -31,13 +33,26 @@ func extractBearerToken(header string) (string, error) {
 	return jwtToken[1], nil
 }
 
-func Authentication(tri clientAuthnv1.TokenReviewInterface) gin.HandlerFunc {
+func Authentication(tri clientAuthnv1.TokenReviewInterface, cache *cache.Cache, cacheExpirationAuthorized, cacheExpirationUnauthorized time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token, err := extractBearerToken(c.GetHeader("Authorization"))
 		if err != nil {
 			abort.Abort(c, err.Error(), http.StatusBadRequest)
 			return
 		}
+
+		userInfo := cache.Get(token)
+		if userInfo != nil {
+			if userInfo == false { // Unauthenticated
+				abort.Abort(c, "Authentication failed", http.StatusUnauthorized)
+				return
+			}
+
+			c.Set("user", userInfo)
+			c.Next()
+			return
+		}
+
 		tr, err := tri.Create(c.Request.Context(), &apiAuthnv1.TokenReview{
 			Spec: apiAuthnv1.TokenReviewSpec{
 				Token: token,
@@ -49,8 +64,12 @@ func Authentication(tri clientAuthnv1.TokenReviewInterface) gin.HandlerFunc {
 		}
 		if !tr.Status.Authenticated {
 			abort.Abort(c, "Authentication failed", http.StatusUnauthorized)
+			cache.Set(token, false, cacheExpirationUnauthorized)
 			return
 		}
+
+		cache.Set(token, tr.Status.User, cacheExpirationAuthorized)
+
 		c.Set("user", tr.Status.User)
 	}
 }

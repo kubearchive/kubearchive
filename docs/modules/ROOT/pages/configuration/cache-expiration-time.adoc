@@ -1,0 +1,57 @@
+= Cache Expiration Time
+
+KubeArchive delegates authentication and authorization to Kubernetes. To
+avoid pressure on the Kubernetes API, KubeArchive caches the authentication
+and authorization answers.
+
+There are two different environment variables that control cache expiration:
+
+* `CACHE_EXPIRATION_AUTHORIZED`: controls the expiration time for authorized/authenticated requests.
+    If not set, the default value is **10 minutes**.
+* `CACHE_EXPIRATION_UNAUTHORIZED`: controls the expiration time for unauthorized/unauthenticated requests.
+    If not set, the default value is **1 minute**.
+
+To modify the expiration time, perform the following steps:
+
+. Edit or patch the `kubearchive-api-server` Deployment present on the `kubearchive`
+namespace. The values need to be parseable by
+link:https://pkg.go.dev/time#ParseDuration[time.ParseDuration]):
++
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+      - name: kubearchive-api-server
+        env:
+        - name: CACHE_EXPIRATION_AUTHORIZED
+          value: 1h
+        - name: CACHE_EXPIRATION_UNAUTHORIZED
+          value: 5m
+----
+
+[WARNING]
+====
+If the values are not set or they are not parseable by
+link:https://pkg.go.dev/time#ParseDuration[time.ParseDuration]
+the Deployment fails and does not start.
+====
+
+. Save the patch somewhere in the disk and apply it:
++
+[source,bash]
+----
+kubectl patch -n kubearchive deployment kubearchive-api-server --patch-file path/to/patch.yaml
+----
+
+[IMPORTANT]
+.Expiring the cache
+====
+To expire the current cache restart the `kubearchive-api-server` deployment with
+the command
+[command]`kubectl rollout -n kubearchive restart deployment kubearchive-api-server`.
+====

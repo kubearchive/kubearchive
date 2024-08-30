@@ -6,8 +6,10 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/kubearchive/kubearchive/cmd/api/abort"
+	"github.com/kubearchive/kubearchive/pkg/cache"
 
 	"github.com/gin-gonic/gin"
 	apiAuthnv1 "k8s.io/api/authentication/v1"
@@ -16,8 +18,7 @@ import (
 	clientAuthzv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
-func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.HandlerFunc {
-
+func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface, cache *cache.Cache, cacheExpirationAuthorized, cacheExpirationUnauthorized time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		usr, ok := c.Get("user")
 		if !ok {
@@ -27,6 +28,17 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.Hand
 		userInfo, ok := usr.(apiAuthnv1.UserInfo)
 		if !ok {
 			abort.Abort(c, fmt.Sprintf("unexpected user type in context: %T", usr), http.StatusInternalServerError)
+			return
+		}
+
+		allowed := cache.Get(userInfo.Username)
+		if allowed != nil {
+			if allowed != true {
+				abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
+
+			c.Next()
 			return
 		}
 
@@ -48,7 +60,11 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface) gin.Hand
 			abort.Abort(c, fmt.Sprintf("Unexpected error on SAR: %s", err.Error()), http.StatusInternalServerError)
 			return
 		}
+
+		cache.Set(userInfo.Username, sar.Status.Allowed, cacheExpirationAuthorized)
+
 		if !sar.Status.Allowed {
+			cache.Set(userInfo.Username, sar.Status.Allowed, cacheExpirationUnauthorized)
 			abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
 			return
 		}

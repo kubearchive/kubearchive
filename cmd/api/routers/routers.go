@@ -4,6 +4,7 @@
 package routers
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/kubearchive/kubearchive/cmd/api/abort"
@@ -36,11 +37,17 @@ type List struct {
 func (c *Controller) GetAllResources(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
-	kind := getAPIResourceKind(context)
-	resources, err := c.Database.QueryResources(context.Request.Context(), kind, group, version)
 
+	kind, err := getAPIResourceKind(context)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, err.Error())
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resources, err := c.Database.QueryResources(context.Request.Context(), kind, group, version)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	context.JSON(http.StatusOK, NewList(resources))
@@ -50,27 +57,69 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
 	namespace := context.Param("namespace")
-	kind := getAPIResourceKind(context)
-	resources, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, group, version, namespace)
 
+	kind, err := getAPIResourceKind(context)
 	if err != nil {
-		context.JSON(http.StatusInternalServerError, err.Error())
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resources, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, group, version, namespace)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	context.JSON(http.StatusOK, NewList(resources))
 }
 
-func getAPIResourceKind(context *gin.Context) string {
+func (c *Controller) GetAllCoreResources(context *gin.Context) {
+	version := context.Param("version")
+
+	kind, err := getAPIResourceKind(context)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resources, err := c.Database.QueryCoreResources(context.Request.Context(), kind, version)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	context.JSON(http.StatusOK, NewList(resources))
+}
+
+func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
+	version := context.Param("version")
+	namespace := context.Param("namespace")
+
+	kind, err := getAPIResourceKind(context)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resources, err := c.Database.QueryNamespacedCoreResources(context.Request.Context(), kind, version, namespace)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	context.JSON(http.StatusOK, NewList(resources))
+}
+
+func getAPIResourceKind(context *gin.Context) (string, error) {
 	resource, ok := context.Get("apiResource")
 	if !ok {
-		abort.Abort(context, "API resource not found", http.StatusInternalServerError)
+		return "", errors.New("API resource not found")
 	}
 	apiResource, ok := resource.(metav1.APIResource)
 	if !ok {
-		abort.Abort(context, fmt.Sprintf("unexpected API resource type in context: %T", resource),
-			http.StatusInternalServerError)
+		return "", fmt.Errorf("unexpected API resource type, in context: %T", resource)
 	}
-	return apiResource.Kind
+	return apiResource.Kind, nil
 }
 
 // NewList creates a new List struct with apiVersion "v1",

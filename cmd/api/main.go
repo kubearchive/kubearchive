@@ -69,6 +69,8 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	router.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient()))
 	router.GET("/apis/:group/:version/:resourceType", controller.GetAllResources)
 	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedResources)
+	router.GET("/api/:version/:resourceType", controller.GetAllCoreResources)
+	router.GET("/api/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedCoreResources)
 
 	return &Server{
 		router:    router,

@@ -253,10 +253,17 @@ to start a debugger to which attach from your IDE.
 
 ## Enabling Telemetry
 
-We use Jaeger for tracing on development. As some dependencies use the Zipkin format
-to send traces, we are using the zipkin-compatible endpoint of Jaeger.
+We use the Grafana Labs Stack (Grafana, Tempo, Loki and Prometheus) for observability on development.
+Specifially we use the
+[LGTM Docker container](https://github.com/grafana/docker-otel-lgtm)
+which also includes an OpenTelemetry Collector.
+As some dependencies use the Zipkin format to send traces, we are using the
+Collector's zipkin receiver.
 
-1. Create the following ConfigMap to enable Telemetry for Knative Eventing.
+**Note**: KubeArchive sends traces and metrics to an intermediate OpenTelemetry
+Collector, which sends the data to the LGTM's Collector.
+
+1. Create the following ConfigMap to enable telemetry for Knative Eventing.
     ```bash
     kubectl apply -f - <<EOF
     apiVersion: v1
@@ -266,7 +273,7 @@ to send traces, we are using the zipkin-compatible endpoint of Jaeger.
       namespace: knative-eventing
     data:
       backend: "zipkin"
-      zipkin-endpoint: "http://traces-collector.kubearchive.svc.cluster.local:9411/api/v2/spans"
+      zipkin-endpoint: "http://grafana-lgtm.kubearchive.svc.cluster.local:9411"
       sample-rate: "1"
     EOF
     ```
@@ -276,13 +283,15 @@ to send traces, we are using the zipkin-compatible endpoint of Jaeger.
     ```bash
     --set "integrations.observability.enabled=true"
     ```
-    This extra flag makes Helm deploy a traces collector and sets the appropiate environment
-    variables for the KubeArchive deployments.
-1. Forward the traces collector port to localhost:
+    This extra flag makes Helm deploy all necessary resources for observability
+    and configures the environment variables on the KubeArchive components.
+1. Forward the Grafana UI port to localhost:
     ```bash
-    kubectl port-forward -n kubearchive svc/traces-collector 16686:16686 &
+    kubectl port-forward -n kubearchive svc/grafana-lgtm 3000:3000 &
     ```
-1. Open [http://localhost:16686](http://localhost:16686) in your browser.
+1. Open [http://localhost:3000](http://localhost:3000) in your browser, use `admin`
+as username and `admin` as password. In the sidebar go to the Explore section to
+start exploring metrics.
 
 ## Known issues
 

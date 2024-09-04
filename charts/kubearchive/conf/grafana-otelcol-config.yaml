@@ -1,0 +1,48 @@
+---
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  prometheus/collector:
+    config:
+      scrape_configs:
+        - job_name: 'opentelemetry-collector'
+          static_configs:
+            - targets: ['localhost:8888']
+  zipkin:
+    endpoint: 0.0.0.0:9411
+
+processors:
+  batch:
+
+exporters:
+  otlphttp/metrics:
+    endpoint: http://localhost:9090/api/v1/otlp
+    tls:
+      insecure: true
+  otlphttp/traces:
+    endpoint: http://localhost:4418
+    tls:
+      insecure: true
+  otlphttp/logs:
+    endpoint: http://localhost:3100/otlp
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp, zipkin]
+      processors: [batch]
+      exporters: [otlphttp/traces]
+    metrics:
+      receivers: [otlp,prometheus/collector]
+      processors: [batch]
+      exporters: [otlphttp/metrics]
+    logs:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp/logs]

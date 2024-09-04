@@ -10,28 +10,25 @@ import (
 	"strings"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
-	sdkTrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
 // the name of the environment variable that will determine if instrumentation needs to be started
 const OtelStartEnvVar = "KUBEARCHIVE_OTEL_ENABLED"
 
-var tp *sdkTrace.TracerProvider
+var tp *trace.TracerProvider
 
 // Start creates a Span Processor and exporter, registers them with a TracerProvider, and sets the default
 // TracerProvider and SetTextMapPropagator
 func Start(serviceName string) error {
 	if canSkipInit() {
 		return nil
-	}
-
-	exporter, err := otlptracehttp.New(context.Background())
-	if err != nil {
-		return err
 	}
 
 	res, err := resource.New(
@@ -48,14 +45,33 @@ func Start(serviceName string) error {
 		return err
 	}
 
-	tp = sdkTrace.NewTracerProvider(
-		sdkTrace.WithBatcher(exporter),
-		sdkTrace.WithResource(res),
+	traceExporter, err := otlptracehttp.New(context.Background())
+	if err != nil {
+		return err
+	}
+
+	tp = trace.NewTracerProvider(
+		trace.WithBatcher(traceExporter),
+		trace.WithResource(res),
 	)
 
 	otel.SetTracerProvider(tp)
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
+	metricExporter, err := otlpmetrichttp.New(context.Background())
+	if err != nil {
+		return err
+	}
+	mp := metric.NewMeterProvider(
+		metric.WithResource(res),
+		metric.WithReader(metric.NewPeriodicReader(metricExporter)),
+	)
+	if err != nil {
+		return err
+	}
+
+	otel.SetMeterProvider(mp)
+
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 	return nil
 }
 

@@ -11,7 +11,7 @@ SPDX-License-Identifier: Apache-2.0
 
 {{/* If 'enabled' we deploy a traces collector, so override the endpoint to use it */}}
 {{- if (eq $enabled true) -}}
-    {{- $endpoint = tpl "http://traces-collector.{{ .Release.Namespace }}.svc.cluster.local:4318" . -}}
+    {{- $endpoint = tpl "http://otel-collector.{{ .Release.Namespace }}.svc.cluster.local:4318" . -}}
 {{- end -}}
 
 - name: KUBEARCHIVE_OTEL_ENABLED

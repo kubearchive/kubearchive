@@ -33,7 +33,7 @@ func TestKubeArchiveDeployments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	retry.Do(func() error {
+	retryErr := retry.Do(func() error {
 		deployments, err := client.AppsV1().Deployments("kubearchive").List(context.Background(), metav1.ListOptions{})
 		if err != nil {
 			return fmt.Errorf("Failed to get Deployments from the 'kubearchive' namespace: %w", err)
@@ -54,8 +54,12 @@ func TestKubeArchiveDeployments(t *testing.T) {
 			return nil
 		}
 
-		return errors.New("Timed out while waiting deployments to be ready.")
+		return errors.New("Timed out while waiting for deployments to be ready.")
 	})
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
 }
 
 // This test checks if the Kubernetes Objects created by the KubeArchive Operator
@@ -259,7 +263,7 @@ func TestDatabaseConnection(t *testing.T) {
 
 	// wait to sink pod ready and generate connection retries with the database
 	t.Logf("Waiting for sink to be up, and to generate retries with the database")
-	err = retry.Do(func() error {
+	retryErr := retry.Do(func() error {
 		logs, err := test.GetPodLogs(clientset, "kubearchive", "kubearchive-sink")
 		if err != nil {
 			return err
@@ -273,8 +277,8 @@ func TestDatabaseConnection(t *testing.T) {
 		return fmt.Errorf("Pod didn't try to connect to the database yet")
 	})
 
-	if err != nil {
-		t.Fatal(err)
+	if retryErr != nil {
+		t.Fatal(retryErr)
 	}
 
 	// wake-up database -> replicas = 1
@@ -291,7 +295,7 @@ func TestDatabaseConnection(t *testing.T) {
 	t.Logf("Changing database to %d replicas", scaleDatabase.Spec.Replicas)
 	t.Log(*usDatabase)
 
-	err = retry.Do(func() error {
+	retryErr = retry.Do(func() error {
 		logs, err := test.GetPodLogs(clientset, "kubearchive", "kubearchive-sink")
 		if err != nil {
 			return nil
@@ -305,7 +309,7 @@ func TestDatabaseConnection(t *testing.T) {
 		return errors.New("Pod didn't connect successfully to the database yet")
 	})
 
-	if err != nil {
-		t.Fatal(err)
+	if retryErr != nil {
+		t.Fatal(retryErr)
 	}
 }

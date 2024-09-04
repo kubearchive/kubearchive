@@ -1,0 +1,78 @@
+= Enabling Observability on KubeArchive
+
+KubeArchive is instrumented to emit observability data, specifically metrics and
+traces. This can be enabled and configured with two environment
+variables present on all of the KubeArchive components:
+
+* `KUBEARCHIVE_OTEL_ENABLED`: one of "true" or "false". Defaults to "false". It
+   controls if observability data is sent to `OTEL_EXPORTER_OTLP_ENDPOINT`.
+* `OTEL_EXPORTER_OTLP_ENDPOINT`: an OTLP compatible endpoint where traces are
+    sent. By default it is set to an empty string.
+
+To change these environment variables values, edit or patch the
+`kubearchive-api-server`, `kubearchive-sink` and `kubearchive-operator`
+Deployments on the `kubearchive` namespace:
+
+. Patch for the `kubearchive-api-server` Deployment:
++
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: kubearchive-api-server
+          env:
+            - name: KUBEARCHIVE_OTEL_ENABLED
+              value: "true"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.observability.svc.cluster.local:4318"
+----
+
+. Patch for the `kubearchive-sink` Deployment:
++
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: kubearchive-sink
+          env:
+            - name: KUBEARCHIVE_OTEL_ENABLED
+              value: "true"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.observability.svc.cluster.local:4318"
+----
+
+. Patch for the `kubearchive-operator` Deployment:
++
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          env:
+            - name: KUBEARCHIVE_OTEL_ENABLED
+              value: "true"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://traces-collector.observability.svc.cluster.local:4318"
+----
+
+. Apply the patches:
++
+[source,bash]
+----
+kubectl patch -n kubearchive deployment <deployment-name> --patch-file path/to/patch.yaml
+----

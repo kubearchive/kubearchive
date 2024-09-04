@@ -130,3 +130,32 @@ func TestGetAPIResource(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDiscoveryURL(t *testing.T) {
+	testCases := []struct {
+		name     string
+		group    string
+		version  string
+		expected string
+	}{
+		{
+			name:     "core",
+			group:    "",
+			version:  "v1",
+			expected: "/api/v1",
+		},
+		{
+			name:     "non-core",
+			group:    "batch",
+			version:  "v1",
+			expected: "/apis/batch/v1",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := getDiscoveryURL(tc.group, tc.version)
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}

@@ -18,26 +18,20 @@ import (
 // @rh-hemartin opened a ticket to allow for a context on that function, see https://github.com/kubernetes/client-go/issues/1370
 func GetAPIResource(client rest.Interface) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		groupVersion := fmt.Sprintf("%s/%s", c.Param("group"), c.Param("version"))
-
-		// TODO: when we support the core API we need to change this
-		url := fmt.Sprintf("/apis/%s", groupVersion)
-		result := client.Get().AbsPath(url).Do(c.Request.Context())
+		discoveryURL := getDiscoveryURL(c.Param("group"), c.Param("version"))
+		result := client.Get().AbsPath(discoveryURL).Do(c.Request.Context())
 
 		if result.Error() != nil {
 			status := 0
 			result.StatusCode(&status)
-			abort.Abort(c, fmt.Errorf("Unable to retrieve information from '%s', error: %w", url, result.Error()).Error(), status)
+			abort.Abort(c, fmt.Errorf("Unable to retrieve information from '%s', error: %w", discoveryURL, result.Error()).Error(), status)
 			return
 		}
 
-		resources := &metav1.APIResourceList{
-			GroupVersion: groupVersion,
-		}
-
+		resources := &metav1.APIResourceList{}
 		err := result.Into(resources)
 		if err != nil {
-			abort.Abort(c, fmt.Errorf("Unable to deserialize result from '%s', error: %w", url, err).Error(), http.StatusInternalServerError)
+			abort.Abort(c, fmt.Errorf("Unable to deserialize result from '%s', error: %w", discoveryURL, err).Error(), http.StatusInternalServerError)
 			return
 		}
 
@@ -52,4 +46,15 @@ func GetAPIResource(client rest.Interface) gin.HandlerFunc {
 			fmt.Sprintf("Unable to find the API resource %s in the Kubernetes cluster", resourceName),
 			http.StatusBadRequest)
 	}
+}
+
+func getDiscoveryURL(group, version string) string {
+	//  Core resource case: /api as root, just version
+	url := fmt.Sprintf("/api/%s", version)
+	if group != "" {
+		// Non Core resource case: /apis as root, group and version used
+		url = fmt.Sprintf("/apis/%s/%s", group, version)
+	}
+
+	return url
 }

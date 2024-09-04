@@ -95,6 +95,9 @@ func (db *Database) performResourceQuery(ctx context.Context, query string, args
 		castedArgs[i] = v
 	}
 	rows, err := db.db.QueryContext(ctx, query, castedArgs...)
+	if err != nil {
+		return nil, err
+	}
 	defer func(rows *sql.Rows) {
 		err = rows.Close()
 	}(rows)

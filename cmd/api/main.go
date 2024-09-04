@@ -85,17 +85,17 @@ func main() {
 		log.Printf("Could not start opentelemetry: %s", err)
 	}
 
-	db, err := database.NewDatabase()
-	if err != nil {
-		log.Fatalf("Could not connect to database: %s", err)
-	}
-	controller := routers.Controller{Database: db}
-
 	cacheExpirations, err := getCacheExpirations()
 	if err != nil {
 		log.Fatal(err)
 	}
 	cache := cache.New()
+
+	db, err := database.NewDatabase()
+	if err != nil {
+		log.Fatalf("Could not connect to database: %s", err)
+	}
+	controller := routers.Controller{Database: db}
 
 	server := NewServer(getKubernetesClient(), controller, cache, cacheExpirations)
 	err = server.router.RunTLS("localhost:8081", "/etc/kubearchive/ssl/tls.crt", "/etc/kubearchive/ssl/tls.key")

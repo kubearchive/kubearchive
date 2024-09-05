@@ -25,6 +25,8 @@ spec:
               readOnly: true
               mountPath: /etc/kubearchive/ssl/
           env:
+            - name: GIN_MODE
+              value: {{ ternary "release" "debug" .Values.global.production }}
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:

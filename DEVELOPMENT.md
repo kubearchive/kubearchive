@@ -115,9 +115,13 @@ kubectl delete ns kubearchive
    ```bash
    kubectl port-forward -n kubearchive svc/kubearchive-database 5432:5432
    ```
-2. Populate the database with test objects.
+1. Run the sql script to create the `resource` table.
    ```bash
-   go run database/init_db.go
+   psql -h localhost -U kubearchive -p 5432 -d kubearchive --password -a -q -f database/ddl-resource.sql
+   ```
+1. Optional: insert test data in the `resource` table.
+   ```bash
+   psql -h localhost -U kubearchive --password -p 5432 -d kubearchive -a -q -f database/dml-example.sql
    ```
 
 ## Generate activity on the KubeArchive sink

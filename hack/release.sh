@@ -72,6 +72,6 @@ gh release create "${NEXT_VERSION}" \
     --title "Release ${NEXT_VERSION}" \
     --repo ${RELEASE_REPOSITORY} \
     kubearchive.yaml \
-    database/ddl.sql
+    database/ddl-resource.sql
 rm ./release-notes.md
 rm ./kubearchive.yaml

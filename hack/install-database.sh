@@ -101,9 +101,5 @@ sleep 15  # Wait for PostgreSQL to be really ready
 export DATABASE_POD=$(kubectl get -n databases pod -l app=postgresql -o name)
 echo "CREATE USER kubearchive WITH ENCRYPTED PASSWORD 'P0stgr3sdbP@ssword';" | kubectl exec -i -n databases ${DATABASE_POD} -- psql -h localhost
 echo "CREATE DATABASE kubearchive WITH OWNER kubearchive;" | kubectl exec -i -n databases ${DATABASE_POD} -- psql -h localhost
-cat database/ddl.sql | kubectl exec -i -n databases ${DATABASE_POD} -- psql -h localhost --user=kubearchive kubearchive
+cat database/ddl-resource.sql | kubectl exec -i -n databases ${DATABASE_POD} -- psql -h localhost --user=kubearchive kubearchive
 
-kubectl port-forward -n databases svc/postgresql 5432:5432 &
-export PORT_FORWARD_PID=$!
-go run database/init_db.go
-kill ${PORT_FORWARD_PID}

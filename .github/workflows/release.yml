@@ -41,5 +41,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # For the 'release-notes' tool
         run: |
           ko login ${{ vars.OCI_REGISTRY }} --username ${{ secrets.OCI_USERNAME }} --password ${{ secrets.OCI_PASSWORD }}
-          helm registry login ${{ vars.OCI_REGISTRY }} --username ${{ secrets.OCI_USERNAME }} --password ${{ secrets.OCI_PASSWORD }}
           bash hack/release.sh

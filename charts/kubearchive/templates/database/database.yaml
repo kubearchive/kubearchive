@@ -1,5 +1,4 @@
-# yamllint disable rule:braces
-{{- if .Values.database.enabled }}
+{{- if .Values.database.enabled -}}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

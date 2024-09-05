@@ -3,6 +3,11 @@
 # Declare variables to be passed into your templates.
 
 ---
+global:
+  # If 'true' it excludes resources such as the `test` namespace or the test service account
+  # used for testing API endpoints.
+  production: false
+
 # values used to create the api-server
 apiServer:
   name: "{{ .Release.Name }}-api-server"
@@ -60,12 +65,14 @@ operator:
 database:
   # Controls if the database is deployed or not. The secret with the credentials
   # is deployed always, as the sink and the api-server need to connect somewhere.
-  # Provide the proper `url` and credentials if you provide your database
-  # TODO: set 'enabled' to 'false' when we start distributing the chart for production installation
+  # If 'enabled: true' the secret credentials are automatically set, if you want to
+  # provide your own database, set 'enabled: false' and modify the secret after deploying
   enabled: true
 
   name: "{{ .Release.Name }}-database"
+
   url: "{{ tpl .Values.database.name . }}.{{ .Release.Namespace }}.svc.cluster.local"
+
   # number of database pods that should be deployed
   replicaCount: 1
   # database container image
@@ -86,11 +93,12 @@ database:
   # database basic configuration
   postgresData:
     # database name
-    dbName: "postgresdb"
+    dbName: "kubearchive"
     # database user
-    dbUser: "ps_user"
+    dbUser: "kubearchive"
     # database password
     dbPassword: "P0stgr3sdbP@ssword"  # notsecret
+
 
 integrations:
   observability:

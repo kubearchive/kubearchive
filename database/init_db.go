@@ -19,8 +19,8 @@ type flags struct {
 }
 
 var defaultValues = &flags{
-	DatabaseName:     "postgresdb",
-	DatabaseUser:     "ps_user",
+	DatabaseName:     "kubearchive",
+	DatabaseUser:     "kubearchive",
 	DatabasePassword: "P0stgr3sdbP@ssword", // notsecret
 }
 

@@ -41,7 +41,10 @@ spec:
                   name: {{ tpl .Values.database.secret . }}
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_URL
-              value: {{ tpl .Values.database.url . }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ tpl .Values.database.secret . }}
+                  key: POSTGRES_URL
             - name: POSTGRES_PORT
               value: "{{ required "A Postgres port must be specified" .Values.database.service.port }}"
             {{- include "kubearchive.v1.otel.env" . | nindent 12 }}

@@ -13,3 +13,4 @@ linters:
     - nilerr
     - usestdlibvars
     - wastedassign
+    - unparam

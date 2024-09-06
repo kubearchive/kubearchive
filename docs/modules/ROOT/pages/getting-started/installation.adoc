@@ -1,0 +1,62 @@
+= Installation
+
+ifeval::["{page-component-display-version}" == "main"]
+:download-path: https://github.com/kubearchive/kubearchive/releases/latest/download
+endif::[]
+ifeval::["{page-component-display-version}" != "main"]
+:download-path: https://github.com/kubearchive/kubearchive/releases/download/{page-component-display-version}
+endif::[]
+
+This document explains how to install and configure KubeArchive in your Kubernetes cluster.
+
+== Prerequisites
+
+* A PostgreSQL instance
+* CertManager is installed on the Kubernetes cluster (+v1.9.1)
+* Knative Eventing is installed on the Kubernetes cluster (+v1.15.0)
+
+== Prepare the Database
+
+. Create ada user and a password for KubeArchive to use.
+. Create a database for KubeArchive, with admin permissions granted to the user you just created.
+. As the user, execute the `ddl-resource.sql` we provide for initializing the database, located at:
++
+[source,bash,subs="attributes"]
+----
+wget {download-path}/ddl-resource.sql
+psql -h database.example.com -U username ... -f ddl-resource.sql
+----
++
+This file creates a PostgreSQL schema, a table for KubeArchive and other stuff KubeArchive
+requires.
+
+== Install and Configure KubeArchive
+
+. Apply the release YAML to install KubeArchive:
++
+[source,bash,subs="attributes"]
+----
+kubectl apply -n kubearchive -f {download-path}/kubearchive.yaml
+----
+
+. Provide the credentials for the database in the `kubearchive-database-credentials` secret:
++
+[source,bash]
+----
+cat <<EOF > /tmp/patch.yaml
+stringData:
+  POSTGRES_URL: <your-postgresql-url>
+  POSTGRES_USER: <kubearchive-username>
+  POSTGRES_DB: <kubearchive-database>
+  POSTGRES_PASSWORD: '<kubearchive-password>'
+EOF
+kubectl patch -n kubearchive secret kubearchive-database-credentials --patch-file /tmp/patch.yaml
+----
+
+. Restart the `kubearchive-api-server` and `kubearchive-sink` Deployments to update
+the database credentials secret:
++
+[source,bash]
+----
+kubectl rollout -n kubearchive restart deployment kubearchive-sink kubearchive-api-server
+----

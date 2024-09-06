@@ -32,7 +32,7 @@ END;
 create trigger set_timestamp before
     update
     on
-        kubearchive.resource for each row execute function trigger_set_timestamp();
+        kubearchive.resource for each row execute function kubearchive.trigger_set_timestamp();
 
 -- Permissions
 

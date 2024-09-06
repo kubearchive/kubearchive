@@ -4,15 +4,15 @@ Please read our contributor guidelines:
 https://kubearchive.github.io/kubearchive/main/contributors/guide.html
 -->
 
-## Which Issue(s) this Pull Request Fixes
+## Which Issue(s) this Pull Request Resolves
 <!-- Please make sure to create an issue you can link to and mention it here
 to automatically close it. If this PR covers part of the work, instead of
-"Fixes #", use "Related to #"
+"Resolves #", use "Related to #"
 
-Usage: `Fixes #<issue number>`, or `Fixes (paste link of issue)`.
+Usage: `Resolves #<issue number>`, or `Resolves (paste link of issue)`.
 -->
 
-Fixes #
+Resolves #
 
 ## Release Note
 <!--

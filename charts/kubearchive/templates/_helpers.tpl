@@ -24,7 +24,7 @@ SPDX-License-Identifier: Apache-2.0
 {{- define "kubearchive.v1.database.env" -}}
 {{- $enabled := .Values.database.enabled -}}
 {{- if $enabled -}}
-POSTGRES_URL: {{ .Values.database.url | b64enc | quote }}
+POSTGRES_URL: {{ tpl .Values.database.url . | b64enc | quote }}
 POSTGRES_DB: {{ .Values.database.postgresData.dbName | b64enc | quote }}
 POSTGRES_USER: {{ .Values.database.postgresData.dbUser | b64enc | quote }}
 POSTGRES_PASSWORD: {{ .Values.database.postgresData.dbPassword | b64enc | quote }}

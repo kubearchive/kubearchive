@@ -12,6 +12,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      # Checkout 'fetch-tags' does not work properly, see https://github.com/actions/checkout/issues/701
+      - name: Fecth tags
+        run: git fetch --tags origin
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
@@ -22,3 +25,8 @@ jobs:
       - name: Generate Site
         working-directory: ./docs
         run: npm run build
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          path: docs/build/site
+          retention-days: 1

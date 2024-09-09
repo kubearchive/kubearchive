@@ -1,4 +1,21 @@
 {{- if .Values.database.enabled -}}
+{{- $dbNs := "databases" }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $dbNs }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ tpl .Values.database.name . }}-ddl
+  namespace: {{ $dbNs }}
+  labels:
+    app: {{ tpl .Values.database.name . }}
+data:
+  ddl.sql: |
+  {{- tpl (.Files.Get "conf/ddl-resource.sql") . | required "Empty 'conf/ddl-resource.sql" | nindent 4 }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -6,6 +23,7 @@ metadata:
   labels:
     app: {{ tpl .Values.database.name . }}
   name: {{ tpl .Values.database.name . }}
+  namespace: {{ $dbNs }}
 spec:
   storageClassName: manual
   accessModes:
@@ -20,6 +38,7 @@ metadata:
   labels:
     app: {{ tpl .Values.database.name . }}
   name: {{ tpl .Values.database.name . }}
+  namespace: {{ $dbNs }}
 spec:
   replicas: {{ .Values.database.replicaCount }}
   selector:
@@ -36,16 +55,29 @@ spec:
           imagePullPolicy: {{ .Values.database.image.pullPolicy }}
           ports:
             - containerPort: {{ .Values.database.service.port }}
-          envFrom:
-            - secretRef:
-                name: {{ tpl .Values.database.secret . }}
+          env:
+            - name: POSTGRES_DB
+              value: root
+            - name: POSTGRES_USER
+              value: root
+            - name: POSTGRES_PASSWORD
+              value: password  # notsecret
           volumeMounts:
             - mountPath: "/var/lib/postgresql/data"
               name: {{ .Values.database.volumes.name }}
+            {{- if not .Values.global.production }}
+            - name: ddl
+              mountPath: "/docker-entrypoint-initdb.d"
+            {{- end }}
       volumes:
         - name: {{ .Values.database.volumes.name }}
           persistentVolumeClaim:
             claimName: {{ tpl .Values.database.name . }}
+        {{- if not .Values.global.production }}
+        - name: ddl
+          configMap:
+            name: {{ tpl .Values.database.name . }}-ddl
+        {{- end }}
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -69,6 +101,7 @@ metadata:
   labels:
     app: {{ tpl .Values.database.name .  }}
   name: {{ tpl .Values.database.name . }}
+  namespace: {{ $dbNs }}
 spec:
   type: {{ .Values.database.service.type }}
   ports:

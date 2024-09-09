@@ -5,7 +5,16 @@
 set -o errexit
 set -o xtrace
 
-bash hack/install-database.sh
+kubectl apply -f - <<< $(helm template kubearchive charts/kubearchive \
+  -s templates/database/database.yaml \
+  --set "database.enabled=true"  --set "global.production=true")
+
+kubectl rollout status deployment --namespace=databases --timeout=30s
+sleep 15  # Wait for PostgreSQL to be really ready
+
+echo "CREATE USER kubearchive WITH ENCRYPTED PASSWORD 'P0stgr3sdbP@ssword';" | kubectl exec -i -n databases deploy/kubearchive-database -- psql
+echo "CREATE DATABASE kubearchive WITH OWNER kubearchive;" | kubectl exec -i -n databases deploy/kubearchive-database -- psql
+cat database/ddl-resource.sql | kubectl exec -i -n databases deploy/kubearchive-database -- psql --user=kubearchive kubearchive
 
 export CERT_MANAGER_VERSION=v1.9.1
 export KNATIVE_EVENTING_VERSION=v1.15.0

@@ -71,7 +71,7 @@ database:
 
   name: "{{ .Release.Name }}-database"
 
-  url: "{{ tpl .Values.database.name . }}.{{ .Release.Namespace }}.svc.cluster.local"
+  url: "{{ tpl .Values.database.name . }}.database.svc.cluster.local"
 
   # number of database pods that should be deployed
   replicaCount: 1

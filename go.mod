@@ -2,7 +2,7 @@ module github.com/kubearchive/kubearchive
 
 go 1.22.0
 
-toolchain go1.23.0
+toolchain go1.23.1
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
@@ -32,7 +32,7 @@ require (
 	k8s.io/cli-runtime v0.30.3
 	k8s.io/client-go v0.31.0
 	knative.dev/eventing v0.42.1
-	knative.dev/pkg v0.0.0-20240905103434-a1469cf54480
+	knative.dev/pkg v0.0.0-20240909013621-7c0ad27b0957
 	sigs.k8s.io/controller-runtime v0.19.0
 )
 

@@ -20,7 +20,7 @@ import (
 )
 
 // the name of the environment variable that will determine if instrumentation needs to be started
-const OtelStartEnvVar = "KUBEARCHIVE_OTEL_ENABLED"
+const OtelStartEnvVar = "KUBEARCHIVE_OTEL_MODE"
 
 var tp *trace.TracerProvider
 
@@ -50,10 +50,23 @@ func Start(serviceName string) error {
 		return err
 	}
 
-	tp = trace.NewTracerProvider(
+	tracerProviderOptions := []trace.TracerProviderOption{
 		trace.WithBatcher(traceExporter),
 		trace.WithResource(res),
-	)
+	}
+
+	otelMode := os.Getenv(OtelStartEnvVar)
+	if otelMode == "enabled" {
+		tracerProviderOptions = append(tracerProviderOptions, trace.WithSampler(trace.AlwaysSample()))
+	} else if otelMode == "delegated" {
+		// This is the default, I didn't want to leave an empty block here. This could drift in the future.
+		tracerProviderOptions = append(tracerProviderOptions, trace.WithSampler(trace.ParentBased(trace.AlwaysSample())))
+	} else {
+		// "disabled" is not checked in this if/else because the code does not get here when the value is "disabled"
+		return fmt.Errorf("Value '%s' for '%s' not valid. Use 'disabled', 'enabled' or 'delegated'.", otelMode, OtelStartEnvVar)
+	}
+
+	tp = trace.NewTracerProvider(tracerProviderOptions...)
 
 	otel.SetTracerProvider(tp)
 
@@ -75,11 +88,11 @@ func Start(serviceName string) error {
 	return nil
 }
 
-// canSkipInit returns a bool representing if OtelStartEnvVar is set to false. This function is a helper for Start.
+// canSkipInit returns a bool representing if OtelStartEnvVar is set to "disabled" or not. This function is a helper for Start.
 // Instrumentation should *ONLY* be started if this function returns false
 func canSkipInit() bool {
 	startEnv := os.Getenv(OtelStartEnvVar)
-	return strings.ToLower(startEnv) == "false"
+	return strings.ToLower(startEnv) == "disabled"
 }
 
 // FlushSpanBuffer exports all completed spans that have not been exported for all SpanProcessors registered with the

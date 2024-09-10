@@ -4,8 +4,13 @@ KubeArchive is instrumented to emit observability data, specifically metrics and
 traces. This can be enabled and configured with two environment
 variables present on all of the KubeArchive components:
 
-* `KUBEARCHIVE_OTEL_ENABLED`: one of "true" or "false". Defaults to "false". It
-   controls if observability data is sent to `OTEL_EXPORTER_OTLP_ENDPOINT`.
+* `KUBEARCHIVE_OTEL_MODE`: one of "enabled", "delegated" or "disabled". Defaults to
+an "disabled". It controls when observability data is sent to `OTEL_EXPORTER_OTLP_ENDPOINT`:
+** "disabled": do not send traces or metrics.
+** "enabled": always send traces and metrics. Useful for observability in development.
+** "delegated": always send metrics but send traces only when the incoming request sent its traces (see
+link:https://www.w3.org/TR/trace-context-2/#sampled-flag[W3 Trace Context `sampled` flag]).
+Useful for observability in production.
 * `OTEL_EXPORTER_OTLP_ENDPOINT`: an OTLP compatible endpoint where traces are
     sent. By default it is set to an empty string.
 
@@ -26,8 +31,8 @@ spec:
       containers:
         - name: kubearchive-api-server
           env:
-            - name: KUBEARCHIVE_OTEL_ENABLED
-              value: "true"
+            - name: KUBEARCHIVE_OTEL_MODE
+              value: "delegated"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.observability.svc.cluster.local:4318"
 ----
@@ -45,8 +50,8 @@ spec:
       containers:
         - name: kubearchive-sink
           env:
-            - name: KUBEARCHIVE_OTEL_ENABLED
-              value: "true"
+            - name: KUBEARCHIVE_OTEL_MODE
+              value: "delegated"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.observability.svc.cluster.local:4318"
 ----
@@ -64,8 +69,8 @@ spec:
       containers:
         - name: manager
           env:
-            - name: KUBEARCHIVE_OTEL_ENABLED
-              value: "true"
+            - name: KUBEARCHIVE_OTEL_MODE
+              value: "delegated"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://traces-collector.observability.svc.cluster.local:4318"
 ----

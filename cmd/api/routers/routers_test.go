@@ -156,3 +156,60 @@ func TestNoAPIResourceInContextError(t *testing.T) {
 	assert.Contains(t, res.Body.String(), "API resource not found")
 	assert.NotContains(t, res.Body.String(), "Kind")
 }
+
+func TestLivez(t *testing.T) {
+
+	router := gin.Default()
+	ctrl := Controller{Database: fake.NewFakeDatabase(testResources),
+		CacheConfiguration: CacheExpirations{Authorized: 60, Unauthorized: 5}}
+	router.GET("/livez", ctrl.Livez)
+	res := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/livez", nil)
+	router.ServeHTTP(res, req)
+
+	expected, _ := json.Marshal(gin.H{
+		"code":           http.StatusOK,
+		"ginMode":        "debug",
+		"authCacheTTL":   60,
+		"unAuthCacheTTL": 5,
+		"openTelemetry":  "disabled",
+		"message":        "healthy",
+	})
+
+	assert.Equal(t, res.Body.Bytes(), expected)
+}
+
+func TestReadyz(t *testing.T) {
+
+	testCases := []struct {
+		name        string
+		dbConnReady bool
+		expected    int
+	}{
+		{
+			name:        "Database Ready",
+			dbConnReady: true,
+			expected:    http.StatusOK,
+		},
+		{
+			name:        "Database Not Ready",
+			dbConnReady: false,
+			expected:    http.StatusServiceUnavailable,
+		},
+	}
+	for _, testCase := range testCases {
+		router := gin.Default()
+		var ctrl Controller
+		if testCase.dbConnReady {
+			ctrl = Controller{Database: fake.NewFakeDatabase(testResources)}
+		} else {
+			ctrl = Controller{Database: fake.NewFakeDatabaseWithError(errors.New("test error"))}
+		}
+		router.GET("/readyz", ctrl.Readyz)
+		res := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/readyz", nil)
+		router.ServeHTTP(res, req)
+
+		assert.Equal(t, testCase.expected, res.Code)
+	}
+}

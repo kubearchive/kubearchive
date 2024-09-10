@@ -20,52 +20,83 @@ import (
 
 func fakeServer(k8sClient kubernetes.Interface, cache *cache.Cache) *Server {
 	if k8sClient == nil {
+		// Replacing deprecated NewSimpleClientset for NewClientset fails because of TokenReview
+		// It may be related to https://github.com/kubernetes/kubernetes/issues/126850 so keeping deprecated.
 		k8sClient = fakeK8s.NewSimpleClientset()
 	}
 	controller := routers.Controller{Database: fakeDB.NewFakeDatabase(nil)}
-	expirations := &cacheExpirations{Authorized: 1 * time.Second, Unauthorized: 1 * time.Second}
+	expirations := &routers.CacheExpirations{Authorized: 1 * time.Second, Unauthorized: 1 * time.Second}
 	return NewServer(k8sClient, controller, cache, expirations)
 }
 
 func TestNewServer(t *testing.T) {
-	k8sClient := fakeK8s.NewSimpleClientset()
-	cache := cache.New()
+	k8sClient := fakeK8s.NewClientset()
+	memCache := cache.New()
 
-	server := fakeServer(k8sClient, cache)
+	server := fakeServer(k8sClient, memCache)
 	assert.NotNil(t, server.router)
 	assert.Equal(t, server.k8sClient, k8sClient)
 }
 
-func TestOtelMiddlewareConfigured(t *testing.T) {
+func TestMiddlewareConfigured(t *testing.T) {
 	// Set up server
 	server := fakeServer(nil, nil)
-	// Get the context for a new response recorder for inspection and set it to the router engine
-	c := gin.CreateTestContextOnly(httptest.NewRecorder(), server.router)
-	c.Request, _ = http.NewRequest(http.MethodGet, "/", nil)
-	server.router.HandleContext(c)
-	// Get the handler names from the context
-	names := c.HandlerNames()
-	// Test that the last handlers in the chain are the expected ones
-	// The full handler names may be different when running in debug mode
-	expectedNames := []string{
-		"otelgin.Middleware",
-		"Authentication",
-		"RBACAuthorization",
-		"GetAPIResource",
-	}
-	for idx, name := range names[len(names)-len(expectedNames):] {
-		assert.Contains(t, name, expectedNames[idx])
+
+	testCases := []struct {
+		name               string
+		path               string
+		hasControllerRoute bool
+		expectedMiddleware []string
+	}{
+		{
+			name:               "Root group",
+			path:               "/",
+			hasControllerRoute: false,
+			expectedMiddleware: []string{"otelgin.Middleware"},
+		},
+		{
+			name:               "API group",
+			path:               "/api/v1/jobs",
+			hasControllerRoute: true,
+			expectedMiddleware: []string{"otelgin.Middleware", "Authentication", "RBACAuthorization", "GetAPIResource"},
+		},
+		{
+			name:               "APIs group",
+			path:               "/apis/apps/v1/deployments",
+			hasControllerRoute: true,
+			expectedMiddleware: []string{"otelgin.Middleware", "Authentication", "RBACAuthorization", "GetAPIResource"},
+		},
 	}
 
+	for _, testCase := range testCases {
+		// Get the context for a new response recorder for inspection and set it to the router engine
+		c := gin.CreateTestContextOnly(httptest.NewRecorder(), server.router)
+		c.Request, _ = http.NewRequest(http.MethodGet, testCase.path, nil)
+		server.router.HandleContext(c)
+		// Get the handler names from the context
+		handlers := c.HandlerNames()
+		// Test that the last handlers in the chain are the expected ones
+		// The full handler names may be different when running in debug mode
+		// When the path actually matches a route the last handler is the route method
+		var middlewareHandlers []string
+		if testCase.hasControllerRoute {
+			middlewareHandlers = handlers[len(handlers)-len(testCase.expectedMiddleware)-1 : len(handlers)-1]
+		} else {
+			middlewareHandlers = handlers[len(handlers)-len(testCase.expectedMiddleware):]
+		}
+		for idx, middlewareHandler := range middlewareHandlers {
+			assert.Contains(t, middlewareHandler, testCase.expectedMiddleware[idx])
+		}
+	}
 }
 
-func TestAuthMiddlewareConfigured(t *testing.T) {
+func TestUnauthQuery(t *testing.T) {
 	// Set up server
-	cache := cache.New()
-	server := fakeServer(nil, cache)
+	memCache := cache.New()
+	server := fakeServer(nil, memCache)
 	// Make a correct request with an invalid token
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/", nil)
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/jobs", nil)
 	req.Header.Set("Authorization", "Bearer token")
 	server.router.ServeHTTP(res, req)
 	// Assert unauthenticated request

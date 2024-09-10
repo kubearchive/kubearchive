@@ -6,19 +6,27 @@ package routers
 import (
 	"errors"
 	"fmt"
-
-	"github.com/kubearchive/kubearchive/cmd/api/abort"
+	"os"
+	"time"
 
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kubearchive/kubearchive/cmd/api/abort"
 	"github.com/kubearchive/kubearchive/pkg/database"
+	"github.com/kubearchive/kubearchive/pkg/observability"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+type CacheExpirations struct {
+	Authorized   time.Duration
+	Unauthorized time.Duration
+}
+
 type Controller struct {
-	Database database.DBInterface
+	Database           database.DBInterface
+	CacheConfiguration CacheExpirations
 }
 
 // We roll our own List because we don't want to wrap resources
@@ -108,6 +116,34 @@ func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 	}
 
 	context.JSON(http.StatusOK, NewList(resources))
+}
+
+// Livez returns current server configuration as we don't have a clear deadlock indicator
+func (c *Controller) Livez(context *gin.Context) {
+
+	observabilityConfig := os.Getenv(observability.OtelStartEnvVar)
+	if observabilityConfig == "" {
+		observabilityConfig = "disabled"
+	}
+
+	context.JSON(http.StatusOK, gin.H{
+		"code":           http.StatusOK,
+		"ginMode":        gin.Mode(),
+		"authCacheTTL":   c.CacheConfiguration.Authorized,
+		"unAuthCacheTTL": c.CacheConfiguration.Unauthorized,
+		"openTelemetry":  observabilityConfig,
+		"message":        "healthy",
+	})
+}
+
+// Readyz checks Database connection
+func (c *Controller) Readyz(context *gin.Context) {
+	err := c.Database.Ping(context)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	context.JSON(http.StatusOK, gin.H{"message": "ready"})
 }
 
 func getAPIResourceKind(context *gin.Context) (string, error) {

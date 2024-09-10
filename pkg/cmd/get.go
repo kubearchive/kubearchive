@@ -20,6 +20,7 @@ type GetOptions struct {
 	IsCoreResource bool
 	APIPath        string
 	Resource       string
+	GroupVersion   string
 	Token          string
 
 	KubeArchiveHost string
@@ -39,9 +40,9 @@ func NewGetCmd() *cobra.Command {
 	o := NewGetOptions()
 
 	cmd := &cobra.Command{
-		Use:   "get [RESOURCES]",
+		Use:   "get [GROUPVERSION] [RESOURCE]",
 		Short: "Command to get resources from KubeArchive",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			err = o.Complete(args)
@@ -66,14 +67,20 @@ func NewGetCmd() *cobra.Command {
 }
 
 func (o *GetOptions) Complete(args []string) error {
-	o.Resource = args[0]
-	if strings.HasPrefix(o.Resource, "v1") {
+	o.GroupVersion = args[0]
+	if strings.HasPrefix(o.GroupVersion, "v1") {
 		o.IsCoreResource = true
 	}
 
-	o.APIPath = fmt.Sprintf("/apis/%s", o.Resource)
+	o.Resource = args[1]
+	APIPathWithoutRoot := fmt.Sprintf("%s/%s", o.GroupVersion, o.Resource)
+	if *o.kubeFlags.Namespace != "" {
+		APIPathWithoutRoot = fmt.Sprintf("%s/namespaces/%s/%s", o.GroupVersion, *o.kubeFlags.Namespace, o.Resource)
+	}
+
+	o.APIPath = fmt.Sprintf("/apis/%s", APIPathWithoutRoot)
 	if o.IsCoreResource {
-		o.APIPath = fmt.Sprintf("/api/%s", o.Resource)
+		o.APIPath = fmt.Sprintf("/api/%s", APIPathWithoutRoot)
 	}
 
 	config, err := o.kubeFlags.ToRESTConfig()

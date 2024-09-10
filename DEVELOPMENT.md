@@ -72,6 +72,11 @@ Install these tools:
     cmd/operator/generate.sh
     ```
 
+1. Install a database:
+   ```bash
+   integrations/database/postgresql/install.sh
+   ```
+
 ## Install KubeArchive
 
 1. Use Helm to install KubeArchive:

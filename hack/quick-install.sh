@@ -5,7 +5,7 @@
 set -o errexit
 set -o xtrace
 
-bash hack/install-database.sh
+bash integrations/database/postgresql/install.sh
 
 export CERT_MANAGER_VERSION=v1.9.1
 export KNATIVE_EVENTING_VERSION=v1.15.0
@@ -32,19 +32,18 @@ EOF
 bash cmd/operator/generate.sh
 helm template kubearchive charts/kubearchive -n kubearchive \
     --include-crds \
-    --set "global.production=true" \
-    --set "database.enabled=false" > /tmp/kubearchive-not-resolved.yaml
+    --set "global.production=true" > /tmp/kubearchive-not-resolved.yaml
 ko resolve -f /tmp/kubearchive-not-resolved.yaml --base-import-paths > /tmp/kubearchive.yaml
 kubectl apply -n kubearchive -f /tmp/kubearchive.yaml
 
-cat <<EOF > /tmp/patch.yaml
+cat << EOF > /tmp/patch.yaml
 stringData:
+  POSTGRES_PORT: "5432"
   POSTGRES_URL: postgresql.databases.svc.cluster.local
   POSTGRES_USER: kubearchive
   POSTGRES_DB: kubearchive
   POSTGRES_PASSWORD: 'P0stgr3sdbP@ssword'  # notsecret
 EOF
 kubectl patch -n kubearchive secrets kubearchive-database-credentials --patch-file /tmp/patch.yaml
-
-kubectl rollout status deployment --namespace=kubearchive --timeout=60s
+kubectl rollout restart deployment --namespace=kubearchive kubearchive-sink kubearchive-api-server
 kubectl get -n kubearchive deployments

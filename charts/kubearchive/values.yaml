@@ -61,35 +61,12 @@ operator:
   # github.com/kubearchive/kubearchive/cmd/operator
   debug: false
 
-# values used to create a PostgreSQL database
+# values used to access an already deployed PostgreSQL database
+# if the database has different name, namespace or credentials please change them below
 database:
-  # Controls if the database is deployed or not. The secret with the credentials
-  # is deployed always, as the sink and the api-server need to connect somewhere.
-  # If 'enabled: true' the secret credentials are automatically set, if you want to
-  # provide your own database, set 'enabled: false' and modify the secret after deploying
-  enabled: true
-
-  name: "{{ .Release.Name }}-database"
-
-  url: "{{ tpl .Values.database.name . }}.{{ .Release.Namespace }}.svc.cluster.local"
-
-  # number of database pods that should be deployed
-  replicaCount: 1
-  # database container image
-  image:
-    repository: postgres
-    pullPolicy: IfNotPresent
-    tag: "16"
-  # database volumes
-  volumes:
-    name: "postgresdata"
-    storage: "5Gi"
-  # database service
-  service:
-    type: NodePort
-    port: 5432
+  url: "postgresql.databases.svc.cluster.local"
   # database secret
-  secret: "{{ tpl .Values.database.name . }}-credentials"
+  secret: "kubearchive-database-credentials"
   # database basic configuration
   postgresData:
     # database name
@@ -98,7 +75,6 @@ database:
     dbUser: "kubearchive"
     # database password
     dbPassword: "P0stgr3sdbP@ssword"  # notsecret
-
 
 integrations:
   observability:

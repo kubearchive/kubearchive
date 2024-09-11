@@ -1,0 +1,18 @@
+---
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: ClusterOutput
+metadata:
+  name: splunk-output
+spec:
+  splunkHec:
+    hec_host: splunk-single-standalone-headless
+    insecure_ssl: true
+    hec_port: 8088
+    hec_token:
+      valueFrom:
+        secretKeyRef:
+          name: splunk-splunk-operator-secret
+          key: hec_token
+    index: main
+    format:
+      type: json

@@ -1,0 +1,15 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: generate-logs-task
+spec:
+  steps:
+    - name: generate
+      image: quay.io/kubearchive/mingrammer/flog
+      imagePullPolicy: IfNotPresent
+      args:
+        - "-n"
+        - "1024"
+        - "-d"
+        - "20ms"

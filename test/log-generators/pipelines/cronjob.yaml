@@ -1,0 +1,16 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: submit-generate-logs
+spec:
+  schedule: "*/1 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: submit
+              image: curlimages/curl
+              args: ["curl", "-X", "POST", "--data", "{}", "el-cron-listener.${NAMESPACE}.svc.cluster.local:8080"]
+          restartPolicy: Never

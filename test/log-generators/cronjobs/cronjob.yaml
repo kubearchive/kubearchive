@@ -1,0 +1,23 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: generate-log
+spec:
+  schedule: "* * * * *"
+  successfulJobsHistoryLimit: 1000
+  failedJobsHistoryLimit: 50
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: generate
+              image: mingrammer/flog
+              imagePullPolicy: IfNotPresent
+              args:
+                - "-n"
+                - "1024"
+                - "-d"
+                - "20ms"
+          restartPolicy: OnFailure

@@ -28,7 +28,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.29.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.31.0
-	k8s.io/apimachinery v0.31.0
+	k8s.io/apimachinery v0.31.1
 	k8s.io/cli-runtime v0.30.3
 	k8s.io/client-go v0.31.0
 	knative.dev/eventing v0.42.1

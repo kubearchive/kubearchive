@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubearchive-user
+type: kubernetes.io/basic-auth
+data:
+  host: a3ViZWFyY2hpdmUtcnc=
+  password: UDBzdGdyM3NkYlBAc3N3b3Jk # notsecret
+  port: NTQzMg==
+  username: a3ViZWFyY2hpdmU=

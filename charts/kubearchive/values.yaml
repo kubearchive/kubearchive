@@ -63,7 +63,7 @@ operator:
 # values used to access an already deployed PostgreSQL database
 # if the database has different name, namespace or credentials please change them below
 database:
-  url: "postgresql.databases.svc.cluster.local"
+  url: "kubearchive-rw.postgresql.svc.cluster.local"
   # database secret
   secret: "kubearchive-database-credentials"
   # database basic configuration

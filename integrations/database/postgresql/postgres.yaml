@@ -1,0 +1,16 @@
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: kubearchive
+spec:
+  instances: 1
+  bootstrap:
+    initdb:
+      database: kubearchive
+      secret:
+        name: kubearchive-user
+      owner: kubearchive
+  enableSuperuserAccess: true
+  storage:
+    size: 1Gi

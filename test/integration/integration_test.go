@@ -14,6 +14,7 @@ import (
 	"github.com/avast/retry-go/v4"
 	"github.com/kubearchive/kubearchive/test"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestMain(m *testing.M) {
@@ -67,20 +68,26 @@ func TestDatabaseConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// database deployment
-	deploymentScaleDatabase, err := clientset.AppsV1().Deployments("databases").GetScale(context.Background(), "postgresql", metav1.GetOptions{})
+	dynclient, err := test.GetDynamicKubernetesClient()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// database replicas = 0
-	scaleDatabase := *deploymentScaleDatabase
-	scaleDatabase.Spec.Replicas = 0
-	usDatabase, err := clientset.AppsV1().Deployments("databases").UpdateScale(context.Background(), "postgresql", &scaleDatabase, metav1.UpdateOptions{})
+
+	// Fence database
+	clusterResource := schema.GroupVersionResource{Group: "postgresql.cnpg.io", Version: "v1", Resource: "clusters"}
+	resource, err := dynclient.Resource(clusterResource).Namespace("postgresql").Get(context.Background(), "kubearchive", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Changing database to %d replicas", scaleDatabase.Spec.Replicas)
-	t.Log(*usDatabase)
+	annotations := resource.GetAnnotations()
+	annotations["cnpg.io/fencedInstances"] = "[\"*\"]"
+	resource.SetAnnotations(annotations)
+
+	resource, err = dynclient.Resource(clusterResource).Namespace("postgresql").Update(context.Background(), resource, metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Fenced database")
 
 	// restart sink pod - replicas = 0
 	deploymentScaleSink, err := clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
@@ -134,19 +141,20 @@ func TestDatabaseConnection(t *testing.T) {
 		t.Fatal(retryErr)
 	}
 
-	// wake-up database -> replicas = 1
-	deploymentScaleDatabase, err = clientset.AppsV1().Deployments("databases").GetScale(context.Background(), "postgresql", metav1.GetOptions{})
+	// Unfence database
+	resource, err = dynclient.Resource(clusterResource).Namespace("postgresql").Get(context.Background(), "kubearchive", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	scaleDatabase = *deploymentScaleDatabase
-	scaleDatabase.Spec.Replicas = 1
-	usDatabase, err = clientset.AppsV1().Deployments("databases").UpdateScale(context.Background(), "postgresql", &scaleDatabase, metav1.UpdateOptions{})
+	annotations = resource.GetAnnotations()
+	delete(annotations, "cnpg.io/fencedInstances")
+	resource.SetAnnotations(annotations)
+
+	resource, err = dynclient.Resource(clusterResource).Namespace("postgresql").Update(context.Background(), resource, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Changing database to %d replicas", scaleDatabase.Spec.Replicas)
-	t.Log(*usDatabase)
+	t.Logf("Unfenced database")
 
 	retryErr = retry.Do(func() error {
 		logs, err := test.GetPodLogs(clientset, "kubearchive", "kubearchive-sink")

@@ -7,7 +7,7 @@ toolchain go1.23.1
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/semver/v3 v3.3.0
-	github.com/XSAM/otelsql v0.33.0
+	github.com/XSAM/otelsql v0.34.0
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/cloudevents/sdk-go/observability/opentelemetry/v2 v2.15.2
 	github.com/cloudevents/sdk-go/v2 v2.15.2
@@ -24,8 +24,8 @@ require (
 	go.opentelemetry.io/otel v1.30.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.29.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.29.0
-	go.opentelemetry.io/otel/sdk v1.29.0
-	go.opentelemetry.io/otel/sdk/metric v1.29.0
+	go.opentelemetry.io/otel/sdk v1.30.0
+	go.opentelemetry.io/otel/sdk/metric v1.30.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.31.1
 	k8s.io/apimachinery v0.31.1

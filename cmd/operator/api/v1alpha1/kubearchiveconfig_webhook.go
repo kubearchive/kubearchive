@@ -75,6 +75,12 @@ func (kac *KubeArchiveConfig) validateCELExpressions() (admission.Warnings, erro
 				errList = append(errList, err)
 			}
 		}
+		if resource.ArchiveOnDelete != "" {
+			_, err := cel.CreateCelExprOr(resource.ArchiveOnDelete)
+			if err != nil {
+				errList = append(errList, err)
+			}
+		}
 	}
 	return nil, errors.Join(errList...)
 }

@@ -14,8 +14,8 @@ SPDX-License-Identifier: Apache-2.0
     {{- $endpoint = tpl "http://otel-collector.{{ .Release.Namespace }}.svc.cluster.local:4318" . -}}
 {{- end -}}
 
-- name: KUBEARCHIVE_OTEL_ENABLED
-  value: '{{ ternary "false" "true" (eq $endpoint "") }}'
+- name: KUBEARCHIVE_OTEL_MODE
+  value: '{{ ternary "disabled" "enabled" (eq $endpoint "") }}'
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
   value: "{{ $endpoint }}"
 {{- end -}}

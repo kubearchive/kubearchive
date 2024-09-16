@@ -12,9 +12,10 @@ import (
 )
 
 type KubeArchiveConfigResource struct {
-	Selector    sourcesv1.APIVersionKindSelector `json:"selector,omitempty"`
-	ArchiveWhen string                           `json:"archiveWhen,omitempty"`
-	DeleteWhen  string                           `json:"deleteWhen,omitempty"`
+	Selector        sourcesv1.APIVersionKindSelector `json:"selector,omitempty"`
+	ArchiveWhen     string                           `json:"archiveWhen,omitempty"`
+	DeleteWhen      string                           `json:"deleteWhen,omitempty"`
+	ArchiveOnDelete string                           `json:"archiveOnDelete,omitempty"`
 }
 
 // KubeArchiveConfigSpec defines the desired state of KubeArchiveConfig

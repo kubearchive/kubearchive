@@ -158,7 +158,7 @@ By default, KubeArchive listens to `Event`s in the `test` namespace.
 
 1. On a new terminal, use `curl` or your browser to perform a query:
     ```bash
-    curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create token kubearchive-test -n kubearchive)" \
+    curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create -n test token default)" \
     https://localhost:8081/apis/batch/v1/jobs | jq
     ```
 
@@ -181,13 +181,13 @@ By default, KubeArchive listens to `Event`s in the `test` namespace.
 
 1. Run the CLI:
     ```bash
-    go run cmd/kubectl-archive/main.go get batch/v1/jobs --token $(kubectl -n kubearchive create token kubearchive-test)
+    go run cmd/kubectl-archive/main.go get batch/v1 jobs --token $(kubectl create -n test token default)
     ```
 
 1. Generate a new job, and run again:
     ```bash
     kubectl create job my-job --image=busybox
-    go run cmd/kubectl-archive/main.go get batch/v1/jobs --token $(kubectl -n kubearchive create token kubearchive-test)
+    go run cmd/kubectl-archive/main.go get batch/v1 jobs --token $(kubectl create -n test token default)
     ```
 
 ## Running integration tests
@@ -256,7 +256,7 @@ to start a debugger to which attach from your IDE.
 1. Generate traffic:
     * API: Query the API using `curl` or your browser:
    ```bash
-   curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create token kubearchive-test -n kubearchive)" \
+   curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create -n test token default)" \
    https://localhost:8081/apis/batch/v1/jobs | jq
    ```
    * Operator: Deploy the test resources that already include a KubeArchiveConfig Custom Resource

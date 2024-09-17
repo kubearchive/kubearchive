@@ -1,13 +1,7 @@
-#!/bin/bash
 # Copyright KubeArchive Authors
 # SPDX-License-Identifier: Apache-2.0
-# WARNING: this is intended to run in a single node
+# WARNING: this is intended to be applied in a single node
 #   Kubernetes environment and just for testing purposes
-
-set -o errexit
-set -o xtrace
-
-kubectl apply -f - <<EOF
 ---
 apiVersion: v1
 kind: Namespace
@@ -74,6 +68,13 @@ spec:
               value: root
             - name: POSTGRES_PASSWORD
               value: password  # notsecret
+          readinessProbe:
+            exec:
+              command:
+                - psql
+                - -l
+            initialDelaySeconds: 10
+            periodSeconds: 5
       volumes:
         - name: postgresql
           persistentVolumeClaim:
@@ -92,14 +93,3 @@ spec:
     - port: 5432
   selector:
     app: postgresql
-
-EOF
-
-kubectl rollout status deployment --namespace=databases --timeout=30s
-sleep 15  # Wait for PostgreSQL to be really ready
-
-export DATABASE_POD=$(kubectl get -n databases pod -l app=postgresql -o name)
-echo "CREATE USER kubearchive WITH ENCRYPTED PASSWORD 'P0stgr3sdbP@ssword';" | kubectl exec -i -n databases ${DATABASE_POD} -- psql -h localhost
-echo "CREATE DATABASE kubearchive WITH OWNER kubearchive;" | kubectl exec -i -n databases ${DATABASE_POD} -- psql -h localhost
-cat database/ddl-resource.sql | kubectl exec -i -n databases ${DATABASE_POD} -- psql -h localhost --user=kubearchive kubearchive
-

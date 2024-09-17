@@ -36,6 +36,18 @@ spec:
               value: "{{ .Values.apiServer.cache.expirationAuthenticated }}"
             - name: CACHE_EXPIRATION_UNAUTHORIZED
               value: "{{ .Values.apiServer.cache.expirationUnauthenticated }}"
+          {{- if not .Values.apiServer.debug }}
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8081
+              scheme: HTTPS
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+              scheme: HTTPS
+          {{- end }}
 ---
 kind: Service
 apiVersion: v1

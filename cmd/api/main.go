@@ -40,11 +40,6 @@ type Server struct {
 	router    *gin.Engine
 }
 
-type cacheExpirations struct {
-	Authorized   time.Duration
-	Unauthorized time.Duration
-}
-
 func getKubernetesClient() *kubernetes.Clientset {
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -59,18 +54,31 @@ func getKubernetesClient() *kubernetes.Clientset {
 	return client
 }
 
-func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, cache *cache.Cache, cacheExpirations *cacheExpirations) *Server {
+func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, cache *cache.Cache, cacheExpirations *routers.CacheExpirations) *Server {
+
 	router := gin.Default()
 	router.Use(otelgin.Middleware("")) // Empty string so the library sets the proper server
-	router.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews(), cache, cacheExpirations.Authorized, cacheExpirations.Unauthorized))
-	router.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache, cacheExpirations.Authorized, cacheExpirations.Unauthorized))
-	// TODO - Probably want to use cache for the discovery client
-	// See https://pkg.go.dev/k8s.io/client-go/discovery/cached/disk#NewCachedDiscoveryClientForConfig
-	router.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient()))
-	router.GET("/apis/:group/:version/:resourceType", controller.GetAllResources)
-	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedResources)
-	router.GET("/api/:version/:resourceType", controller.GetAllCoreResources)
-	router.GET("/api/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedCoreResources)
+
+	apiGroup := router.Group("/api")
+	apisGroup := router.Group("/apis")
+	groups := [...]*gin.RouterGroup{apisGroup, apiGroup}
+	// Set up middleware for each group
+	for _, group := range groups {
+		group.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews(), cache, cacheExpirations.Authorized, cacheExpirations.Unauthorized))
+		group.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache, cacheExpirations.Authorized, cacheExpirations.Unauthorized))
+		// TODO - Probably want to use cache for the discovery client
+		// See https://pkg.go.dev/k8s.io/client-go/discovery/cached/disk#NewCachedDiscoveryClientForConfig
+		group.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient()))
+	}
+
+	router.GET("/livez", controller.Livez)
+	router.GET("/readyz", controller.Readyz)
+
+	apisGroup.GET("/:group/:version/:resourceType", controller.GetAllResources)
+	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedResources)
+
+	apiGroup.GET("/:version/:resourceType", controller.GetAllCoreResources)
+	apiGroup.GET("/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedCoreResources)
 
 	return &Server{
 		router:    router,
@@ -89,22 +97,22 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	cache := cache.New()
+	memCache := cache.New()
 
 	db, err := database.NewDatabase()
 	if err != nil {
 		log.Fatalf("Could not connect to database: %s", err)
 	}
-	controller := routers.Controller{Database: db}
+	controller := routers.Controller{Database: db, CacheConfiguration: *cacheExpirations}
 
-	server := NewServer(getKubernetesClient(), controller, cache, cacheExpirations)
-	err = server.router.RunTLS("localhost:8081", "/etc/kubearchive/ssl/tls.crt", "/etc/kubearchive/ssl/tls.key")
+	server := NewServer(getKubernetesClient(), controller, memCache, cacheExpirations)
+	err = server.router.RunTLS("0.0.0.0:8081", "/etc/kubearchive/ssl/tls.crt", "/etc/kubearchive/ssl/tls.key")
 	if err != nil {
 		log.Printf("Could not run server on localhost: %s", err)
 	}
 }
 
-func getCacheExpirations() (*cacheExpirations, error) {
+func getCacheExpirations() (*routers.CacheExpirations, error) {
 	expirationAuthorizedString := os.Getenv(cacheExpirationAuthorizedEnvVar)
 	if expirationAuthorizedString == "" {
 		return nil, fmt.Errorf("The environment variable '%s' should be set.", cacheExpirationAuthorizedEnvVar)
@@ -125,7 +133,7 @@ func getCacheExpirations() (*cacheExpirations, error) {
 		return nil, fmt.Errorf("'%s': '%s' could not be parsed into a duration: %s", cacheExpirationUnauthorizedEnvVar, expirationUnauthorizedString, err)
 	}
 
-	return &cacheExpirations{
+	return &routers.CacheExpirations{
 		Authorized:   expirationAuthorized,
 		Unauthorized: expirationUnauthorized,
 	}, nil

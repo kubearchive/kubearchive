@@ -19,19 +19,3 @@ SPDX-License-Identifier: Apache-2.0
 - name: OTEL_EXPORTER_OTLP_ENDPOINT
   value: "{{ $endpoint }}"
 {{- end -}}
-
-{{/* Override database information when database is deployed */}}
-{{- define "kubearchive.v1.database.env" -}}
-{{- $enabled := .Values.database.enabled -}}
-{{- if $enabled -}}
-POSTGRES_URL: {{ tpl .Values.database.url . | b64enc | quote }}
-POSTGRES_DB: {{ .Values.database.postgresData.dbName | b64enc | quote }}
-POSTGRES_USER: {{ .Values.database.postgresData.dbUser | b64enc | quote }}
-POSTGRES_PASSWORD: {{ .Values.database.postgresData.dbPassword | b64enc | quote }}
-{{- else -}}
-POSTGRES_URL: ""
-POSTGRES_DB: ""
-POSTGRES_USER: ""
-POSTGRES_PASSWORD: ""
-{{- end -}}
-{{- end -}}

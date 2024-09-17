@@ -24,29 +24,11 @@ spec:
             - mountPath: "{{ .Values.sink.mountPath }}"
               name: "sink-filters"
               readOnly: true
+          envFrom:
+            # Provide DB URL, user, password, database and port as env vars
+            - secretRef:
+                name: {{ .Values.database.secret }}
           env:
-            - name: POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: {{ tpl .Values.database.secret . }}
-                  key: POSTGRES_DB
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ tpl .Values.database.secret . }}
-                  key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ tpl .Values.database.secret . }}
-                  key: POSTGRES_PASSWORD
-            - name: POSTGRES_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ tpl .Values.database.secret . }}
-                  key: POSTGRES_URL
-            - name: POSTGRES_PORT
-              value: "{{ .Values.database.service.port }}"
             - name: MOUNT_PATH
               value: "{{ .Values.sink.mountPath }}"
             {{- include "kubearchive.v1.otel.env" . | nindent 12 }}

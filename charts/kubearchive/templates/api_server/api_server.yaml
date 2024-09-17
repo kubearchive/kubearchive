@@ -24,31 +24,13 @@ spec:
             - name: tls-secret
               readOnly: true
               mountPath: /etc/kubearchive/ssl/
+          envFrom:
+            # Provide DB URL, user, password, database and port as env vars
+            - secretRef:
+                name: {{ .Values.database.secret }}
           env:
             - name: GIN_MODE
               value: {{ ternary "release" "debug" .Values.global.production }}
-            - name: POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: {{ tpl .Values.database.secret . }}
-                  key: POSTGRES_DB
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: {{ tpl .Values.database.secret . }}
-                  key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ tpl .Values.database.secret . }}
-                  key: POSTGRES_PASSWORD
-            - name: POSTGRES_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ tpl .Values.database.secret . }}
-                  key: POSTGRES_URL
-            - name: POSTGRES_PORT
-              value: "{{ required "A Postgres port must be specified" .Values.database.service.port }}"
             {{- include "kubearchive.v1.otel.env" . | nindent 12 }}
             - name: CACHE_EXPIRATION_AUTHORIZED
               value: "{{ .Values.apiServer.cache.expirationAuthenticated }}"

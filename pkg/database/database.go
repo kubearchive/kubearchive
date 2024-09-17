@@ -30,6 +30,7 @@ type DBInterface interface {
 	QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error)
 	QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error)
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
+	Ping(ctx context.Context) error
 }
 
 type Database struct {
@@ -65,6 +66,10 @@ func NewDatabase() (*Database, error) {
 	}
 	log.Println("Successfully connected to the database")
 	return &Database{db, resourceTableName}, nil
+}
+
+func (db *Database) Ping(ctx context.Context) error {
+	return db.db.PingContext(ctx)
 }
 
 func (db *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {

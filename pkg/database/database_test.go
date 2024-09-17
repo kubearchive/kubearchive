@@ -105,3 +105,12 @@ func TestQueryNamespacedCoreResources(t *testing.T) {
 	assert.NotEqual(t, 0, len(resources))
 	assert.NoError(t, err)
 }
+
+func TestPing(t *testing.T) {
+	db, mock := NewMock()
+	mock.ExpectPing()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	database := Database{db: db, resourceTableName: "test"}
+	assert.Nil(t, database.Ping(ctx))
+}

@@ -38,6 +38,10 @@ func NewFakeDatabaseWithError(err error) *Database {
 	return &Database{resources, err}
 }
 
+func (f *Database) Ping(ctx context.Context) error {
+	return f.err
+}
+
 func (f *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return f.filterResoucesByKindAndApiVersion(kind, apiVersion), f.err

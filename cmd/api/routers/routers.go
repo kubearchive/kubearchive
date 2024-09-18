@@ -138,7 +138,7 @@ func (c *Controller) Livez(context *gin.Context) {
 
 // Readyz checks Database connection
 func (c *Controller) Readyz(context *gin.Context) {
-	err := c.Database.Ping(context)
+	err := c.Database.Ping(context.Request.Context())
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusServiceUnavailable)
 		return

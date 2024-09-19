@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
@@ -127,4 +128,22 @@ func GetPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (log
 	logs = string(logBytes)
 
 	return logs, nil
+}
+
+func GetDynamicKubernetesClient() (*dynamic.DynamicClient, error) {
+	var kubeconfig string
+	if home := homedir.HomeDir(); home != "" {
+		kubeconfig = filepath.Join(home, ".kube", "config")
+	}
+
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("Error instantiating k8s from host %s: %s", config.Host, err)
+	}
+	return client, nil
 }

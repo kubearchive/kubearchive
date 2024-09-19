@@ -15,20 +15,6 @@ kubectl apply -f https://github.com/knative/eventing/releases/download/knative-$
 kubectl rollout status deployment --namespace=cert-manager --timeout=30s
 kubectl rollout status deployment --namespace=knative-eventing --timeout=30s
 
-kubectl apply -f - << EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: config-features
-  namespace: knative-eventing
-  labels:
-    eventing.knative.dev/release: devel
-    knative.dev/config-propagation: original
-    knative.dev/config-category: eventing
-data:
-  new-apiserversource-filters: enabled
-EOF
-
 bash cmd/operator/generate.sh
 helm template kubearchive charts/kubearchive -n kubearchive \
     --include-crds \
@@ -36,14 +22,21 @@ helm template kubearchive charts/kubearchive -n kubearchive \
 ko resolve -f /tmp/kubearchive-not-resolved.yaml --base-import-paths > /tmp/kubearchive.yaml
 kubectl apply -n kubearchive -f /tmp/kubearchive.yaml
 
-cat << EOF > /tmp/patch.yaml
-stringData:
-  POSTGRES_PORT: "5432"
-  POSTGRES_URL: postgresql.databases.svc.cluster.local
-  POSTGRES_USER: kubearchive
-  POSTGRES_DB: kubearchive
-  POSTGRES_PASSWORD: 'P0stgr3sdbP@ssword'  # notsecret
-EOF
-kubectl patch -n kubearchive secrets kubearchive-database-credentials --patch-file /tmp/patch.yaml
-kubectl rollout restart deployment --namespace=kubearchive kubearchive-sink kubearchive-api-server
+kubectl -n kubearchive rollout status deployment --timeout=90s
+kubectl -n kubearchive wait pod --all --for=condition=ready --timeout=90s
+
+# Make sure webhooks are up and running.
+LOCAL_PORT=8443
+kubectl -n kubearchive port-forward service/kubearchive-operator-webhooks ${LOCAL_PORT}:443 >& /dev/null &
+
+# Wait for $LOCAL_PORT to become available.
+while ! nc -vz localhost ${LOCAL_PORT} > /dev/null 2>&1 ; do
+    echo -n .
+    sleep 0.5
+done
+echo .
+
 kubectl get -n kubearchive deployments
+
+# Kill all background jobs, including the port-forward started earlier.
+trap 'kill $(jobs -p)' EXIT

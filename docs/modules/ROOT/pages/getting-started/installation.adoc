@@ -19,12 +19,12 @@ This document explains how to install and configure KubeArchive in your Kubernet
 
 . Create ada user and a password for KubeArchive to use.
 . Create a database for KubeArchive, with admin permissions granted to the user you just created.
-. As the user, execute the `ddl-resource.sql` we provide for initializing the database, located at:
+. As the user, execute the `kubearchive.sql` we provide for initializing the database, located at:
 +
 [source,bash,subs="attributes"]
 ----
-wget {download-path}/ddl-resource.sql
-psql -h database.example.com -U username ... -f ddl-resource.sql
+wget {download-path}/kubearchive.sql
+psql -h database.example.com -U username ... -f kubearchive.sql
 ----
 +
 This file creates a PostgreSQL schema, a table for KubeArchive and other stuff KubeArchive

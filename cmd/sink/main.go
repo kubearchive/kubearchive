@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	ceOtelObs "github.com/cloudevents/sdk-go/observability/opentelemetry/v2/client"
@@ -94,6 +95,34 @@ func (sink *Sink) Receive(ctx context.Context, event cloudevents.Event) {
 		event.ID(),
 		k8sObj.GetUID(),
 	)
+
+	if strings.HasSuffix(event.Type(), ".delete") {
+		sink.Logger.Printf(
+			"The type of cloudevent %s is Delete. Checking if object %s needs to be archived\n",
+			event.ID(),
+			k8sObj.GetUID(),
+		)
+		if sink.Filters.MustArchiveOnDelete(ctx, k8sObj) {
+			ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+			err = sink.Db.WriteResource(ctx, k8sObj, event.Data())
+			if err != nil {
+				sink.Logger.Printf(
+					"Failed to write object %s from cloudevent %s to the database: %s\n",
+					k8sObj.GetUID(),
+					event.ID(),
+					err,
+				)
+			}
+			defer cancel()
+			return
+		}
+		sink.Logger.Printf(
+			"Object %s from cloudevent %s does not need to be archived after deletion\n",
+			k8sObj.GetUID(),
+			event.ID(),
+		)
+		return
+	}
 	if !sink.Filters.MustArchive(ctx, k8sObj) {
 		sink.Logger.Printf("Object %s from cloudevent %s does not need to be archived\n", k8sObj.GetUID(), event.ID())
 		return
@@ -116,13 +145,14 @@ func (sink *Sink) Receive(ctx context.Context, event cloudevents.Event) {
 	if sink.Filters.MustDelete(ctx, k8sObj) {
 		sink.Logger.Println("Attempting to delete kubernetes object:", k8sObj.GetUID())
 		kind := k8sObj.GetObjectKind().GroupVersionKind()
-		resource, _ := meta.UnsafeGuessKindToResource(kind) // we only need the plural resource
+		resource, _ := meta.UnsafeGuessKindToResource(kind)     // we only need the plural resource
+		propagationPolicy := metav1.DeletePropagationBackground // can't get address of a const
 		k8sCtx, k8sCancel := context.WithTimeout(ctx, time.Second*5)
 		defer k8sCancel()
 		err = sink.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).Delete(
 			k8sCtx,
 			k8sObj.GetName(),
-			metav1.DeleteOptions{},
+			metav1.DeleteOptions{PropagationPolicy: &propagationPolicy},
 		)
 		if err != nil {
 			sink.Logger.Printf("Could not delete object %s: %s\n", k8sObj.GetUID(), err)

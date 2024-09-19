@@ -1,0 +1,19 @@
+---
+apiVersion: kubearchive.kubearchive.org/v1alpha1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+spec:
+  resources:
+    - selector:
+        apiVersion: tekton.dev/v1
+        kind: PipelineRun
+      deleteWhen: has(status.completionTime)
+    - selector:
+        apiVersion: tekton.dev/v1
+        kind: TaskRun
+      archiveOnDelete: "true"
+    - selector:
+        apiVersion: v1
+        kind: Pod
+      archiveOnDelete: "'tekton.dev/pipeline' in metadata.labels"

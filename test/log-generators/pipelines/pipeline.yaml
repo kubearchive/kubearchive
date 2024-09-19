@@ -1,0 +1,10 @@
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: generate-logs
+spec:
+  tasks:
+    - name: generate
+      taskRef:
+        name: generate-logs-task

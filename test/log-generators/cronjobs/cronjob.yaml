@@ -13,7 +13,7 @@ spec:
         spec:
           containers:
             - name: generate
-              image: mingrammer/flog
+              image: quay.io/kubearchive/mingrammer/flog
               imagePullPolicy: IfNotPresent
               args:
                 - "-n"

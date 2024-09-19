@@ -55,7 +55,6 @@ func getKubernetesClient() *kubernetes.Clientset {
 }
 
 func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, cache *cache.Cache, cacheExpirations *routers.CacheExpirations) *Server {
-
 	router := gin.Default()
 	router.Use(otelgin.Middleware("")) // Empty string so the library sets the proper server
 
@@ -68,7 +67,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 		group.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache, cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 		// TODO - Probably want to use cache for the discovery client
 		// See https://pkg.go.dev/k8s.io/client-go/discovery/cached/disk#NewCachedDiscoveryClientForConfig
-		group.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient()))
+		group.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient(), cache))
 	}
 
 	router.GET("/livez", controller.Livez)

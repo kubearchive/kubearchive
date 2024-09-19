@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kubearchive/kubearchive/pkg/cache"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -84,7 +85,7 @@ func TestGetAPIResource(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
+			cache := cache.New()
 			apiResources, err := k8sClient.Discovery().ServerResourcesForGroupVersion(fmt.Sprintf("%s/%s", tc.group, tc.version))
 			status := http.StatusOK
 			response := ""
@@ -119,13 +120,15 @@ func TestGetAPIResource(t *testing.T) {
 			c.AddParam("group", tc.group)
 			c.AddParam("version", tc.version)
 			c.AddParam("resourceType", tc.resource)
-			GetAPIResource(restClient)(c)
-			apiResource, _ := c.Get("apiResource")
+
+			GetAPIResource(restClient, cache)(c)
+
+			apiResourceKind := c.GetString("apiResourceKind")
 			assert.Equal(t, tc.expectedCode, res.Code)
 			if tc.expectedCode == http.StatusOK {
-				assert.Equal(t, apiResource, testAPIResource)
+				assert.Equal(t, "Crontab", apiResourceKind)
 			} else {
-				assert.Nil(t, apiResource)
+				assert.Equal(t, "", apiResourceKind)
 			}
 		})
 	}
@@ -156,6 +159,43 @@ func TestGetDiscoveryURL(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			result := getDiscoveryURL(tc.group, tc.version)
 			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestGetApiResourceKind(t *testing.T) {
+	testCases := []struct {
+		name     string
+		expected string
+		error    bool
+	}{
+		{
+			name:     "no error",
+			expected: "ArbitraryKind",
+			error:    false,
+		},
+		{
+			name:     "error",
+			expected: "",
+			error:    true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(res)
+			c.Set("apiResourceKind", tc.expected)
+
+			kind, err := GetAPIResourceKind(c)
+
+			assert.Equal(t, tc.expected, kind)
+			if tc.error {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
 		})
 	}
 }

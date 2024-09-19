@@ -12,7 +12,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/kubearchive/kubearchive/pkg/database"
@@ -22,29 +21,15 @@ import (
 var testResources = fake.CreateTestResources()
 var nonCoreResources = testResources[:1]
 var coreResources = testResources[1:2]
-var testCoreAPIResource = metav1.APIResource{
-	Kind:         "Pod",
-	Name:         "pods",
-	Version:      "v1",
-	SingularName: "pod",
-	Namespaced:   true,
-}
-var testNonCoreAPIResource = metav1.APIResource{
-	Kind:         "Crontab",
-	Name:         "crontabs",
-	Group:        "stable.example.com",
-	Version:      "v1",
-	SingularName: "crontab",
-	Namespaced:   true}
 
 func setupRouter(db database.DBInterface, core bool) *gin.Engine {
 	router := gin.Default()
 	ctrl := Controller{Database: db}
 	router.Use(func(c *gin.Context) {
 		if core {
-			c.Set("apiResource", testCoreAPIResource)
+			c.Set("apiResourceKind", "Pod")
 		} else {
-			c.Set("apiResource", testNonCoreAPIResource)
+			c.Set("apiResourceKind", "Crontab")
 		}
 	})
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetAllResources)

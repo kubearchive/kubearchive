@@ -4,17 +4,24 @@
 name: Release
 on:
   workflow_dispatch:
+  schedule:
+    # 9:25 UTC every 1th and 15th of month
+    - cron: "25 09 1,15 * *"
 
 jobs:
   setup:
     uses: ./.github/workflows/log_run_details.yml
   release:
+    # Run manually or (scheduled and upstream repository), so don't allow for scheduled on forks
+    if: github.event_name == "workflow_dispatch" || (github.event_name == "schedule" && github.repository == 'kubearchive/kubearchive')
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
+        with:
+          ssh-key: ${{ secrets.PUSH_TO_MAIN_DEPLOY_KEY }}
       # Checkout 'fetch-tags' does not work properly, see https://github.com/actions/checkout/issues/701
       - name: Fecth tags
         run: git fetch --tags origin

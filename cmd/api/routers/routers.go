@@ -4,18 +4,15 @@
 package routers
 
 import (
-	"errors"
-	"fmt"
+	"net/http"
 	"os"
 	"time"
 
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/abort"
+	"github.com/kubearchive/kubearchive/cmd/api/discovery"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/observability"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -46,7 +43,7 @@ func (c *Controller) GetAllResources(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
 
-	kind, err := getAPIResourceKind(context)
+	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
@@ -66,7 +63,7 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 	version := context.Param("version")
 	namespace := context.Param("namespace")
 
-	kind, err := getAPIResourceKind(context)
+	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
@@ -84,7 +81,7 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 func (c *Controller) GetAllCoreResources(context *gin.Context) {
 	version := context.Param("version")
 
-	kind, err := getAPIResourceKind(context)
+	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
@@ -103,7 +100,7 @@ func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 	version := context.Param("version")
 	namespace := context.Param("namespace")
 
-	kind, err := getAPIResourceKind(context)
+	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
@@ -120,7 +117,6 @@ func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 
 // Livez returns current server configuration as we don't have a clear deadlock indicator
 func (c *Controller) Livez(context *gin.Context) {
-
 	observabilityConfig := os.Getenv(observability.OtelStartEnvVar)
 	if observabilityConfig == "" {
 		observabilityConfig = "disabled"
@@ -138,24 +134,12 @@ func (c *Controller) Livez(context *gin.Context) {
 
 // Readyz checks Database connection
 func (c *Controller) Readyz(context *gin.Context) {
-	err := c.Database.Ping(context)
+	err := c.Database.Ping(context.Request.Context())
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
 	context.JSON(http.StatusOK, gin.H{"message": "ready"})
-}
-
-func getAPIResourceKind(context *gin.Context) (string, error) {
-	resource, ok := context.Get("apiResource")
-	if !ok {
-		return "", errors.New("API resource not found")
-	}
-	apiResource, ok := resource.(metav1.APIResource)
-	if !ok {
-		return "", fmt.Errorf("unexpected API resource type, in context: %T", resource)
-	}
-	return apiResource.Kind, nil
 }
 
 // NewList creates a new List struct with apiVersion "v1",

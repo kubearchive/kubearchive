@@ -6,25 +6,16 @@ package database
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 	"time"
 
 	"github.com/XSAM/otelsql"
 	"github.com/avast/retry-go/v4"
-	"github.com/kubearchive/kubearchive/pkg/models"
-	_ "github.com/lib/pq"
+	_ "github.com/go-sql-driver/mysql"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-const (
-	resourceTableName        = "resource"
-	resourcesQuery           = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2"
-	namespacedResourcesQuery = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2 AND namespace=$3"
-	writeResource            = `INSERT INTO %s (uuid, api_version, kind, name, namespace, resource_version, cluster_deleted_ts, data) Values ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT(uuid) DO UPDATE SET name=$4, namespace=$5, resource_version=$6, cluster_deleted_ts=$7, data=$8`
-)
-
-type DBInterface interface {
+type DatabaseInterface interface {
 	QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error)
 	QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error)
 	QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error)
@@ -34,16 +25,25 @@ type DBInterface interface {
 }
 
 type Database struct {
-	db                *sql.DB
-	resourceTableName string
+	db         *sql.DB
+	info       *DatabaseInfo
+	postgresql *PostgreSQLDatabase
+	mysql      *MySQLDatabase
 }
 
 func NewDatabase() (*Database, error) {
-	dataSource, err := ConnectionStr()
+	env, err := getDatabaseEnvironmentVars()
 	if err != nil {
 		return nil, err
 	}
-	var db *sql.DB
+
+	database := &Database{info: NewDatabaseInfo(env)}
+	if env[DbKindEnvVar] == "mysql" {
+		database.mysql = &MySQLDatabase{BaseDatabase: &BaseDatabase{info: database.info}}
+	} else {
+		database.postgresql = &PostgreSQLDatabase{BaseDatabase: &BaseDatabase{info: database.info}}
+	}
+
 	configs := []retry.Option{
 		retry.Attempts(10),
 		retry.OnRetry(func(n uint, err error) {
@@ -54,108 +54,64 @@ func NewDatabase() (*Database, error) {
 
 	errRetry := retry.Do(
 		func() error {
-			db, err = otelsql.Open("postgres", dataSource)
+			database.db, err = otelsql.Open(database.info.driver, database.info.connectionString)
 			if err != nil {
 				return err
 			}
-			return db.Ping()
+			return database.db.Ping()
 		},
 		configs...)
 	if errRetry != nil {
 		return nil, errRetry
 	}
 	log.Println("Successfully connected to the database")
-	return &Database{db, resourceTableName}, nil
+
+	if env[DbKindEnvVar] == "mysql" {
+		database.mysql.db = database.db
+	} else {
+		database.postgresql.db = database.db
+	}
+	return database, nil
 }
 
 func (db *Database) Ping(ctx context.Context) error {
-	return db.db.PingContext(ctx)
+	if db.mysql != nil {
+		return db.mysql.DBPing(ctx)
+	}
+	return db.postgresql.DBPing(ctx)
 }
 
 func (db *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(resourcesQuery, db.resourceTableName) //nolint:gosec
-	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	return db.performResourceQuery(ctx, query, kind, apiVersion)
+	if db.mysql != nil {
+		return db.mysql.DBQueryResources(ctx, kind, group, version)
+	}
+	return db.postgresql.DBQueryResources(ctx, kind, group, version)
 }
 
 func (db *Database) QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(resourcesQuery, db.resourceTableName) //nolint:gosec
-	return db.performResourceQuery(ctx, query, kind, version)
+	if db.mysql != nil {
+		return db.mysql.DBQueryCoreResources(ctx, kind, version)
+	}
+	return db.postgresql.DBQueryCoreResources(ctx, kind, version)
 }
 
 func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(namespacedResourcesQuery, db.resourceTableName) //nolint:gosec
-	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	return db.performResourceQuery(ctx, query, kind, apiVersion, namespace)
+	if db.mysql != nil {
+		return db.mysql.DBQueryNamespacedResources(ctx, kind, group, version, namespace)
+	}
+	return db.postgresql.DBQueryNamespacedResources(ctx, kind, group, version, namespace)
 }
 
 func (db *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(namespacedResourcesQuery, db.resourceTableName) //nolint:gosec
-	return db.performResourceQuery(ctx, query, kind, version, namespace)
-}
-
-func (db *Database) performResourceQuery(ctx context.Context, query string, args ...string) ([]*unstructured.Unstructured, error) {
-	castedArgs := make([]interface{}, len(args))
-	for i, v := range args {
-		castedArgs[i] = v
+	if db.mysql != nil {
+		return db.mysql.DBQueryNamespacedCoreResources(ctx, kind, version, namespace)
 	}
-	rows, err := db.db.QueryContext(ctx, query, castedArgs...)
-	if err != nil {
-		return nil, err
-	}
-	defer func(rows *sql.Rows) {
-		err = rows.Close()
-	}(rows)
-	var resources []*unstructured.Unstructured
-	if err != nil {
-		return resources, err
-	}
-	for rows.Next() {
-		var b sql.RawBytes
-		var r *unstructured.Unstructured
-		if err := rows.Scan(&b); err != nil {
-			return resources, err
-		}
-		if r, err = models.UnstructuredFromByteSlice([]byte(b)); err != nil {
-			return resources, err
-		}
-		resources = append(resources, r)
-	}
-	return resources, err
+	return db.postgresql.DBQueryNamespacedCoreResources(ctx, kind, version, namespace)
 }
 
 func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
-	query := fmt.Sprintf(writeResource, db.resourceTableName)
-	tx, err := db.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)
+	if db.mysql != nil {
+		return db.mysql.DBWriteResource(ctx, k8sObj, data)
 	}
-	_, execErr := tx.ExecContext(
-		ctx,
-		query,
-		k8sObj.GetUID(),
-		k8sObj.GetAPIVersion(),
-		k8sObj.GetKind(),
-		k8sObj.GetName(),
-		k8sObj.GetNamespace(),
-		k8sObj.GetResourceVersion(),
-		models.OptionalTimestamp(k8sObj.GetDeletionTimestamp()),
-		data,
-	)
-	if execErr != nil {
-		rollbackErr := tx.Rollback()
-		if rollbackErr != nil {
-			return fmt.Errorf("write to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
-		}
-		return fmt.Errorf("write to database failed: %s", execErr)
-	}
-	execErr = tx.Commit()
-	if execErr != nil {
-		rollbackErr := tx.Rollback()
-		if rollbackErr != nil {
-			return fmt.Errorf("commit to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
-		}
-		return fmt.Errorf("commit to database failed and the transactions was rolled back: %s", execErr)
-	}
-	return nil
+	return db.postgresql.DBWriteResource(ctx, k8sObj, data)
 }

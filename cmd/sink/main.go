@@ -38,14 +38,14 @@ const (
 )
 
 type Sink struct {
-	Db          database.DBInterface
+	Db          database.DatabaseInterface
 	EventClient ceClient.Client
 	Filters     *filters.Filters
 	K8sClient   *dynamic.DynamicClient
 	Logger      *log.Logger
 }
 
-func NewSink(db database.DBInterface, logger *log.Logger, filters *filters.Filters) *Sink {
+func NewSink(db database.DatabaseInterface, logger *log.Logger, filters *filters.Filters) *Sink {
 	if logger == nil {
 		logger = log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds|log.LUTC)
 		logger.Println("Sink was provided a nil logger, falling back to default logger")

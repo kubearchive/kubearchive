@@ -22,7 +22,7 @@ var testResources = fake.CreateTestResources()
 var nonCoreResources = testResources[:1]
 var coreResources = testResources[1:2]
 
-func setupRouter(db database.DBInterface, core bool) *gin.Engine {
+func setupRouter(db database.DatabaseInterface, core bool) *gin.Engine {
 	router := gin.Default()
 	ctrl := Controller{Database: db}
 	router.Use(func(c *gin.Context) {

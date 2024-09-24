@@ -34,16 +34,18 @@ type DBInterface interface {
 }
 
 type Database struct {
-	db                *sql.DB
-	resourceTableName string
+	db   *sql.DB
+	info DatabaseInfo
 }
 
-func NewDatabase() (*Database, error) {
-	dataSource, err := ConnectionStr()
+func NewDatabase() (DBInterface, error) {
+	env, err := getDatabaseEnvironmentVars()
 	if err != nil {
 		return nil, err
 	}
 	var db *sql.DB
+	dbInfo := NewDatabaseInfo(env)
+
 	configs := []retry.Option{
 		retry.Attempts(10),
 		retry.OnRetry(func(n uint, err error) {
@@ -54,7 +56,7 @@ func NewDatabase() (*Database, error) {
 
 	errRetry := retry.Do(
 		func() error {
-			db, err = otelsql.Open("postgres", dataSource)
+			db, err = otelsql.Open(dbInfo.driver, dbInfo.connectionString)
 			if err != nil {
 				return err
 			}
@@ -65,7 +67,12 @@ func NewDatabase() (*Database, error) {
 		return nil, errRetry
 	}
 	log.Println("Successfully connected to the database")
-	return &Database{db, resourceTableName}, nil
+
+	if env[DbKindEnvVar] == "mysql" {
+		return MySQLDatabase{&Database{db, *dbInfo}}, nil
+	} else {
+		return PostgreSQLDatabase{&Database{db, *dbInfo}}, nil
+	}
 }
 
 func (db *Database) Ping(ctx context.Context) error {
@@ -73,24 +80,24 @@ func (db *Database) Ping(ctx context.Context) error {
 }
 
 func (db *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(resourcesQuery, db.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(resourcesQuery, db.info.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return db.performResourceQuery(ctx, query, kind, apiVersion)
 }
 
 func (db *Database) QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(resourcesQuery, db.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(resourcesQuery, db.info.resourceTableName) //nolint:gosec
 	return db.performResourceQuery(ctx, query, kind, version)
 }
 
 func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(namespacedResourcesQuery, db.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(namespacedResourcesQuery, db.info.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return db.performResourceQuery(ctx, query, kind, apiVersion, namespace)
 }
 
 func (db *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(namespacedResourcesQuery, db.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(namespacedResourcesQuery, db.info.resourceTableName) //nolint:gosec
 	return db.performResourceQuery(ctx, query, kind, version, namespace)
 }
 
@@ -122,40 +129,4 @@ func (db *Database) performResourceQuery(ctx context.Context, query string, args
 		resources = append(resources, r)
 	}
 	return resources, err
-}
-
-func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
-	query := fmt.Sprintf(writeResource, db.resourceTableName)
-	tx, err := db.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)
-	}
-	_, execErr := tx.ExecContext(
-		ctx,
-		query,
-		k8sObj.GetUID(),
-		k8sObj.GetAPIVersion(),
-		k8sObj.GetKind(),
-		k8sObj.GetName(),
-		k8sObj.GetNamespace(),
-		k8sObj.GetResourceVersion(),
-		models.OptionalTimestamp(k8sObj.GetDeletionTimestamp()),
-		data,
-	)
-	if execErr != nil {
-		rollbackErr := tx.Rollback()
-		if rollbackErr != nil {
-			return fmt.Errorf("write to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
-		}
-		return fmt.Errorf("write to database failed: %s", execErr)
-	}
-	execErr = tx.Commit()
-	if execErr != nil {
-		rollbackErr := tx.Rollback()
-		if rollbackErr != nil {
-			return fmt.Errorf("commit to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
-		}
-		return fmt.Errorf("commit to database failed and the transactions was rolled back: %s", execErr)
-	}
-	return nil
 }

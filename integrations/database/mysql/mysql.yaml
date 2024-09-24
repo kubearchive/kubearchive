@@ -1,0 +1,8 @@
+---
+apiVersion: mysql.oracle.com/v2
+kind: InnoDBCluster
+metadata:
+  name: kubearchive
+spec:
+  secretName: root-secret
+  tlsUseSelfSigned: true

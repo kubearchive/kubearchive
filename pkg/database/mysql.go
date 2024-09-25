@@ -28,14 +28,11 @@ var mysqlStmts = &SQLStatements{
 }
 
 func NewMySQLDatabase(env *databaseEnvironment) (*MySQLDatabase, error) {
-	connData := connectionData{driver: "mysql",
-		connectionString: fmt.Sprintf(mysqlConnectionString, env.user, env.password, env.host, env.port, env.name),
-	}
-	conn, err := connData.establishConnection()
+	conn, err := establishConnection("mysql",
+		fmt.Sprintf(mysqlConnectionString, env.user, env.password, env.host, env.port, env.name))
 	if err != nil {
 		return nil, err
 	}
-
 	return &MySQLDatabase{&Database{conn, *mysqlStmts}}, nil
 }
 

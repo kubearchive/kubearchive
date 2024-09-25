@@ -28,10 +28,8 @@ type PostgreSQLDatabase struct {
 }
 
 func NewPostgreSQLDatabase(env *databaseEnvironment) (*PostgreSQLDatabase, error) {
-	connData := connectionData{driver: "postgres",
-		connectionString: fmt.Sprintf(postgreSQLConnectionString, env.user, env.password, env.host, env.port, env.name),
-	}
-	conn, err := connData.establishConnection()
+	conn, err := establishConnection("postgres",
+		fmt.Sprintf(postgreSQLConnectionString, env.user, env.password, env.host, env.port, env.name))
 	if err != nil {
 		return nil, err
 	}

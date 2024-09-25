@@ -12,12 +12,7 @@ import (
 	"github.com/avast/retry-go/v4"
 )
 
-type connectionData struct {
-	driver           string
-	connectionString string
-}
-
-func (dbi *connectionData) establishConnection() (*sql.DB, error) {
+func establishConnection(driver, connectionString string) (*sql.DB, error) {
 	configs := []retry.Option{
 		retry.Attempts(10),
 		retry.OnRetry(func(n uint, err error) {
@@ -28,7 +23,7 @@ func (dbi *connectionData) establishConnection() (*sql.DB, error) {
 	var conn *sql.DB
 	errRetry := retry.Do(
 		func() error {
-			conn, err := otelsql.Open(dbi.driver, dbi.connectionString)
+			conn, err := otelsql.Open(driver, connectionString)
 			if err != nil {
 				return err
 			}

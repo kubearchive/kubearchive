@@ -15,6 +15,7 @@ import (
 	"github.com/XSAM/otelsql"
 	"github.com/avast/retry-go/v4"
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -40,24 +41,10 @@ type DatabaseInterface interface {
 	Ping(ctx context.Context) error
 }
 
-type Database struct {
-	db         *sql.DB
-	info       *DatabaseInfo
-	postgresql *PostgreSQLDatabase
-	mysql      *MySQLDatabase
-}
-
 func NewDatabase() (DatabaseInterface, error) {
 	env, err := getDatabaseEnvironmentVars()
 	if err != nil {
 		return nil, err
-	}
-
-	database := &Database{info: NewDatabaseInfo(env)}
-	if env[DbKindEnvVar] == "mysql" {
-		database.mysql = &MySQLDatabase{BaseDatabase: &BaseDatabase{info: database.info}}
-	} else {
-		database.postgresql = &PostgreSQLDatabase{BaseDatabase: &BaseDatabase{info: database.info}}
 	}
 
 	configs := []retry.Option{
@@ -69,13 +56,14 @@ func NewDatabase() (DatabaseInterface, error) {
 	}
 
 	driverName, connectionString := getConnectionString(env)
+	var db *sql.DB
 	errRetry := retry.Do(
 		func() error {
-			database.db, err = otelsql.Open(driverName, connectionString)
+			db, err = otelsql.Open(driverName, connectionString)
 			if err != nil {
 				return err
 			}
-			return database.db.Ping()
+			return db.Ping()
 		},
 		configs...)
 	if errRetry != nil {
@@ -84,53 +72,10 @@ func NewDatabase() (DatabaseInterface, error) {
 	log.Println("Successfully connected to the database")
 
 	if env[DbKindEnvVar] == "mysql" {
-		database.mysql.db = database.db
+		return newMySQLDatabase(db), nil
 	} else {
-		database.postgresql.db = database.db
+		return newPostgreSQLDatabase(db), nil
 	}
-	return database, nil
-}
-
-func (db *Database) Ping(ctx context.Context) error {
-	if db.mysql != nil {
-		return db.mysql.DBPing(ctx)
-	}
-	return db.postgresql.DBPing(ctx)
-}
-
-func (db *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
-	if db.mysql != nil {
-		return db.mysql.DBQueryResources(ctx, kind, group, version)
-	}
-	return db.postgresql.DBQueryResources(ctx, kind, group, version)
-}
-
-func (db *Database) QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error) {
-	if db.mysql != nil {
-		return db.mysql.DBQueryCoreResources(ctx, kind, version)
-	}
-	return db.postgresql.DBQueryCoreResources(ctx, kind, version)
-}
-
-func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
-	if db.mysql != nil {
-		return db.mysql.DBQueryNamespacedResources(ctx, kind, group, version, namespace)
-	}
-	return db.postgresql.DBQueryNamespacedResources(ctx, kind, group, version, namespace)
-}
-
-func (db *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
-	if db.mysql != nil {
-		return db.mysql.DBQueryNamespacedCoreResources(ctx, kind, version, namespace)
-	}
-	return db.postgresql.DBQueryNamespacedCoreResources(ctx, kind, version, namespace)
-}
-
-func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
-	if db.mysql != nil {
-		return db.mysql.DBWriteResource(ctx, k8sObj, data)
-	}
-	return db.postgresql.DBWriteResource(ctx, k8sObj, data)
 }
 
 // Reads database connection info from the environment variables and returns a map of variable name to value.

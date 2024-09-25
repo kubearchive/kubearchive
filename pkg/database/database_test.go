@@ -26,16 +26,16 @@ const (
 )
 
 var tests = []struct {
-	name string
-	db   *Database
+	name   string
+	dbKind string
 }{
 	{
-		name: "postgresql",
-		db:   &Database{info: PostgreSQLDatabaseInfo, mysql: nil, postgresql: &PostgreSQLDatabase{&BaseDatabase{info: PostgreSQLDatabaseInfo}}},
+		name:   "postgresql",
+		dbKind: "postgresql",
 	},
 	{
-		name: "mysql",
-		db:   &Database{info: MySQLDatabaseInfo, mysql: &MySQLDatabase{&BaseDatabase{info: MySQLDatabaseInfo}}, postgresql: nil},
+		name:   "mysql",
+		dbKind: "mysql",
 	},
 }
 
@@ -52,7 +52,7 @@ func TestQueryResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
-			setupDatabase(tt.db, db)
+			dbImpl := setupDatabase(tt.dbKind, db)
 
 			rows := sqlmock.NewRows([]string{"data"}).
 				AddRow(json.RawMessage(testCronJobResource))
@@ -62,7 +62,7 @@ func TestQueryResources(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 			defer cancel()
 
-			resources, err := tt.db.QueryResources(ctx, kind, group, version)
+			resources, err := dbImpl.QueryResources(ctx, kind, group, version)
 			assert.NotNil(t, resources)
 			assert.NotEqual(t, 0, len(resources))
 			assert.NoError(t, err)
@@ -74,7 +74,7 @@ func TestQueryNamespacedResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
-			setupDatabase(tt.db, db)
+			dbImpl := setupDatabase(tt.dbKind, db)
 
 			rows := sqlmock.NewRows([]string{"data"}).
 				AddRow(json.RawMessage(testCronJobResource))
@@ -84,7 +84,7 @@ func TestQueryNamespacedResources(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 			defer cancel()
 
-			resources, err := tt.db.QueryNamespacedResources(ctx, kind, group, version, namespace)
+			resources, err := dbImpl.QueryNamespacedResources(ctx, kind, group, version, namespace)
 			assert.NotNil(t, resources)
 			assert.NotEqual(t, 0, len(resources))
 			assert.NoError(t, err)
@@ -96,7 +96,7 @@ func TestCoreQueryResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
-			setupDatabase(tt.db, db)
+			dbImpl := setupDatabase(tt.dbKind, db)
 
 			rows := sqlmock.NewRows([]string{"data"}).
 				AddRow(json.RawMessage(testPodResource))
@@ -106,7 +106,7 @@ func TestCoreQueryResources(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 			defer cancel()
 
-			resources, err := tt.db.QueryCoreResources(ctx, kind, version)
+			resources, err := dbImpl.QueryCoreResources(ctx, kind, version)
 			assert.NotNil(t, resources)
 			assert.NotEqual(t, 0, len(resources))
 			assert.NoError(t, err)
@@ -118,7 +118,7 @@ func TestQueryNamespacedCoreResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
-			setupDatabase(tt.db, db)
+			dbImpl := setupDatabase(tt.dbKind, db)
 
 			rows := sqlmock.NewRows([]string{"data"}).
 				AddRow(json.RawMessage(testPodResource))
@@ -128,7 +128,7 @@ func TestQueryNamespacedCoreResources(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 			defer cancel()
 
-			resources, err := tt.db.QueryNamespacedCoreResources(ctx, kind, version, namespace)
+			resources, err := dbImpl.QueryNamespacedCoreResources(ctx, kind, version, namespace)
 			assert.NotNil(t, resources)
 			assert.NotEqual(t, 0, len(resources))
 			assert.NoError(t, err)
@@ -140,21 +140,18 @@ func TestPing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
-			setupDatabase(tt.db, db)
+			dbImpl := setupDatabase(tt.dbKind, db)
 			mock.ExpectPing()
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 			defer cancel()
-			assert.Nil(t, tt.db.Ping(ctx))
+			assert.Nil(t, dbImpl.Ping(ctx))
 		})
 	}
 }
 
-func setupDatabase(database *Database, db *sql.DB) {
-	database.db = db
-	if database.postgresql != nil {
-		database.postgresql.db = db
-	} else {
-		database.mysql.db = db
+func setupDatabase(dbKind string, db *sql.DB) DatabaseInterface {
+	if dbKind == "mysql" {
+		return newMySQLDatabase(db)
 	}
-
+	return newPostgreSQLDatabase(db)
 }

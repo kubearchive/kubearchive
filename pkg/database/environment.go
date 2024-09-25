@@ -32,12 +32,12 @@ type databaseEnvironment struct {
 func newDatabaseEnvironment() (*databaseEnvironment, error) {
 	var err error
 
-	kind := getEnv(DbKindEnvVar, err)
-	name := getEnv(DbNameEnvVar, err)
-	user := getEnv(DbUserEnvVar, err)
-	password := getEnv(DbPasswordEnvVar, err)
-	host := getEnv(DbHostEnvVar, err)
-	port := getEnv(DbPortEnvVar, err)
+	kind := getEnv(DbKindEnvVar, &err)
+	name := getEnv(DbNameEnvVar, &err)
+	user := getEnv(DbUserEnvVar, &err)
+	password := getEnv(DbPasswordEnvVar, &err)
+	host := getEnv(DbHostEnvVar, &err)
+	port := getEnv(DbPortEnvVar, &err)
 
 	if err == nil {
 		return &databaseEnvironment{kind, name, user, password, host, port}, nil
@@ -46,10 +46,10 @@ func newDatabaseEnvironment() (*databaseEnvironment, error) {
 	}
 }
 
-func getEnv(key string, err error) string {
+func getEnv(key string, err *error) string {
 	value, exists := os.LookupEnv(key)
 	if !exists {
-		err = errors.Join(err, fmt.Errorf(dbConnectionErrStr, key))
+		*err = errors.Join(*err, fmt.Errorf(dbConnectionErrStr, key))
 	}
 	return value
 }

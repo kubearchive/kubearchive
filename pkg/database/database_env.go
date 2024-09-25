@@ -20,7 +20,7 @@ const (
 	DbPortEnvVar     string = "DATABASE_PORT"
 )
 
-type DatabaseEnvironment struct {
+type databaseEnvironment struct {
 	kind     string
 	name     string
 	user     string
@@ -29,7 +29,7 @@ type DatabaseEnvironment struct {
 	port     string
 }
 
-func NewDatabaseEnvironment() (*DatabaseEnvironment, error) {
+func newDatabaseEnvironment() (*databaseEnvironment, error) {
 	var err error
 
 	kind := getEnv(DbKindEnvVar, err)
@@ -40,7 +40,7 @@ func NewDatabaseEnvironment() (*DatabaseEnvironment, error) {
 	port := getEnv(DbPortEnvVar, err)
 
 	if err == nil {
-		return &DatabaseEnvironment{kind, name, user, password, host, port}, nil
+		return &databaseEnvironment{kind, name, user, password, host, port}, nil
 	} else {
 		return nil, err
 	}

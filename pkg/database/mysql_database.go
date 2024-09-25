@@ -5,7 +5,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -13,14 +12,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+const mysqlConnectionString = "%s:%s@tcp(%s:%s)/%s"
+
 type MySQLDatabase struct {
 	*Database
 }
 
-var MySQLDatabaseInfo = &DatabaseInfo{
-	driver:                   "mysql",
-	connectionString:         "%s:%s@tcp(%s:%s)/%s",
-	connectionErrorString:    dbConnectionErrStr,
+var mysqlQueries = &queryData{
 	resourceTableName:        "resource",
 	resourcesQuery:           "SELECT data FROM %s WHERE kind=? AND api_version=?",
 	namespacedResourcesQuery: "SELECT data FROM %s WHERE kind=? AND api_version=? AND namespace=?",
@@ -29,14 +27,20 @@ var MySQLDatabaseInfo = &DatabaseInfo{
 		"ON DUPLICATE KEY UPDATE name=?, namespace=?, resource_version=?, cluster_deleted_ts=?, data=?",
 }
 
-func NewMySQLDatabase(env *DatabaseEnvironment) MySQLDatabase {
-	MySQLDatabaseInfo.applyEnv(env)
-	var db *sql.DB
-	return MySQLDatabase{&Database{db, *MySQLDatabaseInfo}}
+func NewMySQLDatabase(env *databaseEnvironment) (*MySQLDatabase, error) {
+	connData := connectionData{driver: "mysql",
+		connectionString: fmt.Sprintf(mysqlConnectionString, env.user, env.password, env.host, env.port, env.name),
+	}
+	conn, err := connData.establishConnection()
+	if err != nil {
+		return nil, err
+	}
+
+	return &MySQLDatabase{&Database{conn, *mysqlQueries}}, nil
 }
 
 func (db MySQLDatabase) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
-	query := fmt.Sprintf(db.info.writeResourceSQL, db.info.resourceTableName)
+	query := fmt.Sprintf(db.queryData.writeResourceSQL, db.queryData.resourceTableName)
 	tx, err := db.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)

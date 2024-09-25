@@ -5,7 +5,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -13,10 +12,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-var PostgreSQLDatabaseInfo = &DatabaseInfo{
-	driver:                   "postgres",
-	connectionString:         "user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
-	connectionErrorString:    dbConnectionErrStr,
+const postgreSQLConnectionString = "user=%s password=%s dbname=%s host=%s port=%s sslmode=disable"
+
+var postgreSQLQueries = &queryData{
 	resourceTableName:        "resource",
 	resourcesQuery:           "SELECT data FROM %s WHERE kind=$1 AND api_version=$2",
 	namespacedResourcesQuery: "SELECT data FROM %s WHERE kind=$1 AND api_version=$2 AND namespace=$3",
@@ -29,14 +27,19 @@ type PostgreSQLDatabase struct {
 	*Database
 }
 
-func NewPostgreSQLDatabase(env *DatabaseEnvironment) PostgreSQLDatabase {
-	PostgreSQLDatabaseInfo.applyEnv(env)
-	var db *sql.DB
-	return PostgreSQLDatabase{&Database{db, *PostgreSQLDatabaseInfo}}
+func NewPostgreSQLDatabase(env *databaseEnvironment) (*PostgreSQLDatabase, error) {
+	connData := connectionData{driver: "postgres",
+		connectionString: fmt.Sprintf(postgreSQLConnectionString, env.user, env.password, env.host, env.port, env.name),
+	}
+	conn, err := connData.establishConnection()
+	if err != nil {
+		return nil, err
+	}
+	return &PostgreSQLDatabase{&Database{conn, *postgreSQLQueries}}, nil
 }
 
 func (db PostgreSQLDatabase) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
-	query := fmt.Sprintf(db.info.writeResourceSQL, db.info.resourceTableName)
+	query := fmt.Sprintf(db.queryData.writeResourceSQL, db.queryData.resourceTableName)
 	tx, err := db.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)

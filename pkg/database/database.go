@@ -7,29 +7,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
-	"time"
 
-	"github.com/XSAM/otelsql"
-	"github.com/avast/retry-go/v4"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	_ "github.com/lib/pq"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type DatabaseInfo struct {
-	driver                   string
-	connectionString         string
-	connectionErrorString    string
+type queryData struct {
 	resourceTableName        string
 	resourcesQuery           string
 	namespacedResourcesQuery string
 	writeResourceSQL         string
-}
-
-func (dbi *DatabaseInfo) applyEnv(env *DatabaseEnvironment) {
-	dbi.connectionString = fmt.Sprintf(dbi.connectionString,
-		env.user, env.password, env.name, env.host, env.port, env.host, env.port)
 }
 
 type DBInterface interface {
@@ -39,56 +27,23 @@ type DBInterface interface {
 	QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error)
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
 	Ping(ctx context.Context) error
-	EstablishConnection() error
 }
 
 type Database struct {
-	db   *sql.DB
-	info DatabaseInfo
+	db        *sql.DB
+	queryData queryData
 }
 
 func NewDatabase() (DBInterface, error) {
-	env, err := NewDatabaseEnvironment()
+	env, err := newDatabaseEnvironment()
 	if err != nil {
 		return nil, err
 	}
-	var database DBInterface
 	if env.kind == "mysql" {
-		database = NewMySQLDatabase(env)
+		return NewMySQLDatabase(env)
 	} else {
-		database = NewPostgreSQLDatabase(env)
+		return NewPostgreSQLDatabase(env)
 	}
-	err = database.EstablishConnection()
-	if err != nil {
-		return nil, err
-	}
-	return database, nil
-}
-
-func (db *Database) EstablishConnection() error {
-	configs := []retry.Option{
-		retry.Attempts(10),
-		retry.OnRetry(func(n uint, err error) {
-			log.Printf("Retry request %d, get error: %v", n+1, err)
-		}),
-		retry.Delay(time.Second),
-	}
-	var conn *sql.DB
-	errRetry := retry.Do(
-		func() error {
-			conn, err := otelsql.Open(db.info.driver, db.info.connectionString)
-			if err != nil {
-				return err
-			}
-			return conn.Ping()
-		},
-		configs...)
-	if errRetry != nil {
-		return errRetry
-	}
-	log.Println("Successfully connected to the database")
-	db.db = conn
-	return nil
 }
 
 func (db *Database) Ping(ctx context.Context) error {
@@ -96,24 +51,24 @@ func (db *Database) Ping(ctx context.Context) error {
 }
 
 func (db *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(db.info.resourcesQuery, db.info.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.queryData.resourcesQuery, db.queryData.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return db.performResourceQuery(ctx, query, kind, apiVersion)
 }
 
 func (db *Database) QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(db.info.resourcesQuery, db.info.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.queryData.resourcesQuery, db.queryData.resourceTableName) //nolint:gosec
 	return db.performResourceQuery(ctx, query, kind, version)
 }
 
 func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(db.info.namespacedResourcesQuery, db.info.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.queryData.namespacedResourcesQuery, db.queryData.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return db.performResourceQuery(ctx, query, kind, apiVersion, namespace)
 }
 
 func (db *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(db.info.namespacedResourcesQuery, db.info.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.queryData.namespacedResourcesQuery, db.queryData.resourceTableName) //nolint:gosec
 	return db.performResourceQuery(ctx, query, kind, version, namespace)
 }
 

@@ -3,28 +3,8 @@
 
 package database
 
-import (
-	"errors"
-	"fmt"
-	"os"
-)
-
-const (
-	dbConnectionErrStr string = "Could not create database connection string: %s must be set"
-
-	DbKindEnvVar     string = "DATABASE_KIND"
-	DbNameEnvVar     string = "DATABASE_DB"
-	DbUserEnvVar     string = "DATABASE_USER"
-	DbPasswordEnvVar string = "DATABASE_PASSWORD" // #nosec G101 not a password
-	DbHostEnvVar     string = "DATABASE_URL"
-	DbPortEnvVar     string = "DATABASE_PORT"
-)
-
-var DbEnvVars = [...]string{DbKindEnvVar, DbNameEnvVar, DbUserEnvVar, DbPasswordEnvVar, DbHostEnvVar, DbPortEnvVar}
-
 type DatabaseInfo struct {
 	driver                   string
-	connectionString         string
 	connectionErrorString    string
 	resourceTableName        string
 	resourcesQuery           string
@@ -34,7 +14,6 @@ type DatabaseInfo struct {
 
 var PostgreSQLDatabaseInfo = &DatabaseInfo{
 	driver:                   "postgres",
-	connectionString:         "user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
 	connectionErrorString:    dbConnectionErrStr,
 	resourceTableName:        "resource",
 	resourcesQuery:           "SELECT data FROM %s WHERE kind=$1 AND api_version=$2",
@@ -46,7 +25,6 @@ var PostgreSQLDatabaseInfo = &DatabaseInfo{
 
 var MySQLDatabaseInfo = &DatabaseInfo{
 	driver:                   "mysql",
-	connectionString:         "%s:%s@tcp(%s:%s)/%s",
 	connectionErrorString:    dbConnectionErrStr,
 	resourceTableName:        "resource",
 	resourcesQuery:           "SELECT data FROM %s WHERE kind=? AND api_version=?",
@@ -58,33 +36,9 @@ var MySQLDatabaseInfo = &DatabaseInfo{
 
 func NewDatabaseInfo(env map[string]string) *DatabaseInfo {
 	if env[DbKindEnvVar] == "mysql" {
-		MySQLDatabaseInfo.connectionString = fmt.Sprintf(MySQLDatabaseInfo.connectionString, env[DbUserEnvVar],
-			env[DbPasswordEnvVar], env[DbHostEnvVar], env[DbPortEnvVar], env[DbNameEnvVar])
 		return MySQLDatabaseInfo
 	}
 
 	// Default is postgresql
-	PostgreSQLDatabaseInfo.connectionString = fmt.Sprintf(PostgreSQLDatabaseInfo.connectionString, env[DbUserEnvVar],
-		env[DbPasswordEnvVar], env[DbNameEnvVar], env[DbHostEnvVar], env[DbPortEnvVar])
 	return PostgreSQLDatabaseInfo
-}
-
-// Reads database connection info from the environment variables and returns a map of variable name to value.
-func getDatabaseEnvironmentVars() (map[string]string, error) {
-	var err error
-	env := make(map[string]string)
-	for _, name := range DbEnvVars {
-		value, exists := os.LookupEnv(name)
-		if exists {
-			env[name] = value
-		} else {
-			err = errors.Join(err, fmt.Errorf(dbConnectionErrStr, name))
-		}
-	}
-	if err == nil {
-		return env, nil
-	} else {
-		return nil, err
-	}
-
 }

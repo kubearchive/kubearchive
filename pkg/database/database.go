@@ -6,7 +6,10 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/XSAM/otelsql"
@@ -14,6 +17,19 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+const (
+	dbConnectionErrStr string = "Could not create database connection string: %s must be set"
+
+	DbKindEnvVar     string = "DATABASE_KIND"
+	DbNameEnvVar     string = "DATABASE_DB"
+	DbUserEnvVar     string = "DATABASE_USER"
+	DbPasswordEnvVar string = "DATABASE_PASSWORD" // #nosec G101 not a password
+	DbHostEnvVar     string = "DATABASE_URL"
+	DbPortEnvVar     string = "DATABASE_PORT"
+)
+
+var DbEnvVars = [...]string{DbKindEnvVar, DbNameEnvVar, DbUserEnvVar, DbPasswordEnvVar, DbHostEnvVar, DbPortEnvVar}
 
 type DatabaseInterface interface {
 	QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error)
@@ -31,7 +47,7 @@ type Database struct {
 	mysql      *MySQLDatabase
 }
 
-func NewDatabase() (*Database, error) {
+func NewDatabase() (DatabaseInterface, error) {
 	env, err := getDatabaseEnvironmentVars()
 	if err != nil {
 		return nil, err
@@ -52,9 +68,10 @@ func NewDatabase() (*Database, error) {
 		retry.Delay(time.Second),
 	}
 
+	driverName, connectionString := getConnectionString(env)
 	errRetry := retry.Do(
 		func() error {
-			database.db, err = otelsql.Open(database.info.driver, database.info.connectionString)
+			database.db, err = otelsql.Open(driverName, connectionString)
 			if err != nil {
 				return err
 			}
@@ -114,4 +131,46 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 		return db.mysql.DBWriteResource(ctx, k8sObj, data)
 	}
 	return db.postgresql.DBWriteResource(ctx, k8sObj, data)
+}
+
+// Reads database connection info from the environment variables and returns a map of variable name to value.
+func getDatabaseEnvironmentVars() (map[string]string, error) {
+	var err error
+	env := make(map[string]string)
+	for _, name := range DbEnvVars {
+		value, exists := os.LookupEnv(name)
+		if exists {
+			env[name] = value
+		} else {
+			err = errors.Join(err, fmt.Errorf(dbConnectionErrStr, name))
+		}
+	}
+	if err == nil {
+		return env, nil
+	} else {
+		return nil, err
+	}
+
+}
+
+func getConnectionString(env map[string]string) (string, string) {
+	if env[DbKindEnvVar] == "mysql" {
+		return "mysql", fmt.Sprintf(
+			"%s:%s@tcp(%s:%s)/%s",
+			env[DbUserEnvVar],
+			env[DbPasswordEnvVar],
+			env[DbHostEnvVar],
+			env[DbPortEnvVar],
+			env[DbNameEnvVar],
+		)
+	}
+
+	return "postgres", fmt.Sprintf(
+		"user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
+		env[DbUserEnvVar],
+		env[DbPasswordEnvVar],
+		env[DbNameEnvVar],
+		env[DbHostEnvVar],
+		env[DbPortEnvVar],
+	)
 }

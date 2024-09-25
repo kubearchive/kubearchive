@@ -16,6 +16,30 @@ type MySQLDatabase struct {
 	*BaseDatabase
 }
 
+func (db *MySQLDatabase) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (db *MySQLDatabase) QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (db *MySQLDatabase) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (db *MySQLDatabase) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (db *MySQLDatabase) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
+	return nil
+}
+
+func (db *MySQLDatabase) Ping(ctx context.Context) error {
+	return nil
+}
+
 func (db *MySQLDatabase) DBWriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
 	query := fmt.Sprintf(db.info.writeResourceSQL, db.info.resourceTableName)
 	tx, err := db.db.BeginTx(ctx, nil)

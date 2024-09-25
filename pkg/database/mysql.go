@@ -18,7 +18,7 @@ type MySQLDatabase struct {
 	*Database
 }
 
-var mysqlQueries = &queryData{
+var mysqlStmts = &SQLStatements{
 	resourceTableName:        "resource",
 	resourcesQuery:           "SELECT data FROM %s WHERE kind=? AND api_version=?",
 	namespacedResourcesQuery: "SELECT data FROM %s WHERE kind=? AND api_version=? AND namespace=?",
@@ -36,11 +36,11 @@ func NewMySQLDatabase(env *databaseEnvironment) (*MySQLDatabase, error) {
 		return nil, err
 	}
 
-	return &MySQLDatabase{&Database{conn, *mysqlQueries}}, nil
+	return &MySQLDatabase{&Database{conn, *mysqlStmts}}, nil
 }
 
 func (db MySQLDatabase) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
-	query := fmt.Sprintf(db.queryData.writeResourceSQL, db.queryData.resourceTableName)
+	query := fmt.Sprintf(db.sqlStmts.writeResourceSQL, db.sqlStmts.resourceTableName)
 	tx, err := db.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)

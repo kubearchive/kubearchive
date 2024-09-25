@@ -14,7 +14,7 @@ import (
 
 const postgreSQLConnectionString = "user=%s password=%s dbname=%s host=%s port=%s sslmode=disable"
 
-var postgreSQLQueries = &queryData{
+var postgresqlStmts = &SQLStatements{
 	resourceTableName:        "resource",
 	resourcesQuery:           "SELECT data FROM %s WHERE kind=$1 AND api_version=$2",
 	namespacedResourcesQuery: "SELECT data FROM %s WHERE kind=$1 AND api_version=$2 AND namespace=$3",
@@ -35,11 +35,11 @@ func NewPostgreSQLDatabase(env *databaseEnvironment) (*PostgreSQLDatabase, error
 	if err != nil {
 		return nil, err
 	}
-	return &PostgreSQLDatabase{&Database{conn, *postgreSQLQueries}}, nil
+	return &PostgreSQLDatabase{&Database{conn, *postgresqlStmts}}, nil
 }
 
 func (db PostgreSQLDatabase) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
-	query := fmt.Sprintf(db.queryData.writeResourceSQL, db.queryData.resourceTableName)
+	query := fmt.Sprintf(db.sqlStmts.writeResourceSQL, db.sqlStmts.resourceTableName)
 	tx, err := db.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)

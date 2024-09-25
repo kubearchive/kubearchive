@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type queryData struct {
+type SQLStatements struct {
 	resourceTableName        string
 	resourcesQuery           string
 	namespacedResourcesQuery string
@@ -30,8 +30,8 @@ type DBInterface interface {
 }
 
 type Database struct {
-	db        *sql.DB
-	queryData queryData
+	db       *sql.DB
+	sqlStmts SQLStatements
 }
 
 func NewDatabase() (DBInterface, error) {
@@ -51,24 +51,24 @@ func (db *Database) Ping(ctx context.Context) error {
 }
 
 func (db *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(db.queryData.resourcesQuery, db.queryData.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.sqlStmts.resourcesQuery, db.sqlStmts.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return db.performResourceQuery(ctx, query, kind, apiVersion)
 }
 
 func (db *Database) QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(db.queryData.resourcesQuery, db.queryData.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.sqlStmts.resourcesQuery, db.sqlStmts.resourceTableName) //nolint:gosec
 	return db.performResourceQuery(ctx, query, kind, version)
 }
 
 func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(db.queryData.namespacedResourcesQuery, db.queryData.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.sqlStmts.namespacedResourcesQuery, db.sqlStmts.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return db.performResourceQuery(ctx, query, kind, apiVersion, namespace)
 }
 
 func (db *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(db.queryData.namespacedResourcesQuery, db.queryData.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.sqlStmts.namespacedResourcesQuery, db.sqlStmts.resourceTableName) //nolint:gosec
 	return db.performResourceQuery(ctx, query, kind, version, namespace)
 }
 

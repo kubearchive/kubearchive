@@ -17,12 +17,20 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-const (
-	resourceTableName        = "resource"
-	resourcesQuery           = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2"
-	namespacedResourcesQuery = "SELECT data FROM %s WHERE kind=$1 AND api_version=$2 AND namespace=$3"
-	writeResource            = `INSERT INTO %s (uuid, api_version, kind, name, namespace, resource_version, cluster_deleted_ts, data) Values ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT(uuid) DO UPDATE SET name=$4, namespace=$5, resource_version=$6, cluster_deleted_ts=$7, data=$8`
-)
+type DatabaseInfo struct {
+	driver                   string
+	connectionString         string
+	connectionErrorString    string
+	resourceTableName        string
+	resourcesQuery           string
+	namespacedResourcesQuery string
+	writeResourceSQL         string
+}
+
+func (dbi *DatabaseInfo) applyEnv(env *DatabaseEnvironment) {
+	dbi.connectionString = fmt.Sprintf(dbi.connectionString,
+		env.user, env.password, env.name, env.host, env.port, env.host, env.port)
+}
 
 type DBInterface interface {
 	QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error)
@@ -31,6 +39,7 @@ type DBInterface interface {
 	QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error)
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
 	Ping(ctx context.Context) error
+	EstablishConnection() error
 }
 
 type Database struct {
@@ -39,13 +48,24 @@ type Database struct {
 }
 
 func NewDatabase() (DBInterface, error) {
-	env, err := getDatabaseEnvironmentVars()
+	env, err := NewDatabaseEnvironment()
 	if err != nil {
 		return nil, err
 	}
-	var db *sql.DB
-	dbInfo := NewDatabaseInfo(env)
+	var database DBInterface
+	if env.kind == "mysql" {
+		database = NewMySQLDatabase(env)
+	} else {
+		database = NewPostgreSQLDatabase(env)
+	}
+	err = database.EstablishConnection()
+	if err != nil {
+		return nil, err
+	}
+	return database, nil
+}
 
+func (db *Database) EstablishConnection() error {
 	configs := []retry.Option{
 		retry.Attempts(10),
 		retry.OnRetry(func(n uint, err error) {
@@ -53,26 +73,22 @@ func NewDatabase() (DBInterface, error) {
 		}),
 		retry.Delay(time.Second),
 	}
-
+	var conn *sql.DB
 	errRetry := retry.Do(
 		func() error {
-			db, err = otelsql.Open(dbInfo.driver, dbInfo.connectionString)
+			conn, err := otelsql.Open(db.info.driver, db.info.connectionString)
 			if err != nil {
 				return err
 			}
-			return db.Ping()
+			return conn.Ping()
 		},
 		configs...)
 	if errRetry != nil {
-		return nil, errRetry
+		return errRetry
 	}
 	log.Println("Successfully connected to the database")
-
-	if env[DbKindEnvVar] == "mysql" {
-		return MySQLDatabase{&Database{db, *dbInfo}}, nil
-	} else {
-		return PostgreSQLDatabase{&Database{db, *dbInfo}}, nil
-	}
+	db.db = conn
+	return nil
 }
 
 func (db *Database) Ping(ctx context.Context) error {
@@ -80,24 +96,24 @@ func (db *Database) Ping(ctx context.Context) error {
 }
 
 func (db *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(resourcesQuery, db.info.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.info.resourcesQuery, db.info.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return db.performResourceQuery(ctx, query, kind, apiVersion)
 }
 
 func (db *Database) QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(resourcesQuery, db.info.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.info.resourcesQuery, db.info.resourceTableName) //nolint:gosec
 	return db.performResourceQuery(ctx, query, kind, version)
 }
 
 func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(namespacedResourcesQuery, db.info.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.info.namespacedResourcesQuery, db.info.resourceTableName) //nolint:gosec
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	return db.performResourceQuery(ctx, query, kind, apiVersion, namespace)
 }
 
 func (db *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
-	query := fmt.Sprintf(namespacedResourcesQuery, db.info.resourceTableName) //nolint:gosec
+	query := fmt.Sprintf(db.info.namespacedResourcesQuery, db.info.resourceTableName) //nolint:gosec
 	return db.performResourceQuery(ctx, query, kind, version, namespace)
 }
 

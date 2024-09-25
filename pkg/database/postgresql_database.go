@@ -5,6 +5,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -12,8 +13,26 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+var PostgreSQLDatabaseInfo = &DatabaseInfo{
+	driver:                   "postgres",
+	connectionString:         "user=%s password=%s dbname=%s host=%s port=%s sslmode=disable",
+	connectionErrorString:    dbConnectionErrStr,
+	resourceTableName:        "resource",
+	resourcesQuery:           "SELECT data FROM %s WHERE kind=$1 AND api_version=$2",
+	namespacedResourcesQuery: "SELECT data FROM %s WHERE kind=$1 AND api_version=$2 AND namespace=$3",
+	writeResourceSQL: "INSERT INTO %s (uuid, api_version, kind, name, namespace, resource_version, cluster_deleted_ts, data) " +
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8) " +
+		"ON CONFLICT(uuid) DO UPDATE SET name=$4, namespace=$5, resource_version=$6, cluster_deleted_ts=$7, data=$8",
+}
+
 type PostgreSQLDatabase struct {
 	*Database
+}
+
+func NewPostgreSQLDatabase(env *DatabaseEnvironment) PostgreSQLDatabase {
+	PostgreSQLDatabaseInfo.applyEnv(env)
+	var db *sql.DB
+	return PostgreSQLDatabase{&Database{db, *PostgreSQLDatabaseInfo}}
 }
 
 func (db PostgreSQLDatabase) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {

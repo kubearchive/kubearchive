@@ -5,6 +5,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -14,6 +15,24 @@ import (
 
 type MySQLDatabase struct {
 	*Database
+}
+
+var MySQLDatabaseInfo = &DatabaseInfo{
+	driver:                   "mysql",
+	connectionString:         "%s:%s@tcp(%s:%s)/%s",
+	connectionErrorString:    dbConnectionErrStr,
+	resourceTableName:        "resource",
+	resourcesQuery:           "SELECT data FROM %s WHERE kind=? AND api_version=?",
+	namespacedResourcesQuery: "SELECT data FROM %s WHERE kind=? AND api_version=? AND namespace=?",
+	writeResourceSQL: "INSERT INTO %s (uuid, api_version, kind, name, namespace, resource_version, cluster_deleted_ts, data) " +
+		"VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +
+		"ON DUPLICATE KEY UPDATE name=?, namespace=?, resource_version=?, cluster_deleted_ts=?, data=?",
+}
+
+func NewMySQLDatabase(env *DatabaseEnvironment) MySQLDatabase {
+	MySQLDatabaseInfo.applyEnv(env)
+	var db *sql.DB
+	return MySQLDatabase{&Database{db, *MySQLDatabaseInfo}}
 }
 
 func (db MySQLDatabase) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {

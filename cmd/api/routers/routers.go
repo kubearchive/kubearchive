@@ -78,6 +78,27 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 	context.JSON(http.StatusOK, NewList(resources))
 }
 
+func (c *Controller) GetNamespacedResourceByName(context *gin.Context) {
+	group := context.Param("group")
+	version := context.Param("version")
+	namespace := context.Param("namespace")
+	name := context.Param("name")
+
+	kind, err := discovery.GetAPIResourceKind(context)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resource, err := c.Database.QueryNamespacedResourceByName(context.Request.Context(), kind, group, version, namespace, name)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	context.JSON(http.StatusOK, resource)
+}
+
 func (c *Controller) GetAllCoreResources(context *gin.Context) {
 	version := context.Param("version")
 
@@ -113,6 +134,26 @@ func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 	}
 
 	context.JSON(http.StatusOK, NewList(resources))
+}
+
+func (c *Controller) GetNamespacedCoreResourceByName(context *gin.Context) {
+	version := context.Param("version")
+	namespace := context.Param("namespace")
+	name := context.Param("name")
+
+	kind, err := discovery.GetAPIResourceKind(context)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resource, err := c.Database.QueryNamespacedCoreResourceByName(context.Request.Context(), kind, version, namespace, name)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	context.JSON(http.StatusOK, resource)
 }
 
 // Livez returns current server configuration as we don't have a clear deadlock indicator

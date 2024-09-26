@@ -34,8 +34,10 @@ func setupRouter(db database.DBInterface, core bool) *gin.Engine {
 	})
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetAllResources)
 	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType", ctrl.GetAllResources)
+	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name", ctrl.GetNamespacedResourceByName)
 	router.GET("/api/:version/:resourceType", ctrl.GetAllCoreResources)
 	router.GET("/api/:version/namespace/:namespace/:resourceType", ctrl.GetNamespacedCoreResources)
+	router.GET("/api/:version/namespace/:namespace/:resourceType/:name", ctrl.GetNamespacedCoreResourceByName)
 	return router
 }
 
@@ -67,6 +69,21 @@ func TestGetNamespacedResources(t *testing.T) {
 		t.Fail()
 	}
 	assert.Equal(t, NewList(nonCoreResources), resources)
+}
+
+func TestGetNamespacedResourcesByName(t *testing.T) {
+	router := setupRouter(fake.NewFakeDatabase(testResources), false)
+
+	res := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs/test", nil)
+	router.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusOK, res.Code)
+	var resource *unstructured.Unstructured
+	if err := json.NewDecoder(res.Body).Decode(&resource); err != nil {
+		t.Fail()
+	}
+	assert.Equal(t, nonCoreResources[0], resource)
 }
 
 func TestGetResourcesEmpty(t *testing.T) {
@@ -112,6 +129,21 @@ func TestGetCoreNamespacedResources(t *testing.T) {
 		t.Fail()
 	}
 	assert.Equal(t, NewList(coreResources), resources)
+}
+
+func TestGetCoreNamespacedResourcesByName(t *testing.T) {
+	router := setupRouter(fake.NewFakeDatabase(testResources), true)
+
+	res := httptest.NewRecorder()
+	req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespace/test/pods/test", nil)
+	router.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusOK, res.Code)
+	var resource *unstructured.Unstructured
+	if err := json.NewDecoder(res.Body).Decode(&resource); err != nil {
+		t.Fail()
+	}
+	assert.Equal(t, coreResources[0], resource)
 }
 
 func TestDBError(t *testing.T) {

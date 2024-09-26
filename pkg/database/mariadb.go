@@ -37,6 +37,10 @@ func (info MariaDBDatabaseInfo) GetNamespacedResourcesSQL() string {
 	return "SELECT data FROM resource WHERE kind=? AND api_version=? AND namespace=?"
 }
 
+func (info MariaDBDatabaseInfo) GetNamespacedResourceByNameSQL() string {
+	return "SELECT data FROM resource WHERE kind=? AND api_version=? AND namespace=? AND name=?"
+}
+
 func (info MariaDBDatabaseInfo) GetWriteResourceSQL() string {
 	return "INSERT INTO resource (uuid, api_version, kind, name, namespace, resource_version, cluster_deleted_ts, data) " +
 		"VALUES (?, ?, ?, ?, ?, ?, ?, ?) " +

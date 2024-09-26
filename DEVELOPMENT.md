@@ -279,31 +279,15 @@ Collector's zipkin receiver.
 **Note**: KubeArchive sends traces and metrics to an intermediate OpenTelemetry
 Collector, which sends the data to the LGTM's Collector.
 
-1. Create the following ConfigMap to enable telemetry for Knative Eventing.
+1. After installing KubeArchive, run:
     ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: config-tracing
-      namespace: knative-eventing
-    data:
-      backend: "zipkin"
-      zipkin-endpoint: "http://grafana-lgtm.kubearchive.svc.cluster.local:9411"
-      sample-rate: "1"
-    EOF
+    bash integrations/observability/grafana/install.sh
     ```
     **Note**: Knative's APIServerSource created before applying this change do not emit traces. Recreate
     the KubeArchiveConfig to trigger the recreation of the APIServerSource.
-1. Install or upgrade KubeArchive adding the following option to the Helm command:
-    ```bash
-    --set "integrations.observability.enabled=true"
-    ```
-    This extra flag makes Helm deploy all necessary resources for observability
-    and configures the environment variables on the KubeArchive components.
 1. Forward the Grafana UI port to localhost:
     ```bash
-    kubectl port-forward -n kubearchive svc/grafana-lgtm 3000:3000 &
+    kubectl port-forward -n observability svc/grafana-lgtm 3000:3000 &
     ```
 1. Open [http://localhost:3000](http://localhost:3000) in your browser, use `admin`
 as username and `admin` as password. In the sidebar go to the Explore section to

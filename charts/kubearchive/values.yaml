@@ -63,17 +63,14 @@ operator:
 # values used to access an already deployed PostgreSQL database
 # if the database has different name, namespace or credentials please change them below
 database:
-  url: "kubearchive-rw.postgresql.svc.cluster.local"
-  # database secret
+  kind: "postgresql"
   secret: "kubearchive-database-credentials"
-  # database basic configuration
-  postgresData:
-    # database name
-    dbName: "kubearchive"
-    # database user
-    dbUser: "kubearchive"
-    # database password
-    dbPassword: "P0stgr3sdbP@ssword"  # notsecret
+  postgresql:
+    dbUrl: "kubearchive-rw.postgresql.svc.cluster.local"
+    dbPort: "5432"
+  dbName: "kubearchive"
+  dbUser: "kubearchive"
+  dbPassword: "Databas3Passw0rd"  # notsecret
 
 integrations:
   observability:

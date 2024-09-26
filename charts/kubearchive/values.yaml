@@ -65,6 +65,9 @@ operator:
 database:
   kind: "postgresql"
   secret: "kubearchive-database-credentials"
+  mariadb:
+    dbUrl: "kubearchive.mariadb.svc.cluster.local"
+    dbPort: "3306"
   postgresql:
     dbUrl: "kubearchive-rw.postgresql.svc.cluster.local"
     dbPort: "5432"

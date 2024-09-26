@@ -33,6 +33,10 @@ var tests = []struct {
 		name:     "postgresql",
 		database: &Database{info: &PostgreSQLDatabaseInfo{}},
 	},
+	{
+		name:     "mariadb",
+		database: &Database{info: &MariaDBDatabaseInfo{}},
+	},
 }
 
 func NewMock() (*sql.DB, sqlmock.Sqlmock) {

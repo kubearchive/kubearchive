@@ -7,6 +7,14 @@ spec:
   resources:
     - selector:
         apiVersion: batch/v1
+        kind: CronJob
+      archiveWhen: "true"
+    - selector:
+        apiVersion: batch/v1
         kind: Job
       archiveWhen: has(status.startTime)
       deleteWhen: has(status.completionTime)
+    - selector:
+        apiVersion: v1
+        kind: Pod
+      archiveOnDelete: "true"

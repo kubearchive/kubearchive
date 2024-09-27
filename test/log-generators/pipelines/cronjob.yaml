@@ -2,9 +2,9 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: submit-generate-logs
+  name: submit-generate-log
 spec:
-  schedule: "*/1 * * * *"
+  schedule: "* * * * *"
   jobTemplate:
     spec:
       template:

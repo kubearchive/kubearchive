@@ -14,6 +14,9 @@ case $i in
     --namespace=*)
     NAMESPACE=`echo $i | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
+    --num-jobs=*)
+    NUM_JOBS=`echo $i | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
     --help)
     HELP=True
     ;;
@@ -28,6 +31,7 @@ done
 HELP=${HELP:-""}
 UNKNOWN=${UNKNOWN:-""}
 export NAMESPACE=${NAMESPACE:-generate-logs-pipelines}
+NUM_JOBS=${NUM_JOBS:-1}
 
 # Help and usage
 if [ "${HELP}" == "True" ] || [ "${UNKNOWN}" == "True" ]; then
@@ -35,6 +39,9 @@ if [ "${HELP}" == "True" ] || [ "${UNKNOWN}" == "True" ]; then
 
     --namespace    Namespace to use to log generation.
                    Default value is ${NAMESPACE}
+
+    --num-jobs     Number of Pipelines to create in the namespace.
+                   Default value is ${NUM_JOBS}
 
     "
     if [ "${UNKNOWN}" == "True" ]; then
@@ -44,7 +51,16 @@ if [ "${HELP}" == "True" ] || [ "${UNKNOWN}" == "True" ]; then
     fi
 fi
 
+CRONJOB=${SCRIPT_DIR}/cronjob.yaml
+mv ${CRONJOB} ${CRONJOB}.orig
+
+for i in $(seq 1 ${NUM_JOBS}); do
+    sed -e "s/name: submit-generate-log/name: submit-generate-log-${i}/" ${CRONJOB}.orig > ${SCRIPT_DIR}/cronjob-${i}.yaml
+done
 
 kubectl create ns ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 cat ${SCRIPT_DIR}/*.yaml | envsubst | kubectl -n ${NAMESPACE} apply -f -
 kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=90s
+
+rm -f ${SCRIPT_DIR}/cronjob-*.yaml
+mv ${CRONJOB}.orig ${CRONJOB}

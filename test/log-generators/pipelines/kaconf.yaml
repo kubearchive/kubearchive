@@ -16,4 +16,4 @@ spec:
     - selector:
         apiVersion: v1
         kind: Pod
-      archiveOnDelete: "'tekton.dev/pipeline' in metadata.labels"
+      archiveOnDelete: "true"

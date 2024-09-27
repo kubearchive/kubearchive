@@ -16,7 +16,11 @@ kubectl rollout status deployment --namespace=cnpg-system --timeout=90s
 # Create the postgres database server.
 kubectl create ns ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n ${NAMESPACE} apply -f .
-kubectl -n ${NAMESPACE} wait pod/kubearchive-1 --for=create --timeout=60s
+echo "Waiting for kubernetes to create the postgres database pod."
+while OUTPUT=$(kubectl -n ${NAMESPACE} get pods kubearchive-1 2>&1); [[ $OUTPUT == Error* ]]; do
+    sleep 0.5
+done
+echo "Postgresql database pod started."
 kubectl -n ${NAMESPACE} wait pod/kubearchive-1 --for=condition=ready --timeout=90s
 
 # Create the kubearchive database

@@ -61,7 +61,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-            {{- include "kubearchive.v1.otel.env" . | nindent 12 }}
+            - name: KUBEARCHIVE_OTEL_MODE
+              value: "disabled"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: ""
           image: {{ .Values.operator.image }}
           {{- if not .Values.operator.debug }}
           livenessProbe:
@@ -110,4 +113,3 @@ spec:
           secret:
             defaultMode: 420
             secretName: {{ tpl .Values.operator.secret . }}
-

@@ -74,14 +74,3 @@ database:
   dbName: "kubearchive"
   dbUser: "kubearchive"
   dbPassword: "Databas3Passw0rd"  # notsecret
-
-integrations:
-  observability:
-    # If "true" a Jaeger all-in-one Deployment is created in the '{{ .Release.Namespace }}' namespace
-    enabled: false
-    # Jaeger all-in-one image tag used for the Deploy if 'enabled' is true
-    imageTag: 1.57.0
-    # Value to which OTEL_EXPORTER_OTLP_ENDPOINT is set. If it is set KubeArchive tries to send telemetry data
-    # If you set `enabled` to true, this is set to the deployed Jaeger all-in-one instance
-    # see `_helpers.tpl` for more information.
-    endpoint: ""

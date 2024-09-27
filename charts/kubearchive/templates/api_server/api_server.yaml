@@ -31,7 +31,10 @@ spec:
           env:
             - name: GIN_MODE
               value: {{ ternary "release" "debug" .Values.global.production }}
-            {{- include "kubearchive.v1.otel.env" . | nindent 12 }}
+            - name: KUBEARCHIVE_OTEL_MODE
+              value: "disabled"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: ""
             - name: CACHE_EXPIRATION_AUTHORIZED
               value: "{{ .Values.apiServer.cache.expirationAuthenticated }}"
             - name: CACHE_EXPIRATION_UNAUTHORIZED

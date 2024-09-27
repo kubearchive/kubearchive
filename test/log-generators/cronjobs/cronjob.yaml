@@ -5,8 +5,8 @@ metadata:
   name: generate-log
 spec:
   schedule: "* * * * *"
-  successfulJobsHistoryLimit: 1000
-  failedJobsHistoryLimit: 50
+  successfulJobsHistoryLimit: 10
+  failedJobsHistoryLimit: 2
   jobTemplate:
     spec:
       template:

@@ -85,8 +85,11 @@ After you make changes to the code use Helm to redeploy KubeArchive:
     kubectl get -n kubearchive secrets kubearchive-api-server-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
     ```
 
-1. **[ Optional ]** Create a service account with a specific role to test the REST API.
-    This Helm chart already provides `kubearchive-test-sa` with `view` privileges for testing purposes.
+1. Create a service account with a specific role to test the REST API.
+   You can use the `default` user with `view` privileges provided for the `test` namespace in `test/users/test-user.yaml`.
+    ```bash
+    kubectl apply -f test/users/
+    ```
 
 1. On a new terminal, use `curl` or your browser to perform a query:
     ```bash
@@ -115,6 +118,7 @@ After you make changes to the code use Helm to redeploy KubeArchive:
     ```bash
     go run cmd/kubectl-archive/main.go get batch/v1 jobs --token $(kubectl create -n test token default)
     ```
+   **NOTE**: For this to work the `test/users/test-user.yaml` must be applied.
 
 1. Generate a new job, and run again:
     ```bash
@@ -189,6 +193,8 @@ to start a debugger to which attach from your IDE.
     * [Goland instructions](https://golangforall.com/en/post/go-docker-delve-remote-debug.html#goland-ide)
 1. Generate traffic:
     * API: Query the API using `curl` or your browser:
+
+   **NOTE**: For this to work the `test/users/test-user.yaml` must be applied.
    ```bash
    curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create -n test token default)" \
    https://localhost:8081/apis/batch/v1/jobs | jq
@@ -207,31 +213,15 @@ Collector's zipkin receiver.
 **Note**: KubeArchive sends traces and metrics to an intermediate OpenTelemetry
 Collector, which sends the data to the LGTM's Collector.
 
-1. Create the following ConfigMap to enable telemetry for Knative Eventing.
+1. After installing KubeArchive, run:
     ```bash
-    kubectl apply -f - <<EOF
-    apiVersion: v1
-    kind: ConfigMap
-    metadata:
-      name: config-tracing
-      namespace: knative-eventing
-    data:
-      backend: "zipkin"
-      zipkin-endpoint: "http://grafana-lgtm.kubearchive.svc.cluster.local:9411"
-      sample-rate: "1"
-    EOF
+    bash integrations/observability/grafana/install.sh
     ```
     **Note**: Knative's APIServerSource created before applying this change do not emit traces. Recreate
     the KubeArchiveConfig to trigger the recreation of the APIServerSource.
-1. Install or upgrade KubeArchive adding the following option to the Helm command:
-    ```bash
-    --set "integrations.observability.enabled=true"
-    ```
-    This extra flag makes Helm deploy all necessary resources for observability
-    and configures the environment variables on the KubeArchive components.
 1. Forward the Grafana UI port to localhost:
     ```bash
-    kubectl port-forward -n kubearchive svc/grafana-lgtm 3000:3000 &
+    kubectl port-forward -n observability svc/grafana-lgtm 3000:3000 &
     ```
 1. Open [http://localhost:3000](http://localhost:3000) in your browser, use `admin`
 as username and `admin` as password. In the sidebar go to the Explore section to
@@ -279,3 +269,26 @@ To access the Splunk web interface from outside of the cluster, the following st
    export KIND_CLUSTER_NAME=$(kind -q get clusters)
    ```
    **NOTE**: In case you have more than one kind cluster running, manually set the proper one
+
+1. Deploying the operator (for example using the `hack/quick-install.sh` script), the `Deployment` doesn't reach `Ready` state:
+    ```
+    Waiting for deployment "kubearchive-operator" rollout to finish: 0 of 1 updated replicas are available...
+    error: timed out waiting for the condition
+    ```
+    And in the logs of the `kubearchive-operator` you see the following ERROR:
+    ```
+     ❯ kubectl logs -n kubearchive deploy/kubearchive-operator --tail=5
+     2024-09-20T08:45:35Z    ERROR   error received after stop sequence was engaged  {"error": "leader election lost"}
+     sigs.k8s.io/controller-runtime/pkg/manager.(*controllerManager).engageStopProcedure.func1
+     sigs.k8s.io/controller-runtime@v0.19.0/pkg/manager/internal.go:512
+     2024-09-20T08:45:35Z    ERROR   setup   problem running operator        {"error": "too many open files"}
+     main.main
+     github.com/kubearchive/kubearchive/cmd/operator/main.go:154
+     runtime.main
+     runtime/proc.go:271
+    ```
+    Run the following command:
+    ```bash
+    sudo sysctl fs.inotify.max_user_watches=524288
+    sudo sysctl fs.inotify.max_user_instances=512
+    ```

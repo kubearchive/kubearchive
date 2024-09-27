@@ -31,7 +31,10 @@ spec:
           env:
             - name: MOUNT_PATH
               value: "{{ .Values.sink.mountPath }}"
-            {{- include "kubearchive.v1.otel.env" . | nindent 12 }}
+            - name: KUBEARCHIVE_OTEL_MODE
+              value: "disabled"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: ""
 ---
 kind: Service
 apiVersion: v1

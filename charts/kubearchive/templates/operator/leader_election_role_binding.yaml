@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
     app.kubernetes.io/managed-by: kustomize
   name: {{ $leaderElection }}
+  namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

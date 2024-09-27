@@ -18,7 +18,7 @@ webhooks:
     clientConfig:
       service:
         name: {{ $webhooksServiceName }}
-        namespace: {{ .Release.Name }}
+        namespace: {{ .Release.Namespace }}
         path: /mutate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
     failurePolicy: Fail
     name: mkubearchiveconfig.kb.io
@@ -52,7 +52,7 @@ webhooks:
     clientConfig:
       service:
         name: {{ $webhooksServiceName }}
-        namespace: {{ .Release.Name }}
+        namespace: {{ .Release.Namespace }}
         path: /validate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
     failurePolicy: Fail
     name: vkubearchiveconfig.kb.io

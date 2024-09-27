@@ -10,6 +10,7 @@ metadata:
     app.kubernetes.io/part-of: operator
     app.kubernetes.io/managed-by: kustomize
   name: "{{ tpl .Values.operator.cert . }}"
+  namespace: {{ .Release.Namespace }}
 spec:
   dnsNames:
     - "{{ tpl .Values.operator.name . }}-webhooks.{{ .Release.Namespace }}.svc"

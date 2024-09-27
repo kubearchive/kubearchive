@@ -11,6 +11,7 @@ metadata:
     app.kubernetes.io/created-by: {{ tpl .Values.operator.name . }}
     app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
   name: {{ $leaderElection }}
+  namespace: {{ .Release.Namespace }}
 rules:
   - apiGroups:
       - ""

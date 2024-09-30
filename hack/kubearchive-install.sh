@@ -15,9 +15,7 @@ PODS=$(kubectl -n kubearchive get pods | grep -E -v "NAME|No resources|apiserver
 
 YAML=$(mktemp --suffix=.yaml -t kubearchive-XXX)
 bash cmd/operator/generate.sh
-helm template kubearchive charts/kubearchive -n kubearchive \
-    --include-crds \
-    --set "global.production=true" > /tmp/kubearchive-not-resolved.yaml
+helm template kubearchive charts/kubearchive -n kubearchive --include-crds > /tmp/kubearchive-not-resolved.yaml
 ko resolve -f /tmp/kubearchive-not-resolved.yaml --base-import-paths > ${YAML}
 kubectl apply -n kubearchive -f ${YAML}
 

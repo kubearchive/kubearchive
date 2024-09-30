@@ -12,6 +12,7 @@ metadata:
     app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
     control-plane: {{ $controlPlane }}
   name: {{ tpl .Values.operator.name . }}
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:

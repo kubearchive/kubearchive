@@ -14,6 +14,7 @@ metadata:
     app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
     app.kubernetes.io/managed-by: kustomize
   name: {{ $metrics }}
+  namespace: {{ .Release.Namespace }}
 spec:
   endpoints:
     - path: /metrics

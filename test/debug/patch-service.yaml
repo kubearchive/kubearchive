@@ -1,0 +1,7 @@
+---
+spec:
+  ports:
+    - name: debug
+      protocol: TCP
+      port: 40000
+      targetPort: 40000

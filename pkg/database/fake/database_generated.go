@@ -56,12 +56,35 @@ func (f *Database) QueryNamespacedResources(ctx context.Context, kind, group, ve
 	return f.filterResourcesByKindApiVersionAndNamespace(kind, apiVersion, namespace), f.err
 }
 
+func (f *Database) QueryNamespacedResourceByName(ctx context.Context, kind, group, version, namespace, name string) (*unstructured.Unstructured, error) {
+	apiVersion := fmt.Sprintf("%s/%s", group, version)
+	resources := f.filterResourceByKindApiVersionNamespaceAndName(kind, apiVersion, namespace, name)
+	if len(resources) > 1 {
+		return nil, fmt.Errorf("More than one resource found")
+	}
+	if len(resources) == 0 {
+		return nil, f.err
+	}
+	return resources[0], f.err
+}
+
 func (f *Database) QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error) {
 	return f.filterResoucesByKindAndApiVersion(kind, version), f.err
 }
 
 func (f *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
 	return f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace), f.err
+}
+
+func (f *Database) QueryNamespacedCoreResourceByName(ctx context.Context, kind, version, namespace, name string) (*unstructured.Unstructured, error) {
+	resources := f.filterResourceByKindApiVersionNamespaceAndName(kind, version, namespace, name)
+	if len(resources) > 1 {
+		return nil, fmt.Errorf("More than one resource found")
+	}
+	if len(resources) == 0 {
+		return nil, f.err
+	}
+	return resources[0], f.err
 }
 
 func (f *Database) filterResoucesByKindAndApiVersion(kind, apiVersion string) []*unstructured.Unstructured {
@@ -78,6 +101,16 @@ func (f *Database) filterResourcesByKindApiVersionAndNamespace(kind, apiVersion,
 	var filteredResources []*unstructured.Unstructured
 	for _, resource := range f.resources {
 		if resource.GetKind() == kind && resource.GetAPIVersion() == apiVersion && resource.GetNamespace() == namespace {
+			filteredResources = append(filteredResources, resource)
+		}
+	}
+	return filteredResources
+}
+
+func (f *Database) filterResourceByKindApiVersionNamespaceAndName(kind, apiVersion, namespace, name string) []*unstructured.Unstructured {
+	var filteredResources []*unstructured.Unstructured
+	for _, resource := range f.resources {
+		if resource.GetKind() == kind && resource.GetAPIVersion() == apiVersion && resource.GetNamespace() == namespace && resource.GetName() == name {
 			filteredResources = append(filteredResources, resource)
 		}
 	}

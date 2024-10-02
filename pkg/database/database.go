@@ -21,6 +21,7 @@ type DBInfoInterface interface {
 	GetConnectionString() string
 	GetResourcesSQL() string
 	GetNamespacedResourcesSQL() string
+	GetNamespacedResourceByNameSQL() string
 	GetWriteResourceSQL() string
 }
 
@@ -28,7 +29,9 @@ type DBInterface interface {
 	QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error)
 	QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error)
 	QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error)
+	QueryNamespacedResourceByName(ctx context.Context, kind, group, version, namespace, name string) (*unstructured.Unstructured, error)
 	QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error)
+	QueryNamespacedCoreResourceByName(ctx context.Context, kind, version, namespace, name string) (*unstructured.Unstructured, error)
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
 	Ping(ctx context.Context) error
 }
@@ -72,8 +75,31 @@ func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, v
 	return db.performResourceQuery(ctx, db.info.GetNamespacedResourcesSQL(), kind, apiVersion, namespace)
 }
 
+func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, group, version, namespace, name string) (*unstructured.Unstructured, error) {
+	apiVersion := fmt.Sprintf("%s/%s", group, version)
+	resources, err := db.performResourceQuery(ctx, db.info.GetNamespacedResourceByNameSQL(), kind, apiVersion, namespace, name)
+	if len(resources) == 0 {
+		return nil, err
+	} else if len(resources) == 1 {
+		return resources[0], err
+	} else {
+		return nil, fmt.Errorf("More than one resource found")
+	}
+}
+
 func (db *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
 	return db.performResourceQuery(ctx, db.info.GetNamespacedResourcesSQL(), kind, version, namespace)
+}
+
+func (db *Database) QueryNamespacedCoreResourceByName(ctx context.Context, kind, version, namespace, name string) (*unstructured.Unstructured, error) {
+	resources, err := db.performResourceQuery(ctx, db.info.GetNamespacedResourceByNameSQL(), kind, version, namespace, name)
+	if len(resources) == 0 {
+		return nil, err
+	} else if len(resources) == 1 {
+		return resources[0], err
+	} else {
+		return nil, fmt.Errorf("More than one resource found")
+	}
 }
 
 func (db *Database) performResourceQuery(ctx context.Context, query string, args ...string) ([]*unstructured.Unstructured, error) {

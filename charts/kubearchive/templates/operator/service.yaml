@@ -19,11 +19,5 @@ spec:
       protocol: TCP
       targetPort: {{ $targetPort }}
       name: webhook-server
-    {{- if .Values.operator.debug }}
-    - port: 40000
-      protocol: TCP
-      targetPort: 40000
-      name: debug
-    {{- end}}
   selector:
     control-plane: {{ $controlPlane }}

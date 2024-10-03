@@ -150,31 +150,19 @@ export KO_DEFAULTBASEIMAGE=registry.redhat.io/rhel9/support-tools
 **[NOTE]**: Using this images usually needs the pod property `runAsNonRoot` set to `false`.
 
 ## Remote IDE debugging
-   **[NOTE]**: Before running these steps make sure that your cluster has the kubearchive
-   dependencies from running `quick-install.sh` but without kubearchive itself (run `kubearchive-delete.sh`)
 
 Use [delve](https://golangforall.com/en/post/go-docker-delve-remote-debug.html)
 to start a debugger to which attach from your IDE.
 
-1. Deploy the chart with `ko` and `helm` in debug mode using an image with `delve`:
-   Specify the [component].debug variable to `true` and update the image accordingly.
-
-   * Deployment to debug the API:
-   ```bash
-   helm install kubearchive charts/kubearchive --create-namespace -n kubearchive \
-     --set apiServer.debug=true \
-     --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api --debug) \
-     --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
-     --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator)
-   ```
-   * Deployment to debug the Operator:
-   ```bash
-   helm install kubearchive charts/kubearchive --create-namespace -n kubearchive \
-     --set operator.debug=true \
-     --set-string apiServer.image=$(ko build github.com/kubearchive/kubearchive/cmd/api) \
-     --set-string sink.image=$(ko build github.com/kubearchive/kubearchive/cmd/sink) \
-     --set-string operator.image=$(ko build github.com/kubearchive/kubearchive/cmd/operator --debug)
-   ```
+1. Run the script `test/debug/debug-deploy.sh` with one of the following values: `operator`, `sink`, `api-server`
+    * Deployment to debug the API:
+    ```bash
+    bash test/debug/debug-deploy.sh api-server
+    ```
+    * Deployment to debug the Operator:
+    ```bash
+    bash test/debug/debug-deploy.sh operator
+    ```
 
 1. Forward the port 40000 from the service that you want to debug:
 
@@ -200,6 +188,9 @@ to start a debugger to which attach from your IDE.
    https://localhost:8081/apis/batch/v1/jobs | jq
    ```
    * Operator: Deploy the test resources that already include a KubeArchiveConfig Custom Resource
+
+**NOTE**: Debug just one component at once. After debugging a component, redeploy KubeArchive
+with `hack/kubearchive-delete.sh` and `hack/kubearchive-install.sh`
 
 ## Enabling Telemetry
 

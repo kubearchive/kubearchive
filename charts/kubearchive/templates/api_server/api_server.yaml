@@ -31,7 +31,7 @@ spec:
                 name: {{ .Values.database.secret }}
           env:
             - name: GIN_MODE
-              value: {{ ternary "release" "debug" .Values.global.production }}
+              value: "release"
             - name: KUBEARCHIVE_OTEL_MODE
               value: "disabled"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
@@ -40,7 +40,6 @@ spec:
               value: "{{ .Values.apiServer.cache.expirationAuthenticated }}"
             - name: CACHE_EXPIRATION_UNAUTHORIZED
               value: "{{ .Values.apiServer.cache.expirationUnauthenticated }}"
-          {{- if not .Values.apiServer.debug }}
           livenessProbe:
             httpGet:
               path: /livez
@@ -51,7 +50,6 @@ spec:
               path: /readyz
               port: 8081
               scheme: HTTPS
-          {{- end }}
 ---
 kind: Service
 apiVersion: v1
@@ -66,9 +64,3 @@ spec:
       port: {{ required "An API Server port must be specified" .Values.apiServer.port }}
       targetPort: {{ required "An API Server targetPort must be specified" .Values.apiServer.port }}
       name: server
-    {{- if .Values.apiServer.debug }}
-    - protocol: TCP
-      port: 40000
-      targetPort: 40000
-      name: debug
-    {{- end}}

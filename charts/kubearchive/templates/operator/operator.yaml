@@ -51,9 +51,6 @@ spec:
                 - ALL
         - name: manager
           args:
-          {{- if .Values.operator.debug }}
-            - --
-          {{- end }}
             - --health-probe-bind-address=:8081
             - --metrics-bind-address=127.0.0.1:8080
             - --leader-elect
@@ -67,14 +64,12 @@ spec:
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: ""
           image: {{ .Values.operator.image }}
-          {{- if not .Values.operator.debug }}
           livenessProbe:
             httpGet:
               path: /healthz
               port: {{ $port }}
             initialDelaySeconds: 15
             periodSeconds: 20
-          {{- end }}
           ports:
             - containerPort: 9443
               name: webhook-server
@@ -83,7 +78,6 @@ spec:
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
               readOnly: true
-          {{- if not .Values.operator.debug }}
           readinessProbe:
             httpGet:
               path: /readyz
@@ -102,11 +96,8 @@ spec:
             capabilities:
               drop:
                 - ALL
-          {{- end }}
-      {{- if not .Values.operator.debug }}
       securityContext:
         runAsNonRoot: true
-      {{- end }}
       serviceAccountName: {{ tpl .Values.operator.name . }}
       terminationGracePeriodSeconds: 10
       volumes:

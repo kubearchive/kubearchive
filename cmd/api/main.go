@@ -5,7 +5,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"time"
@@ -16,6 +16,7 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/api/routers"
 	"github.com/kubearchive/kubearchive/pkg/cache"
 	"github.com/kubearchive/kubearchive/pkg/database"
+	"github.com/kubearchive/kubearchive/pkg/middleware"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -55,7 +56,9 @@ func getKubernetesClient() *kubernetes.Clientset {
 }
 
 func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, cache *cache.Cache, cacheExpirations *routers.CacheExpirations) *Server {
-	router := gin.Default()
+	router := gin.New()
+	router.Use(gin.Recovery())
+	router.Use(middleware.Logger)
 	router.Use(otelgin.Middleware("")) // Empty string so the library sets the proper server
 
 	apiGroup := router.Group("/api")
@@ -88,28 +91,30 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 }
 
 func main() {
-	log.Printf("Starting KubeArchive API with version '%s', commit SHA '%s', built '%s'", version, commit, date)
+	slog.Info("Starting KubeArchive API", "version", version, "commit", commit, "built", date)
 	err := observability.Start(otelServiceName)
 	if err != nil {
-		log.Printf("Could not start opentelemetry: %s", err)
+		slog.Info("Could not start opentelemetry", "error", err.Error())
 	}
 
 	cacheExpirations, err := getCacheExpirations()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error(err.Error())
 	}
 	memCache := cache.New()
 
 	db, err := database.NewDatabase()
 	if err != nil {
-		log.Fatalf("Could not connect to database: %s", err)
+		slog.Error("Could not connect to database", "error", err.Error())
+		os.Exit(1)
 	}
 	controller := routers.Controller{Database: db, CacheConfiguration: *cacheExpirations}
 
 	server := NewServer(getKubernetesClient(), controller, memCache, cacheExpirations)
 	err = server.router.RunTLS("0.0.0.0:8081", "/etc/kubearchive/ssl/tls.crt", "/etc/kubearchive/ssl/tls.key")
 	if err != nil {
-		log.Printf("Could not run server on localhost: %s", err)
+		slog.Error("Could not run server on localhost", "error", err.Error())
+		os.Exit(1)
 	}
 }
 

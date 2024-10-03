@@ -5,7 +5,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -42,16 +42,12 @@ type Sink struct {
 	EventClient ceClient.Client
 	Filters     *filters.Filters
 	K8sClient   *dynamic.DynamicClient
-	Logger      *log.Logger
 }
 
-func NewSink(db database.DBInterface, logger *log.Logger, filters *filters.Filters) *Sink {
-	if logger == nil {
-		logger = log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds|log.LUTC)
-		logger.Println("Sink was provided a nil logger, falling back to default logger")
-	}
+func NewSink(db database.DBInterface, filters *filters.Filters) *Sink {
 	if db == nil {
-		logger.Fatalln("Cannot start sink when db connection is nil")
+		slog.Error("Cannot start sink when db connection is nil")
+		os.Exit(1)
 	}
 
 	httpClient, err := cloudevents.NewHTTP(
@@ -61,16 +57,19 @@ func NewSink(db database.DBInterface, logger *log.Logger, filters *filters.Filte
 		}),
 	)
 	if err != nil {
-		logger.Fatalf("Failed to create HTTP client: %s\n", err.Error())
+		slog.Error("Failed to create HTTP client", "err", err.Error())
+		os.Exit(1)
 	}
 	eventClient, err := cloudevents.NewClient(httpClient, ceClient.WithObservabilityService(ceOtelObs.NewOTelObservabilityService()))
 	if err != nil {
-		logger.Fatalf("Failed to create CloudEvents HTTP client: %s\n", err.Error())
+		slog.Error("Failed to create CloudEvents HTTP client", "err", err.Error())
+		os.Exit(1)
 	}
 
 	k8sClient, err := k8s.GetKubernetesClient()
 	if err != nil {
-		logger.Fatalln("Could not start a kubernetes client:", err)
+		slog.Error("Could not start a kubernetes client", "err", err)
+		os.Exit(1)
 	}
 
 	return &Sink{
@@ -78,72 +77,87 @@ func NewSink(db database.DBInterface, logger *log.Logger, filters *filters.Filte
 		EventClient: eventClient,
 		Filters:     filters,
 		K8sClient:   k8sClient,
-		Logger:      logger,
 	}
 }
 
 // Processes incoming cloudevents and writes them to the database
 func (sink *Sink) Receive(ctx context.Context, event cloudevents.Event) {
-	sink.Logger.Println("Received cloudevent: ", event.ID())
+	slog.Info("Received cloudevent", "id", event.ID())
 	k8sObj, err := models.UnstructuredFromByteSlice(event.Data())
 	if err != nil {
-		sink.Logger.Printf("Cloudevent %s is malformed and will not be processed: %s\n", event.ID(), err)
+		slog.Error("Cloudevent is malformed and will not be processed", "id", event.ID(), "err", err)
 		return
 	}
-	sink.Logger.Printf(
-		"Cloudevent %s contains all required fields. Checking if its object %s needs to be archived\n",
-		event.ID(),
-		k8sObj.GetUID(),
+	slog.Info(
+		"Cloudevent contains all required fields. Checking if its object needs to be archived",
+		"id", event.ID(),
+		"objectID", k8sObj.GetUID(),
 	)
 
 	if strings.HasSuffix(event.Type(), ".delete") {
-		sink.Logger.Printf(
-			"The type of cloudevent %s is Delete. Checking if object %s needs to be archived\n",
-			event.ID(),
-			k8sObj.GetUID(),
+		slog.Info(
+			"The type of cloudevent is Delete. Checking if object needs to be archived",
+			"id", event.ID(),
+			"objectID", k8sObj.GetUID(),
 		)
 		if sink.Filters.MustArchiveOnDelete(ctx, k8sObj) {
 			ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 			err = sink.Db.WriteResource(ctx, k8sObj, event.Data())
 			if err != nil {
-				sink.Logger.Printf(
-					"Failed to write object %s from cloudevent %s to the database: %s\n",
-					k8sObj.GetUID(),
-					event.ID(),
-					err,
+				slog.Error(
+					"Failed to write object from cloudevent to the database",
+					"objectID", k8sObj.GetUID(),
+					"id", event.ID(),
+					"err", err,
 				)
 			}
 			defer cancel()
 			return
 		}
-		sink.Logger.Printf(
-			"Object %s from cloudevent %s does not need to be archived after deletion\n",
-			k8sObj.GetUID(),
-			event.ID(),
+		slog.Info(
+			"Object from cloudevent does not need to be archived after deletion",
+			"objectID", k8sObj.GetUID(),
+			"id", event.ID(),
 		)
 		return
 	}
 	if !sink.Filters.MustArchive(ctx, k8sObj) {
-		sink.Logger.Printf("Object %s from cloudevent %s does not need to be archived\n", k8sObj.GetUID(), event.ID())
-		return
-	}
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
-	sink.Logger.Printf("Writing object %s from cloudevent %s into the database\n", k8sObj.GetUID(), event.ID())
-	err = sink.Db.WriteResource(ctx, k8sObj, event.Data())
-	defer cancel()
-	if err != nil {
-		sink.Logger.Printf(
-			"Failed to write object %s from cloudevent %s to the database: %s\n",
-			k8sObj.GetUID(),
-			event.ID(),
-			err,
+		slog.Info(
+			"Object from cloudevent does not need to be archived",
+			"objectID", k8sObj.GetUID(),
+			"id", event.ID(),
 		)
 		return
 	}
-	sink.Logger.Printf("Successfully wrote object %s from cloudevent %s to the database\n", k8sObj.GetUID(), event.ID())
-	sink.Logger.Printf("Checking if object %s from cloudevent %s needs to be deleted\n", k8sObj.GetUID(), event.ID())
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	slog.Info(
+		"Writing object from cloudevent into the database",
+		"objectID", k8sObj.GetUID(),
+		"id", event.ID(),
+	)
+	err = sink.Db.WriteResource(ctx, k8sObj, event.Data())
+	defer cancel()
+	if err != nil {
+		slog.Error(
+			"Failed to write object from cloudevent to the database",
+			"objectID", k8sObj.GetUID(),
+			"id", event.ID(),
+			"err", err,
+		)
+		return
+	}
+	slog.Info(
+		"Successfully wrote object from cloudevent to the database",
+		"objectID", k8sObj.GetUID(),
+		"id", event.ID(),
+	)
+	slog.Info(
+		"Checking if object from cloudevent needs to be deleted",
+		"objectID", k8sObj.GetUID(),
+		"id", event.ID(),
+	)
 	if sink.Filters.MustDelete(ctx, k8sObj) {
-		sink.Logger.Println("Attempting to delete kubernetes object:", k8sObj.GetUID())
+		slog.Info("Attempting to delete kubernetes object", "objectID", k8sObj.GetUID())
 		kind := k8sObj.GetObjectKind().GroupVersionKind()
 		resource, _ := meta.UnsafeGuessKindToResource(kind)     // we only need the plural resource
 		propagationPolicy := metav1.DeletePropagationBackground // can't get address of a const
@@ -155,58 +169,68 @@ func (sink *Sink) Receive(ctx context.Context, event cloudevents.Event) {
 			metav1.DeleteOptions{PropagationPolicy: &propagationPolicy},
 		)
 		if err != nil {
-			sink.Logger.Printf("Could not delete object %s: %s\n", k8sObj.GetUID(), err)
+			slog.Error(
+				"Could not delete object",
+				"objectID", k8sObj.GetUID(),
+				"err", err,
+			)
 			return
 		}
-		sink.Logger.Printf("Successfully requested kubernetes object %s be deleted\n", k8sObj.GetUID())
+		slog.Info("Successfully requested kubernetes object be deleted", "objectID", k8sObj.GetUID())
 		deleteTs := metav1.Now()
 		k8sObj.SetDeletionTimestamp(&deleteTs)
-		sink.Logger.Println("Updating cluster_deleted_ts for kubernetes object:", k8sObj.GetUID())
+		slog.Info("Updating cluster_deleted_ts for kubernetes object", "objectID", k8sObj.GetUID())
 		updateCtx, updateCancel := context.WithTimeout(ctx, time.Second*5)
 		err = sink.Db.WriteResource(updateCtx, k8sObj, event.Data())
 		defer updateCancel()
 		if err != nil {
-			sink.Logger.Println("Failed to update cluster_deleted_ts for kubernetes object:", k8sObj.GetUID())
+			slog.Error("Failed to update cluster_deleted_ts for kubernetes object", "objectID", k8sObj.GetUID())
 			return
 		}
-		sink.Logger.Println("Successfully deleted kubernetes object:", k8sObj.GetUID())
+		slog.Info("Successfully deleted kubernetes object", "objectID", k8sObj.GetUID())
 	} else {
-		sink.Logger.Printf("Object %s from cloudevent %s does not need to be deleted\n", k8sObj.GetUID(), event.ID())
+		slog.Info(
+			"Object from cloudevent does not need to be deleted",
+			"objectID", k8sObj.GetUID(),
+			"id", event.ID(),
+		)
 	}
 }
 
 func main() {
-	logger := log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds|log.LUTC)
-	logger.Printf("Starting KubeArchive Sink with version '%s', commit SHA '%s', built '%s'", version, commit, date)
+	slog.Info("Starting KubeArchive Sink", "version", version, "commit", commit, "built", date)
 
 	err := kaObservability.Start(otelServiceName)
 	if err != nil {
-		logger.Printf("Could not start tracing: %s\n", err.Error())
+		slog.Error("Could not start tracing", "err", err.Error())
+		os.Exit(1)
 	}
 	db, err := database.NewDatabase()
 	if err != nil {
-		logger.Fatalf("Could not connect to the database: %s\n", err)
+		slog.Error("Could not connect to the database", "err", err)
+		os.Exit(1)
 	}
 	filters, err := filters.NewFilters()
 	if err != nil {
-		logger.Printf(
-			"Not all filters could be created from the ConfigMap. Some archive and delete operations will not execute until the errors are resolved: %s\n",
-			err,
+		slog.Error(
+			"Not all filters could be created from the ConfigMap. Some archive and delete operations will not execute until the errors are resolved",
+			"err", err,
 		)
 	}
 	stopUpdating, err := files.UpdateOnPaths(filters.Update, filters.Path())
 	if err != nil {
-		logger.Println("Could not listen for updates to filters:", err)
+		slog.Error("Could not listen for updates to filters", "err", err)
 	}
 	defer func() {
 		err := stopUpdating()
 		if err != nil {
-			logger.Println("Encountered an issue stopping filter updates:", err)
+			slog.Error("Encountered an issue stopping filter updates", "err", err)
 		}
 	}()
-	sink := NewSink(db, logger, filters)
+	sink := NewSink(db, filters)
 	err = sink.EventClient.StartReceiver(context.Background(), sink.Receive)
 	if err != nil {
-		logger.Fatalf("Failed to start receiving CloudEvents: %s\n", err.Error())
+		slog.Error("Failed to start receiving CloudEvents", "err", err.Error())
+		os.Exit(1)
 	}
 }

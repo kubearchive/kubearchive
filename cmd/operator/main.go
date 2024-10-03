@@ -7,11 +7,13 @@ import (
 	"crypto/tls"
 	"flag"
 	"log"
+	"log/slog"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -22,6 +24,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	"github.com/go-logr/logr"
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/cmd/operator/internal/controller"
 	"github.com/kubearchive/kubearchive/pkg/observability"
@@ -33,11 +36,10 @@ import (
 const otelServiceName = "kubearchive.operator"
 
 var (
-	version  = "main"
-	commit   = ""
-	date     = ""
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	version = "main"
+	commit  = ""
+	date    = ""
+	scheme  = runtime.NewScheme()
 )
 
 func init() {
@@ -49,6 +51,7 @@ func init() {
 }
 
 func main() {
+	klog.SetSlogLogger(slog.Default()) // klog is used by the election leader process
 	err := observability.Start(otelServiceName)
 	if err != nil {
 		log.Printf("Could not start OpenTelemetry: %s\n", err)
@@ -74,7 +77,7 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+	ctrl.SetLogger(logr.FromSlogHandler(slog.Default().Handler()))
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -83,7 +86,7 @@ func main() {
 	// - https://github.com/advisories/GHSA-qppj-fm5r-hxr3
 	// - https://github.com/advisories/GHSA-4374-p667-p6c8
 	disableHTTP2 := func(c *tls.Config) {
-		setupLog.Info("disabling http/2")
+		slog.Info("disabling http/2")
 		c.NextProtos = []string{"http/1.1"}
 	}
 
@@ -107,6 +110,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "e7a70c64.kubearchive.org",
+		Logger:                 logr.FromSlogHandler(slog.Default().Handler()),
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -120,7 +124,7 @@ func main() {
 		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start operator")
+		slog.Error("unable to start operator", "err", err)
 		os.Exit(1)
 	}
 
@@ -129,29 +133,29 @@ func main() {
 		Scheme: mgr.GetScheme(),
 		Mapper: mgr.GetRESTMapper(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "KubeArchiveConfig")
+		slog.Error("unable to create controller", "controller", "KubeArchiveConfig", "err", err)
 		os.Exit(1)
 	}
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err = (&kubearchiveapi.KubeArchiveConfig{}).SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "KubeArchiveConfig")
+			slog.Error("unable to create webhook", "webhook", "KubeArchiveConfig", "err", err)
 			os.Exit(1)
 		}
 	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
+		slog.Error("unable to set up health check", "err", err)
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+		slog.Error("unable to set up ready check", "err", err)
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting operator", "version", version, "commit", commit, "date", date)
+	slog.Info("starting operator", "version", version, "commit", commit, "built", date)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running operator")
+		slog.Error("problem running operator", "err", err)
 		os.Exit(1)
 	}
 }

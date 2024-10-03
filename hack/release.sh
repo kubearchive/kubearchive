@@ -58,10 +58,7 @@ git tag -a "${NEXT_VERSION}" -m "Release ${NEXT_VERSION}"
 # Build and push
 bash cmd/operator/generate.sh
 
-helm template kubearchive charts/kubearchive -n kubearchive \
-    --include-crds \
-    --set "global.production=true" \
-    --set "database.enabled=false" > /tmp/kubearchive-not-resolved.yaml
+helm template kubearchive charts/kubearchive -n kubearchive --include-crds > /tmp/kubearchive-not-resolved.yaml
 ko resolve -f /tmp/kubearchive-not-resolved.yaml --base-import-paths --tags=${NEXT_VERSION} > kubearchive.yaml
 
 git push

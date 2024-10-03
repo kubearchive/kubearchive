@@ -1,7 +1,0 @@
-{{- if eq .Values.global.production false -}}
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: test
-{{- end -}}

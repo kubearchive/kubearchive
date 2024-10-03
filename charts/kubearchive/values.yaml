@@ -3,11 +3,6 @@
 # Declare variables to be passed into your templates.
 
 ---
-global:
-  # If 'true' it excludes resources such as the `test` namespace or the test service account
-  # used for testing API endpoints.
-  production: false
-
 # values used to create the api-server
 apiServer:
   name: "{{ .Release.Name }}-api-server"

@@ -4,7 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"log"
+	"log/slog"
+	"os"
 	"regexp"
 	"testing"
 	"time"
@@ -60,7 +61,8 @@ var subtests = []struct {
 func NewMock() (*sql.DB, sqlmock.Sqlmock) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
-		log.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+		slog.Error("an error '%s' was not expected when opening a stub database connection", "err", err)
+		os.Exit(1)
 	}
 
 	return db, mock

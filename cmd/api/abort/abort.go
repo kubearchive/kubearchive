@@ -4,13 +4,13 @@
 package abort
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/gin-gonic/gin"
 )
 
 func Abort(c *gin.Context, msg string, code int) {
-	log.Println(msg)
+	slog.Error(msg)
 	c.JSON(code, gin.H{"message": msg})
 	c.Abort()
 }

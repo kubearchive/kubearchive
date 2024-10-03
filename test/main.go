@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/rand"
 	"os"
 	"os/exec"
@@ -47,7 +47,7 @@ func CreateResources(resources ...string) error {
 		}
 		f.Close()
 
-		log.Printf("running ko apply -f %s, file kept for inspection.", f.Name())
+		slog.Info("running ko apply -f, file kept for inspection.", "file", f.Name())
 		cmd := exec.Command("ko", "apply", "-f", f.Name()) // #nosec G204
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -71,7 +71,7 @@ func DeleteResources(resources ...string) error {
 		}
 		f.Close()
 
-		log.Printf("running kubectl delete -f %s, file kept for inspection.", f.Name())
+		slog.Info("running kubectl delete -f, file kept for inspection.", "file", f.Name())
 		cmd := exec.Command("kubectl", "delete", "-f", f.Name()) // #nosec G204
 		output, err := cmd.CombinedOutput()
 		if err != nil {

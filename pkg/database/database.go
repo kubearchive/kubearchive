@@ -46,7 +46,6 @@ func NewDatabase() (DBInterface, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	var database DBInterface
 	if f, ok := RegisteredDatabases[env[DbKindEnvVar]]; ok {
 		database = f(env)

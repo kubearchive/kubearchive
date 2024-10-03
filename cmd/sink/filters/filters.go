@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"maps"
 	"os"
 	"strings"
@@ -248,61 +248,62 @@ func (f *Filters) deleteFiltersWithMatcher(matcher NamespaceMatcher) {
 
 // Update updates the archive, delete, and archiveOnDelete filters when a ConfigMap file changes.
 func (f *Filters) Update(watcher *fsnotify.Watcher) {
-	logger := log.New(os.Stderr, "", log.LstdFlags|log.Lmicroseconds|log.LUTC)
 	for {
 		select {
 		case event, ok := <-watcher.Events:
 			if !ok { // watcher.Close() was called. We will not receive events anymore.
 				return
 			}
-			f.handleFsEvent(logger, event)
+			f.handleFsEvent(event)
 		case err, ok := <-watcher.Errors:
 			if !ok { // watcher.Close() was called. We will not receive errors anymore.
 				return
 			}
-			logger.Println("Encountered an error while watching for changes to filters:", err)
+			slog.Error("Encountered an error while watching for changes to filters", "err", err)
 		}
 	}
 }
 
 // handleFsEvent handles the logic for updating filters when an fsnotify.Event is received.
-func (f *Filters) handleFsEvent(logger *log.Logger, event fsnotify.Event) {
+func (f *Filters) handleFsEvent(event fsnotify.Event) {
 	switch event.Op {
 	case fsnotify.Create, fsnotify.Write:
 		if files.IsDirOrDne(event.Name) {
 			break
 		}
-		logger.Printf("File %s changed. Updating filters accordingly\n", event.Name)
+		slog.Info("File changed. Updating filters accordingly", "file", event.Name)
 		fileName, dir := files.FileNameAndDirFromPath(event.Name)
 		filePaths, err := files.DirectoryFiles(dir)
 		if err != nil {
-			logger.Printf("Could not get all files in directory %s: %s\n", dir, err)
+			slog.Info("Could not get all files in directory", "dir", dir, "err", err)
 			break
 		}
 		globalArchive, globalDelete, globalArchiveOnDelete, err := getGlobalCelExprs(filePaths)
 		if err != nil && !errors.Is(err, ErrNoGlobal) {
-			logger.Println("Could not read global filters:", err)
+			slog.Info("Could not read global filters", "err", err)
 			break
 		}
 		if fileName == globalKey {
-			logger.Println("Creating global filters")
+			slog.Info("Creating global filters")
 			err = f.changeGlobalFilters(filePaths, globalArchive, globalDelete, globalArchiveOnDelete)
 			if err != nil {
-				logger.Println("Problem creating global filters:", err)
+				slog.Error("Problem creating global filters", "err", err)
 			}
-			logger.Println("Successfully created global filters")
+			slog.Info("Successfully created global filters")
 			break
 		}
-		logger.Println("Creating filters for namespace:", fileName)
+		slog.Info("Creating filters for namespace", "namespace", fileName)
 		if event.Has(fsnotify.Write) {
 			err = f.updateNamespaceFilters(fileName, event.Name, globalArchive, globalDelete, globalArchiveOnDelete)
 		} else {
 			err = f.createNamespaceFilters(fileName, event.Name, globalArchive, globalDelete, globalArchiveOnDelete)
 		}
 		if err != nil {
-			logger.Printf("Problem creating filters for namespace %s: %s\n", fileName, err)
+			slog.Error("Problem creating filters for namespace", "namespace", fileName, "err", err)
+		} else {
+			slog.Info("Created filters for namespace", "namespace", fileName)
 		}
-		logger.Println("Created filters for namespace:", fileName)
+
 	case fsnotify.Remove, fsnotify.Rename:
 		// fsnotify.Rename contains the old file name. If it was renamed in the same directory we will receive
 		// fsnotify.Create event for the new file name. Therefore we can treat it the same as fsnotify.Remove
@@ -310,12 +311,12 @@ func (f *Filters) handleFsEvent(logger *log.Logger, event fsnotify.Event) {
 		if strings.HasPrefix(fileName, "..") {
 			break
 		}
-		logger.Printf("File %s was deleted. Updating filters accordingly\n", event.Name)
+		slog.Info("File was deleted. Updating filters accordingly", "file", event.Name)
 		if fileName == globalKey {
-			logger.Println("Removing global filters")
+			slog.Info("Removing global filters")
 			filePaths, err := files.DirectoryFiles(dir)
 			if err != nil {
-				logger.Printf("Could not get all files in directory %s: %s\n", dir, err)
+				slog.Info("Could not get all files in directory", "dir", dir, "err", err)
 				break
 			}
 			globalArchive := make(map[string]string)
@@ -323,18 +324,18 @@ func (f *Filters) handleFsEvent(logger *log.Logger, event fsnotify.Event) {
 			globalArchiveOnDelete := make(map[string]string)
 			err = f.changeGlobalFilters(filePaths, globalArchive, globalDelete, globalArchiveOnDelete)
 			if err != nil {
-				logger.Println("Problem removing global filters:", err)
+				slog.Error("Problem removing global filters", "err", err)
 				break
 			}
-			logger.Println("Removed global filters")
+			slog.Info("Removed global filters")
 			break
 		}
-		logger.Println("Removing filters for namespace:", fileName)
+		slog.Info("Removing filters for namespace", "namespace", fileName)
 		f.deleteNamespaceFilters(fileName)
-		logger.Println("Removed filters for namespace:", fileName)
+		slog.Info("Removed filters for namespace", "namespace", fileName)
 	default:
 		// fsnotify.Chmod is the only case not handled, but we don't care if file permissions change
-		logger.Println("Ignoring file system event:", event.String())
+		slog.Info("Ignoring file system event", "event", event.String())
 	}
 }
 

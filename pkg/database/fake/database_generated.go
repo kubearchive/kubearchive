@@ -121,3 +121,7 @@ func (f *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstr
 	f.resources = append(f.resources, k8sObj)
 	return nil
 }
+
+func (f *Database) CloseDB() error {
+	return f.err
+}

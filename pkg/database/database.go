@@ -34,6 +34,7 @@ type DBInterface interface {
 	QueryNamespacedCoreResourceByName(ctx context.Context, kind, version, namespace, name string) (*unstructured.Unstructured, error)
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
 	Ping(ctx context.Context) error
+	CloseDB() error
 }
 
 type Database struct {
@@ -164,4 +165,7 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 		return fmt.Errorf("commit to database failed and the transactions was rolled back: %s", execErr)
 	}
 	return nil
+}
+func (db *Database) CloseDB() error {
+	return db.db.Close()
 }

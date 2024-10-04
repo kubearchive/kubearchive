@@ -210,6 +210,15 @@ func main() {
 		slog.Error("Could not connect to the database", "err", err)
 		os.Exit(1)
 	}
+	defer func(db database.DBInterface) {
+		err := db.CloseDB()
+		if err != nil {
+			slog.Error("Could not close the database connection", "error", err.Error())
+		} else {
+			slog.Info("Connection closed successfully")
+		}
+	}(db)
+
 	filters, err := filters.NewFilters()
 	if err != nil {
 		slog.Error(

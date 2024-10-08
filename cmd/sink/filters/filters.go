@@ -9,92 +9,62 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
-	"os"
-	"strings"
 	"sync"
 
-	"github.com/fsnotify/fsnotify"
 	"github.com/google/cel-go/cel"
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	ocel "github.com/kubearchive/kubearchive/pkg/cel"
-	"github.com/kubearchive/kubearchive/pkg/files"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
+	toolsWatch "k8s.io/client-go/tools/watch"
 )
 
 const (
-	globalKey       = "kubearchive"
-	mountPathEnvVar = "MOUNT_PATH"
+	globalKey     = "kubearchive"
+	k9eNamespace  = "kubearchive"
+	filtersCmName = "sink-filters"
 )
 
 var ErrNoGlobal = errors.New("no global expressions exist")
 
 type Filters struct {
 	*sync.RWMutex
+	clientset       kubernetes.Interface
 	archive         map[NamespaceGroupVersionKind]cel.Program
 	delete          map[NamespaceGroupVersionKind]cel.Program
 	archiveOnDelete map[NamespaceGroupVersionKind]cel.Program
-	path            string
 }
 
-// EmptyFilters returns a Filters struct with an empty archive, delete, and archiveOnDelete slices.
-func EmptyFilters() *Filters {
+// NewFilters creates a Filters struct with empty archive, delete, and archiveOnDelete slices.
+func NewFilters(clientset kubernetes.Interface) *Filters {
 	return &Filters{
 		RWMutex:         &sync.RWMutex{},
+		clientset:       clientset,
 		archive:         make(map[NamespaceGroupVersionKind]cel.Program),
 		delete:          make(map[NamespaceGroupVersionKind]cel.Program),
 		archiveOnDelete: make(map[NamespaceGroupVersionKind]cel.Program),
-		path:            os.Getenv(mountPathEnvVar),
 	}
-}
 
-// NewFilters creates a Filters struct from the path to a directory where a ConfigMap was mounted. If path is empty
-// string or path does not exist, it returns a Filters struct with empty archive, delete, and archiveOnDelete slices. It
-// will attempt to create all the cel programs that it can from the ConfigMap. Any errors that are encountered are
-// wrapped together and returned. Even if this function returns an error, the Filters struct returned can still be used
-// and will not be nil.
-func NewFilters() (*Filters, error) {
-	var errList []error
-	filters := EmptyFilters()
-	exists, err := files.PathExists(filters.path)
-	if err != nil {
-		return filters, fmt.Errorf("cannot determine if ConfigMap is mounted at path %s: %s", filters.path, err)
-	}
-	if filters.path == "" || !exists {
-		return filters, fmt.Errorf("cannot create Filters. ConfigMap is not mounted at path %s", filters.path)
-	}
-	filterFiles, err := files.DirectoryFiles(filters.path)
-	if err != nil {
-		return filters, fmt.Errorf(
-			"cannot create Filters. Could not read files created from ConfigMap mounted at path %s: %s",
-			filters.path,
-			err,
-		)
-	}
-	globalArchive, globalDelete, globalArchiveOnDelete, err := getGlobalCelExprs(filterFiles)
-	// We don't need to report an error if no global filters were provided
-	if err != nil && !errors.Is(err, ErrNoGlobal) {
-		errList = append(errList, err)
-	}
-	errList = append(errList, filters.changeGlobalFilters(filterFiles, globalArchive, globalDelete, globalArchiveOnDelete))
-
-	return filters, errors.Join(errList...)
 }
 
 // getGlobalCelExprs returns three maps that have GroupVersionKind strings as keys and cel expression strings as values.
 // The first map is archive cel expressions, the second map is delete cel expressions, and the third map is archive on
-// delete cel expression. If no global file exists, it returns ErrNoGlobal. Otherwise it will return any error it
-// encounters trying to read the global file or trying to yaml.Unmarshal the global file into a
-// []KubeArchiveConfigResources.
-func getGlobalCelExprs(filterFiles map[string]string) (map[string]string, map[string]string, map[string]string, error) {
+// delete cel expression. If no global key exists, it returns ErrNoGlobal. Otherwise it will return any error it
+// encounters to yaml.Unmarshal the []KubeArchiveConfigResources for the global key.
+func getGlobalCelExprs(stringResources map[string]string) (map[string]string, map[string]string, map[string]string, error) {
 	archiveExprs := make(map[string]string)
 	deleteExprs := make(map[string]string)
 	archiveOnDelete := make(map[string]string)
-	globalFile, exists := filterFiles[globalKey]
+	kacResources, exists := stringResources[globalKey]
 	if !exists {
 		return archiveExprs, deleteExprs, archiveOnDelete, ErrNoGlobal
 	}
-	resources, err := kubearchiveapi.LoadFromFile(globalFile)
+	resources, err := kubearchiveapi.LoadFromString(kacResources)
 	if err != nil {
 		return archiveExprs, deleteExprs, archiveOnDelete, err
 	}
@@ -108,16 +78,18 @@ func getGlobalCelExprs(filterFiles map[string]string) (map[string]string, map[st
 }
 
 // changeGlobalFilters must be called when global filters for f have changed. This includes when f is first created.
-func (f *Filters) changeGlobalFilters(
-	filterFiles, globalArchive, globalDelete, globalArchiveOnDelete map[string]string,
-) error {
+func (f *Filters) changeGlobalFilters(stringResources map[string]string) error {
 	errList := []error{}
-	delete(filterFiles, globalKey)
+	globalArchive, globalDelete, globalArchiveOnDelete, err := getGlobalCelExprs(stringResources)
+	if err != nil && !errors.Is(err, ErrNoGlobal) {
+		errList = append(errList, err)
+	}
+	delete(stringResources, globalKey)
 	archiveMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	deleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	archiveOnDeleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
-	for namespace, filePath := range filterFiles {
-		nsArchive, nsDelete, nsArchiveOnDelete, err := f.createFilters(namespace, filePath, globalArchive, globalDelete, globalArchiveOnDelete)
+	for namespace, kacResources := range stringResources {
+		nsArchive, nsDelete, nsArchiveOnDelete, err := f.createFilters(namespace, kacResources, globalArchive, globalDelete, globalArchiveOnDelete)
 		maps.Copy(archiveMap, nsArchive)
 		maps.Copy(deleteMap, nsDelete)
 		maps.Copy(archiveOnDeleteMap, nsArchiveOnDelete)
@@ -125,28 +97,12 @@ func (f *Filters) changeGlobalFilters(
 			errList = append(errList, err)
 		}
 	}
-	err := errors.Join(errList...)
+	err = errors.Join(errList...)
 	f.Lock()
 	defer f.Unlock()
 	f.archive = archiveMap
 	f.delete = deleteMap
-	return err
-}
-
-// createNamespaceFilters creates archive, delete, and archiveOnDelete filters for namespace from the
-// KubeArchiveConfigResource stored in file. It tries to create all the filters it can even if it encounters errors. Any
-// errors encountered are wrapped together and returned. createNamespaceFilters should only be called when no filters
-// have been created for namespace. That case is handled by updateNamespaceFilters.
-func (f *Filters) createNamespaceFilters(
-	namespace, file string,
-	globalArchive, globalDelete, globalArchiveOnDelete map[string]string,
-) error {
-	namespaceArchive, namespaceDelete, namespaceArchiveOnDelete, err := f.createFilters(
-		namespace, file, globalArchive, globalDelete, globalArchiveOnDelete,
-	)
-	f.Lock()
-	defer f.Unlock()
-	f.insertFilters(namespaceArchive, namespaceDelete, namespaceArchiveOnDelete)
+	f.archiveOnDelete = archiveOnDeleteMap
 	return err
 }
 
@@ -157,7 +113,7 @@ func (f *Filters) createNamespaceFilters(
 // wraps all errors it encounters while creating filters and returns the wrapped error. Even if the returned error is
 // not nil, the maps returned can still be used.
 func (f *Filters) createFilters(
-	namespace, file string,
+	namespace, kacResources string,
 	globalArchive, globalDelete, globalArchiveOnDelete map[string]string,
 ) (
 	map[NamespaceGroupVersionKind]cel.Program,
@@ -168,7 +124,7 @@ func (f *Filters) createFilters(
 	archiveMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	deleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	archiveOnDeleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
-	resources, err := kubearchiveapi.LoadFromFile(file)
+	resources, err := kubearchiveapi.LoadFromString(kacResources)
 	if err != nil {
 		return archiveMap, deleteMap, archiveOnDeleteMap, err
 	}
@@ -204,138 +160,52 @@ func (f *Filters) createFilters(
 	return archiveMap, deleteMap, archiveOnDeleteMap, errors.Join(errList...)
 }
 
-// updateNamespaceFilters updates the cel filters for namespace, from file. It differs from createNamespaceFilters by
-// deleting all filters for namespace before inserting the new ones.
-func (f *Filters) updateNamespaceFilters(
-	namespace, file string,
-	globalArchive, globalDelete, globalArchiveOnDelete map[string]string,
-) error {
-	namespaceArchive, namespaceDelete, namespaceArchiveOnDelete, err := f.createFilters(namespace, file, globalArchive, globalDelete, globalArchiveOnDelete)
-	matcher := NamespaceMatcherFromNamespace(namespace)
-	f.Lock()
-	defer f.Unlock()
-	f.deleteFiltersWithMatcher(matcher)
-	f.insertFilters(namespaceArchive, namespaceDelete, namespaceArchiveOnDelete)
-	return err
-}
+type UpdateStopper func()
 
-// insertFilters copies filters from insertArchive into archive, copies insertDelete into delete, and copies
-// insertArchiveOnDelete into archiveOnDelete. insertFilters does not call Lock() or Unlock() so this must be done by
-// the method that calls it.
-func (f *Filters) insertFilters(
-	insertArchive, insertDelete, insertArchiveOnDelete map[NamespaceGroupVersionKind]cel.Program,
-) {
-	maps.Copy(f.archive, insertArchive)
-	maps.Copy(f.delete, insertDelete)
-	maps.Copy(f.archiveOnDelete, insertArchiveOnDelete)
-}
+// noopUpdateStopper implements UpdateStopper so that filters.Update can return an UpdateStopper if it fails to create a
+// watcher for the ConfigMap
+func noopUpdateStopper() {}
 
-// deleteNamespaceFilters deletes all filters for namespace.
-func (f *Filters) deleteNamespaceFilters(namespace string) {
-	matcher := NamespaceMatcherFromNamespace(namespace)
-	f.Lock()
-	defer f.Unlock()
-	f.deleteFiltersWithMatcher(matcher)
-}
-
-// deleteFiltersWithMatcher uses matcher to delete all filters in archive and delete where matcher returns true. It does
-// not call Lock() or Unlock() so this must be done by the method that calls it.
-func (f *Filters) deleteFiltersWithMatcher(matcher NamespaceMatcher) {
-	maps.DeleteFunc(f.archive, matcher)
-	maps.DeleteFunc(f.delete, matcher)
-	maps.DeleteFunc(f.archiveOnDelete, matcher)
-}
-
-// Update updates the archive, delete, and archiveOnDelete filters when a ConfigMap file changes.
-func (f *Filters) Update(watcher *fsnotify.Watcher) {
-	for {
-		select {
-		case event, ok := <-watcher.Events:
-			if !ok { // watcher.Close() was called. We will not receive events anymore.
-				return
-			}
-			f.handleFsEvent(event)
-		case err, ok := <-watcher.Errors:
-			if !ok { // watcher.Close() was called. We will not receive errors anymore.
-				return
-			}
-			slog.Error("Encountered an error while watching for changes to filters", "err", err)
-		}
+// Update updates the archive, delete, and archiveOnDelete filters when the ConfigMap changes.
+func (f *Filters) Update() (UpdateStopper, error) {
+	watcher := func(options metav1.ListOptions) (watch.Interface, error) {
+		return f.clientset.CoreV1().ConfigMaps(k9eNamespace).Watch(
+			context.Background(),
+			metav1.SingleObject(metav1.ObjectMeta{Name: filtersCmName, Namespace: k9eNamespace}),
+		)
 	}
+	retryWatcher, err := toolsWatch.NewRetryWatcher("1", &cache.ListWatch{WatchFunc: watcher})
+	if err != nil {
+		return noopUpdateStopper, fmt.Errorf("Could not create a watcher for the %s ConfigMap: %s", filtersCmName, err)
+	}
+	go f.handleUpdates(retryWatcher)
+	return retryWatcher.Stop, nil
 }
 
-// handleFsEvent handles the logic for updating filters when an fsnotify.Event is received.
-func (f *Filters) handleFsEvent(event fsnotify.Event) {
-	switch event.Op {
-	case fsnotify.Create, fsnotify.Write:
-		if files.IsDirOrDne(event.Name) {
-			break
-		}
-		slog.Info("File changed. Updating filters accordingly", "file", event.Name)
-		fileName, dir := files.FileNameAndDirFromPath(event.Name)
-		filePaths, err := files.DirectoryFiles(dir)
-		if err != nil {
-			slog.Info("Could not get all files in directory", "dir", dir, "err", err)
-			break
-		}
-		globalArchive, globalDelete, globalArchiveOnDelete, err := getGlobalCelExprs(filePaths)
-		if err != nil && !errors.Is(err, ErrNoGlobal) {
-			slog.Info("Could not read global filters", "err", err)
-			break
-		}
-		if fileName == globalKey {
-			slog.Info("Creating global filters")
-			err = f.changeGlobalFilters(filePaths, globalArchive, globalDelete, globalArchiveOnDelete)
-			if err != nil {
-				slog.Error("Problem creating global filters", "err", err)
+// handleUpdates handles the logic for updating filters when a watch.Event is received from the watcher.
+func (f *Filters) handleUpdates(watcher watch.Interface) {
+	for event := range watcher.ResultChan() {
+		switch event.Type {
+		case watch.Added, watch.Modified:
+			slog.Info("Received watch event of type. Updating filters", "event type", string(event.Type))
+			configMap, ok := event.Object.(*corev1.ConfigMap)
+			if !ok {
+				slog.Error("Could not convert object from the event to a ConfigMap")
+				continue
 			}
-			slog.Info("Successfully created global filters")
-			break
-		}
-		slog.Info("Creating filters for namespace", "namespace", fileName)
-		if event.Has(fsnotify.Write) {
-			err = f.updateNamespaceFilters(fileName, event.Name, globalArchive, globalDelete, globalArchiveOnDelete)
-		} else {
-			err = f.createNamespaceFilters(fileName, event.Name, globalArchive, globalDelete, globalArchiveOnDelete)
-		}
-		if err != nil {
-			slog.Error("Problem creating filters for namespace", "namespace", fileName, "err", err)
-		} else {
-			slog.Info("Created filters for namespace", "namespace", fileName)
-		}
-
-	case fsnotify.Remove, fsnotify.Rename:
-		// fsnotify.Rename contains the old file name. If it was renamed in the same directory we will receive
-		// fsnotify.Create event for the new file name. Therefore we can treat it the same as fsnotify.Remove
-		fileName, dir := files.FileNameAndDirFromPath(event.Name)
-		if strings.HasPrefix(fileName, "..") {
-			break
-		}
-		slog.Info("File was deleted. Updating filters accordingly", "file", event.Name)
-		if fileName == globalKey {
-			slog.Info("Removing global filters")
-			filePaths, err := files.DirectoryFiles(dir)
+			err := f.changeGlobalFilters(configMap.Data)
 			if err != nil {
-				slog.Info("Could not get all files in directory", "dir", dir, "err", err)
-				break
+				slog.Error("Error encountered while updating filters", "error", err)
 			}
-			globalArchive := make(map[string]string)
-			globalDelete := make(map[string]string)
-			globalArchiveOnDelete := make(map[string]string)
-			err = f.changeGlobalFilters(filePaths, globalArchive, globalDelete, globalArchiveOnDelete)
+		case watch.Deleted:
+			slog.Info("Received watch event of type delete. Updating filters")
+			err := f.changeGlobalFilters(make(map[string]string))
 			if err != nil {
-				slog.Error("Problem removing global filters", "err", err)
-				break
+				slog.Error("Error encountered while updating filters", "error", err)
 			}
-			slog.Info("Removed global filters")
-			break
+		default:
+			slog.Info("Ignoring watch event of type", "event type", string(event.Type))
 		}
-		slog.Info("Removing filters for namespace", "namespace", fileName)
-		f.deleteNamespaceFilters(fileName)
-		slog.Info("Removed filters for namespace", "namespace", fileName)
-	default:
-		// fsnotify.Chmod is the only case not handled, but we don't care if file permissions change
-		slog.Info("Ignoring file system event", "event", event.String())
 	}
 }
 
@@ -386,9 +256,4 @@ func (f *Filters) MustArchiveOnDelete(ctx context.Context, obj *unstructured.Uns
 	ngvk := NamespaceGVKFromObject(obj)
 	program, exists := f.archiveOnDelete[ngvk]
 	return exists && ocel.ExecuteBooleanCEL(ctx, program, obj)
-}
-
-// Path returns f.path, which is the directory where the ConfigMap is mounted.
-func (f *Filters) Path() string {
-	return f.path
 }

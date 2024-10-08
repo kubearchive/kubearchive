@@ -50,3 +50,17 @@ This document lists and details the database schema used by KubeArchive.
 |jsonb not null
 |Resource definition in JSON format.
 |===
+
+== Indexes
+
+[%header, cols="2m,2m"]
+|===
+|Name
+|Fields
+
+|resource_kind_idx
+|kind,api_version
+
+|resource_kind_namespace_idx
+|kind, api_version, namespace
+|===

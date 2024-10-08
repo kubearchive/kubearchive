@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.4 (Debian 16.4-1.pgdg110+1)
--- Dumped by pg_dump version 16.1
+-- Dumped from database version 16.4 (Debian 16.4-1.pgdg110+2)
+-- Dumped by pg_dump version 16.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -88,6 +88,20 @@ ALTER TABLE ONLY public.resource
 
 
 --
+-- Name: resource_kind_idx; Type: INDEX; Schema: public; Owner: kubearchive
+--
+
+CREATE INDEX resource_kind_idx ON public.resource USING btree (kind, api_version);
+
+
+--
+-- Name: resource_kind_namespace_idx; Type: INDEX; Schema: public; Owner: kubearchive
+--
+
+CREATE INDEX resource_kind_namespace_idx ON public.resource USING btree (kind, api_version, namespace);
+
+
+--
 -- Name: resource set_timestamp; Type: TRIGGER; Schema: public; Owner: kubearchive
 --
 
@@ -97,4 +111,3 @@ CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.resource FOR EACH ROW EXECU
 --
 -- PostgreSQL database dump complete
 --
-

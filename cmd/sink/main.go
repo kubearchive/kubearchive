@@ -17,7 +17,6 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/sink/filters"
 	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	"github.com/kubearchive/kubearchive/pkg/database"
-	"github.com/kubearchive/kubearchive/pkg/files"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	kaObservability "github.com/kubearchive/kubearchive/pkg/observability"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -219,23 +218,18 @@ func main() {
 		}
 	}(db)
 
-	filters, err := filters.NewFilters()
+	clientset, err := k8s.GetKubernetesClientset()
 	if err != nil {
-		slog.Error(
-			"Not all filters could be created from the ConfigMap. Some archive and delete operations will not execute until the errors are resolved",
-			"err", err,
-		)
+		slog.Error("Could not get a kubernetes client", "error", err)
+		os.Exit(1)
 	}
-	stopUpdating, err := files.UpdateOnPaths(filters.Update, filters.Path())
+	filters := filters.NewFilters(clientset)
+	stopUpdating, err := filters.Update()
 	if err != nil {
-		slog.Error("Could not listen for updates to filters", "err", err)
+		slog.Error("Could not listen for updates to filters:", "error", err)
+		os.Exit(1)
 	}
-	defer func() {
-		err := stopUpdating()
-		if err != nil {
-			slog.Error("Encountered an issue stopping filter updates", "err", err)
-		}
-	}()
+	defer stopUpdating()
 	sink := NewSink(db, filters)
 	err = sink.EventClient.StartReceiver(context.Background(), sink.Receive)
 	if err != nil {

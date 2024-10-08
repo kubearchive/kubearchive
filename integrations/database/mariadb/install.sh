@@ -11,6 +11,9 @@ NAMESPACE="mariadb"
 
 # Install MariaDB operator.
 kubectl create ns mariadb-operator --dry-run=client -o yaml | kubectl apply -f -
+helm repo add mariadb-operator https://helm.mariadb.com/mariadb-operator
+helm repo update mariadb-operator
+helm upgrade --install --namespace mariadb-operator mariadb-operator-crds mariadb-operator/mariadb-operator-crds
 helm upgrade --install --namespace mariadb-operator mariadb-operator mariadb-operator/mariadb-operator
 kubectl -n mariadb-operator rollout status deployment --timeout=90s
 

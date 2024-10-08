@@ -3,7 +3,7 @@
 --
 
 -- Dumped from database version 16.4 (Debian 16.4-1.pgdg110+2)
--- Dumped by pg_dump version 16.4
+-- Dumped by pg_dump version 16.1
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -85,6 +85,27 @@ ALTER TABLE public.resource OWNER TO kubearchive;
 
 ALTER TABLE ONLY public.resource
     ADD CONSTRAINT resource_pkey PRIMARY KEY (uuid);
+
+
+--
+-- Name: idx_json_annotations; Type: INDEX; Schema: public; Owner: kubearchive
+--
+
+CREATE INDEX idx_json_annotations ON public.resource USING gin ((((data -> 'metadata'::text) -> 'annotations'::text)) jsonb_path_ops);
+
+
+--
+-- Name: idx_json_labels; Type: INDEX; Schema: public; Owner: kubearchive
+--
+
+CREATE INDEX idx_json_labels ON public.resource USING gin ((((data -> 'metadata'::text) -> 'labels'::text)) jsonb_path_ops);
+
+
+--
+-- Name: idx_json_owners; Type: INDEX; Schema: public; Owner: kubearchive
+--
+
+CREATE INDEX idx_json_owners ON public.resource USING gin ((((data -> 'metadata'::text) -> 'ownerReferences'::text)) jsonb_path_ops);
 
 
 --

@@ -17,3 +17,12 @@ resources for one-shot builds and want to keep track of those builds over time.
 
 * [Code of Conduct](./CODE_OF_CONDUCT.md)
 * [Documentation](https://kubearchive.github.io/kubearchive/main/index.html)
+* [KubeArchive's Contribution Guide](https://kubearchive.github.io/kubearchive/main/contributors/guide.html)
+
+## Get In Touch
+
+You can get in touch with the KubeArchive team at:
+
+* [Slack](https://kubernetes.slack.com/archives/C07MB5YBVCL) to get an invite go [here](https://slack.k8s.io/)
+* [KubeArchive mailing list](https://groups.google.com/g/kubearchive)
+* [KubeArchive Developers mailing list](https://groups.google.com/g/kubearchive-developers)

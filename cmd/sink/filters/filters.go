@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	globalKey       = "_global"
+	globalKey       = "kubearchive"
 	mountPathEnvVar = "MOUNT_PATH"
 )
 

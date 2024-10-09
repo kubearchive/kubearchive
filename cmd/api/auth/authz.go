@@ -42,6 +42,11 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface, cache *c
 			return
 		}
 
+		verb := "list"
+		if c.Param("name") != "" {
+			verb = "get"
+		}
+
 		sar, err := sari.Create(c.Request.Context(), &apiAuthzv1.SubjectAccessReview{
 			Spec: apiAuthzv1.SubjectAccessReviewSpec{
 				User:   userInfo.Username,
@@ -51,7 +56,8 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface, cache *c
 					Group:     c.Param("group"),
 					Version:   c.Param("version"),
 					Resource:  c.Param("resourceType"),
-					Verb:      "get",
+					Name:      c.Param("name"),
+					Verb:      verb,
 				},
 			},
 		}, metav1.CreateOptions{})

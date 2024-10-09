@@ -37,19 +37,60 @@ func (c *fakeSubjectAccessReviews) Create(ctx context.Context, subjectAccessRevi
 
 func TestAuthZMiddleware(t *testing.T) {
 	tests := []struct {
-		name       string
-		authorized bool
-		expected   int
+		name         string
+		authorized   bool
+		resourceName string
+		namespace    string
+		verb         string
+		expected     int
 	}{
 		{
-			name:       "Unauthorized",
-			authorized: false,
-			expected:   http.StatusUnauthorized,
+			name:         "Unauthorized list core resource request",
+			authorized:   false,
+			resourceName: "",
+			namespace:    "",
+			verb:         "list",
+			expected:     http.StatusUnauthorized,
 		},
 		{
-			name:       "Authorized",
-			authorized: true,
-			expected:   http.StatusOK,
+			name:         "Authorized list core resource request",
+			authorized:   true,
+			resourceName: "",
+			namespace:    "",
+			verb:         "list",
+			expected:     http.StatusOK,
+		},
+		{
+			name:         "Unauthorized list namespaced resource request",
+			authorized:   false,
+			resourceName: "",
+			namespace:    "ns",
+			verb:         "list",
+			expected:     http.StatusUnauthorized,
+		},
+		{
+			name:         "Authorized list namespaced resource request",
+			authorized:   true,
+			resourceName: "",
+			namespace:    "ns",
+			verb:         "list",
+			expected:     http.StatusOK,
+		},
+		{
+			name:         "Unauthorized get namespaced resource request",
+			authorized:   true,
+			resourceName: "test-resource",
+			namespace:    "ns",
+			verb:         "get",
+			expected:     http.StatusOK,
+		},
+		{
+			name:         "Authorized list namespaced resource request",
+			authorized:   true,
+			resourceName: "test-resource",
+			namespace:    "ns",
+			verb:         "get",
+			expected:     http.StatusOK,
 		},
 	}
 
@@ -64,6 +105,8 @@ func TestAuthZMiddleware(t *testing.T) {
 				gin.Param{Key: "group", Value: group},
 				gin.Param{Key: "version", Value: version},
 				gin.Param{Key: "resourceType", Value: resource},
+				gin.Param{Key: "namespace", Value: tc.namespace},
+				gin.Param{Key: "name", Value: tc.resourceName},
 			}
 			c.Request, _ = http.NewRequest(http.MethodGet, "", nil)
 			RBACAuthorization(fsar, cache, cacheExpirationDuration, cacheExpirationDuration)(c)
@@ -72,8 +115,8 @@ func TestAuthZMiddleware(t *testing.T) {
 			assert.Equal(t, group, ra.Group)
 			assert.Equal(t, resource, ra.Resource)
 			assert.Equal(t, version, ra.Version)
-			assert.Equal(t, "get", ra.Verb)
-			assert.Equal(t, "", ra.Namespace)
+			assert.Equal(t, tc.verb, ra.Verb)
+			assert.Equal(t, tc.namespace, ra.Namespace)
 			assert.Equal(t, tc.authorized, cache.Get("fakeusername"), "Cache should be populated with the proper value.")
 		})
 	}

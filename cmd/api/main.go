@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/auth"
 	"github.com/kubearchive/kubearchive/cmd/api/discovery"
+	"github.com/kubearchive/kubearchive/cmd/api/pagination"
 	"github.com/kubearchive/kubearchive/cmd/api/routers"
 	"github.com/kubearchive/kubearchive/pkg/cache"
 	"github.com/kubearchive/kubearchive/pkg/database"
@@ -71,6 +72,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 		// TODO - Probably want to use cache for the discovery client
 		// See https://pkg.go.dev/k8s.io/client-go/discovery/cached/disk#NewCachedDiscoveryClientForConfig
 		group.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient(), cache))
+		group.Use(pagination.Middleware())
 	}
 
 	router.GET("/livez", controller.Livez)

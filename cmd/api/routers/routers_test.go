@@ -53,7 +53,7 @@ func TestGetAllResources(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
 		t.Fail()
 	}
-	assert.Equal(t, NewList(nonCoreResources), resources)
+	assert.Equal(t, NewList(nonCoreResources, ""), resources)
 }
 
 func TestGetNamespacedResources(t *testing.T) {
@@ -68,7 +68,7 @@ func TestGetNamespacedResources(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
 		t.Fail()
 	}
-	assert.Equal(t, NewList(nonCoreResources), resources)
+	assert.Equal(t, NewList(nonCoreResources, ""), resources)
 }
 
 func TestGetNamespacedResourcesByName(t *testing.T) {
@@ -98,7 +98,7 @@ func TestGetResourcesEmpty(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
 		t.Fail()
 	}
-	assert.Equal(t, NewList(nil), resources)
+	assert.Equal(t, NewList(nil, ""), resources)
 }
 
 func TestGetAllCoreResources(t *testing.T) {
@@ -113,7 +113,7 @@ func TestGetAllCoreResources(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
 		t.Fail()
 	}
-	assert.Equal(t, NewList(coreResources), resources)
+	assert.Equal(t, NewList(coreResources, ""), resources)
 }
 
 func TestGetCoreNamespacedResources(t *testing.T) {
@@ -128,7 +128,7 @@ func TestGetCoreNamespacedResources(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
 		t.Fail()
 	}
-	assert.Equal(t, NewList(coreResources), resources)
+	assert.Equal(t, NewList(coreResources, ""), resources)
 }
 
 func TestGetCoreNamespacedResourcesByName(t *testing.T) {

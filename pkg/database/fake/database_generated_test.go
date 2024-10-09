@@ -77,7 +77,7 @@ func TestQueryResources(t *testing.T) {
 	db := NewFakeDatabase(testResources)
 
 	for _, tt := range tests {
-		filteredResources, err := db.QueryResources(context.TODO(), tt.kind, tt.group, tt.version)
+		filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.group, tt.version, "", "", "")
 		assert.Equal(t, tt.expected, filteredResources)
 		assert.Nil(t, err)
 	}
@@ -142,7 +142,7 @@ func TestQueryNamespacedResources(t *testing.T) {
 
 	db := NewFakeDatabase(testResources)
 	for _, tt := range tests {
-		filteredResources, err := db.QueryNamespacedResources(context.TODO(), tt.kind, tt.group, tt.version, tt.namespace)
+		filteredResources, _, _, err := db.QueryNamespacedResources(context.TODO(), tt.kind, tt.group, tt.version, tt.namespace, "", "", "")
 		assert.Equal(t, tt.expected, filteredResources)
 		assert.Nil(t, err)
 	}
@@ -288,7 +288,7 @@ func TestQueryCoreResources(t *testing.T) {
 	db := NewFakeDatabase(testResources)
 
 	for _, tt := range tests {
-		filteredResources, err := db.QueryCoreResources(context.TODO(), tt.kind, tt.version)
+		filteredResources, _, _, err := db.QueryCoreResources(context.TODO(), tt.kind, tt.version, "", "", "")
 		assert.Equal(t, tt.expected, filteredResources)
 		assert.Nil(t, err)
 	}
@@ -339,7 +339,7 @@ func TestQueryNamespacedCoreResources(t *testing.T) {
 	db := NewFakeDatabase(testResources)
 
 	for _, tt := range tests {
-		filteredResources, err := db.QueryNamespacedCoreResources(context.TODO(), tt.kind, tt.version, tt.namespace)
+		filteredResources, _, _, err := db.QueryNamespacedCoreResources(context.TODO(), tt.kind, tt.version, tt.namespace, "", "", "")
 		assert.Equal(t, tt.expected, filteredResources)
 		assert.Nil(t, err)
 	}

@@ -27,21 +27,37 @@ func (info PostgreSQLDatabaseInfo) GetConnectionString() string {
 }
 
 func (info PostgreSQLDatabaseInfo) GetResourcesSQL() string {
-	return "SELECT data FROM resource WHERE kind=$1 AND api_version=$2"
+	return "SELECT data->'metadata'->'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 ORDER BY ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid)"
+}
+
+func (info PostgreSQLDatabaseInfo) GetResourcesLimitedSQL() string {
+	return "SELECT data->'metadata'->'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 ORDER BY ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid) LIMIT $3"
+}
+
+func (info PostgreSQLDatabaseInfo) GetResourcesLimitedContinueSQL() string {
+	return "SELECT data->'metadata'->'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 AND ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid) > ($3, $4) ORDER BY ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid) LIMIT $5"
 }
 
 func (info PostgreSQLDatabaseInfo) GetNamespacedResourcesSQL() string {
-	return "SELECT data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3"
+	return "SELECT data->'metadata'->'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 ORDER BY ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid)"
+}
+
+func (info PostgreSQLDatabaseInfo) GetNamespacedResourcesLimitedSQL() string {
+	return "SELECT data->'metadata'->'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 ORDER BY ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid) LIMIT $4"
+}
+
+func (info PostgreSQLDatabaseInfo) GetNamespacedResourcesLimitedContinueSQL() string {
+	return "SELECT data->'metadata'->'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid) > ($4, $5) ORDER BY ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid) LIMIT $6"
+}
+
+func (info PostgreSQLDatabaseInfo) GetNamespacedResourceByNameSQL() string {
+	return "SELECT data->'metadata'->'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND name=$4"
 }
 
 func (info PostgreSQLDatabaseInfo) GetWriteResourceSQL() string {
 	return "INSERT INTO resource (uuid, api_version, kind, name, namespace, resource_version, cluster_deleted_ts, data) " +
 		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8) " +
 		"ON CONFLICT(uuid) DO UPDATE SET name=$4, namespace=$5, resource_version=$6, cluster_deleted_ts=$7, data=$8"
-}
-
-func (info PostgreSQLDatabaseInfo) GetNamespacedResourceByNameSQL() string {
-	return "SELECT data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND name=$4"
 }
 
 type PostgreSQLDatabase struct {

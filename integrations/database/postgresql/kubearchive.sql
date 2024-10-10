@@ -60,6 +60,18 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: log_url; Type: TABLE; Schema: public; Owner: kubearchive
+--
+
+CREATE TABLE public.log_url (
+    uuid uuid NOT NULL,
+    url text NOT NULL
+);
+
+
+ALTER TABLE public.log_url OWNER TO kubearchive;
+
+--
 -- Name: resource; Type: TABLE; Schema: public; Owner: kubearchive
 --
 
@@ -109,6 +121,13 @@ CREATE INDEX idx_json_owners ON public.resource USING gin ((((data -> 'metadata'
 
 
 --
+-- Name: log_url_uuid_idx; Type: INDEX; Schema: public; Owner: kubearchive
+--
+
+CREATE INDEX log_url_uuid_idx ON public.resource USING btree (uuid);
+
+
+--
 -- Name: resource_kind_idx; Type: INDEX; Schema: public; Owner: kubearchive
 --
 
@@ -130,5 +149,14 @@ CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.resource FOR EACH ROW EXECU
 
 
 --
+-- Name: log_url fk_uuid_resource; Type: FK CONSTRAINT; Schema: public; Owner: kubearchive
+--
+
+ALTER TABLE ONLY public.log_url
+    ADD CONSTRAINT fk_uuid_resource FOREIGN KEY (uuid) REFERENCES public.resource(uuid);
+
+
+--
 -- PostgreSQL database dump complete
 --
+

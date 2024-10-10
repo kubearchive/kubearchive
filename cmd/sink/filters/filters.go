@@ -23,11 +23,17 @@ import (
 )
 
 const (
-	globalKey       = "kubearchive"
+	globalKeyEnvVar = "KUBEARCHIVE_NAMESPACE"
 	mountPathEnvVar = "MOUNT_PATH"
 )
 
 var ErrNoGlobal = errors.New("no global expressions exist")
+
+// getGlobalKey returns the key where global filters can be found in the sink-filters ConfigMap. Will return empty
+// string if the environment variable with the name specified by globalKeyEnvVar is not set.
+func getGlobalKey() string {
+	return os.Getenv(globalKeyEnvVar)
+}
 
 type Filters struct {
 	*sync.RWMutex
@@ -90,7 +96,7 @@ func getGlobalCelExprs(filterFiles map[string]string) (map[string]string, map[st
 	archiveExprs := make(map[string]string)
 	deleteExprs := make(map[string]string)
 	archiveOnDelete := make(map[string]string)
-	globalFile, exists := filterFiles[globalKey]
+	globalFile, exists := filterFiles[getGlobalKey()]
 	if !exists {
 		return archiveExprs, deleteExprs, archiveOnDelete, ErrNoGlobal
 	}
@@ -112,7 +118,7 @@ func (f *Filters) changeGlobalFilters(
 	filterFiles, globalArchive, globalDelete, globalArchiveOnDelete map[string]string,
 ) error {
 	errList := []error{}
-	delete(filterFiles, globalKey)
+	delete(filterFiles, getGlobalKey())
 	archiveMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	deleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	archiveOnDeleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
@@ -283,7 +289,7 @@ func (f *Filters) handleFsEvent(event fsnotify.Event) {
 			slog.Info("Could not read global filters", "err", err)
 			break
 		}
-		if fileName == globalKey {
+		if fileName == getGlobalKey() {
 			slog.Info("Creating global filters")
 			err = f.changeGlobalFilters(filePaths, globalArchive, globalDelete, globalArchiveOnDelete)
 			if err != nil {
@@ -312,7 +318,7 @@ func (f *Filters) handleFsEvent(event fsnotify.Event) {
 			break
 		}
 		slog.Info("File was deleted. Updating filters accordingly", "file", event.Name)
-		if fileName == globalKey {
+		if fileName == getGlobalKey() {
 			slog.Info("Removing global filters")
 			filePaths, err := files.DirectoryFiles(dir)
 			if err != nil {

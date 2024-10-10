@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"os"
 	"sync"
 
 	"github.com/google/cel-go/cel"
@@ -25,12 +26,18 @@ import (
 )
 
 const (
-	globalKey     = "kubearchive"
-	k9eNamespace  = "kubearchive"
+	globalKeyEnvVar = "KUBEARCHIVE_NAMESPACE"
 	filtersCmName = "sink-filters"
 )
 
-var ErrNoGlobal = errors.New("no global expressions exist")
+var (
+	ErrNoGlobal = errors.New("no global expressions exist")
+	globalKey   string // gets set in init() and should be treated as const
+)
+
+func init() {
+	globalKey = os.Getenv(globalKeyEnvVar)
+}
 
 type Filters struct {
 	*sync.RWMutex
@@ -169,9 +176,9 @@ func noopUpdateStopper() {}
 // Update updates the archive, delete, and archiveOnDelete filters when the ConfigMap changes.
 func (f *Filters) Update() (UpdateStopper, error) {
 	watcher := func(options metav1.ListOptions) (watch.Interface, error) {
-		return f.clientset.CoreV1().ConfigMaps(k9eNamespace).Watch(
+		return f.clientset.CoreV1().ConfigMaps(globalKey).Watch(
 			context.Background(),
-			metav1.SingleObject(metav1.ObjectMeta{Name: filtersCmName, Namespace: k9eNamespace}),
+			metav1.SingleObject(metav1.ObjectMeta{Name: filtersCmName, Namespace: globalKey}),
 		)
 	}
 	retryWatcher, err := toolsWatch.NewRetryWatcher("1", &cache.ListWatch{WatchFunc: watcher})

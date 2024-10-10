@@ -349,7 +349,7 @@ func (f *Filters) MustArchive(ctx context.Context, obj *unstructured.Unstructure
 	defer f.RUnlock()
 	ngvk := NamespaceGVKFromObject(obj)
 	program, exists := f.archive[ngvk]
-	return f.mustDelete(ctx, obj) || (exists && ocel.ExecuteCel(ctx, program, obj))
+	return f.mustDelete(ctx, obj) || (exists && ocel.ExecuteBooleanCEL(ctx, program, obj))
 }
 
 // MustDelete returns whether obj needs to be deleted. Obj needs to be deleted if the cel program in delete that matches
@@ -372,7 +372,7 @@ func (f *Filters) mustDelete(ctx context.Context, obj *unstructured.Unstructured
 	}
 	ngvk := NamespaceGVKFromObject(obj)
 	program, exists := f.delete[ngvk]
-	return exists && ocel.ExecuteCel(ctx, program, obj)
+	return exists && ocel.ExecuteBooleanCEL(ctx, program, obj)
 }
 
 // MustArchiveOnDelete returns whether obj needs to be archived if it was already deleted. Obj need to be archived if
@@ -385,7 +385,7 @@ func (f *Filters) MustArchiveOnDelete(ctx context.Context, obj *unstructured.Uns
 	defer f.RUnlock()
 	ngvk := NamespaceGVKFromObject(obj)
 	program, exists := f.archiveOnDelete[ngvk]
-	return exists && ocel.ExecuteCel(ctx, program, obj)
+	return exists && ocel.ExecuteBooleanCEL(ctx, program, obj)
 }
 
 // Path returns f.path, which is the directory where the ConfigMap is mounted.

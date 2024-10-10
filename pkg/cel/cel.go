@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
+	"github.com/google/cel-go/common/types/ref"
 	celext "github.com/google/cel-go/ext"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -19,6 +20,10 @@ import (
 func CreateCelExprOr(exprs ...string) (*cel.Program, error) {
 	exprs = FormatCelExprs(exprs...)
 	expr := strings.Join(exprs, " || ")
+	return CompileCELExpr(expr)
+}
+
+func CompileCELExpr(expr string) (*cel.Program, error) {
 	mapStrDyn := decls.NewMapType(decls.String, decls.Dyn)
 	env, err := cel.NewEnv(
 		celext.Strings(),
@@ -65,14 +70,19 @@ func FormatCelExprs(exprs ...string) []string {
 	return newExprs
 }
 
-// executeCel executes the cel program with obj as the input. If the program returns and error or if the program returns
-// a value that cannot be converted to bool, false is returned. Otherwise the bool returned by the cel program is
-// returned.
-func ExecuteCel(ctx context.Context, program cel.Program, obj *unstructured.Unstructured) bool {
-	val, _, err := program.ContextEval(ctx, obj.Object)
-	if err != nil {
+// ExecuteBoolean CEL executes the cel program with obj as the input. If the program returns and error or
+// if the program returns a value that cannot be converted to bool, false is returned. Otherwise the bool
+// returned by the CEL program is returned.
+func ExecuteBooleanCEL(ctx context.Context, program cel.Program, obj *unstructured.Unstructured) bool {
+	val := ExecuteCEL(ctx, program, obj)
+	if val == nil {
 		return false
 	}
 	boolVal, ok := val.Value().(bool)
 	return ok && boolVal
+}
+
+func ExecuteCEL(ctx context.Context, program cel.Program, obj *unstructured.Unstructured) ref.Val {
+	val, _, _ := program.ContextEval(ctx, obj.Object)
+	return val
 }

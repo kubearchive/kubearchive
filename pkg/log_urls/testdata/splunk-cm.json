@@ -1,0 +1,7 @@
+{
+  "POD_ID": "cel:metadata.uid",
+  "CONTAINER_NAME": "cel:spec.containers.map(m, m.name)",
+  "POD": "spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"{POD_ID}\"",
+  "CONTAINER": "spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"{CONTAINER_NAME}\"",
+  "LOG_URL": "http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}"
+}

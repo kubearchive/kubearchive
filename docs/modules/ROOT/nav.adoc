@@ -14,3 +14,6 @@
 
 * Reference
 ** xref:reference/database.adoc[]
+
+* Design
+** xref:design/logging-integration.adoc[]

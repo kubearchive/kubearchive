@@ -2,7 +2,7 @@
 
 This document lists and details the database schema used by KubeArchive.
 
-== Table `kubearchive.resource`
+== Table `resource`
 
 [%header, cols="2m,2m,3"]
 |===
@@ -63,4 +63,22 @@ This document lists and details the database schema used by KubeArchive.
 
 |resource_kind_namespace_idx
 |kind, api_version, namespace
+
+|===
+
+== Table `log_url`
+
+[%header, cols="2m,2m,3"]
+|===
+|Name
+|Type
+|Description
+
+|uuid
+|uuid not null
+|The UUID of the Kubernetes resource in the `resource` table.
+
+|url
+|url not null
+|The generated URL of the log file.
 |===

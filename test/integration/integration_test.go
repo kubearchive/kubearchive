@@ -4,15 +4,26 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"net/http"
+
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	"github.com/kubearchive/kubearchive/test"
+	authenticationv1 "k8s.io/api/authentication/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -169,6 +180,136 @@ func TestDatabaseConnection(t *testing.T) {
 
 		return errors.New("Pod didn't connect successfully to the database yet")
 	})
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+}
+
+func TestArchiveAndRead(t *testing.T) {
+	clientset, errClient := test.GetKubernetesClient()
+	if errClient != nil {
+		t.Fatal(errClient)
+	}
+
+	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
+	_, errNamespace := clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespaceName,
+		},
+	}, metav1.CreateOptions{})
+	if errNamespace != nil {
+		t.Fatal(errNamespace)
+	}
+	// This register the function.
+	t.Cleanup(func() {
+		// delete the test namespace
+		errNamespace = clientset.CoreV1().Namespaces().Delete(context.Background(), namespaceName, metav1.DeleteOptions{})
+		if errNamespace != nil {
+			t.Fatal(errNamespace)
+		}
+	})
+	// Call the log-generator.
+	namespaceCmd := fmt.Sprintf("--namespace=%s", namespaceName)
+	cmd := exec.Command("bash", "../log-generators/cronjobs/install.sh", namespaceCmd, "--num-jobs=1")
+	output, errScript := cmd.CombinedOutput()
+	if errScript != nil {
+		fmt.Println("Could not run the log-generator: ", errScript)
+		t.Fatal(errScript)
+	}
+	fmt.Println("Output: ", string(output))
+
+	_, errRoleBinding := clientset.RbacV1().RoleBindings(namespaceName).Create(context.Background(), &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "view-default-test",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "default",
+				Namespace: namespaceName,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "view",
+		},
+	},
+		metav1.CreateOptions{})
+
+	if errRoleBinding != nil {
+		t.Fatal(errRoleBinding)
+	}
+
+	// Retrieve the objects from the DB using the API.
+	secret, errSecret := clientset.CoreV1().Secrets("kubearchive").Get(context.Background(), "kubearchive-api-server-tls", metav1.GetOptions{})
+	if errSecret != nil {
+		t.Fatal(errSecret)
+	}
+
+	token, errToken := clientset.CoreV1().ServiceAccounts(namespaceName).CreateToken(context.Background(), "default", &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
+	if errToken != nil {
+		fmt.Printf("could not create a token, %s", errToken)
+		t.Fatal(errToken)
+	}
+
+	caCertPool := x509.NewCertPool()
+	appendCert := caCertPool.AppendCertsFromPEM(secret.Data["ca.crt"])
+	if !appendCert {
+		fmt.Printf("could not append the CA cert")
+		t.Fatal(errors.New("could not append the CA cert"))
+	}
+	clientHTTP := http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: caCertPool,
+			},
+		},
+	}
+
+	url := fmt.Sprintf("https://localhost:8081/apis/batch/v1/namespaces/%s/cronjobs", namespaceName)
+	request, errRequest := http.NewRequest("GET", url, nil)
+	if errRequest != nil {
+		fmt.Printf("could not create a request, %s", errRequest)
+		t.Fatal(errRequest)
+	}
+	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.Status.Token))
+
+	retryErr := retry.Do(func() error {
+		response, errResp := clientHTTP.Do(request)
+		if errResp != nil {
+			fmt.Printf("Couldn't get a response HTTP, %s\n", errResp)
+			t.Fatal(errResp)
+			return errResp
+		}
+		defer response.Body.Close()
+
+		body, errReadAll := io.ReadAll(response.Body)
+		if errReadAll != nil {
+			fmt.Printf("Couldn't read Body, %s\n", errReadAll)
+			return errReadAll
+		}
+		fmt.Printf("HTTP body: %s\n", body)
+
+		if response.StatusCode != http.StatusOK {
+			fmt.Printf("The HTTP status returned is not OK, %s\n", response.Status)
+			return errors.New(response.Status)
+		}
+		type Response struct {
+			Items []*unstructured.Unstructured `json:"items"`
+		}
+		var data Response
+		errJson := json.Unmarshal(body, &data)
+		if errJson != nil {
+			fmt.Printf("Couldn't unmarshal JSON, %s\n", errJson)
+			return errJson
+		}
+		if len(data.Items) == 1 {
+			return nil
+		}
+		return errors.New("could not retrieved a CronJob from the API")
+	}, retry.Attempts(20))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

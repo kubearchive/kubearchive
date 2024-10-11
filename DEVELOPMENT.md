@@ -222,7 +222,7 @@ start exploring metrics.
 ### Splunk
 To set up your development environment to use Splunk, run the following command:
     ```bash
-    test/logging/splunk/install.sh
+    integrations/logging/splunk/install.sh
     ```
 This will install the Splunk and Logging operators into the `splunk-operator` namespaces on your cluster.
 It will also configure logging so that all `Pod` logs are automatically sent to Splunk.

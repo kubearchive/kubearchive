@@ -1,0 +1,205 @@
+= Logging Integration
+
+== Overview
+
+KubeArchive needs to support logging, but it is not a logging system itself and
+does not implement logging. Instead, KubeArchive will integrate with logging systems
+and provide URLs for retrieving log files from the logging system for a specific
+Kubernetes resource.
+
+It is important to note that logs are tied to `Pods`. When a user requests the logs
+for a Tekton `PipelineRun`, what they expect to get back are the logs attached to the
+`Pods` that were part of the `PipelineRun`. Similar cases exist for requesting logs for
+`Jobs` and `CronJobs`. KubeArchive has to be able to handle this seamlessly for the user.
+
+== Retrieving Log Information
+
+In generic terms, this can be done using the owner reference field in a resource, a
+sort of backwards recursive search. When a `PipelineRun` is deleted, all the `TaskRuns`
+associated with the `PipelineRun`, and `Pods` associated with those `TaskRuns`, are
+deleted. This is done using the owner references.
+
+KubeArchive can do things similarly. When logs for a resource are requested, a query
+is made to find all the resources that have that initial resource as an owner. Then
+each resource returned is processed similarly, eventually building up a list of log
+file links. This generic approach should work for any resource.
+
+This also implies that KubeArchive is configured correctly to support this. It must
+be configured so that the initial resource and any dependent resources, all the way
+down to and including the `Pods`, are archived.
+
+Here's a sample `KubeArchiveConfig` as an example:
+[source,yaml]
+----
+---
+apiVersion: kubearchive.kubearchive.org/v1alpha1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+  namespace: test
+spec:
+  resources:
+    - deleteWhen: has(status.completionTime)
+      selector:
+        apiVersion: ""
+        kind: CronJob
+    - archiveOnDelete: true
+      selector:
+        apiVersion: ""
+        kind: Pod
+----
+So in this case, the `CronJob` is configured to be archived and deleted when
+the status contains a "completionTime" key. When that deletion happens,
+kubernetes will turn around and delete the associated `Pod`. Since we have
+configured `archiveOnDelete` for `Pods` to be true, KubeArchive will archive
+the `Pod` itself and generate the URLs for all the associated logs. The
+configuration would be similar for `PipelineRuns`, with the addition of
+the archiving of the `TaskRuns`.
+
+[IMPORTANT]
+====
+
+- KubeArchive has no responsibility for sending the logs to the logging system.
+This is all configured elsewhere and outside of KubeArchive.
+- When the `Pod` is archived, the URL for accessing the log should be generated
+and stored with it. There is no attempt to query the logging system to verify
+the existence of the log.
+
+====
+
+Here's another sample `KubeArchiveConfig` for `PipelineRuns`:
+[source,yaml]
+----
+---
+apiVersion: kubearchive.kubearchive.org/v1alpha1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+  namespace: test
+spec:
+  resources:
+    - selector:
+        apiVersion: tekton.dev/v1
+        kind: PipelineRun
+      deleteWhen: has(status.completionTime)
+    - selector:
+        apiVersion: tekton.dev/v1
+        kind: TaskRun
+      archiveOnDelete: true
+    - selector:
+        apiVersion: v1
+        kind: Pod
+      archiveOnDelete: has(body.metadata.labels["tekton.dev/pipeline"])
+----
+In this case the following happens:
+
+- `PipelineRuns` are archived when they complete.
+- `TaskRuns` are archived when they are deleted.
+- `Pods` are archived when they are deleted and are also part of a Tekton `Pipeline`.
+
+== Generating Log URLs
+
+The logging system is an integration in KubeArchive. All that is required for
+the integration is the successful generation of a URL to access the log for a
+specific `Pod` in the logging system. URLs will ONLY be generated for `Pods`.
+
+To support multiple logging systems, the URLs must be able to be parameterized
+based on the logging system. This is done via a `ConfigMap` named for the
+logging system being implemented. This `ConfigMap` requires a single entry,
+LOG_URL, whose string value will be interpolated using the other variables
+defined in the `ConfigMap`.  For example, take this `ConfigMap` for Splunk:
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-splunk
+  namespace: kubearchive
+data:
+  POD_ID: cel:metadata.uid
+  CONTAINER_NAME: cel:spec.containers.map(m, m.name)
+  POD: 'spath "kubernetes.pod_id" | search "kubernetes.pod_id"="{POD_ID}"'
+  CONTAINER: 'spath "kubernetes.container_name" | search "kubernetes.container_name"="{CONTAINER_NAME}"'
+  LOG_URL: http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}
+----
+The value of each variable is either a string or a CEL expression. A value that
+begins with the prefix "cel:" will be evaluated as a CEL expression against the
+body of the cloud event (i.e. the resource) to determine the real value of that
+variable used in the substitution. For example:
+
+So when generating the logging URL to be stored when a `Pod` is archived,
+the following steps are done:
+
+1. A map is created and populated all non-CEL expression key-value pairs from the `ConfigMap`.
+1. All variables containing CEL expression variables are added to the map, and the 
+   value for each of these variables is the value returned by evaluating the CEL expression.
+1. The value for LOG_URL is then interpolated recursively using this map until no more
+   substitutions are done, resulting in the final URL to the log in the logging system.
+
+== Implementation
+
+=== Database
+
+The KubeArchive database will have a table named `log_url` with three fields:
+
+1. A `uuid` field which is a foreign key to `resource.uuid`.  
+1. A `url` field which is the URL for one of the logs.
+
+The `uuid` field should point back to a `Pod` entry in the `resource` table.
+
+=== Sink
+
+When the sink archives a `Pod`, it must take the additional step go gather all
+the log information and generate the log URL for each. These are stored in the 
+`log_url` table.
+
+The sink should first delete any existing entries in the `log_url` table for the
+`Pod` being archived. Earlier archival requests may have already created records
+in the `log_url` table, and they should be removed to avoid duplicates.
+
+The sink will also need to mount and use the `ConfigMap` for logging as detailed 
+in the <<Configuration>> section.
+
+=== CLI
+
+The CLI will implement a `logs` command similar to `kubectl logs`. 
+[source,bash]
+----
+ka logs resource name
+----
+This command will return the URLs of the logs associated with the resource of type name. For
+example:
+[source,bash]
+----
+ka logs PipelineRun generate-logs-9fkp8 -n generate-logs-pipelines
+----
+This will return all the log URLs associated with the `PipelineRun` named "generate-logs-9fkp8".
+
+The CLI will have to traverse the owner references to gather all of the logs associated
+with the given resource. Note that logs could be queried for any resource. Most
+resource will not have any logs associated with them or their descendents, but queries on
+logs for `TaskRuns` and `Pods` are possible.
+
+=== API
+
+The API needs to providate a mechanism similar to the CLI for retrieving log URLs.
+
+=== Configuration
+
+KubeArchive will need to have a `ConfigMap` for configuring logging (and potentially 
+other things). This `ConfigMap` should be named `kubearchive-config` and reside in the
+installation namespace.
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-config
+  namespace: kubearchive
+data:
+  logging-configmap-name: kubearchive-splunk
+----
+The sink should check this `ConfigMap`, and if it exists and the `logging-configmap-name` key
+is set, it should mount that `ConfigMap` and use it for generating log URLs.

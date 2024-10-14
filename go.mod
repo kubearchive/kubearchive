@@ -27,7 +27,7 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.30.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.31.0
 	go.opentelemetry.io/otel/sdk v1.31.0
-	go.opentelemetry.io/otel/sdk/metric v1.30.0
+	go.opentelemetry.io/otel/sdk/metric v1.31.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.31.1
 	k8s.io/apimachinery v0.31.1

@@ -1,0 +1,194 @@
+= Logging Integrations
+
+== Overview
+
+KubeArchive supports logging, but it is not a logging system itself and
+does not implement logging. Instead, KubeArchive integrates with logging systems
+and provide URLs for retrieving log files from the logging system for a specific
+Kubernetes resource.
+
+It is important to note that logs are tied to `Pods`. When a user requests the logs
+for a Tekton `PipelineRun`, what they expect to get back are the logs attached to the
+`Pods` that were part of the `PipelineRun`. Similar cases exist for requesting logs for
+`Jobs` and `CronJobs`. KubeArchive handles this seamlessly for the user.
+
+== KubeArchiveConfig Configuration
+
+KubeArchive retrieves log URLs using the owner references field of a resource.
+When logs for a resource are requested, a query is made to find all the resources
+that have that initial resource as an owner. Then each resource returned is
+processed similarly, eventually building up a list of `Pods` and from those a 
+list of log file links. This generic approach works for any resource.
+
+A `KubeArchiveConfig` needs to be configured correctly to support this, meaning it must
+be configured so that the initial resource and any dependent resources, all the way
+down to and including the `Pods`, are archived.
+
+Here's a sample `KubeArchiveConfig` as an example:
+[source,yaml]
+----
+---
+apiVersion: kubearchive.kubearchive.org/v1alpha1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+  namespace: test
+spec:
+  resources:
+    - deleteWhen: has(status.completionTime)
+      selector:
+        apiVersion: ""
+        kind: CronJob
+    - archiveOnDelete: true
+      selector:
+        apiVersion: ""
+        kind: Pod
+----
+In this example, the `CronJob` is configured to be archived and deleted when
+the status contains a "completionTime" key. When that deletion happens,
+kubernetes will in turn delete the associated `Pod`. Since we have
+configured `archiveOnDelete` for `Pods` to be true, KubeArchive will archive
+the `Pod` itself and generate the URLs for all the associated logs.
+
+[IMPORTANT]
+====
+
+- KubeArchive has no responsibility for sending the logs to the logging system.
+This is all configured elsewhere and outside of KubeArchive.
+- When the `Pod` is archived, the URL for accessing the log are generated
+and stored with it. There is no attempt to query the logging system to verify
+the existence of the log.
+
+====
+
+Here's another sample `KubeArchiveConfig` for `PipelineRuns`:
+[source,yaml]
+----
+---
+apiVersion: kubearchive.kubearchive.org/v1alpha1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+  namespace: test
+spec:
+  resources:
+    - selector:
+        apiVersion: tekton.dev/v1
+        kind: PipelineRun
+      deleteWhen: has(status.completionTime)
+    - selector:
+        apiVersion: tekton.dev/v1
+        kind: TaskRun
+      archiveOnDelete: true
+    - selector:
+        apiVersion: v1
+        kind: Pod
+      archiveOnDelete: has(body.metadata.labels["tekton.dev/pipeline"])
+----
+In this example the following happens:
+
+- `PipelineRuns` are archived when they complete.
+- `TaskRuns` are archived when they are deleted.
+- `Pods` are archived when they are deleted and are also part of a Tekton `Pipeline`.
+
+== Configuring Log URL Generation
+
+Logging URL generation in KubeArchive is controlled using a `ConfigMap` in 
+the KubeArchive installation namespace.  URLs are generated using parameters
+that allow the URL to point to the specific log file associated with the 
+given `Pod`. This `ConfigMap` requires a single entry, LOG_URL, whose string
+value will be interpolated using the other variables defined in the `ConfigMap`.
+For example, take this `ConfigMap` for Splunk:
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-splunk
+  namespace: kubearchive
+data:
+  POD_ID: cel:metadata.uid
+  CONTAINER_NAME: cel:spec.containers.map(m, m.name)
+  POD: 'spath "kubernetes.pod_id" | search "kubernetes.pod_id"="{POD_ID}"'
+  CONTAINER: 'spath "kubernetes.container_name" | search "kubernetes.container_name"="{CONTAINER_NAME}"'
+  LOG_URL: http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}
+----
+The value of each variable is either a string or a CEL expression. A value that
+begins with the prefix "cel:" will be evaluated as a CEL expression against the
+body of the cloud event (i.e. the resource) to determine the real value of that
+variable used in the substitution. For example:
+
+When generating a log URL to be stored when a `Pod` is archived, the following steps are done:
+
+1. All variables containing CEL expression variables are evaluated against the `Pod`
+   resource being archived.
+1. The value for LOG_URL is then interpolated recursively using the values in the `ConfigMap`
+   until no more substitutions are done, resulting in the final URL to the log in the
+   logging system.
+
+== KubeArchive Configuration
+
+Once the logging `ConfigMap` has been installed in the KubeArchive installation
+namespace, KubeArchive needs to be configured to recognize and use it.
+
+This is done by adding the logging "configMapRef to the "kubearchive-config" `ConfigMap` in
+the same namespace:
+
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-config
+data:
+  logging:
+    configMapRef: splunk-logging
+----
+
+== Supported Logging Systems
+
+KubeArchive currently integrates with both Splunk and Elasticsearch
+
+=== Elasticsearch
+
+Following is a sample `ConfigMap` that generates log URLs for Elasticsearch. Note the
+ElasticSearch requires a data view be defined in order to see logs in Kibana. In this 
+example the data view ID is hard-coded as DATA_VIEW_ID in the `ConfigMap`. This value
+needs to be changed to one appropriate for the Elasticsearch installation being used
+by KubeArchive.
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: es-logging
+  namespace: kubearchive
+data:
+  # A data view for fluentd must be created and the ID provided here.
+  DATA_VIEW_ID: "035bffd1-b4b5-4123-af57-d89368cabfd8"
+  CONTAINER_NAME: "cel:spec.containers.map(m, m.name)"
+  POD_ID: "cel:metadata.uid"
+  LOG_URL: "https://localhost:5601/app/discover#/?_a=(columns:!(),dataSource:(dataViewId:'{DATA_VIEW_ID}',type:dataView),filters:!(('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:_index,negate:!f,params:(query:fluentd),type:phrase),query:(match_phrase:(_index:fluentd))),('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:kubernetes.pod_id,negate:!f,params:(query:'{POD_ID}'),type:phrase),query:(match_phrase:(kubernetes.pod_id:'{POD_ID}'))),('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:kubernetes.container_name,negate:!f,params:(query:{CONTAINER_NAME}),type:phrase),query:(match_phrase:(kubernetes.container_name:{CONTAINER_NAME})))),interval:auto,query:(language:kuery,query:''),sort:!())"
+----
+
+=== Splunk
+
+Following is a sample `ConfigMap` for Splunk.
+
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: splunk-logging
+  namespace: kubearchive
+data:
+  CONTAINER: 'spath "kubernetes.container_name" | search "kubernetes.container_name"="{CONTAINER_NAME}"'
+  CONTAINER_NAME: "cel:spec.containers.map(m, m.name)"
+  POD: 'spath "kubernetes.pod_id" | search "kubernetes.pod_id"="{POD_ID}"'
+  POD_ID: "cel:metadata.uid"
+  LOG_URL: "http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}"
+----

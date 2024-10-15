@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/abort"
 	"github.com/kubearchive/kubearchive/cmd/api/discovery"
+	"github.com/kubearchive/kubearchive/cmd/api/pagination"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -42,6 +43,7 @@ type List struct {
 func (c *Controller) GetAllResources(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
+	limit, uuid, date := pagination.GetValuesFromContext(context)
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
@@ -49,19 +51,27 @@ func (c *Controller) GetAllResources(context *gin.Context) {
 		return
 	}
 
-	resources, err := c.Database.QueryResources(context.Request.Context(), kind, group, version)
+	resources, lastUUID, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, group, version, limit, uuid, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	context.JSON(http.StatusOK, NewList(resources))
+	var continueToken string
+	if limit != "" {
+		// If the limit was specified, we create the token otherwise
+		// send an empty string
+		continueToken = pagination.CreateToken(lastUUID, lastDate)
+	}
+
+	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 
 func (c *Controller) GetNamespacedResources(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
 	namespace := context.Param("namespace")
+	limit, uuid, date := pagination.GetValuesFromContext(context)
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
@@ -69,13 +79,20 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 		return
 	}
 
-	resources, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, group, version, namespace)
+	resources, lastUUID, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, group, version, namespace, limit, uuid, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	context.JSON(http.StatusOK, NewList(resources))
+	continueToken := pagination.CreateToken(lastUUID, lastDate)
+	if limit == "" {
+		// When the limit is empty, we return an empty continueToken
+		// so there is no `continue` in the metadata answer
+		continueToken = ""
+	}
+
+	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 
 func (c *Controller) GetNamespacedResourceByName(context *gin.Context) {
@@ -101,6 +118,7 @@ func (c *Controller) GetNamespacedResourceByName(context *gin.Context) {
 
 func (c *Controller) GetAllCoreResources(context *gin.Context) {
 	version := context.Param("version")
+	limit, uuid, date := pagination.GetValuesFromContext(context)
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
@@ -108,18 +126,26 @@ func (c *Controller) GetAllCoreResources(context *gin.Context) {
 		return
 	}
 
-	resources, err := c.Database.QueryCoreResources(context.Request.Context(), kind, version)
+	resources, lastUUID, lastDate, err := c.Database.QueryCoreResources(context.Request.Context(), kind, version, limit, uuid, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	context.JSON(http.StatusOK, NewList(resources))
+	continueToken := pagination.CreateToken(lastUUID, lastDate)
+	if limit == "" {
+		// When the limit is empty, we return an empty continueToken
+		// so there is no `continue` in the metadata answer
+		continueToken = ""
+	}
+
+	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 
 func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 	version := context.Param("version")
 	namespace := context.Param("namespace")
+	limit, uuid, date := pagination.GetValuesFromContext(context)
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
@@ -127,13 +153,20 @@ func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 		return
 	}
 
-	resources, err := c.Database.QueryNamespacedCoreResources(context.Request.Context(), kind, version, namespace)
+	resources, lastUUID, lastDate, err := c.Database.QueryNamespacedCoreResources(context.Request.Context(), kind, version, namespace, limit, uuid, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	context.JSON(http.StatusOK, NewList(resources))
+	continueToken := pagination.CreateToken(lastUUID, lastDate)
+	if limit == "" {
+		// When the limit is empty, we return an empty continueToken
+		// so there is no `continue` in the metadata answer
+		continueToken = ""
+	}
+
+	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 
 func (c *Controller) GetNamespacedCoreResourceByName(context *gin.Context) {
@@ -186,11 +219,12 @@ func (c *Controller) Readyz(context *gin.Context) {
 // NewList creates a new List struct with apiVersion "v1",
 // kind "List" and resource Version "". These values
 // can be deserialized into any metav1.<Kind>List safely
-func NewList(resources []*unstructured.Unstructured) List {
+func NewList(resources []*unstructured.Unstructured, continueValue string) List {
+	metadata := map[string]string{"resourceVersion": "", "continue": continueValue}
 	return List{
 		ApiVersion: "v1",
 		Kind:       "List",
 		Items:      resources,
-		Metadata:   map[string]string{"resourceVersion": ""},
+		Metadata:   metadata,
 	}
 }

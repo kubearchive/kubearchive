@@ -23,11 +23,18 @@ import (
 )
 
 const (
-	globalKey       = "kubearchive"
+	globalKeyEnvVar = "KUBEARCHIVE_NAMESPACE"
 	mountPathEnvVar = "MOUNT_PATH"
 )
 
-var ErrNoGlobal = errors.New("no global expressions exist")
+var (
+	ErrNoGlobal = errors.New("no global expressions exist")
+	globalKey   string // gets set in init() and should be treated as const
+)
+
+func init() {
+	globalKey = os.Getenv(globalKeyEnvVar)
+}
 
 type Filters struct {
 	*sync.RWMutex

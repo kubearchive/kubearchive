@@ -33,8 +33,8 @@ sink:
   targetPort: 8080
   # number of kubearchive sink pods that should be deployed
   replicas: 1
-  # the path that the sink will mount the KubeArchive ConfigMap
-  mountPath: "/data/sink-filters"
+  # cannot be {{ tpl .Values.sink.name . }} because that conflicts with the role to delete resources in a namespace
+  watchRole: "{{ tpl .Values.sink.name . }}-watch"
 
 # values used to create the operator
 operator:

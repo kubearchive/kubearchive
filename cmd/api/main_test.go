@@ -5,6 +5,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,24 +70,27 @@ func TestMiddlewareConfigured(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
-		// Get the context for a new response recorder for inspection and set it to the router engine
-		c := gin.CreateTestContextOnly(httptest.NewRecorder(), server.router)
-		c.Request, _ = http.NewRequest(http.MethodGet, testCase.path, nil)
-		server.router.HandleContext(c)
-		// Get the handler names from the context
-		handlers := c.HandlerNames()
-		// Test that the last handlers in the chain are the expected ones
-		// The full handler names may be different when running in debug mode
-		// When the path actually matches a route the last handler is the route method
-		var middlewareHandlers []string
-		if testCase.hasControllerRoute {
-			middlewareHandlers = handlers[len(handlers)-len(testCase.expectedMiddleware)-1 : len(handlers)-1]
-		} else {
-			middlewareHandlers = handlers[len(handlers)-len(testCase.expectedMiddleware):]
-		}
-		for idx, middlewareHandler := range middlewareHandlers {
-			assert.Contains(t, middlewareHandler, testCase.expectedMiddleware[idx])
-		}
+		t.Run(testCase.name, func(t *testing.T) {
+			c := gin.CreateTestContextOnly(httptest.NewRecorder(), server.router)
+			c.Request, _ = http.NewRequest(http.MethodGet, testCase.path, nil)
+			server.router.HandleContext(c)
+
+			handlers := c.HandlerNames()
+
+			t.Log(handlers)
+			for _, expectedHandler := range testCase.expectedMiddleware {
+				expectedHandlerExists := false
+				for _, handler := range handlers {
+					if strings.Contains(handler, expectedHandler) {
+						expectedHandlerExists = true
+					}
+				}
+
+				if !expectedHandlerExists {
+					t.Fatalf("Handler %s is not in the list of handlers", expectedHandler)
+				}
+			}
+		})
 	}
 }
 

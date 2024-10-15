@@ -14,24 +14,14 @@ spec:
       labels: *labels
     spec:
       serviceAccountName: {{ tpl .Values.sink.name . }}
-      volumes:
-        - name: sink-filters
-          configMap:
-            name: sink-filters
       containers:
         - name: {{ tpl .Values.sink.name . }}
           image: {{ .Values.sink.image }}
-          volumeMounts:
-            - mountPath: "{{ .Values.sink.mountPath }}"
-              name: "sink-filters"
-              readOnly: true
           envFrom:
             # Provide DB URL, user, password, database and port as env vars
             - secretRef:
                 name: {{ .Values.database.secret }}
           env:
-            - name: MOUNT_PATH
-              value: "{{ .Values.sink.mountPath }}"
             - name: KUBEARCHIVE_OTEL_MODE
               value: "disabled"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT

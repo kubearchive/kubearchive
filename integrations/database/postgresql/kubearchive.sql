@@ -119,6 +119,11 @@ CREATE INDEX idx_json_labels ON public.resource USING gin ((((data -> 'metadata'
 
 CREATE INDEX idx_json_owners ON public.resource USING gin ((((data -> 'metadata'::text) -> 'ownerReferences'::text)) jsonb_path_ops);
 
+--
+-- Name: idx_json_creation_timestamp; Type: INDEX; Schema: public; Owner: kubearchive
+--
+
+CREATE INDEX idx_creation_timestamp ON public.resource USING gin ((((data -> 'metadata'::text) -> 'creationTimestamp'::text)) jsonb_path_ops);
 
 --
 -- Name: log_url_uuid_idx; Type: INDEX; Schema: public; Owner: kubearchive

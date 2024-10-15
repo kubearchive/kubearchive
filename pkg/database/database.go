@@ -19,19 +19,29 @@ var RegisteredDatabases = make(map[string]newDatabaseFunc)
 type DBInfoInterface interface {
 	GetDriverName() string
 	GetConnectionString() string
+
 	GetResourcesSQL() string
+	GetResourcesLimitedSQL() string
+	GetResourcesLimitedContinueSQL() string
+
 	GetNamespacedResourcesSQL() string
+	GetNamespacedResourcesLimitedSQL() string
+	GetNamespacedResourcesLimitedContinueSQL() string
+
 	GetNamespacedResourceByNameSQL() string
+
 	GetWriteResourceSQL() string
 }
 
 type DBInterface interface {
-	QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error)
-	QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error)
-	QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error)
-	QueryNamespacedResourceByName(ctx context.Context, kind, group, version, namespace, name string) (*unstructured.Unstructured, error)
-	QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error)
+	QueryCoreResources(ctx context.Context, kind, version, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error)
+	QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error)
 	QueryNamespacedCoreResourceByName(ctx context.Context, kind, version, namespace, name string) (*unstructured.Unstructured, error)
+
+	QueryResources(ctx context.Context, kind, group, version, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error)
+	QueryNamespacedResources(ctx context.Context, kind, group, version, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error)
+	QueryNamespacedResourceByName(ctx context.Context, kind, group, version, namespace, name string) (*unstructured.Unstructured, error)
+
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
 	Ping(ctx context.Context) error
 	CloseDB() error
@@ -61,23 +71,67 @@ func (db *Database) Ping(ctx context.Context) error {
 	return db.db.PingContext(ctx)
 }
 
-func (db *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
+func (db *Database) QueryResources(ctx context.Context, kind, group, version, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	return db.performResourceQuery(ctx, db.info.GetResourcesSQL(), kind, apiVersion)
+
+	args := []string{kind, apiVersion}
+	query := db.info.GetResourcesSQL()
+	if limit != "" {
+		if continueUUID == "" || continueDate == "" {
+			query = db.info.GetResourcesLimitedSQL()
+			args = append(args, limit)
+		} else {
+			query = db.info.GetResourcesLimitedContinueSQL()
+			args = append(args, continueDate, continueUUID, limit)
+		}
+	}
+
+	return db.performResourceQuery(ctx, query, args...)
 }
 
-func (db *Database) QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error) {
-	return db.performResourceQuery(ctx, db.info.GetResourcesSQL(), kind, version)
+func (db *Database) QueryCoreResources(ctx context.Context, kind, version, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
+	args := []string{kind, version}
+	query := db.info.GetResourcesSQL()
+
+	if limit != "" {
+		if continueUUID == "" || continueDate == "" {
+			query = db.info.GetResourcesLimitedSQL()
+			args = append(args, limit)
+		} else {
+			query = db.info.GetResourcesLimitedContinueSQL()
+			args = append(args, continueDate, continueUUID, limit)
+		}
+	}
+
+	return db.performResourceQuery(ctx, query, args...)
 }
 
-func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
+func (db *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	return db.performResourceQuery(ctx, db.info.GetNamespacedResourcesSQL(), kind, apiVersion, namespace)
+
+	// Build query and args depending on `limit` and `continueValue`
+	args := []string{kind, apiVersion, namespace}
+	query := db.info.GetNamespacedResourcesSQL()
+	if limit != "" {
+		if continueUUID == "" || continueDate == "" {
+			query = db.info.GetNamespacedResourcesLimitedSQL()
+			args = append(args, limit)
+		} else {
+			query = db.info.GetNamespacedResourcesLimitedContinueSQL()
+			args = append(args, continueDate, continueUUID, limit)
+		}
+	}
+
+	return db.performResourceQuery(ctx, query, args...)
 }
 
 func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, group, version, namespace, name string) (*unstructured.Unstructured, error) {
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	resources, err := db.performResourceQuery(ctx, db.info.GetNamespacedResourceByNameSQL(), kind, apiVersion, namespace, name)
+	resources, _, _, err := db.performResourceQuery(ctx, db.info.GetNamespacedResourceByNameSQL(), kind, apiVersion, namespace, name)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(resources) == 0 {
 		return nil, err
 	} else if len(resources) == 1 {
@@ -87,12 +141,29 @@ func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, gro
 	}
 }
 
-func (db *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
-	return db.performResourceQuery(ctx, db.info.GetNamespacedResourcesSQL(), kind, version, namespace)
+func (db *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
+	args := []string{kind, version, namespace}
+	query := db.info.GetNamespacedResourcesSQL()
+
+	if limit != "" {
+		if continueUUID == "" || continueDate == "" {
+			query = db.info.GetNamespacedResourcesLimitedSQL()
+			args = append(args, limit)
+		} else {
+			query = db.info.GetNamespacedResourcesLimitedContinueSQL()
+			args = append(args, continueDate, continueUUID, limit)
+		}
+	}
+
+	return db.performResourceQuery(ctx, query, args...)
 }
 
 func (db *Database) QueryNamespacedCoreResourceByName(ctx context.Context, kind, version, namespace, name string) (*unstructured.Unstructured, error) {
-	resources, err := db.performResourceQuery(ctx, db.info.GetNamespacedResourceByNameSQL(), kind, version, namespace, name)
+	resources, _, _, err := db.performResourceQuery(ctx, db.info.GetNamespacedResourceByNameSQL(), kind, version, namespace, name)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(resources) == 0 {
 		return nil, err
 	} else if len(resources) == 1 {
@@ -102,34 +173,39 @@ func (db *Database) QueryNamespacedCoreResourceByName(ctx context.Context, kind,
 	}
 }
 
-func (db *Database) performResourceQuery(ctx context.Context, query string, args ...string) ([]*unstructured.Unstructured, error) {
+func (db *Database) performResourceQuery(ctx context.Context, query string, args ...string) ([]*unstructured.Unstructured, string, string, error) {
 	castedArgs := make([]interface{}, len(args))
 	for i, v := range args {
 		castedArgs[i] = v
 	}
+
 	rows, err := db.db.QueryContext(ctx, query, castedArgs...)
 	if err != nil {
-		return nil, err
+		return nil, "", "", err
 	}
 	defer func(rows *sql.Rows) {
 		err = rows.Close()
 	}(rows)
 	var resources []*unstructured.Unstructured
 	if err != nil {
-		return resources, err
+		return resources, "", "", err
 	}
+	var date string
+	var uuid string
 	for rows.Next() {
 		var b sql.RawBytes
-		var r *unstructured.Unstructured
-		if err := rows.Scan(&b); err != nil {
-			return resources, err
+		if err := rows.Scan(&date, &uuid, &b); err != nil {
+			return resources, "", "", err
 		}
-		if r, err = models.UnstructuredFromByteSlice([]byte(b)); err != nil {
-			return resources, err
+
+		r, err := models.UnstructuredFromByteSlice([]byte(b))
+		if err != nil {
+			return resources, "", "", err
 		}
 		resources = append(resources, r)
 	}
-	return resources, err
+
+	return resources, uuid, date, nil
 }
 
 func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {

@@ -46,14 +46,14 @@ func (f *Database) TestConnection(env map[string]string) error {
 	return f.err
 }
 
-func (f *Database) QueryResources(ctx context.Context, kind, group, version string) ([]*unstructured.Unstructured, error) {
+func (f *Database) QueryResources(ctx context.Context, kind, group, version, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	return f.filterResoucesByKindAndApiVersion(kind, apiVersion), f.err
+	return f.filterResoucesByKindAndApiVersion(kind, apiVersion), "", "", f.err
 }
 
-func (f *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace string) ([]*unstructured.Unstructured, error) {
+func (f *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	return f.filterResourcesByKindApiVersionAndNamespace(kind, apiVersion, namespace), f.err
+	return f.filterResourcesByKindApiVersionAndNamespace(kind, apiVersion, namespace), "", "", f.err
 }
 
 func (f *Database) QueryNamespacedResourceByName(ctx context.Context, kind, group, version, namespace, name string) (*unstructured.Unstructured, error) {
@@ -68,12 +68,12 @@ func (f *Database) QueryNamespacedResourceByName(ctx context.Context, kind, grou
 	return resources[0], f.err
 }
 
-func (f *Database) QueryCoreResources(ctx context.Context, kind, version string) ([]*unstructured.Unstructured, error) {
-	return f.filterResoucesByKindAndApiVersion(kind, version), f.err
+func (f *Database) QueryCoreResources(ctx context.Context, kind, version, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
+	return f.filterResoucesByKindAndApiVersion(kind, version), "", "", f.err
 }
 
-func (f *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace string) ([]*unstructured.Unstructured, error) {
-	return f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace), f.err
+func (f *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
+	return f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace), "", "", f.err
 }
 
 func (f *Database) QueryNamespacedCoreResourceByName(ctx context.Context, kind, version, namespace, name string) (*unstructured.Unstructured, error) {

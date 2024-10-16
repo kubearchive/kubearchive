@@ -3,6 +3,7 @@ package fake
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -46,37 +47,29 @@ func (f *Database) TestConnection(env map[string]string) error {
 	return f.err
 }
 
-func (f *Database) QueryResources(ctx context.Context, kind, group, version, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
-	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	return f.filterResoucesByKindAndApiVersion(kind, apiVersion), "", "", f.err
-}
-
-func (f *Database) QueryNamespacedResources(ctx context.Context, kind, group, version, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
-	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	return f.filterResourcesByKindApiVersionAndNamespace(kind, apiVersion, namespace), "", "", f.err
-}
-
-func (f *Database) QueryNamespacedResourceByName(ctx context.Context, kind, group, version, namespace, name string) (*unstructured.Unstructured, error) {
-	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	resources := f.filterResourceByKindApiVersionNamespaceAndName(kind, apiVersion, namespace, name)
-	if len(resources) > 1 {
-		return nil, fmt.Errorf("More than one resource found")
+func (f *Database) QueryResources(ctx context.Context, kind, version, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
+	resources := f.filterResoucesByKindAndApiVersion(kind, version)
+	var date string
+	var uuid string
+	if len(resources) > 0 {
+		date = resources[len(resources)-1].GetCreationTimestamp().Format(time.RFC3339)
+		uuid = string(resources[len(resources)-1].GetUID())
 	}
-	if len(resources) == 0 {
-		return nil, f.err
+	return resources, date, uuid, f.err
+}
+
+func (f *Database) QueryNamespacedResources(ctx context.Context, kind, version, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
+	resources := f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace)
+	var date string
+	var uuid string
+	if len(resources) > 0 {
+		date = resources[len(resources)-1].GetCreationTimestamp().Format(time.RFC3339)
+		uuid = string(resources[len(resources)-1].GetUID())
 	}
-	return resources[0], f.err
+	return resources, date, uuid, f.err
 }
 
-func (f *Database) QueryCoreResources(ctx context.Context, kind, version, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
-	return f.filterResoucesByKindAndApiVersion(kind, version), "", "", f.err
-}
-
-func (f *Database) QueryNamespacedCoreResources(ctx context.Context, kind, version, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
-	return f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace), "", "", f.err
-}
-
-func (f *Database) QueryNamespacedCoreResourceByName(ctx context.Context, kind, version, namespace, name string) (*unstructured.Unstructured, error) {
+func (f *Database) QueryNamespacedResourceByName(ctx context.Context, kind, version, namespace, name string) (*unstructured.Unstructured, error) {
 	resources := f.filterResourceByKindApiVersionNamespaceAndName(kind, version, namespace, name)
 	if len(resources) > 1 {
 		return nil, fmt.Errorf("More than one resource found")

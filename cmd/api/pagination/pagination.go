@@ -37,6 +37,9 @@ func CreateToken(uuid, date string) string {
 	// The date is returned as a quoted string, so remove the quotes
 	date = strings.TrimPrefix(date, "\"")
 	date = strings.TrimSuffix(date, "\"")
+	if date == "" && uuid == "" {
+		return ""
+	}
 	tokenString := fmt.Sprintf("%s %s", uuid, date)
 	return base64.StdEncoding.EncodeToString([]byte(tokenString))
 }
@@ -46,32 +49,24 @@ func CreateToken(uuid, date string) string {
 // respective values so they are retrieved by the endpoints that need it
 func Middleware() gin.HandlerFunc {
 	return func(context *gin.Context) {
-		limitString := context.Query(limitKey)
+		// We always a default limit because we don't want to return
+		// large collections if users don't remember to specify a limit
+		limitString := context.DefaultQuery(limitKey, defaultLimit)
 		continueToken := context.Query(continueKey)
 
 		var limit string
-		if limitString == "" {
-			// If not specified, we set a limit so users don't retrieve
-			// large collections by mistake. Those collections could
-			// make us crash if they are too large
-			limit = defaultLimit
-		} else {
-			var err error
-			limitInteger, err := strconv.Atoi(limitString)
-			if err != nil {
-				abort.Abort(context, fmt.Sprintf("limit '%s' could not be converted to integer", limitString), http.StatusBadRequest)
-				return
-			}
-
-			if limitInteger > maxAllowedLimit {
-				abort.Abort(context, fmt.Sprintf("limit '%s' exceeds the maximum allowed '%d'", limitString, maxAllowedLimit), http.StatusBadRequest)
-				return
-			}
-
-			// We reserialize to avoid SQL injection. There is the possibility the
-			// value is a valid integer, but in SQL does something else.
-			limit = strconv.Itoa(limitInteger)
+		limitInteger, err := strconv.Atoi(limitString)
+		if err != nil {
+			abort.Abort(context, fmt.Sprintf("limit '%s' could not be converted to integer", limitString), http.StatusBadRequest)
+			return
 		}
+		if limitInteger > maxAllowedLimit {
+			abort.Abort(context, fmt.Sprintf("limit '%s' exceeds the maximum allowed '%d'", limitString, maxAllowedLimit), http.StatusBadRequest)
+			return
+		}
+		// We reserialize to avoid SQL injection. There is the possibility the
+		// value is a valid integer, but in SQL does something else.
+		limit = strconv.Itoa(limitInteger)
 
 		var continueDate string
 		var continueUUID string

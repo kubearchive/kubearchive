@@ -29,20 +29,12 @@ func (info MariaDBDatabaseInfo) GetConnectionString() string {
 		info.env[DbPasswordEnvVar], info.env[DbHostEnvVar], info.env[DbPortEnvVar], info.env[DbNameEnvVar])
 }
 
-func (info MariaDBDatabaseInfo) GetResourcesSQL() string {
-	return "SELECT JSON_VALUE(data, '$.metadata.creationTimestamp'), uuid, data FROM resource WHERE kind=? AND api_version=? ORDER BY CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime), uuid"
-}
-
 func (info MariaDBDatabaseInfo) GetResourcesLimitedSQL() string {
 	return "SELECT JSON_VALUE(data, '$.metadata.creationTimestamp'), uuid, data FROM resource WHERE kind=? AND api_version=? ORDER BY CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime), uuid LIMIT ?"
 }
 
 func (info MariaDBDatabaseInfo) GetResourcesLimitedContinueSQL() string {
 	return "SELECT JSON_VALUE(data, '$.metadata.creationTimestamp'), uuid, data FROM resource WHERE kind=? AND api_version=? AND (CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime), uuid) > (?, ?) ORDER BY CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime), uuid LIMIT ?"
-}
-
-func (info MariaDBDatabaseInfo) GetNamespacedResourcesSQL() string {
-	return "SELECT JSON_VALUE(data, '$.metadata.creationTimestamp'), uuid, data FROM resource WHERE kind=? AND api_version=? AND namespace=? ORDER BY CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime), uuid"
 }
 
 func (info MariaDBDatabaseInfo) GetNamespacedResourcesLimitedSQL() string {

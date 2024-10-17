@@ -4,6 +4,7 @@
 package routers
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -43,6 +44,7 @@ type List struct {
 func (c *Controller) GetAllResources(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
+	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	limit, uuid, date := pagination.GetValuesFromContext(context)
 
 	kind, err := discovery.GetAPIResourceKind(context)
@@ -51,25 +53,20 @@ func (c *Controller) GetAllResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastUUID, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, group, version, limit, uuid, date)
+	resources, lastUUID, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, apiVersion, limit, uuid, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	var continueToken string
-	if limit != "" {
-		// If the limit was specified, we create the token otherwise
-		// send an empty string
-		continueToken = pagination.CreateToken(lastUUID, lastDate)
-	}
-
+	continueToken := pagination.CreateToken(lastUUID, lastDate)
 	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 
 func (c *Controller) GetNamespacedResources(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
+	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	namespace := context.Param("namespace")
 	limit, uuid, date := pagination.GetValuesFromContext(context)
 
@@ -79,25 +76,20 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastUUID, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, group, version, namespace, limit, uuid, date)
+	resources, lastUUID, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, apiVersion, namespace, limit, uuid, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	continueToken := pagination.CreateToken(lastUUID, lastDate)
-	if limit == "" {
-		// When the limit is empty, we return an empty continueToken
-		// so there is no `continue` in the metadata answer
-		continueToken = ""
-	}
-
 	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 
 func (c *Controller) GetNamespacedResourceByName(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
+	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	namespace := context.Param("namespace")
 	name := context.Param("name")
 
@@ -107,7 +99,7 @@ func (c *Controller) GetNamespacedResourceByName(context *gin.Context) {
 		return
 	}
 
-	resource, err := c.Database.QueryNamespacedResourceByName(context.Request.Context(), kind, group, version, namespace, name)
+	resource, err := c.Database.QueryNamespacedResourceByName(context.Request.Context(), kind, apiVersion, namespace, name)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
@@ -126,19 +118,13 @@ func (c *Controller) GetAllCoreResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastUUID, lastDate, err := c.Database.QueryCoreResources(context.Request.Context(), kind, version, limit, uuid, date)
+	resources, lastUUID, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, version, limit, uuid, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	continueToken := pagination.CreateToken(lastUUID, lastDate)
-	if limit == "" {
-		// When the limit is empty, we return an empty continueToken
-		// so there is no `continue` in the metadata answer
-		continueToken = ""
-	}
-
 	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 
@@ -153,19 +139,13 @@ func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastUUID, lastDate, err := c.Database.QueryNamespacedCoreResources(context.Request.Context(), kind, version, namespace, limit, uuid, date)
+	resources, lastUUID, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, version, namespace, limit, uuid, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	continueToken := pagination.CreateToken(lastUUID, lastDate)
-	if limit == "" {
-		// When the limit is empty, we return an empty continueToken
-		// so there is no `continue` in the metadata answer
-		continueToken = ""
-	}
-
 	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 
@@ -180,7 +160,7 @@ func (c *Controller) GetNamespacedCoreResourceByName(context *gin.Context) {
 		return
 	}
 
-	resource, err := c.Database.QueryNamespacedCoreResourceByName(context.Request.Context(), kind, version, namespace, name)
+	resource, err := c.Database.QueryNamespacedResourceByName(context.Request.Context(), kind, version, namespace, name)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return

@@ -26,20 +26,12 @@ func (info PostgreSQLDatabaseInfo) GetConnectionString() string {
 		info.env[DbPasswordEnvVar], info.env[DbNameEnvVar], info.env[DbHostEnvVar], info.env[DbPortEnvVar])
 }
 
-func (info PostgreSQLDatabaseInfo) GetResourcesSQL() string {
-	return "SELECT data->'metadata'->'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 ORDER BY ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid)"
-}
-
 func (info PostgreSQLDatabaseInfo) GetResourcesLimitedSQL() string {
 	return "SELECT data->'metadata'->'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 ORDER BY ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid) LIMIT $3"
 }
 
 func (info PostgreSQLDatabaseInfo) GetResourcesLimitedContinueSQL() string {
 	return "SELECT data->'metadata'->'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 AND ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid) > ($3, $4) ORDER BY ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid) LIMIT $5"
-}
-
-func (info PostgreSQLDatabaseInfo) GetNamespacedResourcesSQL() string {
-	return "SELECT data->'metadata'->'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 ORDER BY ((data->'metadata'->'creationTimestamp')::text::timestamptz, uuid)"
 }
 
 func (info PostgreSQLDatabaseInfo) GetNamespacedResourcesLimitedSQL() string {

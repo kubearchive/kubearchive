@@ -74,7 +74,7 @@ func NewMock() (*sql.DB, sqlmock.Sqlmock) {
 func TestQueryResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			expectedQuery := regexp.QuoteMeta(tt.database.info.GetResourcesSQL())
+			expectedQuery := regexp.QuoteMeta(tt.database.info.GetResourcesLimitedSQL())
 			for _, ttt := range subtests {
 				t.Run(ttt.name, func(t *testing.T) {
 					db, mock := NewMock()
@@ -82,21 +82,21 @@ func TestQueryResources(t *testing.T) {
 
 					rows := sqlmock.NewRows(columns)
 					if ttt.data {
-						rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testCronJobResource))
+						rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testPodResource))
 					}
-					mock.ExpectQuery(expectedQuery).WithArgs(kind, cronJobApiVersion).WillReturnRows(rows)
+					mock.ExpectQuery(expectedQuery).WithArgs(kind, podApiVersion, "100").WillReturnRows(rows)
 
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 					defer cancel()
 
-					resources, _, _, err := tt.database.QueryResources(ctx, kind, group, version, "", "", "")
-					assert.NoError(t, err)
+					resources, _, _, err := tt.database.QueryResources(ctx, kind, version, "100", "", "")
 					if ttt.numResources == 0 {
 						assert.Nil(t, resources)
 					} else {
 						assert.NotNil(t, resources)
 					}
 					assert.Equal(t, ttt.numResources, len(resources))
+					assert.NoError(t, err)
 				})
 			}
 		})
@@ -106,28 +106,29 @@ func TestQueryResources(t *testing.T) {
 func TestQueryNamespacedResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			expectedQuery := regexp.QuoteMeta(tt.database.info.GetNamespacedResourcesSQL())
+			expectedQuery := regexp.QuoteMeta(tt.database.info.GetNamespacedResourcesLimitedSQL())
 			for _, ttt := range subtests {
-				db, mock := NewMock()
-				tt.database.db = db
+				t.Run(ttt.name, func(t *testing.T) {
+					db, mock := NewMock()
+					tt.database.db = db
 
-				rows := sqlmock.NewRows(columns)
-				if ttt.data {
-					rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testCronJobResource))
-				}
-				mock.ExpectQuery(expectedQuery).WithArgs(kind, cronJobApiVersion, namespace).WillReturnRows(rows)
+					rows := sqlmock.NewRows(columns)
+					if ttt.data {
+						rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testPodResource))
+					}
+					mock.ExpectQuery(expectedQuery).WithArgs(kind, podApiVersion, namespace, "100").WillReturnRows(rows)
 
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancel()
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+					defer cancel()
 
-				resources, _, _, err := tt.database.QueryNamespacedResources(ctx, kind, group, version, namespace, "", "", "")
-				if ttt.numResources == 0 {
-					assert.Nil(t, resources)
-				} else {
-					assert.NotNil(t, resources)
-				}
-				assert.Equal(t, ttt.numResources, len(resources))
-				assert.NoError(t, err)
+					resources, _, _, err := tt.database.QueryNamespacedResources(ctx, kind, version, namespace, "100", "", "")
+					if ttt.numResources == 0 {
+						assert.Nil(t, resources)
+					} else {
+						assert.NotNil(t, resources)
+					}
+					assert.NoError(t, err)
+				})
 			}
 		})
 	}
@@ -138,140 +139,33 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			expectedQuery := regexp.QuoteMeta(tt.database.info.GetNamespacedResourceByNameSQL())
 			for _, ttt := range subtests {
-				db, mock := NewMock()
-				tt.database.db = db
+				t.Run(ttt.name, func(t *testing.T) {
+					db, mock := NewMock()
+					tt.database.db = db
 
-				rows := sqlmock.NewRows(columns)
-				if ttt.data {
-					rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testCronJobResource))
-				}
-				mock.ExpectQuery(expectedQuery).WithArgs(kind, cronJobApiVersion, namespace, cronJobName).WillReturnRows(rows)
+					rows := sqlmock.NewRows(columns)
+					if ttt.data {
+						rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testPodResource))
+					}
+					mock.ExpectQuery(expectedQuery).WithArgs(kind, version, namespace, podName).WillReturnRows(rows)
 
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancel()
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+					defer cancel()
 
-				resource, err := tt.database.QueryNamespacedResourceByName(ctx, kind, group, version, namespace, cronJobName)
-				if ttt.numResources == 0 {
-					assert.Nil(t, resource)
-				} else {
-					assert.NotNil(t, resource)
-				}
-				assert.NoError(t, err)
+					resource, err := tt.database.QueryNamespacedResourceByName(ctx, kind, version, namespace, podName)
+					if ttt.numResources == 0 {
+						assert.Nil(t, resource)
+					} else {
+						assert.NotNil(t, resource)
+					}
+					assert.NoError(t, err)
+				})
 			}
 		})
 	}
 }
 
 func TestQueryNamespacedResourceByNameMoreThanOne(t *testing.T) {
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			expectedQuery := regexp.QuoteMeta(tt.database.info.GetNamespacedResourceByNameSQL())
-			db, mock := NewMock()
-			tt.database.db = db
-
-			row := []driver.Value{"2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testCronJobResource)}
-			rows := sqlmock.NewRows(columns).AddRow(row...).AddRow(row...)
-			mock.ExpectQuery(expectedQuery).WithArgs(kind, cronJobApiVersion, namespace, cronJobName).WillReturnRows(rows)
-
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-			defer cancel()
-
-			resource, err := tt.database.QueryNamespacedResourceByName(ctx, kind, group, version, namespace, cronJobName)
-			assert.Nil(t, resource)
-			assert.EqualError(t, err, "More than one resource found")
-		})
-	}
-}
-
-func TestCoreQueryResources(t *testing.T) {
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			expectedQuery := regexp.QuoteMeta(tt.database.info.GetResourcesSQL())
-			for _, ttt := range subtests {
-				db, mock := NewMock()
-				tt.database.db = db
-
-				rows := sqlmock.NewRows(columns)
-				if ttt.data {
-					rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testPodResource))
-				}
-				mock.ExpectQuery(expectedQuery).WithArgs(kind, podApiVersion).WillReturnRows(rows)
-
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancel()
-
-				resources, _, _, err := tt.database.QueryCoreResources(ctx, kind, version, "", "", "")
-				if ttt.numResources == 0 {
-					assert.Nil(t, resources)
-				} else {
-					assert.NotNil(t, resources)
-				}
-				assert.Equal(t, ttt.numResources, len(resources))
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestQueryNamespacedCoreResources(t *testing.T) {
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			expectedQuery := regexp.QuoteMeta(tt.database.info.GetNamespacedResourcesSQL())
-			for _, ttt := range subtests {
-				db, mock := NewMock()
-				tt.database.db = db
-
-				rows := sqlmock.NewRows(columns)
-				if ttt.data {
-					rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testPodResource))
-				}
-				mock.ExpectQuery(expectedQuery).WithArgs(kind, podApiVersion, namespace).WillReturnRows(rows)
-
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancel()
-
-				resources, _, _, err := tt.database.QueryNamespacedCoreResources(ctx, kind, version, namespace, "", "", "")
-				if ttt.numResources == 0 {
-					assert.Nil(t, resources)
-				} else {
-					assert.NotNil(t, resources)
-				}
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestQueryNamespacedCoreResourceByName(t *testing.T) {
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			expectedQuery := regexp.QuoteMeta(tt.database.info.GetNamespacedResourceByNameSQL())
-			for _, ttt := range subtests {
-				db, mock := NewMock()
-				tt.database.db = db
-
-				rows := sqlmock.NewRows(columns)
-				if ttt.data {
-					rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testPodResource))
-				}
-				mock.ExpectQuery(expectedQuery).WithArgs(kind, version, namespace, podName).WillReturnRows(rows)
-
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancel()
-
-				resource, err := tt.database.QueryNamespacedCoreResourceByName(ctx, kind, version, namespace, podName)
-				if ttt.numResources == 0 {
-					assert.Nil(t, resource)
-				} else {
-					assert.NotNil(t, resource)
-				}
-				assert.NoError(t, err)
-			}
-		})
-	}
-}
-
-func TestQueryNamespacedCoreResourceByNameMoreThanOne(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			expectedQuery := regexp.QuoteMeta(tt.database.info.GetNamespacedResourceByNameSQL())
@@ -285,7 +179,7 @@ func TestQueryNamespacedCoreResourceByNameMoreThanOne(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 			defer cancel()
 
-			resource, err := tt.database.QueryNamespacedCoreResourceByName(ctx, kind, version, namespace, podName)
+			resource, err := tt.database.QueryNamespacedResourceByName(ctx, kind, version, namespace, podName)
 			assert.Nil(t, resource)
 			assert.EqualError(t, err, "More than one resource found")
 		})

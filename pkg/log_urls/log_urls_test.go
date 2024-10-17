@@ -20,28 +20,41 @@ func TestGenerateLogURLs(t *testing.T) {
 		name     string
 		cm       string
 		data     string
-		expected any
+		expected string
 	}{
 		{
-			name:     "test generate log URLs single container",
+			name:     "splunk test generate log URLs single container",
 			cm:       "testdata/splunk-cm.json",
-			data:     "testdata/splunk-test1-data.json",
-			expected: []string{"http://127.0.0.1:8111/app/search/search?q=search * | spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"4df2df3f-7397-4a63-86b4-9f5f1ff84f99\" | spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"generate\""},
+			data:     "testdata/test1-data.json",
+			expected: "testdata/splunk-test1-urls.json",
 		},
 		{
-			name:     "test generate log URLs multiple containers",
+			name:     "splunk test generate log URLs multiple containers",
 			cm:       "testdata/splunk-cm.json",
-			data:     "testdata/splunk-test2-data.json",
-			expected: []string{"http://127.0.0.1:8111/app/search/search?q=search * | spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"a8c9b834-bc4a-4438-8841-23a5ffb9164c\" | spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"nginx-container\"", "http://127.0.0.1:8111/app/search/search?q=search * | spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"a8c9b834-bc4a-4438-8841-23a5ffb9164c\" | spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"busybox-container\"", "http://127.0.0.1:8111/app/search/search?q=search * | spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"a8c9b834-bc4a-4438-8841-23a5ffb9164c\" | spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"echo-3\"", "http://127.0.0.1:8111/app/search/search?q=search * | spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"a8c9b834-bc4a-4438-8841-23a5ffb9164c\" | spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"echo-4\""},
+			data:     "testdata/test2-data.json",
+			expected: "testdata/splunk-test2-urls.json",
+		},
+		{
+			name:     "elasticsearch test generate log URLs single container",
+			cm:       "testdata/es-cm.json",
+			data:     "testdata/test1-data.json",
+			expected: "testdata/es-test1-urls.json",
+		},
+		{
+			name:     "elasticsearch test generate log URLs multiple containers",
+			cm:       "testdata/es-cm.json",
+			data:     "testdata/test2-data.json",
+			expected: "testdata/es-test2-urls.json",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cm := compileCELExpressions(loadJSON(tc.cm))
-			data := loadJSONx(tc.data)
+			cm := compileCELExpressions(loadMapJSON(tc.cm))
+			data := loadUnstructuredJSON(tc.data)
+			expected := loadExpectedJSON(tc.expected)
 			result, _ := GenerateLogURLs(context.Background(), cm, data)
-			assert.Equal(t, tc.expected, result, "Does not match")
+			assert.Equal(t, expected, result, "Does not match")
 		})
 	}
 }
@@ -57,7 +70,7 @@ func compileCELExpressions(cm map[string]interface{}) map[string]interface{} {
 	return result
 }
 
-func loadJSON(filename string) map[string]interface{} {
+func loadMapJSON(filename string) map[string]interface{} {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil
@@ -73,7 +86,7 @@ func loadJSON(filename string) map[string]interface{} {
 	return result
 }
 
-func loadJSONx(filename string) *unstructured.Unstructured {
+func loadUnstructuredJSON(filename string) *unstructured.Unstructured {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil
@@ -82,6 +95,21 @@ func loadJSONx(filename string) *unstructured.Unstructured {
 	bytes, _ := io.ReadAll(file)
 
 	var result *unstructured.Unstructured
+	if err := json.Unmarshal([]byte(bytes), &result); err != nil {
+		return nil
+	}
+	return result
+}
+
+func loadExpectedJSON(filename string) []string {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil
+	}
+	defer file.Close()
+	bytes, _ := io.ReadAll(file)
+
+	var result []string
 	if err := json.Unmarshal([]byte(bytes), &result); err != nil {
 		return nil
 	}

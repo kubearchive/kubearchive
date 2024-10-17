@@ -2,9 +2,9 @@
 apiVersion: logging.banzaicloud.io/v1beta1
 kind: Logging
 metadata:
-  name: kubearchive-splunk
+  name: kubearchive
 spec:
   fluentd:
     disablePvc: true
   fluentbit: {}
-  controlNamespace: splunk-operator
+  controlNamespace: elastic-system

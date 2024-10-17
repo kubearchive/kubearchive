@@ -1,0 +1,29 @@
+---
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: ClusterFlow
+metadata:
+  name: es-flow
+spec:
+  filters:
+    - tag_normaliser: {}
+    - parser:
+        remove_key_name_field: true
+        reserve_data: true
+        parse:
+          type: nginx
+  match:
+    - exclude:
+        namespaces:
+          - cert-manager
+          - cnpg-system
+          - elastic-system
+          - knative-eventing
+          - kube-node-lease
+          - kube-public
+          - kube-system
+          - kubearchive
+          - mariadb-operator
+          - postgresql
+    - select: {}
+  globalOutputRefs:
+    - es-output

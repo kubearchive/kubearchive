@@ -49,17 +49,16 @@ func NewFilters(clientset kubernetes.Interface) *Filters {
 		delete:          make(map[NamespaceGroupVersionKind]cel.Program),
 		archiveOnDelete: make(map[NamespaceGroupVersionKind]cel.Program),
 	}
-
 }
 
 // getGlobalCelExprs returns three maps that have GroupVersionKind strings as keys and cel expression strings as values.
 // The first map is archive cel expressions, the second map is delete cel expressions, and the third map is archive on
 // delete cel expression. If no global key exists, it returns ErrNoGlobal. Otherwise it will return any error it
 // encounters to yaml.Unmarshal the []KubeArchiveConfigResources for the global key.
-func getGlobalCelExprs(stringResources map[string]string) (map[string]string, map[string]string, map[string]string, error) {
-	archiveExprs := make(map[string]string)
-	deleteExprs := make(map[string]string)
-	archiveOnDelete := make(map[string]string)
+func getGlobalCelExprs(stringResources map[string]string) (map[schema.GroupVersionKind]string, map[schema.GroupVersionKind]string, map[schema.GroupVersionKind]string, error) {
+	archiveExprs := make(map[schema.GroupVersionKind]string)
+	deleteExprs := make(map[schema.GroupVersionKind]string)
+	archiveOnDelete := make(map[schema.GroupVersionKind]string)
 	kacResources, exists := stringResources[globalKey]
 	if !exists {
 		return archiveExprs, deleteExprs, archiveOnDelete, ErrNoGlobal
@@ -70,9 +69,9 @@ func getGlobalCelExprs(stringResources map[string]string) (map[string]string, ma
 	}
 	for _, resource := range resources {
 		gvk := schema.FromAPIVersionAndKind(resource.Selector.APIVersion, resource.Selector.Kind)
-		archiveExprs[gvk.String()] = resource.ArchiveWhen
-		deleteExprs[gvk.String()] = resource.DeleteWhen
-		archiveOnDelete[gvk.String()] = resource.ArchiveOnDelete
+		archiveExprs[gvk] = resource.ArchiveWhen
+		deleteExprs[gvk] = resource.DeleteWhen
+		archiveOnDelete[gvk] = resource.ArchiveOnDelete
 	}
 	return archiveExprs, deleteExprs, archiveOnDelete, nil
 }
@@ -114,7 +113,7 @@ func (f *Filters) changeGlobalFilters(stringResources map[string]string) error {
 // not nil, the maps returned can still be used.
 func (f *Filters) createFilters(
 	namespace, kacResources string,
-	globalArchive, globalDelete, globalArchiveOnDelete map[string]string,
+	globalArchive, globalDelete, globalArchiveOnDelete map[schema.GroupVersionKind]string,
 ) (
 	map[NamespaceGroupVersionKind]cel.Program,
 	map[NamespaceGroupVersionKind]cel.Program,
@@ -128,36 +127,85 @@ func (f *Filters) createFilters(
 	if err != nil {
 		return archiveMap, deleteMap, archiveOnDeleteMap, err
 	}
+
 	var errList []error
 	for _, resource := range resources {
 		gvk := schema.FromAPIVersionAndKind(resource.Selector.APIVersion, resource.Selector.Kind)
 		namespaceGvk := NamespaceGVKFromNamespaceAndGvk(namespace, gvk)
-		if resource.ArchiveWhen != "" {
-			archiveExpr, err := ocel.CreateCelExprOr(resource.ArchiveWhen, globalArchive[gvk.String()])
-			if err != nil {
-				errList = append(errList, err)
-			} else {
-				archiveMap[namespaceGvk] = *archiveExpr
-			}
+
+		errs := addLocalFilters(resource.ArchiveWhen, globalArchive[gvk], archiveMap, namespaceGvk)
+		if len(errs) > 0 {
+			errList = append(errList, errs...)
 		}
-		if resource.DeleteWhen != "" {
-			deleteExpr, err := ocel.CreateCelExprOr(resource.DeleteWhen, globalDelete[gvk.String()])
-			if err != nil {
-				errList = append(errList, err)
-			} else {
-				deleteMap[namespaceGvk] = *deleteExpr
-			}
+
+		errs = addLocalFilters(resource.DeleteWhen, globalDelete[gvk], deleteMap, namespaceGvk)
+		if len(errs) > 0 {
+			errList = append(errList, errs...)
 		}
-		if resource.ArchiveOnDelete != "" {
-			archiveOnDeleteExpr, err := ocel.CreateCelExprOr(resource.ArchiveOnDelete, globalArchiveOnDelete[gvk.String()])
-			if err != nil {
-				errList = append(errList, err)
-			} else {
-				archiveOnDeleteMap[namespaceGvk] = *archiveOnDeleteExpr
-			}
+
+		errs = addLocalFilters(resource.ArchiveOnDelete, globalArchiveOnDelete[gvk], archiveOnDeleteMap, namespaceGvk)
+		if len(errs) > 0 {
+			errList = append(errList, errs...)
 		}
 	}
+
+	// Now we cycle the global filters `globalArchive`, `globalDelete` and `globalArchiveOnDelete`
+	// compiling and adding any global filter that was not added already. Here the resources that
+	// are globally filtered but not locally filtered are added.
+	errs := addGlobalFilters(globalArchive, archiveMap, namespace)
+	if len(errs) > 0 {
+		errList = append(errList, errs...)
+	}
+
+	errs = addGlobalFilters(globalDelete, deleteMap, namespace)
+	if len(errs) > 0 {
+		errList = append(errList, errs...)
+	}
+
+	errs = addGlobalFilters(globalArchiveOnDelete, archiveOnDeleteMap, namespace)
+	if len(errs) > 0 {
+		errList = append(errList, errs...)
+	}
+
 	return archiveMap, deleteMap, archiveOnDeleteMap, errors.Join(errList...)
+}
+
+func addLocalFilters(expression string, globalExpression string, localMap map[NamespaceGroupVersionKind]cel.Program, namespaceGvk NamespaceGroupVersionKind) []error {
+	errList := []error{}
+	if expression != "" {
+		expressionCEL, err := ocel.CompileOrCELExpression(expression, globalExpression)
+		if err != nil {
+			errList = append(errList, err)
+		} else {
+			localMap[namespaceGvk] = *expressionCEL
+		}
+	}
+	return errList
+}
+
+func addGlobalFilters(globalExprs map[schema.GroupVersionKind]string, localMap map[NamespaceGroupVersionKind]cel.Program, namespace string) []error {
+	errList := []error{}
+	for gvk, expression := range globalExprs {
+		if expression == "" {
+			continue
+		}
+
+		ngvk := NamespaceGVKFromNamespaceAndGvk(namespace, gvk)
+		_, exists := localMap[ngvk]
+		if exists {
+			continue
+		}
+
+		expressionCEL, err := ocel.CompileOrCELExpression(expression)
+		if err != nil {
+			errList = append(errList, err)
+			continue
+		}
+
+		localMap[ngvk] = *expressionCEL
+	}
+
+	return errList
 }
 
 type UpdateStopper func()

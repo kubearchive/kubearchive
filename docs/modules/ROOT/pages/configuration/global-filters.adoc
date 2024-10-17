@@ -1,0 +1,68 @@
+= Configuring Global Filters on KubeArchive
+
+KubeArchive allows cluster owners to configure global filters. These are applied
+to any KubeArchive namespace containing a `KubeArchiveConfig` custom resource.
+
+To configure the global filters create a `KubeArchiveConfig` in the
+"kubearchive" namespace. When it is created in the "kubearchive" namespace
+these filters are considered global:
+
+[source,yaml]
+----
+---
+apiVersion: kubearchive.kubearchive.org/v1alpha1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+  namespace: kubearchive
+spec:
+  resources:
+    - selector:
+        apiVersion: v1
+        kind: Pod
+      archiveOnDelete: "true"
+----
+
+== Interaction With Local Filters
+
+Global filters only work in namespaces containing a `KubeArchiveConfig` custom
+resource. These can be understood as "local" filters in opposition with global
+filters. Both global and local filters are combined with an "OR" type of logic
+and used for that specific namespace.
+
+For example the following `KubeArchiveConfig` in the namespace "my-team" KubeArchive
+archives jobs as long as they have `status.startTime` and deletes them when they
+have `status.completionTime`. However KubeArchive also archives pods when they are
+about to be deleted, as configured in the global filters in the previous section:
+
+[source,yaml]
+----
+---
+apiVersion: kubearchive.kubearchive.org/v1alpha1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+  namespace: my-team
+spec:
+  resources:
+    - selector:
+        apiVersion: batch/v1
+        kind: Job
+      archiveWhen: has(status.startTime)
+      deleteWhen: has(status.completionTime)
+----
+
+For example the following `KubeArchiveConfig` in the namespace "production" KubeArchive
+only archives pods when they are about to be deleted, as configured in the global filters
+in the previous section:
+
+[source,yaml]
+----
+---
+apiVersion: kubearchive.kubearchive.org/v1alpha1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+  namespace: production
+spec: {}
+----

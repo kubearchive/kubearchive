@@ -31,7 +31,25 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface, cache *c
 			return
 		}
 
-		allowed := cache.Get(userInfo.Username)
+		verb := "list"
+		if c.Param("name") != "" {
+			verb = "get"
+		}
+
+		sarSpec := apiAuthzv1.SubjectAccessReviewSpec{
+			User:   userInfo.Username,
+			Groups: userInfo.Groups,
+			ResourceAttributes: &apiAuthzv1.ResourceAttributes{
+				Namespace: c.Param("namespace"),
+				Group:     c.Param("group"),
+				Version:   c.Param("version"),
+				Resource:  c.Param("resourceType"),
+				Name:      c.Param("name"),
+				Verb:      verb,
+			},
+		}
+
+		allowed := cache.Get(sarSpec.String())
 		if allowed != nil {
 			if allowed != true {
 				abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
@@ -42,24 +60,8 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface, cache *c
 			return
 		}
 
-		verb := "list"
-		if c.Param("name") != "" {
-			verb = "get"
-		}
-
 		sar, err := sari.Create(c.Request.Context(), &apiAuthzv1.SubjectAccessReview{
-			Spec: apiAuthzv1.SubjectAccessReviewSpec{
-				User:   userInfo.Username,
-				Groups: userInfo.Groups,
-				ResourceAttributes: &apiAuthzv1.ResourceAttributes{
-					Namespace: c.Param("namespace"),
-					Group:     c.Param("group"),
-					Version:   c.Param("version"),
-					Resource:  c.Param("resourceType"),
-					Name:      c.Param("name"),
-					Verb:      verb,
-				},
-			},
+			Spec: sarSpec,
 		}, metav1.CreateOptions{})
 
 		if err != nil {
@@ -67,12 +69,11 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface, cache *c
 			return
 		}
 
-		cache.Set(userInfo.Username, sar.Status.Allowed, cacheExpirationAuthorized)
+		cache.Set(sarSpec.String(), sar.Status.Allowed, cacheExpirationAuthorized)
 
 		if !sar.Status.Allowed {
-			cache.Set(userInfo.Username, sar.Status.Allowed, cacheExpirationUnauthorized)
+			cache.Set(sarSpec.String(), sar.Status.Allowed, cacheExpirationUnauthorized)
 			abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
-			return
 		}
 	}
 }

@@ -1,0 +1,13 @@
+---
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: kubearchive
+spec:
+  version: 8.15.0
+  nodeSets:
+    - name: default
+      count: 2
+      config:
+        node.roles: ["master", "data", "ingest"]
+        node.store.allow_mmap: false

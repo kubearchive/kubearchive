@@ -17,6 +17,13 @@ spec:
       containers:
         - name: {{ tpl .Values.sink.name . }}
           image: {{ .Values.sink.image }}
+          resources:
+            requests:
+              cpu: 500m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
           envFrom:
             # Provide DB URL, user, password, database and port as env vars
             - secretRef:
@@ -26,6 +33,16 @@ spec:
               value: "disabled"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: ""
+            - name: OTEL_GO_X_DEPRECATED_RUNTIME_METRICS
+              value: "false"
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
 ---
 kind: Service
 apiVersion: v1

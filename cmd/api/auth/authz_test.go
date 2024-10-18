@@ -19,9 +19,11 @@ import (
 )
 
 const (
-	group    = "stable.example.com"
-	version  = "v1"
-	resource = "crontabs"
+	group     = "stable.example.com"
+	version   = "v1"
+	resource  = "crontabs"
+	username  = "fakeusername"
+	usergroup = "fakeGroup1"
 )
 
 type fakeSubjectAccessReviews struct {
@@ -33,6 +35,17 @@ func (c *fakeSubjectAccessReviews) Create(ctx context.Context, subjectAccessRevi
 	subjectAccessReview.Status.Allowed = c.allowed
 	c.sar = subjectAccessReview
 	return subjectAccessReview, nil
+}
+
+var sarSpec = apiAuthzv1.SubjectAccessReviewSpec{
+	User:   username,
+	Groups: []string{usergroup},
+	ResourceAttributes: &apiAuthzv1.ResourceAttributes{
+		Group:    group,
+		Version:  version,
+		Resource: resource,
+		Verb:     "list",
+	},
 }
 
 func TestAuthZMiddleware(t *testing.T) {
@@ -100,7 +113,7 @@ func TestAuthZMiddleware(t *testing.T) {
 			fsar := &fakeSubjectAccessReviews{allowed: tc.authorized}
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
-			c.Set("user", apiAuthnv1.UserInfo{Username: "fakeusername", UID: "fake", Groups: []string{"fakeGroup1"}})
+			c.Set("user", apiAuthnv1.UserInfo{Username: username, UID: "fake", Groups: []string{usergroup}})
 			c.Params = gin.Params{
 				gin.Param{Key: "group", Value: group},
 				gin.Param{Key: "version", Value: version},
@@ -117,38 +130,39 @@ func TestAuthZMiddleware(t *testing.T) {
 			assert.Equal(t, version, ra.Version)
 			assert.Equal(t, tc.verb, ra.Verb)
 			assert.Equal(t, tc.namespace, ra.Namespace)
-			assert.Equal(t, tc.authorized, cache.Get("fakeusername"), "Cache should be populated with the proper value.")
+			assert.Equal(t, tc.authorized, cache.Get(fsar.sar.Spec.String()), "Cache should be populated with the proper value.")
 		})
 	}
 }
 
 func TestAuthorizationCache(t *testing.T) {
+
 	tests := []struct {
 		name     string
 		allowed  bool
 		expected int
 	}{
 		{
-			name:     "Unauthorized",
+			name:     "Cache authorizes although the action is unauthorized",
 			allowed:  false,
-			expected: http.StatusUnauthorized,
+			expected: http.StatusOK,
 		},
 		{
-			name:     "Authorized",
+			name:     "Cache unauthorizes although the action is authorized",
 			allowed:  true,
-			expected: http.StatusOK,
+			expected: http.StatusUnauthorized,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			cache := cache.New()
-			cache.Set("fakeusername", !tc.allowed, cacheExpirationDuration)
-
 			fsar := &fakeSubjectAccessReviews{allowed: tc.allowed}
+			cache.Set(sarSpec.String(), !tc.allowed, cacheExpirationDuration)
+
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
-			c.Set("user", apiAuthnv1.UserInfo{Username: "fakeusername", UID: "fake", Groups: []string{"fakeGroup1"}})
+			c.Set("user", apiAuthnv1.UserInfo{Username: username, UID: "fake", Groups: []string{usergroup}})
 			c.Params = gin.Params{
 				gin.Param{Key: "group", Value: group},
 				gin.Param{Key: "version", Value: version},
@@ -157,7 +171,8 @@ func TestAuthorizationCache(t *testing.T) {
 			c.Request, _ = http.NewRequest(http.MethodGet, "", nil)
 
 			RBACAuthorization(fsar, cache, cacheExpirationDuration, cacheExpirationDuration)(c)
-			assert.Equal(t, !tc.allowed, cache.Get("fakeusername"))
+			assert.Equal(t, !tc.allowed, cache.Get(sarSpec.String()))
+			assert.Equal(t, tc.expected, res.Code)
 		})
 	}
 }
@@ -169,12 +184,12 @@ func TestDifferentAuthorizationExpirations(t *testing.T) {
 		expected int
 	}{
 		{
-			name:     "Unauthorized",
+			name:     "Unauthorized requests aren't cached",
 			allowed:  false,
 			expected: http.StatusUnauthorized,
 		},
 		{
-			name:     "Authorized",
+			name:     "Authorized requests are cached",
 			allowed:  true,
 			expected: http.StatusOK,
 		},
@@ -186,7 +201,7 @@ func TestDifferentAuthorizationExpirations(t *testing.T) {
 			fsar := &fakeSubjectAccessReviews{allowed: tc.allowed}
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
-			c.Set("user", apiAuthnv1.UserInfo{Username: "fakeusername", UID: "fake", Groups: []string{"fakeGroup1"}})
+			c.Set("user", apiAuthnv1.UserInfo{Username: username, UID: "fake", Groups: []string{usergroup}})
 			c.Params = gin.Params{
 				gin.Param{Key: "group", Value: group},
 				gin.Param{Key: "version", Value: version},
@@ -197,10 +212,11 @@ func TestDifferentAuthorizationExpirations(t *testing.T) {
 			RBACAuthorization(fsar, cache, 10*time.Minute, -10*time.Minute)(c)
 
 			if tc.allowed {
-				assert.Equal(t, tc.allowed, cache.Get("fakeusername"), "Cache should be populated with allowed when authenticated.")
+				assert.Equal(t, tc.allowed, cache.Get(sarSpec.String()), "Cache should be populated with allowed when authorized.")
 			} else {
-				assert.Equal(t, nil, cache.Get("fakeusername"), "Cache should be 'nil' because of negative expiration time.")
+				assert.Equal(t, nil, cache.Get(sarSpec.String()), "Cache should be 'nil' because of negative expiration time.")
 			}
+			assert.Equal(t, tc.expected, res.Code)
 		})
 	}
 }

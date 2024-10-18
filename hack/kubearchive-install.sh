@@ -14,9 +14,11 @@ cd ${SCRIPT_DIR}/..
 PODS=$(kubectl -n kubearchive get pods | grep -E -v "NAME|No resources|apiserversource" |& awk '{print $1}')
 
 YAML=$(mktemp --suffix=.yaml -t kubearchive-XXX)
+TMP=$(mktemp --suffix=.yaml -t kubearchive-not-resolved-XXXX)
+
 bash cmd/operator/generate.sh
-helm template kubearchive charts/kubearchive -n kubearchive --include-crds > /tmp/kubearchive-not-resolved.yaml
-ko resolve -f /tmp/kubearchive-not-resolved.yaml --base-import-paths > ${YAML}
+helm template kubearchive charts/kubearchive -n kubearchive --include-crds > ${TMP}
+ko resolve -f ${TMP} --base-import-paths > ${YAML}
 kubectl apply -n kubearchive -f ${YAML}
 
 rm -f ${YAML}

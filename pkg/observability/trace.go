@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 
+	"go.opentelemetry.io/contrib/instrumentation/host"
+	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -83,6 +85,15 @@ func Start(serviceName string) error {
 	}
 
 	otel.SetMeterProvider(mp)
+	err = host.Start(host.WithMeterProvider(mp))
+	if err != nil {
+		return err
+	}
+
+	err = runtime.Start(runtime.WithMeterProvider(mp))
+	if err != nil {
+		return err
+	}
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 	return nil

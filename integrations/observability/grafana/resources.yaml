@@ -27,6 +27,7 @@ spec:
             - containerPort: 4317
             - containerPort: 4318
             - containerPort: 9411
+            - containerPort: 9090
           volumeMounts:
             - name: otelcol-config
               mountPath: /otel-lgtm/otelcol-config.yaml
@@ -53,6 +54,8 @@ spec:
       port: 4318
     - name: zipkin
       port: 9411
+    - name: prometheus
+      port: 9090
 ---
 apiVersion: v1
 kind: Service

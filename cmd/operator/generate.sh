@@ -16,8 +16,8 @@ cd ${SCRIPT_DIR}
 echo "Generating CRD."
 ${LOCALBIN}/controller-gen crd paths="./..." output:dir=../../charts/kubearchive/crds
 
-patch="/tmp/crd.$$"
-cat << EOF > $patch
+PATCH=$(mktemp -t crd.XXXXXXXX)
+cat << EOF > ${PATCH}
 strategy: Webhook
 webhook:
   clientConfig:
@@ -30,9 +30,9 @@ webhook:
 EOF
 CRD="../../charts/kubearchive/crds/kubearchive.kubearchive.org_kubearchiveconfigs.yaml"
 yq -i '.metadata.annotations."cert-manager.io/inject-ca-from"="kubearchive/kubearchive-operator-certificate"' ${CRD}
-yq -i ".spec.conversion = load(\"$patch\")" ${CRD}
+yq -i ".spec.conversion = load(\"${PATCH}\")" ${CRD}
 
-rm -f $patch
+rm -f ${PATCH}
 
 # Generate role.
 echo "Generating role."

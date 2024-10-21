@@ -45,6 +45,10 @@ spec:
               valueFrom:
                 resourceFieldRef:
                   resource: limits.cpu
+            - name: KUBEARCHIVE_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
 ---
 kind: Service
 apiVersion: v1

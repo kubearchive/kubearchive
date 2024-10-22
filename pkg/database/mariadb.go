@@ -55,6 +55,14 @@ func (info MariaDBDatabaseInfo) GetWriteResourceSQL() string {
 		"ON DUPLICATE KEY UPDATE name=?, namespace=?, resource_version=?, cluster_deleted_ts=?, data=?"
 }
 
+func (info MariaDBDatabaseInfo) GetWriteUrlSQL() string {
+	return "INSERT INTO log_url (uuid, url) VALUES (?, ?)"
+}
+
+func (info MariaDBDatabaseInfo) GetDeleteUrlsSQL() string {
+	return "DELETE FROM log_url WHERE uuid=?"
+}
+
 type MariaDBDatabase struct {
 	*Database
 }

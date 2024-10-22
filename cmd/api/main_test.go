@@ -25,7 +25,7 @@ func fakeServer(k8sClient kubernetes.Interface, cache *cache.Cache) *Server {
 		// It may be related to https://github.com/kubernetes/kubernetes/issues/126850 so keeping deprecated.
 		k8sClient = fakeK8s.NewSimpleClientset()
 	}
-	controller := routers.Controller{Database: fakeDB.NewFakeDatabase(nil)}
+	controller := routers.Controller{Database: fakeDB.NewFakeDatabase(nil, nil)}
 	expirations := &routers.CacheExpirations{Authorized: 1 * time.Second, Unauthorized: 1 * time.Second}
 	return NewServer(k8sClient, controller, cache, expirations)
 }

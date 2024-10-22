@@ -17,7 +17,7 @@ for a Tekton `PipelineRun`, what they expect to get back are the logs attached t
 KubeArchive retrieves log URLs using the owner references field of a resource.
 When logs for a resource are requested, a query is made to find all the resources
 that have that initial resource as an owner. Then each resource returned is
-processed similarly, eventually building up a list of `Pods` and from those a 
+processed similarly, eventually building up a list of `Pods` and from those a
 list of log file links. This generic approach works for any resource.
 
 A `KubeArchiveConfig` needs to be configured correctly to support this, meaning it must
@@ -93,9 +93,9 @@ In this example the following happens:
 
 == Configuring Log URL Generation
 
-Logging URL generation in KubeArchive is controlled using a `ConfigMap` in 
+Logging URL generation in KubeArchive is controlled using a `ConfigMap` in
 the KubeArchive installation namespace.  URLs are generated using parameters
-that allow the URL to point to the specific log file associated with the 
+that allow the URL to point to the specific log file associated with the
 given `Pod`. This `ConfigMap` requires a single entry, LOG_URL, whose string
 value will be interpolated using the other variables defined in the `ConfigMap`.
 For example, take this `ConfigMap` for Splunk:
@@ -132,7 +132,7 @@ When generating a log URL to be stored when a `Pod` is archived, the following s
 Once the logging `ConfigMap` has been installed in the KubeArchive installation
 namespace, KubeArchive needs to be configured to recognize and use it.
 
-This is done by adding the logging "configMapRef to the "kubearchive-config" `ConfigMap` in
+This is done by adding the `logging-configmap-name` to the `kubearchive-config` `ConfigMap` in
 the same namespace:
 
 ----
@@ -142,9 +142,18 @@ kind: ConfigMap
 metadata:
   name: kubearchive-config
 data:
-  logging:
-    configMapRef: splunk-logging
+  logging-configmap-name: splunk-logging
 ----
+
+[IMPORTANT]
+====
+The KubeArchive Sink is not aware of changes to the `kubearchive-config` `ConfigMap`. After making changes to
+`kubearchive-config`, the KubeArchive Sink must be restarted. The following command can be used to perform the restart:
+
+```
+kubectl rollout restart deployment --selector=app=kubearchive-sink
+```
+====
 
 == Supported Logging Systems
 
@@ -153,7 +162,7 @@ KubeArchive currently integrates with both Splunk and Elasticsearch
 === Elasticsearch
 
 Following is a sample `ConfigMap` that generates log URLs for Elasticsearch. Note the
-ElasticSearch requires a data view be defined in order to see logs in Kibana. In this 
+ElasticSearch requires a data view be defined in order to see logs in Kibana. In this
 example the data view ID is hard-coded as DATA_VIEW_ID in the `ConfigMap`. This value
 needs to be changed to one appropriate for the Elasticsearch installation being used
 by KubeArchive.

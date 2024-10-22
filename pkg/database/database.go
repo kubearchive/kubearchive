@@ -29,6 +29,8 @@ type DBInfoInterface interface {
 	GetNamespacedResourceByNameSQL() string
 
 	GetWriteResourceSQL() string
+	GetWriteUrlSQL() string
+	GetDeleteUrlsSQL() string
 }
 
 type DBInterface interface {
@@ -37,6 +39,7 @@ type DBInterface interface {
 	QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (*unstructured.Unstructured, error)
 
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
+	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, urls ...string) error
 	Ping(ctx context.Context) error
 	CloseDB() error
 }
@@ -173,6 +176,68 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 	}
 	return nil
 }
+
+// WriteUrls deletes urls for k8sObj before writing urls to prevent duplicates
+func (db *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, urls ...string) error {
+	tx, err := db.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf(
+			"could not begin transaction to write urls for resource %s: %w",
+			k8sObj.GetUID(),
+			err,
+		)
+	}
+	_, execErr := tx.ExecContext(
+		ctx,
+		db.info.GetDeleteUrlsSQL(),
+		k8sObj.GetUID(),
+	)
+	if execErr != nil {
+		rollbackErr := tx.Rollback()
+		if rollbackErr != nil {
+			return fmt.Errorf(
+				"delete to database failed: %w and unable to roll back transaction: %w",
+				execErr,
+				rollbackErr,
+			)
+		}
+		return fmt.Errorf("delete to database failed: %w", execErr)
+	}
+
+	for _, url := range urls {
+		_, execErr := tx.ExecContext(
+			ctx,
+			db.info.GetWriteUrlSQL(),
+			k8sObj.GetUID(),
+			url,
+		)
+		if execErr != nil {
+			rollbackErr := tx.Rollback()
+			if rollbackErr != nil {
+				return fmt.Errorf(
+					"write to database failed: %w and unable to roll back transaction: %w",
+					execErr,
+					rollbackErr,
+				)
+			}
+			return fmt.Errorf("write to database failed: %w", execErr)
+		}
+	}
+	commitErr := tx.Commit()
+	if commitErr != nil {
+		rollbackErr := tx.Rollback()
+		if rollbackErr != nil {
+			return fmt.Errorf(
+				"commit to database failed: %w and unable rollback transaction: %w",
+				commitErr,
+				rollbackErr,
+			)
+		}
+		return fmt.Errorf("commit to database failed and the transaction was rolled back: %w", commitErr)
+	}
+	return nil
+}
+
 func (db *Database) CloseDB() error {
 	return db.db.Close()
 }

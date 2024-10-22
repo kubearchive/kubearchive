@@ -19,6 +19,7 @@ import (
 )
 
 var testResources = fake.CreateTestResources()
+var testLogUrls = fake.CreateTestLogUrls()
 var nonCoreResources = testResources[:1]
 var coreResources = testResources[1:2]
 
@@ -42,7 +43,7 @@ func setupRouter(db database.DBInterface, core bool) *gin.Engine {
 }
 
 func TestGetAllResources(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources), false)
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), false)
 
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/crontabs", nil)
@@ -57,7 +58,7 @@ func TestGetAllResources(t *testing.T) {
 }
 
 func TestGetNamespacedResources(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources), false)
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), false)
 
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs", nil)
@@ -73,7 +74,7 @@ func TestGetNamespacedResources(t *testing.T) {
 }
 
 func TestGetNamespacedResourcesByName(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources), false)
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), false)
 
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs/test", nil)
@@ -88,7 +89,7 @@ func TestGetNamespacedResourcesByName(t *testing.T) {
 }
 
 func TestGetResourcesEmpty(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase([]*unstructured.Unstructured{}), false)
+	router := setupRouter(fake.NewFakeDatabase([]*unstructured.Unstructured{}, []fake.LogUrlRow{}), false)
 
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs", nil)
@@ -103,7 +104,7 @@ func TestGetResourcesEmpty(t *testing.T) {
 }
 
 func TestGetAllCoreResources(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources), true)
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), true)
 
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
@@ -118,7 +119,7 @@ func TestGetAllCoreResources(t *testing.T) {
 }
 
 func TestGetCoreNamespacedResources(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources), true)
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), true)
 
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespace/test/pods", nil)
@@ -133,7 +134,7 @@ func TestGetCoreNamespacedResources(t *testing.T) {
 }
 
 func TestGetCoreNamespacedResourcesByName(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources), true)
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), true)
 
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespace/test/pods/test", nil)
@@ -163,7 +164,7 @@ func TestNoAPIResourceInContextError(t *testing.T) {
 
 	// Setting a router without a middleware that sets the api resource
 	router := gin.Default()
-	ctrl := Controller{Database: fake.NewFakeDatabase(testResources)}
+	ctrl := Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls)}
 	router.GET("/api/:version/:resourceType", ctrl.GetAllCoreResources)
 
 	res := httptest.NewRecorder()
@@ -178,7 +179,7 @@ func TestNoAPIResourceInContextError(t *testing.T) {
 func TestLivez(t *testing.T) {
 
 	router := gin.Default()
-	ctrl := Controller{Database: fake.NewFakeDatabase(testResources),
+	ctrl := Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls),
 		CacheConfiguration: CacheExpirations{Authorized: 60, Unauthorized: 5}}
 	router.GET("/livez", ctrl.Livez)
 	res := httptest.NewRecorder()
@@ -219,7 +220,7 @@ func TestReadyz(t *testing.T) {
 		router := gin.Default()
 		var ctrl Controller
 		if testCase.dbConnReady {
-			ctrl = Controller{Database: fake.NewFakeDatabase(testResources)}
+			ctrl = Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls)}
 		} else {
 			ctrl = Controller{Database: fake.NewFakeDatabaseWithError(errors.New("test error"))}
 		}

@@ -1,0 +1,6 @@
+[
+  "http://127.0.0.1:8111/app/search/search?q=search * | spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"a8c9b834-bc4a-4438-8841-23a5ffb9164c\" | spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"nginx-container\"",
+  "http://127.0.0.1:8111/app/search/search?q=search * | spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"a8c9b834-bc4a-4438-8841-23a5ffb9164c\" | spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"busybox-container\"",
+  "http://127.0.0.1:8111/app/search/search?q=search * | spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"a8c9b834-bc4a-4438-8841-23a5ffb9164c\" | spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"echo-3\"",
+  "http://127.0.0.1:8111/app/search/search?q=search * | spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"a8c9b834-bc4a-4438-8841-23a5ffb9164c\" | spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"echo-4\""
+]

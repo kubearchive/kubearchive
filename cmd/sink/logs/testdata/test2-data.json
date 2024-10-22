@@ -1,0 +1,250 @@
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "annotations": {
+      "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"kind\":\"Pod\",\"metadata\":{\"annotations\":{},\"name\":\"multi-container-pod\",\"namespace\":\"generate-logs-pipelines\"},\"spec\":{\"containers\":[{\"image\":\"nginx:latest\",\"name\":\"nginx-container\",\"ports\":[{\"containerPort\":80}]},{\"args\":[\"-c\",\"while true; do sleep 20; echo \\\"busybox-container\\\"; date; done\"],\"command\":[\"/bin/sh\"],\"image\":\"busybox:latest\",\"name\":\"busybox-container\"},{\"args\":[\"-c\",\"while true; do sleep 20; echo \\\"echo 1\\\"; date; done\"],\"command\":[\"/bin/sh\"],\"image\":\"busybox:latest\",\"name\":\"echo-3\"},{\"args\":[\"-c\",\"while true; do sleep 20; echo \\\"echo 2\\\"; date; done\"],\"command\":[\"/bin/sh\"],\"image\":\"busybox:latest\",\"name\":\"echo-4\"}]}}\n"
+    },
+    "creationTimestamp": "2024-10-10T13:24:22Z",
+    "managedFields": [
+      {
+        "apiVersion": "v1",
+        "fieldsType": "FieldsV1",
+        "fieldsV1": {
+          "f:metadata": {
+            "f:annotations": {
+              ".": {},
+              "f:kubectl.kubernetes.io/last-applied-configuration": {}
+            }
+          },
+          "f:spec": {
+            "f:containers": {
+              "k:{\"name\":\"busybox-container\"}": {
+                ".": {},
+                "f:args": {},
+                "f:command": {},
+                "f:image": {},
+                "f:imagePullPolicy": {},
+                "f:name": {},
+                "f:resources": {},
+                "f:terminationMessagePath": {},
+                "f:terminationMessagePolicy": {}
+              },
+              "k:{\"name\":\"echo-3\"}": {
+                ".": {},
+                "f:args": {},
+                "f:command": {},
+                "f:image": {},
+                "f:imagePullPolicy": {},
+                "f:name": {},
+                "f:resources": {},
+                "f:terminationMessagePath": {},
+                "f:terminationMessagePolicy": {}
+              },
+              "k:{\"name\":\"echo-4\"}": {
+                ".": {},
+                "f:args": {},
+                "f:command": {},
+                "f:image": {},
+                "f:imagePullPolicy": {},
+                "f:name": {},
+                "f:resources": {},
+                "f:terminationMessagePath": {},
+                "f:terminationMessagePolicy": {}
+              },
+              "k:{\"name\":\"nginx-container\"}": {
+                ".": {},
+                "f:image": {},
+                "f:imagePullPolicy": {},
+                "f:name": {},
+                "f:ports": {
+                  ".": {},
+                  "k:{\"containerPort\":80,\"protocol\":\"TCP\"}": {
+                    ".": {},
+                    "f:containerPort": {},
+                    "f:protocol": {}
+                  }
+                },
+                "f:resources": {},
+                "f:terminationMessagePath": {},
+                "f:terminationMessagePolicy": {}
+              }
+            },
+            "f:dnsPolicy": {},
+            "f:enableServiceLinks": {},
+            "f:restartPolicy": {},
+            "f:schedulerName": {},
+            "f:securityContext": {},
+            "f:terminationGracePeriodSeconds": {}
+          }
+        },
+        "manager": "kubectl-client-side-apply",
+        "operation": "Update",
+        "time": "2024-10-10T13:24:22Z"
+      }
+    ],
+    "name": "multi-container-pod",
+    "namespace": "generate-logs-pipelines",
+    "resourceVersion": "784513",
+    "uid": "a8c9b834-bc4a-4438-8841-23a5ffb9164c"
+  },
+  "spec": {
+    "containers": [
+      {
+        "image": "nginx:latest",
+        "imagePullPolicy": "Always",
+        "name": "nginx-container",
+        "ports": [
+          {
+            "containerPort": 80,
+            "protocol": "TCP"
+          }
+        ],
+        "resources": {},
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File",
+        "volumeMounts": [
+          {
+            "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+            "name": "kube-api-access-qlzd8",
+            "readOnly": true
+          }
+        ]
+      },
+      {
+        "args": [
+          "-c",
+          "while true; do sleep 20; echo \"busybox-container\"; date; done"
+        ],
+        "command": [
+          "/bin/sh"
+        ],
+        "image": "busybox:latest",
+        "imagePullPolicy": "Always",
+        "name": "busybox-container",
+        "resources": {},
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File",
+        "volumeMounts": [
+          {
+            "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+            "name": "kube-api-access-qlzd8",
+            "readOnly": true
+          }
+        ]
+      },
+      {
+        "args": [
+          "-c",
+          "while true; do sleep 20; echo \"echo 1\"; date; done"
+        ],
+        "command": [
+          "/bin/sh"
+        ],
+        "image": "busybox:latest",
+        "imagePullPolicy": "Always",
+        "name": "echo-3",
+        "resources": {},
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File",
+        "volumeMounts": [
+          {
+            "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+            "name": "kube-api-access-qlzd8",
+            "readOnly": true
+          }
+        ]
+      },
+      {
+        "args": [
+          "-c",
+          "while true; do sleep 20; echo \"echo 2\"; date; done"
+        ],
+        "command": [
+          "/bin/sh"
+        ],
+        "image": "busybox:latest",
+        "imagePullPolicy": "Always",
+        "name": "echo-4",
+        "resources": {},
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File",
+        "volumeMounts": [
+          {
+            "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+            "name": "kube-api-access-qlzd8",
+            "readOnly": true
+          }
+        ]
+      }
+    ],
+    "dnsPolicy": "ClusterFirst",
+    "enableServiceLinks": true,
+    "preemptionPolicy": "PreemptLowerPriority",
+    "priority": 0,
+    "restartPolicy": "Always",
+    "schedulerName": "default-scheduler",
+    "securityContext": {},
+    "serviceAccount": "default",
+    "serviceAccountName": "default",
+    "terminationGracePeriodSeconds": 30,
+    "tolerations": [
+      {
+        "effect": "NoExecute",
+        "key": "node.kubernetes.io/not-ready",
+        "operator": "Exists",
+        "tolerationSeconds": 300
+      },
+      {
+        "effect": "NoExecute",
+        "key": "node.kubernetes.io/unreachable",
+        "operator": "Exists",
+        "tolerationSeconds": 300
+      }
+    ],
+    "volumes": [
+      {
+        "name": "kube-api-access-qlzd8",
+        "projected": {
+          "defaultMode": 420,
+          "sources": [
+            {
+              "serviceAccountToken": {
+                "expirationSeconds": 3607,
+                "path": "token"
+              }
+            },
+            {
+              "configMap": {
+                "items": [
+                  {
+                    "key": "ca.crt",
+                    "path": "ca.crt"
+                  }
+                ],
+                "name": "kube-root-ca.crt"
+              }
+            },
+            {
+              "downwardAPI": {
+                "items": [
+                  {
+                    "fieldRef": {
+                      "apiVersion": "v1",
+                      "fieldPath": "metadata.namespace"
+                    },
+                    "path": "namespace"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "status": {
+    "phase": "Pending",
+    "qosClass": "BestEffort"
+  }
+}

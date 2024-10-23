@@ -1,5 +1,5 @@
 {{- $controlPlane := "controller-manager" -}}
-{{- $port := 8081 -}}
+{{- $port := 9443 -}}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -76,10 +76,11 @@ spec:
           image: {{ .Values.operator.image }}
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /validate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
               port: {{ $port }}
+              scheme: HTTPS
             initialDelaySeconds: 15
-            periodSeconds: 20
+            periodSeconds: 60
           ports:
             - containerPort: 9443
               name: webhook-server
@@ -90,9 +91,10 @@ spec:
               readOnly: true
           readinessProbe:
             httpGet:
-              path: /readyz
+              path: /validate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
               port: {{ $port }}
-            initialDelaySeconds: 5
+              scheme: HTTPS
+            initialDelaySeconds: 15
             periodSeconds: 10
           resources:
             limits:

@@ -27,7 +27,7 @@ import (
 
 const (
 	globalKeyEnvVar = "KUBEARCHIVE_NAMESPACE"
-	filtersCmName = "sink-filters"
+	filtersCmName   = "sink-filters"
 )
 
 var (

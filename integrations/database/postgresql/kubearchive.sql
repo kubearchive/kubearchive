@@ -2,12 +2,13 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.4 (Debian 16.4-1.pgdg110+2)
--- Dumped by pg_dump version 16.1
+-- Dumped from database version 17.0 (Debian 17.0-1.pgdg120+1)
+-- Dumped by pg_dump version 17.0 (Debian 17.0-1.pgdg120+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -31,6 +32,7 @@ ALTER DATABASE kubearchive OWNER TO kubearchive;
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -100,6 +102,13 @@ ALTER TABLE ONLY public.resource
 
 
 --
+-- Name: idx_creation_timestamp; Type: INDEX; Schema: public; Owner: kubearchive
+--
+
+CREATE INDEX idx_creation_timestamp ON public.resource USING btree ((((data -> 'metadata'::text) ->> 'creationTimestamp'::text)) DESC);
+
+
+--
 -- Name: idx_json_annotations; Type: INDEX; Schema: public; Owner: kubearchive
 --
 
@@ -119,11 +128,6 @@ CREATE INDEX idx_json_labels ON public.resource USING gin ((((data -> 'metadata'
 
 CREATE INDEX idx_json_owners ON public.resource USING gin ((((data -> 'metadata'::text) -> 'ownerReferences'::text)) jsonb_path_ops);
 
---
--- Name: idx_json_creation_timestamp; Type: INDEX; Schema: public; Owner: kubearchive
---
-
-CREATE INDEX idx_creation_timestamp ON public.resource USING gin ((((data -> 'metadata'::text) -> 'creationTimestamp'::text)) jsonb_path_ops);
 
 --
 -- Name: log_url_uuid_idx; Type: INDEX; Schema: public; Owner: kubearchive
@@ -164,4 +168,3 @@ ALTER TABLE ONLY public.log_url
 --
 -- PostgreSQL database dump complete
 --
-

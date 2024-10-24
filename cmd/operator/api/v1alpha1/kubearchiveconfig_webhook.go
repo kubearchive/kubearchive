@@ -64,19 +64,19 @@ func (kac *KubeArchiveConfig) validateCELExpressions() (admission.Warnings, erro
 	errList := make([]error, 0)
 	for _, resource := range kac.Spec.Resources {
 		if resource.ArchiveWhen != "" {
-			_, err := cel.CreateCelExprOr(resource.ArchiveWhen)
+			_, err := cel.CompileOrCELExpression(resource.ArchiveWhen)
 			if err != nil {
 				errList = append(errList, err)
 			}
 		}
 		if resource.DeleteWhen != "" {
-			_, err := cel.CreateCelExprOr(resource.DeleteWhen)
+			_, err := cel.CompileOrCELExpression(resource.DeleteWhen)
 			if err != nil {
 				errList = append(errList, err)
 			}
 		}
 		if resource.ArchiveOnDelete != "" {
-			_, err := cel.CreateCelExprOr(resource.ArchiveOnDelete)
+			_, err := cel.CompileOrCELExpression(resource.ArchiveOnDelete)
 			if err != nil {
 				errList = append(errList, err)
 			}

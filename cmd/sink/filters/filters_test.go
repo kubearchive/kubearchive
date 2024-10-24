@@ -5,7 +5,10 @@ package filters
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -15,12 +18,19 @@ import (
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 	toolsWatch "k8s.io/client-go/tools/watch"
 	sourcev1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
+
+// nolint:staticcheck
+func TestMain(m *testing.M) {
+	globalKey = "kubearchive"
+	m.Run()
+}
 
 func newMockWatcher(ch <-chan watch.Event) func(metav1.ListOptions) (watch.Interface, error) {
 	return func(options metav1.ListOptions) (watch.Interface, error) {
@@ -167,4 +177,157 @@ func TestHandleUpdates(t *testing.T) {
 		assert.Equal(t, testCase.deleteSize, len(f.delete))
 		assert.Equal(t, testCase.archiveOnDeleteSize, len(f.archiveOnDelete))
 	}
+}
+
+func TestChangeGlobalFilters(t *testing.T) {
+	filters := NewFilters(nil)
+	fh, err := os.Open("testdata/cm.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { fh.Close() })
+
+	fileBytes, err := io.ReadAll(fh)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cm corev1.ConfigMap
+	err = yaml.Unmarshal(fileBytes, &cm)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = filters.changeGlobalFilters(cm.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name           string
+		resource       unstructured.Unstructured
+		sinkFilterPath string
+		mustArchive    bool
+		mustDelete     bool
+	}{
+		{
+			name: "pod is archived because of local filters",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+						"labels": map[string]string{
+							"local-filter": "fake",
+						},
+					},
+				},
+			},
+			sinkFilterPath: "testdata/cm.yaml",
+			mustArchive:    true,
+			mustDelete:     false,
+		},
+		{
+			name: "pod is archived because of global filters",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+						"labels": map[string]string{
+							"global-filter": "fake",
+						},
+					},
+				},
+			},
+			sinkFilterPath: "testdata/cm.yaml",
+			mustArchive:    true,
+			mustDelete:     false,
+		},
+		{
+			name: "pod is not archived",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			sinkFilterPath: "testdata/cm.yaml",
+			mustArchive:    false,
+			mustDelete:     false,
+		},
+		{
+			name: "cronjob is archived because global filters",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "batch/v1",
+					"kind":       "CronJob",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			sinkFilterPath: "testdata/cm.yaml",
+			mustArchive:    true,
+			mustDelete:     false,
+		},
+		{
+			name: "job is archived because global filters and has a start time",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "batch/v1",
+					"kind":       "Job",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+					"status": map[string]string{
+						"startTime": "fake-time",
+					},
+				},
+			},
+			sinkFilterPath: "testdata/cm.yaml",
+			mustArchive:    true,
+			mustDelete:     false,
+		},
+		{
+			name: "job is deleted because global filters and has a completion time",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "batch/v1",
+					"kind":       "Job",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+					"status": map[string]string{
+						"completionTime": "fake-time",
+					},
+				},
+			},
+			sinkFilterPath: "testdata/cm.yaml",
+			mustArchive:    true,
+			mustDelete:     true,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			resourceMustArchive := filters.MustArchive(context.Background(), &testCase.resource)
+			resourceMustDelete := filters.MustDelete(context.Background(), &testCase.resource)
+
+			assert.Equal(t, testCase.mustArchive, resourceMustArchive, "archive should match")
+			assert.Equal(t, testCase.mustDelete, resourceMustDelete, "delete should match")
+		})
+	}
+
 }

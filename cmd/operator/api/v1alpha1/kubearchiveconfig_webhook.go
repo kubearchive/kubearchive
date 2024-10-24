@@ -4,10 +4,13 @@
 package v1alpha1
 
 import (
+	"context"
 	"errors"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -42,6 +45,11 @@ var _ webhook.Validator = &KubeArchiveConfig{}
 func (kac *KubeArchiveConfig) ValidateCreate() (admission.Warnings, error) {
 	kubearchiveconfiglog.Info("validate create", "name", kac.Name)
 
+	errs := kac.validateSingleton()
+	if errs != nil {
+		return nil, errs
+	}
+
 	return kac.validateCELExpressions()
 }
 
@@ -59,7 +67,6 @@ func (kac *KubeArchiveConfig) ValidateDelete() (admission.Warnings, error) {
 	return nil, nil
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (kac *KubeArchiveConfig) validateCELExpressions() (admission.Warnings, error) {
 	errList := make([]error, 0)
 	for _, resource := range kac.Spec.Resources {
@@ -83,4 +90,35 @@ func (kac *KubeArchiveConfig) validateCELExpressions() (admission.Warnings, erro
 		}
 	}
 	return nil, errors.Join(errList...)
+}
+
+//nolint:unparam
+func (kac *KubeArchiveConfig) validateSingleton() error {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return err
+	}
+
+	scheme := runtime.NewScheme()
+	err = AddToScheme(scheme)
+	if err != nil {
+		return err
+	}
+	c, err := client.New(cfg, client.Options{Scheme: scheme})
+	if err != nil {
+		return err
+	}
+
+	kacs := &KubeArchiveConfigList{}
+	err = c.List(context.Background(), kacs, client.InNamespace(kac.Namespace))
+	if err != nil {
+		return err
+	}
+
+	if len(kacs.Items) > 0 {
+		err = errors.New("A KubeArchiveConfig resource already exists in this namespace, and only one is allowed.")
+		return err
+	}
+
+	return nil
 }

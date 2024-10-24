@@ -223,6 +223,7 @@ func main() {
 		slog.Error("Could not get a kubernetes client", "error", err)
 		os.Exit(1)
 	}
+
 	filters := filters.NewFilters(clientset)
 	stopUpdating, err := filters.Update()
 	if err != nil {

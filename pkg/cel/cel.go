@@ -15,9 +15,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// CreateCelExprOr attempts to compile cel expression strings into a cel.Program. If exprs contains more than one cel
+// CompileOrCELExpression attempts to compile cel expression strings into a cel.Program. If exprs contains more than one cel
 // expression string, it will surround each cell expression in parentheses and or them together.
-func CreateCelExprOr(exprs ...string) (*cel.Program, error) {
+func CompileOrCELExpression(exprs ...string) (*cel.Program, error) {
 	exprs = FormatCelExprs(exprs...)
 	expr := strings.Join(exprs, " || ")
 	return CompileCELExpr(expr)

@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
-	"os"
 	"sync"
 
 	"github.com/google/cel-go/cel"
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	ocel "github.com/kubearchive/kubearchive/pkg/cel"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,18 +26,10 @@ import (
 )
 
 const (
-	globalKeyEnvVar = "KUBEARCHIVE_NAMESPACE"
-	filtersCmName   = "sink-filters"
+	filtersCmName = "sink-filters"
 )
 
-var (
-	ErrNoGlobal = errors.New("no global expressions exist")
-	globalKey   string // gets set in init() and should be treated as const
-)
-
-func init() {
-	globalKey = os.Getenv(globalKeyEnvVar)
-}
+var ErrNoGlobal = errors.New("no global expressions exist")
 
 type Filters struct {
 	*sync.RWMutex
@@ -66,7 +58,7 @@ func getGlobalCelExprs(stringResources map[string]string) (map[schema.GroupVersi
 	archiveExprs := make(map[schema.GroupVersionKind]string)
 	deleteExprs := make(map[schema.GroupVersionKind]string)
 	archiveOnDelete := make(map[schema.GroupVersionKind]string)
-	kacResources, exists := stringResources[globalKey]
+	kacResources, exists := stringResources[k8s.KubeArchiveNamespace]
 	if !exists {
 		return archiveExprs, deleteExprs, archiveOnDelete, ErrNoGlobal
 	}
@@ -90,7 +82,7 @@ func (f *Filters) changeGlobalFilters(stringResources map[string]string) error {
 	if err != nil && !errors.Is(err, ErrNoGlobal) {
 		errList = append(errList, err)
 	}
-	delete(stringResources, globalKey)
+	delete(stringResources, k8s.KubeArchiveNamespace)
 	archiveMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	deleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	archiveOnDeleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
@@ -200,9 +192,9 @@ func noopUpdateStopper() {}
 // Update updates the archive, delete, and archiveOnDelete filters when the ConfigMap changes.
 func (f *Filters) Update() (UpdateStopper, error) {
 	watcher := func(options metav1.ListOptions) (watch.Interface, error) {
-		return f.clientset.CoreV1().ConfigMaps(globalKey).Watch(
+		return f.clientset.CoreV1().ConfigMaps(k8s.KubeArchiveNamespace).Watch(
 			context.Background(),
-			metav1.SingleObject(metav1.ObjectMeta{Name: filtersCmName, Namespace: globalKey}),
+			metav1.SingleObject(metav1.ObjectMeta{Name: filtersCmName, Namespace: k8s.KubeArchiveNamespace}),
 		)
 	}
 	retryWatcher, err := toolsWatch.NewRetryWatcher("1", &cache.ListWatch{WatchFunc: watcher})

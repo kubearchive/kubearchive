@@ -14,6 +14,7 @@ import (
 	"time"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
@@ -26,9 +27,8 @@ import (
 	sourcev1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
-// nolint:staticcheck
 func TestMain(m *testing.M) {
-	globalKey = "kubearchive"
+	k8s.SetKubeArchiveNamespaceTest()
 	m.Run()
 }
 

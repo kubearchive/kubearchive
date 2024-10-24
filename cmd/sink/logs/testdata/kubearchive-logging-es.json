@@ -1,0 +1,20 @@
+{
+  "apiVersion": "v1",
+  "data": {
+    "DATA_VIEW_ID": "035bffd1-b4b5-4123-af57-d89368cabfd8",
+    "POD_ID": "cel:metadata.uid",
+    "CONTAINER_NAME": "cel:spec.containers.map(m, m.name)",
+    "LOG_URL": "https://localhost:5601/app/discover#/?_a=(columns:!(),dataSource:(dataViewId:'{DATA_VIEW_ID}',type:dataView),filters:!(('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:_index,negate:!f,params:(query:fluentd),type:phrase),query:(match_phrase:(_index:fluentd))),('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:kubernetes.pod_id,negate:!f,params:(query:'{POD_ID}'),type:phrase),query:(match_phrase:(kubernetes.pod_id:'{POD_ID}'))),('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:kubernetes.container_name,negate:!f,params:(query:{CONTAINER_NAME}),type:phrase),query:(match_phrase:(kubernetes.container_name:{CONTAINER_NAME})))),interval:auto,query:(language:kuery,query:''),sort:!())"
+  },
+  "kind": "ConfigMap",
+  "metadata": {
+    "annotations": {
+      "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"v1\",\"data\":{\"CONTAINER\":\"spath \\\"kubernetes.container_name\\\" | search \\\"kubernetes.container_name\\\"=\\\"{CONTAINER_NAME}\\\"\",\"CONTAINER_NAME\":\"cel:spec.containers.map(m, m.name)\",\"LOG_URL\":\"http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}\",\"POD\":\"spath \\\"kubernetes.pod_id\\\" | search \\\"kubernetes.pod_id\\\"=\\\"{POD_ID}\\\"\",\"POD_ID\":\"cel:metadata.uid\"},\"kind\":\"ConfigMap\",\"metadata\":{\"annotations\":{},\"name\":\"kubearchive-splunk\",\"namespace\":\"kubearchive\"}}\n"
+    },
+    "creationTimestamp": "2024-10-22T18:38:51Z",
+    "name": "kubearchive-es",
+    "namespace": "kubearchive",
+    "resourceVersion": "891",
+    "uid": "b79fd9f3-4dee-4a05-a748-93cabc4398b8"
+  }
+}

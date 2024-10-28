@@ -4,5 +4,7 @@
   "semanticCommits": "disabled",
   "postUpdateOptions": [
     "gomodTidy"
-  ]
+  ],
+  "automerge": true,
+  "prHourlyLimit": 1
 }

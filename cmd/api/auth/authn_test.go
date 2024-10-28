@@ -67,7 +67,7 @@ func TestInvalidAuthHeader(t *testing.T) {
 			ftr := &fakeTokenReview{authenticated: false}
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
-			c.Request, _ = http.NewRequest(http.MethodGet, "", nil)
+			c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 			c.Request.Header = tc.header
 
 			Authentication(ftr, cache, cacheExpirationDuration, cacheExpirationDuration)(c)
@@ -105,7 +105,7 @@ func TestAuthentication(t *testing.T) {
 			ftr := &fakeTokenReview{authenticated: tc.authenticated}
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/", nil)
+			c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 			c.Request.Header.Add("Authorization", "Bearer faketoken")
 
 			Authentication(ftr, cache, cacheExpirationDuration, cacheExpirationDuration)(c)
@@ -151,7 +151,7 @@ func TestAuthenticationCache(t *testing.T) {
 			}
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/", nil)
+			c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 			c.Request.Header.Add("Authorization", "Bearer faketoken")
 
 			Authentication(ftr, cache, cacheExpirationDuration, cacheExpirationDuration)(c)
@@ -186,7 +186,7 @@ func TestDifferentAuthenticationExpirations(t *testing.T) {
 			cache := cache.New()
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/", nil)
+			c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 			c.Request.Header.Add("Authorization", "Bearer faketoken")
 
 			Authentication(ftr, cache, 10*time.Minute, -10*time.Minute)(c)

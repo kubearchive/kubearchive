@@ -116,7 +116,7 @@ func TestGetAPIResource(t *testing.T) {
 
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
-			c.Request, _ = http.NewRequest(http.MethodGet, "/", nil)
+			c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 			c.AddParam("group", tc.group)
 			c.AddParam("version", tc.version)
 			c.AddParam("resourceType", tc.resource)

@@ -45,7 +45,7 @@ func TestGetAllResources(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources), false)
 
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/crontabs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/crontabs", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -60,7 +60,7 @@ func TestGetNamespacedResources(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources), false)
 
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -76,7 +76,7 @@ func TestGetNamespacedResourcesByName(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources), false)
 
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs/test", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -91,7 +91,7 @@ func TestGetResourcesEmpty(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase([]*unstructured.Unstructured{}), false)
 
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -106,7 +106,7 @@ func TestGetAllCoreResources(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources), true)
 
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/api/v1/pods", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -121,7 +121,7 @@ func TestGetCoreNamespacedResources(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources), true)
 
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespace/test/pods", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespace/test/pods", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -136,7 +136,7 @@ func TestGetCoreNamespacedResourcesByName(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources), true)
 
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/api/v1/namespace/test/pods/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespace/test/pods/test", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -151,7 +151,7 @@ func TestDBError(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabaseWithError(errors.New("test error")), true)
 
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/api/v1/pods", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusInternalServerError, res.Code)
@@ -167,7 +167,7 @@ func TestNoAPIResourceInContextError(t *testing.T) {
 	router.GET("/api/:version/:resourceType", ctrl.GetAllCoreResources)
 
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/api/v1/pods", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusInternalServerError, res.Code)
@@ -182,7 +182,7 @@ func TestLivez(t *testing.T) {
 		CacheConfiguration: CacheExpirations{Authorized: 60, Unauthorized: 5}}
 	router.GET("/livez", ctrl.Livez)
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/livez", nil)
+	req := httptest.NewRequest(http.MethodGet, "/livez", nil)
 	router.ServeHTTP(res, req)
 
 	expected, _ := json.Marshal(gin.H{
@@ -225,7 +225,7 @@ func TestReadyz(t *testing.T) {
 		}
 		router.GET("/readyz", ctrl.Readyz)
 		res := httptest.NewRecorder()
-		req, _ := http.NewRequest(http.MethodGet, "/readyz", nil)
+		req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 		router.ServeHTTP(res, req)
 
 		assert.Equal(t, testCase.expected, res.Code)

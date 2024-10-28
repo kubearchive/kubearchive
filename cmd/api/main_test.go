@@ -72,7 +72,7 @@ func TestMiddlewareConfigured(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			c := gin.CreateTestContextOnly(httptest.NewRecorder(), server.router)
-			c.Request, _ = http.NewRequest(http.MethodGet, testCase.path, nil)
+			c.Request = httptest.NewRequest(http.MethodGet, testCase.path, nil)
 			server.router.HandleContext(c)
 
 			handlers := c.HandlerNames()
@@ -100,7 +100,7 @@ func TestUnauthQuery(t *testing.T) {
 	server := fakeServer(nil, memCache)
 	// Make a correct request with an invalid token
 	res := httptest.NewRecorder()
-	req, _ := http.NewRequest(http.MethodGet, "/api/v1/jobs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs", nil)
 	req.Header.Set("Authorization", "Bearer token")
 	server.router.ServeHTTP(res, req)
 	// Assert unauthenticated request

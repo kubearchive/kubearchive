@@ -94,7 +94,7 @@ func Middleware() gin.HandlerFunc {
 			continueTimestamp, err := time.Parse(time.RFC3339, continueDate)
 			if err != nil {
 				log.Printf("Error: %s", err)
-				abort.Abort(context, fmt.Sprintf("continuation token decoded value '%s' is not valid. It should match '%s'", continueDate, time.RFC3339), http.StatusBadRequest)
+				abort.Abort(context, fmt.Sprintf("second element of the continue token does not match '%s'", time.RFC3339), http.StatusBadRequest)
 				return
 			}
 

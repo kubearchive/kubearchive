@@ -10,8 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"net/http"
 
 	"os"
@@ -21,10 +19,14 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/test"
+	"github.com/stretchr/testify/assert"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -38,7 +40,7 @@ func TestMain(m *testing.M) {
 // This test is redundant with the kubectl rollout status from the hack/quick-install.sh
 // but it serves as a valid integration test, not a dummy that is not testing anything real.
 func TestKubeArchiveDeployments(t *testing.T) {
-	client, err := test.GetKubernetesClient()
+	client, _, err := test.GetKubernetesClient()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +76,7 @@ func TestKubeArchiveDeployments(t *testing.T) {
 
 // This test verifies the database connection retries using the Sink component.
 func TestDatabaseConnection(t *testing.T) {
-	clientset, err := test.GetKubernetesClient()
+	clientset, _, err := test.GetKubernetesClient()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +189,7 @@ func TestDatabaseConnection(t *testing.T) {
 }
 
 func TestArchiveAndRead(t *testing.T) {
-	clientset, errClient := test.GetKubernetesClient()
+	clientset, _, errClient := test.GetKubernetesClient()
 	if errClient != nil {
 		t.Fatal(errClient)
 	}
@@ -314,4 +316,203 @@ func TestArchiveAndRead(t *testing.T) {
 	if retryErr != nil {
 		t.Fatal(retryErr)
 	}
+}
+
+func TestPagination(t *testing.T) {
+	clientset, dynamicClient, err := test.GetKubernetesClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
+	_, err = clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespaceName,
+		},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Cleanup(func() {
+		err = clientset.CoreV1().Namespaces().Delete(context.Background(), namespaceName, metav1.DeleteOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	kac := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "KubeArchiveConfig",
+			"apiVersion": fmt.Sprintf("%s/%s", kubearchivev1alpha1.SchemeBuilder.GroupVersion.Group, kubearchivev1alpha1.SchemeBuilder.GroupVersion.Version),
+			"metadata": map[string]string{
+				"name":      "kubearchive",
+				"namespace": namespaceName,
+			},
+			"spec": map[string]any{
+				"resources": []map[string]any{
+					{
+						"selector": map[string]string{
+							"apiVersion": "v1",
+							"kind":       "Pod",
+						},
+						"archiveWhen": "true",
+					},
+				},
+			},
+		},
+	}
+
+	gvr := kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
+	_, err = dynamicClient.Resource(gvr).Namespace(namespaceName).Create(context.Background(), kac, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "pod-",
+			Namespace:    namespaceName,
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				corev1.Container{
+					Name:    "busybox",
+					Command: []string{"echo", "hello"},
+					Image:   "quay.io/fedora/fedora:latest",
+				},
+			},
+		},
+	}
+
+	for _ = range 30 {
+		_, err = clientset.CoreV1().Pods(namespaceName).Create(context.Background(), pod, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	_, err = clientset.RbacV1().RoleBindings(namespaceName).Create(context.Background(), &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "view-default-test",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "default",
+				Namespace: namespaceName,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "view",
+		},
+	},
+		metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token, err := clientset.CoreV1().ServiceAccounts(namespaceName).CreateToken(context.Background(), "default", &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
+	if err != nil {
+		fmt.Printf("could not create a token, %s", err)
+		t.Fatal(err)
+	}
+
+	clientHTTP := http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
+	url := fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods", namespaceName)
+	err = retry.Do(func() error {
+		list, err := getUrl(&clientHTTP, token.Status.Token, url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(list.Items) >= 20 {
+			return nil
+		}
+		return errors.New("could not retrieve Pods from the API")
+	}, retry.Attempts(20), retry.MaxDelay(4*time.Second))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	url = fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods?limit=10", namespaceName)
+	list, err := getUrl(&clientHTTP, token.Status.Token, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, 10, len(list.Items))
+
+	url = fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods?limit=10&continue=%s", namespaceName, list.GetContinue())
+	continueList, err := getUrl(&clientHTTP, token.Status.Token, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	url = fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods?limit=20", namespaceName)
+	allList, err := getUrl(&clientHTTP, token.Status.Token, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var listNames []string
+	for _, item := range list.Items {
+		listNames = append(listNames, item.GetName())
+	}
+
+	var continueListNames []string
+	for _, item := range continueList.Items {
+		continueListNames = append(continueListNames, item.GetName())
+	}
+	assert.NotContains(t, continueListNames, listNames)
+
+	var allListNames []string
+	for _, item := range allList.Items {
+		allListNames = append(allListNames, item.GetName())
+	}
+	assert.Equal(t, allListNames, append(listNames, continueListNames...))
+}
+
+func getUrl(client *http.Client, token string, url string) (*unstructured.UnstructuredList, error) {
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		fmt.Printf("could not create a request, %s", err)
+		return nil, err
+	}
+	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	response, err := client.Do(request)
+	if err != nil {
+		fmt.Printf("Couldn't get a response HTTP, %s\n", err)
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		fmt.Printf("Couldn't read Body, %s\n", err)
+		return nil, err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		fmt.Printf("The HTTP status returned is not OK, %s\n", response.Status)
+		return nil, fmt.Errorf("%d", response.StatusCode)
+	}
+
+	var data unstructured.UnstructuredList
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		fmt.Printf("Couldn't unmarshal JSON, %s\n", err)
+		return nil, err
+	}
+
+	return &data, nil
 }

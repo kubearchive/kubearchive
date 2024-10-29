@@ -4,7 +4,6 @@
 package filters
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -32,7 +31,8 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
-func newMockWatcher(ch <-chan watch.Event) func(metav1.ListOptions) (watch.Interface, error) {
+func newMockWatcher(t testing.TB, ch <-chan watch.Event) func(metav1.ListOptions) (watch.Interface, error) {
+	t.Helper()
 	return func(options metav1.ListOptions) (watch.Interface, error) {
 		return watch.MockWatcher{
 			StopFunc:       func() {},
@@ -43,8 +43,6 @@ func newMockWatcher(ch <-chan watch.Event) func(metav1.ListOptions) (watch.Inter
 
 func TestHandleUpdates(t *testing.T) {
 	f := NewFilters(fake.NewSimpleClientset())
-	buf := bytes.NewBuffer(make([]byte, 0))
-	defer t.Log(buf.String())
 	fooCfg := []kubearchiveapi.KubeArchiveConfigResource{
 		{
 			Selector: sourcev1.APIVersionKindSelector{
@@ -88,7 +86,7 @@ func TestHandleUpdates(t *testing.T) {
 		assert.FailNow(t, "Could not marshall KubeArchiveConfig")
 	}
 
-	cases := []struct {
+	tests := []struct {
 		name                string
 		data                map[string]string
 		eventType           watch.EventType
@@ -142,40 +140,43 @@ func TestHandleUpdates(t *testing.T) {
 		},
 	}
 	var wg sync.WaitGroup
-	for i, testCase := range cases {
-		ch := make(chan watch.Event)
-		watcher := newMockWatcher(ch)
-		retryWatcher, err := toolsWatch.NewRetryWatcher("1", &cache.ListWatch{WatchFunc: watcher})
-		if err != nil {
-			assert.FailNow(t, "Could not create a watcher")
-		}
-		cm := corev1.ConfigMap{
-			TypeMeta: metav1.TypeMeta{
-				Kind:       "ConfigMap",
-				APIVersion: "v1",
-			},
-			ObjectMeta: metav1.ObjectMeta{
-				Name:            "sink-filters",
-				Namespace:       "kubearchive",
-				ResourceVersion: fmt.Sprintf("%d", i),
-			},
-			Data: testCase.data,
-		}
-		event := watch.Event{Type: watch.Modified, Object: &cm}
-		ch <- event
-		wg.Add(1)
-		go func(rw *toolsWatch.RetryWatcher, filter *Filters) {
-			defer wg.Done()
-			filter.handleUpdates(rw)
-		}(retryWatcher, f)
-		// we need to wait before calling retryWatcher.Stop to make sure that it sends a watch.Event first
-		time.Sleep(time.Millisecond * 500)
-		retryWatcher.Stop()
-		// wait until the filters update before checking the result of the update
-		wg.Wait()
-		assert.Equal(t, testCase.archiveSize, len(f.archive))
-		assert.Equal(t, testCase.deleteSize, len(f.delete))
-		assert.Equal(t, testCase.archiveOnDeleteSize, len(f.archiveOnDelete))
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ch := make(chan watch.Event)
+			t.Cleanup(func() { close(ch) })
+			watcher := newMockWatcher(t, ch)
+			retryWatcher, err := toolsWatch.NewRetryWatcher("1", &cache.ListWatch{WatchFunc: watcher})
+			if err != nil {
+				assert.FailNow(t, "Could not create a watcher")
+			}
+			cm := corev1.ConfigMap{
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "ConfigMap",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "sink-filters",
+					Namespace:       "kubearchive",
+					ResourceVersion: fmt.Sprintf("%d", i),
+				},
+				Data: tt.data,
+			}
+			event := watch.Event{Type: watch.Modified, Object: &cm}
+			ch <- event
+			wg.Add(1)
+			go func(rw *toolsWatch.RetryWatcher, filter *Filters) {
+				filter.handleUpdates(rw)
+				wg.Done()
+			}(retryWatcher, f)
+			// we need to wait before calling retryWatcher.Stop to make sure that it sends a watch.Event first
+			time.Sleep(time.Millisecond * 500)
+			retryWatcher.Stop()
+			// wait until the filters update before checking the result of the update
+			wg.Wait()
+			assert.Equal(t, tt.archiveSize, len(f.archive))
+			assert.Equal(t, tt.deleteSize, len(f.delete))
+			assert.Equal(t, tt.archiveOnDeleteSize, len(f.archiveOnDelete))
+		})
 	}
 }
 

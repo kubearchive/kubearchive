@@ -1,5 +1,7 @@
 * Getting Started
 ** xref:getting-started/installation.adoc[]
+** xref:getting-started/kubearchive-api.adoc[]
+** xref:getting-started/configuration.adoc[]
 
 * Configuration
 ** xref:configuration/kubearchiveconfig.adoc[KubeArchiveConfig CRD]

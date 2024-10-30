@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.0 (Debian 17.0-1.pgdg120+1)
--- Dumped by pg_dump version 17.0 (Debian 17.0-1.pgdg120+1)
+-- Dumped from database version 17.0 (Debian 17.0-1.pgdg110+1)
+-- Dumped by pg_dump version 17.0 (Debian 17.0-1.pgdg110+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -66,6 +66,7 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.log_url (
+    id bigint NOT NULL,
     uuid uuid NOT NULL,
     url text NOT NULL
 );
@@ -74,10 +75,32 @@ CREATE TABLE public.log_url (
 ALTER TABLE public.log_url OWNER TO kubearchive;
 
 --
+-- Name: log_url_id_seq; Type: SEQUENCE; Schema: public; Owner: kubearchive
+--
+
+CREATE SEQUENCE public.log_url_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.log_url_id_seq OWNER TO kubearchive;
+
+--
+-- Name: log_url_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: kubearchive
+--
+
+ALTER SEQUENCE public.log_url_id_seq OWNED BY public.log_url.id;
+
+
+--
 -- Name: resource; Type: TABLE; Schema: public; Owner: kubearchive
 --
 
 CREATE TABLE public.resource (
+    id bigint NOT NULL,
     uuid uuid NOT NULL,
     api_version character varying NOT NULL,
     kind character varying NOT NULL,
@@ -94,18 +117,69 @@ CREATE TABLE public.resource (
 ALTER TABLE public.resource OWNER TO kubearchive;
 
 --
+-- Name: resource_id_seq; Type: SEQUENCE; Schema: public; Owner: kubearchive
+--
+
+CREATE SEQUENCE public.resource_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.resource_id_seq OWNER TO kubearchive;
+
+--
+-- Name: resource_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: kubearchive
+--
+
+ALTER SEQUENCE public.resource_id_seq OWNED BY public.resource.id;
+
+
+--
+-- Name: log_url id; Type: DEFAULT; Schema: public; Owner: kubearchive
+--
+
+ALTER TABLE ONLY public.log_url ALTER COLUMN id SET DEFAULT nextval('public.log_url_id_seq'::regclass);
+
+
+--
+-- Name: resource id; Type: DEFAULT; Schema: public; Owner: kubearchive
+--
+
+ALTER TABLE ONLY public.resource ALTER COLUMN id SET DEFAULT nextval('public.resource_id_seq'::regclass);
+
+
+--
+-- Name: log_url log_url_pkey; Type: CONSTRAINT; Schema: public; Owner: kubearchive
+--
+
+ALTER TABLE ONLY public.log_url
+    ADD CONSTRAINT log_url_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: resource resource_pkey; Type: CONSTRAINT; Schema: public; Owner: kubearchive
 --
 
 ALTER TABLE ONLY public.resource
-    ADD CONSTRAINT resource_pkey PRIMARY KEY (uuid);
+    ADD CONSTRAINT resource_pkey PRIMARY KEY (id);
 
 
 --
--- Name: idx_creation_timestamp; Type: INDEX; Schema: public; Owner: kubearchive
+-- Name: resource resource_uuid_key; Type: CONSTRAINT; Schema: public; Owner: kubearchive
 --
 
-CREATE INDEX idx_creation_timestamp ON public.resource USING btree ((((data -> 'metadata'::text) ->> 'creationTimestamp'::text)) DESC);
+ALTER TABLE ONLY public.resource
+    ADD CONSTRAINT resource_uuid_key UNIQUE (uuid);
+
+
+--
+-- Name: idx_creation_timestamp_id; Type: INDEX; Schema: public; Owner: kubearchive
+--
+
+CREATE INDEX idx_creation_timestamp_id ON public.resource USING btree ((((data -> 'metadata'::text) ->> 'creationTimestamp'::text)) DESC, id DESC);
 
 
 --
@@ -158,11 +232,11 @@ CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.resource FOR EACH ROW EXECU
 
 
 --
--- Name: log_url fk_uuid_resource; Type: FK CONSTRAINT; Schema: public; Owner: kubearchive
+-- Name: log_url log_url_uuid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: kubearchive
 --
 
 ALTER TABLE ONLY public.log_url
-    ADD CONSTRAINT fk_uuid_resource FOREIGN KEY (uuid) REFERENCES public.resource(uuid);
+    ADD CONSTRAINT log_url_uuid_fkey FOREIGN KEY (uuid) REFERENCES public.resource(uuid);
 
 
 --

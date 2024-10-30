@@ -1,6 +1,7 @@
 package pagination
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -8,7 +9,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +17,7 @@ func TestMiddleware(t *testing.T) {
 		name               string
 		query              string
 		expectedLimit      string
-		expectedUuid       string
+		expectedInt64      string
 		expectedDate       string
 		expectedStatusCode int
 		expectedBody       string
@@ -26,7 +26,7 @@ func TestMiddleware(t *testing.T) {
 			name:               "default limit is applied",
 			query:              "/",
 			expectedLimit:      "100",
-			expectedUuid:       "",
+			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusOK,
 			expectedBody:       "",
@@ -35,7 +35,7 @@ func TestMiddleware(t *testing.T) {
 			name:               "invalid limit",
 			query:              "/?limit=abc",
 			expectedLimit:      "",
-			expectedUuid:       "",
+			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
 			expectedBody:       `{"message":"limit 'abc' could not be converted to integer"}`,
@@ -44,7 +44,7 @@ func TestMiddleware(t *testing.T) {
 			name:               "valid limit",
 			query:              "/?limit=250",
 			expectedLimit:      "250",
-			expectedUuid:       "",
+			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusOK,
 			expectedBody:       "",
@@ -53,7 +53,7 @@ func TestMiddleware(t *testing.T) {
 			name:               "limit too large",
 			query:              "/?limit=2000",
 			expectedLimit:      "",
-			expectedUuid:       "",
+			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
 			expectedBody:       `{"message":"limit '2000' exceeds the maximum allowed '1000'"}`,
@@ -62,34 +62,34 @@ func TestMiddleware(t *testing.T) {
 			name:               "invalid continue",
 			query:              "/?continue=abc",
 			expectedLimit:      "",
-			expectedUuid:       "",
+			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
 			expectedBody:       `{"message":"could not decode the continuation token"}`,
 		},
 		{
 			name:               "invalid first part of continue",
-			query:              fmt.Sprintf("/?continue=%s", CreateToken("abc", time.Now().Format(time.RFC3339))),
+			query:              fmt.Sprintf("/?continue=%s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("abc %s", time.Now().Format(time.RFC3339))))),
 			expectedLimit:      "",
-			expectedUuid:       "",
+			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
-			expectedBody:       `{"message":"first element of the continue token is not a valid UUID"}`,
+			expectedBody:       `{"message":"first element of the continue token is not a valid int64"}`,
 		},
 		{
 			name:               "invalid second part of continue",
-			query:              fmt.Sprintf("/?continue=%s", CreateToken(uuid.NewString(), time.Now().Format(time.DateOnly))),
+			query:              fmt.Sprintf("/?continue=%s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("1 %s", time.Now().Format(time.DateOnly))))),
 			expectedLimit:      "",
-			expectedUuid:       "",
+			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
 			expectedBody:       `{"message":"second element of the continue token does not match '2006-01-02T15:04:05Z07:00'"}`,
 		},
 		{
 			name:               "valid limit and continue",
-			query:              fmt.Sprintf("/?limit=250&continue=%s", CreateToken("2b3cf807-b599-4c6e-993e-fc298efa0ace", "2024-10-22T08:13:52+02:00")),
+			query:              fmt.Sprintf("/?limit=250&continue=%s", base64.StdEncoding.EncodeToString([]byte("1 2024-10-22T08:13:52+02:00"))),
 			expectedLimit:      "250",
-			expectedUuid:       "2b3cf807-b599-4c6e-993e-fc298efa0ace",
+			expectedInt64:      "1",
 			expectedDate:       "2024-10-22T08:13:52+02:00",
 			expectedStatusCode: http.StatusOK,
 			expectedBody:       "",
@@ -117,7 +117,7 @@ func TestMiddleware(t *testing.T) {
 
 			limit, uuid, date := GetValuesFromContext(c)
 			assert.Equal(t, tc.expectedLimit, limit)
-			assert.Equal(t, tc.expectedUuid, uuid)
+			assert.Equal(t, tc.expectedInt64, uuid)
 			assert.Equal(t, tc.expectedDate, date)
 			assert.Equal(t, tc.expectedStatusCode, result.StatusCode)
 			assert.Equal(t, tc.expectedBody, w.Body.String())

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/kubearchive/kubearchive/cmd/api/abort"
 )
 
@@ -21,7 +20,7 @@ const (
 	limitKey        = "limit"
 	continueKey     = "continue"
 	continueDateKey = "continueDate"
-	continueUUIDKey = "continueUUID"
+	continueIdKey   = "continueId"
 	defaultLimit    = "100"
 	maxAllowedLimit = 1000
 )
@@ -30,17 +29,17 @@ const (
 // information needed. This is kept here so its close to the function
 // that sets these values in the context (Middleware)
 func GetValuesFromContext(context *gin.Context) (string, string, string) {
-	return context.GetString(limitKey), context.GetString(continueUUIDKey), context.GetString(continueDateKey)
+	return context.GetString(limitKey), context.GetString(continueIdKey), context.GetString(continueDateKey)
 }
 
-func CreateToken(uuid, date string) string {
+func CreateToken(uuid int64, date string) string {
 	// The date is returned as a quoted string, so remove the quotes
 	date = strings.TrimPrefix(date, "\"")
 	date = strings.TrimSuffix(date, "\"")
-	if date == "" && uuid == "" {
+	if date == "" && uuid == 0 {
 		return ""
 	}
-	tokenString := fmt.Sprintf("%s %s", uuid, date)
+	tokenString := fmt.Sprintf("%d %s", uuid, date)
 	return base64.StdEncoding.EncodeToString([]byte(tokenString))
 }
 
@@ -69,7 +68,7 @@ func Middleware() gin.HandlerFunc {
 		limit = strconv.Itoa(limitInteger)
 
 		var continueDate string
-		var continueUUID string
+		var continueId string
 		if continueToken != "" {
 			continueBytes, err := base64.StdEncoding.DecodeString(continueToken)
 			if err != nil {
@@ -83,10 +82,11 @@ func Middleware() gin.HandlerFunc {
 				return
 			}
 
-			continueUUID = continueParts[0]
-			err = uuid.Validate(continueUUID)
+			continueId = continueParts[0]
+			// Because the id is an int64 we need to use `ParseInt`
+			_, err = strconv.ParseInt(continueId, 10, 64)
 			if err != nil {
-				abort.Abort(context, "first element of the continue token is not a valid UUID", http.StatusBadRequest)
+				abort.Abort(context, "first element of the continue token is not a valid int64", http.StatusBadRequest)
 				return
 			}
 
@@ -107,6 +107,6 @@ func Middleware() gin.HandlerFunc {
 		// using `GetValuesFromContext`
 		context.Set(limitKey, limit)
 		context.Set(continueDateKey, continueDate)
-		context.Set(continueUUIDKey, continueUUID)
+		context.Set(continueIdKey, continueId)
 	}
 }

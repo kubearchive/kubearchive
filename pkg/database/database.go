@@ -34,8 +34,8 @@ type DBInfoInterface interface {
 }
 
 type DBInterface interface {
-	QueryResources(ctx context.Context, kind, apiVersion, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error)
-	QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error)
+	QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error)
+	QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error)
 	QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (*unstructured.Unstructured, error)
 
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
@@ -68,25 +68,25 @@ func (db *Database) Ping(ctx context.Context) error {
 	return db.db.PingContext(ctx)
 }
 
-func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
+func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
 	args := []string{kind, apiVersion, limit}
 	query := db.info.GetResourcesLimitedSQL()
 
-	if continueUUID != "" && continueDate != "" {
+	if continueId != "" && continueDate != "" {
 		query = db.info.GetResourcesLimitedContinueSQL()
-		args = []string{kind, apiVersion, continueDate, continueUUID, limit}
+		args = []string{kind, apiVersion, continueDate, continueId, limit}
 	}
 
 	return db.performResourceQuery(ctx, query, args...)
 }
 
-func (db *Database) QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
+func (db *Database) QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
 	args := []string{kind, apiVersion, namespace, limit}
 	query := db.info.GetNamespacedResourcesLimitedSQL()
 
-	if continueUUID != "" && continueDate != "" {
+	if continueId != "" && continueDate != "" {
 		query = db.info.GetNamespacedResourcesLimitedContinueSQL()
-		args = []string{kind, apiVersion, namespace, continueDate, continueUUID, limit}
+		args = []string{kind, apiVersion, namespace, continueDate, continueId, limit}
 	}
 
 	return db.performResourceQuery(ctx, query, args...)
@@ -107,7 +107,7 @@ func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, api
 	}
 }
 
-func (db *Database) performResourceQuery(ctx context.Context, query string, args ...string) ([]*unstructured.Unstructured, string, string, error) {
+func (db *Database) performResourceQuery(ctx context.Context, query string, args ...string) ([]*unstructured.Unstructured, int64, string, error) {
 	castedArgs := make([]interface{}, len(args))
 	for i, v := range args {
 		castedArgs[i] = v
@@ -115,31 +115,31 @@ func (db *Database) performResourceQuery(ctx context.Context, query string, args
 
 	rows, err := db.db.QueryContext(ctx, query, castedArgs...)
 	if err != nil {
-		return nil, "", "", err
+		return nil, 0, "", err
 	}
 	defer func(rows *sql.Rows) {
 		err = rows.Close()
 	}(rows)
 	var resources []*unstructured.Unstructured
 	if err != nil {
-		return resources, "", "", err
+		return resources, 0, "", err
 	}
 	var date string
-	var uuid string
+	var id int64
 	for rows.Next() {
 		var b sql.RawBytes
-		if err := rows.Scan(&date, &uuid, &b); err != nil {
-			return resources, "", "", err
+		if err := rows.Scan(&date, &id, &b); err != nil {
+			return resources, 0, "", err
 		}
 
 		r, err := models.UnstructuredFromByteSlice([]byte(b))
 		if err != nil {
-			return resources, "", "", err
+			return resources, 0, "", err
 		}
 		resources = append(resources, r)
 	}
 
-	return resources, uuid, date, nil
+	return resources, id, date, nil
 }
 
 func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {

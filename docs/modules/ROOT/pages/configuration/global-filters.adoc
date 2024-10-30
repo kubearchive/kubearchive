@@ -66,3 +66,8 @@ metadata:
   namespace: production
 spec: {}
 ----
+
+[NOTE]
+====
+The 'KubeArchiveConfig` resource must be named "kubearchive".
+====

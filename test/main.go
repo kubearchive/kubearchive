@@ -82,7 +82,7 @@ func DeleteResources(resources ...string) error {
 	return nil
 }
 
-func GetKubernetesClient() (*kubernetes.Clientset, error) {
+func GetKubernetesClient() (*kubernetes.Clientset, *dynamic.DynamicClient, error) {
 	var kubeconfig string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = filepath.Join(home, ".kube", "config")
@@ -90,14 +90,19 @@ func GetKubernetesClient() (*kubernetes.Clientset, error) {
 
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return client, nil
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, nil, err
+	}
+	return client, dynamicClient, nil
 }
 
 func GetPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (logs string, err error) {

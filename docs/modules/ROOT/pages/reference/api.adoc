@@ -1,0 +1,53 @@
+= API reference
+
+This document contains the endpoints of the KubeArchive API and
+the query parameters they support.
+
+== Related to Kubernetes
+
+[source,text]
+----
+/livez
+/readyz
+----
+
+== Collection of Resources
+
+[source,text]
+----
+/apis/:group/:version/:resourceType
+/apis/:group/:version/namespaces/:namespace/:resourceType
+/api/:version/:resourceType
+/api/:version/namespaces/:namespace/:resourceType
+----
+
+Examples:
+
+[source,text]
+----
+/apis/apps/v1/deployments
+/apis/batch/v1/namespaces/default/jobs
+/api/v1/services
+/api/v1/namespaces/default/pods
+----
+
+Parameters allowed:
+* `limit`: defaults to 100. Not higher than 1000. Limits the number of entries returned.
+* `continue`: token to access the next page of the pagination. Retrieve it at `.metadata.continue`
+of the returned `List` resource. An empty string if there are no more pages remaining.
+
+== Individual Resources
+
+[source,text]
+----
+/apis/:group/:version/namespaces/:namespace/:resourceType/:name
+/api/:version/namespaces/:namespace/:resourceType/:name
+----
+
+Examples:
+
+[source,text]
+----
+/apis/batch/v1/namespaces/default/cronjobs/cleanup-tasks
+/api/v1/namespaces/default/pods/busybox-tooling
+----

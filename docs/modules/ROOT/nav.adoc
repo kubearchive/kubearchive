@@ -15,6 +15,7 @@
 
 * Reference
 ** xref:reference/database.adoc[]
+** xref:reference/api.adoc[]
 
 * Integrations
 ** xref:integrations/logging.adoc[Logging Integrations]

@@ -23,3 +23,8 @@ resource. The format of the `selectors` key can be found in the `ApiServerSource
 link:https://knative.dev/docs/eventing/sources/apiserversource/reference/#resources-parameter[reference documentation].
 
 The `archiveWhen` and `deleteWhen` keys contain expressions that determine when resources of that kind are archived or deleted.
+
+[NOTE]
+====
+The 'KubeArchiveConfig` resource must be named "kubearchive".
+====

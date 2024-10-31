@@ -52,6 +52,14 @@ func (info PostgreSQLDatabaseInfo) GetWriteResourceSQL() string {
 		"ON CONFLICT(uuid) DO UPDATE SET name=$4, namespace=$5, resource_version=$6, cluster_deleted_ts=$7, data=$8"
 }
 
+func (info PostgreSQLDatabaseInfo) GetWriteUrlSQL() string {
+	return "INSERT INTO log_url (uuid, url) VALUES ($1, $2)"
+}
+
+func (info PostgreSQLDatabaseInfo) GetDeleteUrlsSQL() string {
+	return "DELETE FROM log_url WHERE uuid=$1"
+}
+
 type PostgreSQLDatabase struct {
 	*Database
 }

@@ -21,7 +21,11 @@ const (
 )
 
 func GenerateLogURLs(ctx context.Context, cm map[string]interface{}, data *unstructured.Unstructured) ([]string, error) {
-
+	urls := []string{}
+	r, err := regexp.Compile(VARIABLE_REGEX)
+	if err != nil {
+		return urls, fmt.Errorf("Could not compile Regex: %w", err)
+	}
 	// Generate a new map with any CEL expressions evaluated.
 	m := make(map[string]interface{})
 	for key, value := range cm {
@@ -33,8 +37,6 @@ func GenerateLogURLs(ctx context.Context, cm map[string]interface{}, data *unstr
 		m[key] = value
 	}
 
-	r, _ := regexp.Compile(VARIABLE_REGEX)
-	urls := []string{}
 	var vmaps = generateSubstitutionMaps(m)
 	for _, vmap := range vmaps {
 		urls = append(urls, interpolate(vmap[LOG_URL], vmap, r))

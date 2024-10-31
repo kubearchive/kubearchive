@@ -63,7 +63,6 @@ This document lists and details the database schema used by KubeArchive.
 
 |resource_kind_namespace_idx
 |kind, api_version, namespace
-
 |===
 
 == Table `log_url`
@@ -79,6 +78,18 @@ This document lists and details the database schema used by KubeArchive.
 |The UUID of the Kubernetes resource in the `resource` table.
 
 |url
-|url not null
+|text not null
 |The generated URL of the log file.
+
+|container_name
+|text not null
+|The name of the container that the generated the logs.
+
+|created_at
+|timestamp not null
+|Timestamp when the record is inserted in this table.
+
+|updated_at
+|timestamp not null
+|Last time this record was updated.
 |===

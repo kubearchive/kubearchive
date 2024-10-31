@@ -3,6 +3,7 @@
   "data": {
     "DATA_VIEW_ID": "035bffd1-b4b5-4123-af57-d89368cabfd8",
     "POD_ID": "cel:metadata.uid",
+    "CONTAINER_NAME": "this value should get overwritten :)",
     "LOG_URL": "https://localhost:5601/app/discover#/?_a=(columns:!(),dataSource:(dataViewId:'{DATA_VIEW_ID}',type:dataView),filters:!(('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:_index,negate:!f,params:(query:fluentd),type:phrase),query:(match_phrase:(_index:fluentd))),('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:kubernetes.pod_id,negate:!f,params:(query:'{POD_ID}'),type:phrase),query:(match_phrase:(kubernetes.pod_id:'{POD_ID}'))),('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:kubernetes.container_name,negate:!f,params:(query:{CONTAINER_NAME}),type:phrase),query:(match_phrase:(kubernetes.container_name:{CONTAINER_NAME})))),interval:auto,query:(language:kuery,query:''),sort:!())"
   },
   "kind": "ConfigMap",

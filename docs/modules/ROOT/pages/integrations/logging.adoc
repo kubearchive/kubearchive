@@ -109,7 +109,6 @@ metadata:
   namespace: kubearchive
 data:
   POD_ID: cel:metadata.uid
-  CONTAINER_NAME: cel:spec.containers.map(m, m.name)
   POD: 'spath "kubernetes.pod_id" | search "kubernetes.pod_id"="{POD_ID}"'
   CONTAINER: 'spath "kubernetes.container_name" | search "kubernetes.container_name"="{CONTAINER_NAME}"'
   LOG_URL: http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}
@@ -126,6 +125,12 @@ When generating a log URL to be stored when a `Pod` is archived, the following s
 1. The value for LOG_URL is then interpolated recursively using the values in the `ConfigMap`
    until no more substitutions are done, resulting in the final URL to the log in the
    logging system.
+
+[TIP]
+====
+The variable `CONTAINER_NAME` is provided automatically by KubeArchive and can be used if your `LOG_URL`
+requires the name of the container.
+====
 
 == KubeArchive Configuration
 
@@ -177,7 +182,6 @@ metadata:
 data:
   # A data view for fluentd must be created and the ID provided here.
   DATA_VIEW_ID: "035bffd1-b4b5-4123-af57-d89368cabfd8"
-  CONTAINER_NAME: "cel:spec.containers.map(m, m.name)"
   POD_ID: "cel:metadata.uid"
   LOG_URL: "https://localhost:5601/app/discover#/?_a=(columns:!(),dataSource:(dataViewId:'{DATA_VIEW_ID}',type:dataView),filters:!(('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:_index,negate:!f,params:(query:fluentd),type:phrase),query:(match_phrase:(_index:fluentd))),('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:kubernetes.pod_id,negate:!f,params:(query:'{POD_ID}'),type:phrase),query:(match_phrase:(kubernetes.pod_id:'{POD_ID}'))),('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:kubernetes.container_name,negate:!f,params:(query:{CONTAINER_NAME}),type:phrase),query:(match_phrase:(kubernetes.container_name:{CONTAINER_NAME})))),interval:auto,query:(language:kuery,query:''),sort:!())"
 ----
@@ -196,7 +200,6 @@ metadata:
   namespace: kubearchive
 data:
   CONTAINER: 'spath "kubernetes.container_name" | search "kubernetes.container_name"="{CONTAINER_NAME}"'
-  CONTAINER_NAME: "cel:spec.containers.map(m, m.name)"
   POD: 'spath "kubernetes.pod_id" | search "kubernetes.pod_id"="{POD_ID}"'
   POD_ID: "cel:metadata.uid"
   LOG_URL: "http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}"

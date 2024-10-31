@@ -10,14 +10,18 @@ import (
 	"strings"
 
 	ocel "github.com/kubearchive/kubearchive/pkg/cel"
-	"github.com/kubearchive/kubearchive/pkg/log_urls"
+	"github.com/kubearchive/kubearchive/pkg/logurls"
+	"github.com/kubearchive/kubearchive/pkg/models"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes"
 )
 
-const celPrefix = "cel:"
+const (
+	celPrefix        = "cel:"
+	containerNameCel = "cel:spec.containers.map(m, m.name)"
+)
 
 var (
 	configCmRef = corev1.ObjectReference{
@@ -84,6 +88,8 @@ func NewUrlBuilder(ctx context.Context, kubeClient kubernetes.Interface) (*UrlBu
 		return &UrlBuilder{}, fmt.Errorf("Cannot create UrlBuilder with nil kubernetes client")
 	}
 	loggingCm := getKubeArchiveLoggingCm(ctx, kubeClient)
+	// Set CONTAINER_NAME and overwrite it if already defined
+	loggingCm.Data[logurls.ContainerName] = containerNameCel
 	logMap := make(map[string]interface{})
 	for key, val := range loggingCm.Data {
 		celExpr, isCelExpr := strings.CutPrefix(val, celPrefix)
@@ -104,6 +110,6 @@ func NewUrlBuilder(ctx context.Context, kubeClient kubernetes.Interface) (*UrlBu
 	return &UrlBuilder{logMap: logMap}, nil
 }
 
-func (ub *UrlBuilder) Urls(ctx context.Context, data *unstructured.Unstructured) ([]string, error) {
-	return log_urls.GenerateLogURLs(ctx, ub.logMap, data)
+func (ub *UrlBuilder) Urls(ctx context.Context, data *unstructured.Unstructured) ([]models.LogTuple, error) {
+	return logurls.GenerateLogURLs(ctx, ub.logMap, data)
 }

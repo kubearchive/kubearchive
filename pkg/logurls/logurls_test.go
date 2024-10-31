@@ -1,6 +1,6 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
-package log_urls
+package logurls
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	ocel "github.com/kubearchive/kubearchive/pkg/cel"
+	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -101,7 +102,7 @@ func loadUnstructuredJSON(filename string) *unstructured.Unstructured {
 	return result
 }
 
-func loadExpectedJSON(filename string) []string {
+func loadExpectedJSON(filename string) []models.LogTuple {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil
@@ -109,7 +110,7 @@ func loadExpectedJSON(filename string) []string {
 	defer file.Close()
 	bytes, _ := io.ReadAll(file)
 
-	var result []string
+	var result []models.LogTuple
 	if err := json.Unmarshal([]byte(bytes), &result); err != nil {
 		return nil
 	}

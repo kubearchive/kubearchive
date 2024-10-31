@@ -97,7 +97,7 @@ In this case the following happens:
 - `TaskRuns` are archived when they are deleted.
 - `Pods` are archived when they are deleted and are also part of a Tekton `Pipeline`.
 
-== Generating Log URLs
+== Generating Log URLs [[generating_log_urls]]
 
 The logging system is an integration in KubeArchive. All that is required for
 the integration is the successful generation of a URL to access the log for a
@@ -118,7 +118,6 @@ metadata:
   namespace: kubearchive
 data:
   POD_ID: cel:metadata.uid
-  CONTAINER_NAME: cel:spec.containers.map(m, m.name)
   POD: 'spath "kubernetes.pod_id" | search "kubernetes.pod_id"="{POD_ID}"'
   CONTAINER: 'spath "kubernetes.container_name" | search "kubernetes.container_name"="{CONTAINER_NAME}"'
   LOG_URL: http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}
@@ -132,7 +131,9 @@ So when generating the logging URL to be stored when a `Pod` is archived,
 the following steps are done:
 
 1. A map is created and populated all non-CEL expression key-value pairs from the `ConfigMap`.
-1. All variables containing CEL expression variables are added to the map, and the 
+1. The key `CONTAINER_NAME` with the value `cel:spec.containers.map(m, m.name)` is add to the
+   map. If the `ConfigMap` contained the key `CONTAINER_NAME`, its value is overwritten
+1. All variables containing CEL expression variables are added to the map, and the
    value for each of these variables is the value returned by evaluating the CEL expression.
 1. The value for LOG_URL is then interpolated recursively using this map until no more
    substitutions are done, resulting in the final URL to the log in the logging system.
@@ -143,7 +144,7 @@ the following steps are done:
 
 The KubeArchive database will have a table named `log_url` with three fields:
 
-1. A `uuid` field which is a foreign key to `resource.uuid`.  
+1. A `uuid` field which is a foreign key to `resource.uuid`.
 1. A `url` field which is the URL for one of the logs.
 
 The `uuid` field should point back to a `Pod` entry in the `resource` table.
@@ -151,19 +152,20 @@ The `uuid` field should point back to a `Pod` entry in the `resource` table.
 === Sink
 
 When the sink archives a `Pod`, it must take the additional step go gather all
-the log information and generate the log URL for each. These are stored in the 
+the log information and generate the log URL for each. These are stored in the
 `log_url` table.
 
 The sink should first delete any existing entries in the `log_url` table for the
 `Pod` being archived. Earlier archival requests may have already created records
 in the `log_url` table, and they should be removed to avoid duplicates.
 
-The sink will also need to mount and use the `ConfigMap` for logging as detailed 
-in the <<Configuration>> section.
+The sink will also need to mount and use the `ConfigMap` for logging as detailed
+in the <<Configuration>> section. Additionally, the sink will overwrite the ConfigMap
+value for `CONTAINER_NAME` as described in the <<generating_log_urls>> section.
 
 === CLI
 
-The CLI will implement a `logs` command similar to `kubectl logs`. 
+The CLI will implement a `logs` command similar to `kubectl logs`.
 [source,bash]
 ----
 ka logs resource name
@@ -187,7 +189,7 @@ The API needs to providate a mechanism similar to the CLI for retrieving log URL
 
 === Configuration
 
-KubeArchive will need to have a `ConfigMap` for configuring logging (and potentially 
+KubeArchive will need to have a `ConfigMap` for configuring logging (and potentially
 other things). This `ConfigMap` should be named `kubearchive-config` and reside in the
 installation namespace.
 [source,yaml]

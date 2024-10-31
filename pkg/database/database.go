@@ -39,7 +39,7 @@ type DBInterface interface {
 	QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (*unstructured.Unstructured, error)
 
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
-	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, urls ...string) error
+	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, logs ...models.LogTuple) error
 	Ping(ctx context.Context) error
 	CloseDB() error
 }
@@ -178,7 +178,7 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 }
 
 // WriteUrls deletes urls for k8sObj before writing urls to prevent duplicates
-func (db *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, urls ...string) error {
+func (db *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, logs ...models.LogTuple) error {
 	tx, err := db.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf(
@@ -204,12 +204,13 @@ func (db *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstruct
 		return fmt.Errorf("delete to database failed: %w", execErr)
 	}
 
-	for _, url := range urls {
+	for _, log := range logs {
 		_, execErr := tx.ExecContext(
 			ctx,
 			db.info.GetWriteUrlSQL(),
 			k8sObj.GetUID(),
-			url,
+			log.Url,
+			log.ContainerName,
 		)
 		if execErr != nil {
 			rollbackErr := tx.Rollback()

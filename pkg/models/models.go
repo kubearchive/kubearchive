@@ -35,3 +35,8 @@ func OptionalTimestamp(timestamp *metav1.Time) sql.NullString {
 		Valid:  true,
 	}
 }
+
+type LogTuple struct {
+	ContainerName string
+	Url           string
+}

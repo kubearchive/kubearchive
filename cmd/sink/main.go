@@ -124,7 +124,7 @@ func (sink *Sink) writeResource(ctx context.Context, obj *unstructured.Unstructu
 		)
 	}
 	// only write logs for k8s resources likes pods that have them
-	if strings.ToLower(obj.GetKind()) != "pod" {
+	if strings.ToLower(obj.GetKind()) == "pod" {
 		sink.writeLogs(ctx, obj)
 	}
 }
@@ -227,7 +227,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer func(db database.DBInterface) {
-		err := db.CloseDB()
+		err = db.CloseDB()
 		if err != nil {
 			slog.Error("Could not close the database connection", "error", err.Error())
 		} else {

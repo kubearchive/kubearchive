@@ -16,11 +16,11 @@ resources for one-shot builds and want to keep track of those builds over time.
 
 == This documentation
 
-* To start with KubeArchive, go to
+* To get started with KubeArchive, go to
 xref:getting-started/installation.adoc[].
-* For more advanced topics, inspect the "Configuration" and "Integrations" sections
+* For more advanced topics, check out the "Configuration" and "Integrations" sections
 in the sidebar.
-* For things related to contributors, go to
+* For information for contributors, go to
 xref:contributors/guide.adoc[]
 and the "Design" section in the sidebar.
 

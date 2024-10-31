@@ -1,7 +1,7 @@
 = Configuring KubeArchive
 
-This document explains how to configure KubeArchive so you get resources
-archived.
+This document explains how to configure KubeArchive so you can archive
+resources and query them.
 
 == Prerequisites
 * KubeArchive installed and running in a cluster (xref:getting-started/installation.adoc[])
@@ -9,9 +9,9 @@ archived.
 
 == The KubeArchiveConfig resource
 
-To configure KubeArchive to archive or delete resources create a
-KubeArchiveConfig custom resource. KubeArchiveConfigs are limited to 1 per namespace
-and should be named `kubearchive`. The custom resource has this general form:
+To configure KubeArchive to archive or delete resources from the cluster create a
+KubeArchiveConfig custom resource. KubeArchiveConfigs are limited to one per namespace
+and should be named `kubearchive`. KubeArchiveConfigs have this general form:
 
 [source,yaml]
 ----
@@ -22,13 +22,13 @@ metadata:
   name: kubearchive
   namespace: default
 spec:
-  resources: [...]
+  resources: [...] <1>
 ----
 
-`spec.resources` is a list of elements, each defining rules so KubeArchive knows
+<1> `spec.resources` is a list of elements, each defining rules for a specific kind, so KubeArchive knows
 when to archive or delete them.
 
-== The Selector
+==  `selector`: Selecting Resources
 
 Resources in the KubeArchiveConfig are defined using a `selector` which
 requires two keys: `kind` and `apiVersion`. Each entry on `spec.resources`
@@ -60,10 +60,10 @@ spec:
 
 With each entry on `spec.resources` KubeArchive requires one of
 `archiveWhen`, `deleteWhen` and `archiveOnDelete`. These keys accept
-a string which in the
+a string which is an expression in the
 link:https://cel.dev[CEL language format].
 The expressions are evaluated every time a resource defined by `selector`
-changes or gets deleted.
+changes or gets deleted. The expressions must evaluate to either true or false.
 
 
 == `archiveWhen`: Archiving Resources
@@ -89,6 +89,12 @@ spec:
       archiveWhen: status.phase == "Succeeded"
 ----
 
+[TIP]
+====
+`archiveWhen: "true"` is also a valid expression that configures KubeArchive
+to archive the resource every time its updated.
+====
+
 To see it in action apply the KubeArchiveConfig in your namespace and
 run a pod:
 
@@ -97,8 +103,7 @@ run a pod:
 kubectl run fedora --image quay.io/fedora/fedora:latest --restart Never -- sleep 10
 ----
 
-The pod should not appear in KubeArchive until it completes. After a while is present
-on KubeArchive:
+The pod will not appear in KubeArchive until it completes. After completion, it is present in KubeArchive:
 
 [source,bash]
 ----
@@ -115,7 +120,7 @@ $ curl --insecure \
 We use `jq` in these examples to reduce output.
 ====
 
-The pod keeps existing on Kubernetes, occupying space:
+The pod remains in Kubernetes, occupying space:
 
 [source,bash]
 ----
@@ -126,9 +131,9 @@ fedora   0/1     Completed   0          4m50s
 
 == `deleteWhen`: Deleting Resources
 
-They key feature of KubeArchive is deleting resources. This feature keeps
-the Kubernetes cluster free of resources that are not needed anymore. To enable
-deletion of resources use the `deleteWhen` key.
+The key feature of KubeArchive is deleting resources from the Kubernetes
+cluster. This feature keeps the Kubernetes cluster free of resources that
+are not needed anymore. To enable deletion of resources use the `deleteWhen` key.
 
 [IMPORTANT]
 ====
@@ -162,7 +167,7 @@ run a pod:
 kubectl run auto-deleted --image quay.io/fedora/fedora:latest --restart Never -- echo "sleep 10"
 ----
 
-Start watching pods to see how this pod gets created, executed, completed and deleted:
+Start watching pods to see how this pod is created, executed, completed and deleted:
 
 [source,bash]
 ----
@@ -189,13 +194,14 @@ $ curl --insecure \
 "auto-deleted","64c48176-ba8c-4f2a-a662-1fd660f7a3b6"
 ----
 
-== `archiveOnDelete`: Archiving on Deletion
+== `archiveOnDelete`: Archiving on Deletion From the Cluster
 
-KubeArchive also can be used with existing applications that clean up resources.
+KubeArchive can be used with existing applications that clean up resources.
 This enables you to keep using a specialized tool for deletion and use KubeArchive
 to store the resources. The following KubeArchiveConfig configures KubeArchive
-to archive pods when they get deleted only if they match the condition `status.phase == "Succeeded"`
-so failed pods that get deleted do not get archived.
+to archive pods when they get deleted from the cluster only if they match the
+condition `status.phase == "Succeeded"` so failed pods that get deleted
+do not get archived.
 
 [source,yaml]
 ----
@@ -230,7 +236,7 @@ kubectl delete pod archived-on-deletion
 kubectl delete pod failed
 ----
 
-Query KubeArchvie to check that only the pod that completed correctly (`archived-on-deletion`)
+Query KubeArchive to check that only the pod that completed correctly (`archived-on-deletion`)
 was archived:
 
 [source,bash]
@@ -247,7 +253,7 @@ $ curl --insecure \
 == Next Steps
 
 These are the three main functionalities KubeArchive offers related
-to resource archiving. Explore this documentation to learn more
+to resource archiving. Explore the documentation to learn more
 about KubeArchive and go to
 link:https://cel.dev/[cel.dev]
 to learn more about the expression language KubeArchive uses.

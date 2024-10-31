@@ -46,11 +46,11 @@ kubectl apply -n kubearchive -f {download-path}/kubearchive.yaml
 cat <<EOF > /tmp/patch.yaml
 stringData:
   DATABASE_KIND: postgresql
-  DATABASE_PORT:<postgresql-port>
+  DATABASE_PORT: <postgresql-port>
   DATABASE_URL: <postgresql-url>
   DATABASE_USER: <kubearchive-username>
   DATABASE_DB: <kubearchive-database>
-  DATABASE_PASSWORD: '<kubearchive-password>'
+  DATABASE_PASSWORD: <kubearchive-password>
 EOF
 kubectl patch -n kubearchive secret kubearchive-database-credentials --patch-file /tmp/patch.yaml
 ----

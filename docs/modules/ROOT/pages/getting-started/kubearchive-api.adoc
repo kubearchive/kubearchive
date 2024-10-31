@@ -6,13 +6,12 @@ in your cluster.
 [NOTE]
 ====
 This document only covers the basic development scenario, the process
-may be different on your production cluster.
+may be different for a production cluster.
 ====
 
 == Port Forward KubeArchive
 
-After installing KubeArchive different services are created to expose
-it. Use [command]`kubectl` to forward the port of the KubeArchive API:
+After installing, KubeArchive creates different services. Use [command]`kubectl` to forward the port of the KubeArchive API:
 
 [source,bash]
 ----
@@ -22,7 +21,7 @@ kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081
 == Authentication and Authorization
 
 KubeArchive delegates authentication and authorization to the Kubernetes
-RBAC service. So in order to retrieve resources from KubeArchive
+RBAC service. In order to retrieve resources from KubeArchive,
 you need to pass an identity when you make a request. The easiest
 way is to use a service account. Create one and assign it permissions,
 for example:
@@ -43,7 +42,7 @@ kubectl auth can-i list pods \
     --as=system:serviceaccount:default:kubearchive-view --namespace default
 ----
 
-== cURL KubeArchive
+== Query KubeArchive
 
 After creating the service account and configuring its access, generate a token
 and use it to query KubeArchive:
@@ -62,4 +61,4 @@ $ curl --insecure \
 
 Continue reading
 xref:getting-started/configuration.adoc[]
-to use KubeArchvie to archive and delete resources.
+to learn how to use KubeArchive to archive and delete resources.

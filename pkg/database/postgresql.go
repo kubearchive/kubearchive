@@ -5,7 +5,9 @@ package database
 
 import (
 	"fmt"
+	"reflect"
 
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -27,23 +29,39 @@ func (info PostgreSQLDatabaseInfo) GetConnectionString() string {
 }
 
 func (info PostgreSQLDatabaseInfo) GetResourcesLimitedSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp', id, data FROM resource WHERE kind=$1 AND api_version=$2 ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $3"
+	return "SELECT data->'metadata'->>'creationTimestamp' as created_at, id, data FROM resource WHERE kind=$1 AND api_version=$2 ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $3"
 }
 
 func (info PostgreSQLDatabaseInfo) GetResourcesLimitedContinueSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp', id, data FROM resource WHERE kind=$1 AND api_version=$2 AND (data->'metadata'->>'creationTimestamp', id) < ($3, $4) ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $5"
+	return "SELECT data->'metadata'->>'creationTimestamp' as created_at, id, data FROM resource WHERE kind=$1 AND api_version=$2 AND (data->'metadata'->>'creationTimestamp', id) < ($3, $4) ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $5"
 }
 
 func (info PostgreSQLDatabaseInfo) GetNamespacedResourcesLimitedSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp', id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $4"
+	return "SELECT data->'metadata'->>'creationTimestamp' as created_at, id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $4"
 }
 
 func (info PostgreSQLDatabaseInfo) GetNamespacedResourcesLimitedContinueSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp', id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND (data->'metadata'->>'creationTimestamp', id) < ($4, $5) ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $6"
+	return "SELECT data->'metadata'->>'creationTimestamp' as created_at, id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND (data->'metadata'->>'creationTimestamp', id) < ($4, $5) ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $6"
 }
 
 func (info PostgreSQLDatabaseInfo) GetNamespacedResourceByNameSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp', id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND name=$4"
+	return "SELECT data->'metadata'->>'creationTimestamp' as created_at, id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND name=$4"
+}
+
+func (info PostgreSQLDatabaseInfo) GetUUIDSQL() string {
+	return "SELECT uuid FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND name=$4"
+}
+
+func (info PostgreSQLDatabaseInfo) GetOwnedResourcesSQL() string {
+	return "SELECT uuid, kind FROM resource WHERE jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| $1"
+}
+
+func (info PostgreSQLDatabaseInfo) GetLogURLsByPodNameSQL() string {
+	return "SELECT log.url FROM log_url log JOIN resource res ON log.uuid = res.uuid WHERE res.kind='Pod' AND res.api_version=$1 AND res.namespace=$2 AND res.name = $3"
+}
+
+func (info PostgreSQLDatabaseInfo) GetLogURLsSQL() string {
+	return "SELECT url FROM log_url WHERE uuid = any($1)"
 }
 
 func (info PostgreSQLDatabaseInfo) GetWriteResourceSQL() string {
@@ -60,12 +78,30 @@ func (info PostgreSQLDatabaseInfo) GetDeleteUrlsSQL() string {
 	return "DELETE FROM log_url WHERE uuid=$1"
 }
 
+type PostgreSQLParamParser struct{}
+
+// ParseParams in PostgreSQL transform the given arrays as pq.Array because the driver
+// accepts array parameters for prepared statements
+func (PostgreSQLParamParser) ParseParams(query string, args ...any) (string, []any, error) {
+	var parsedArgs []any
+	for _, arg := range args {
+		switch reflect.TypeOf(arg).Kind() {
+		case reflect.Slice:
+			parsedArgs = append(parsedArgs, pq.Array(arg))
+		default:
+			parsedArgs = append(parsedArgs, arg)
+		}
+	}
+	return query, parsedArgs, nil
+}
+
 type PostgreSQLDatabase struct {
 	*Database
 }
 
 func NewPostgreSQLDatabase(env map[string]string) DBInterface {
 	info := PostgreSQLDatabaseInfo{env: env}
+	paramParser := PostgreSQLParamParser{}
 	db := establishConnection(info.GetDriverName(), info.GetConnectionString())
-	return PostgreSQLDatabase{&Database{db: db, info: info}}
+	return PostgreSQLDatabase{&Database{db: db, info: info, paramParser: paramParser}}
 }

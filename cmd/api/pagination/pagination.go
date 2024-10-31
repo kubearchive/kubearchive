@@ -26,7 +26,7 @@ const (
 )
 
 // GetValuesFromContext is a helper function for routes to retrieve the
-// information needed. This is kept here so its close to the function
+// information needed. This is kept here, so it's close to the function
 // that sets these values in the context (Middleware)
 func GetValuesFromContext(context *gin.Context) (string, string, string) {
 	return context.GetString(limitKey), context.GetString(continueIdKey), context.GetString(continueDateKey)
@@ -45,10 +45,10 @@ func CreateToken(uuid int64, date string) string {
 
 // Middleware validates the `limit` and `continue` query parameters
 // and populates `limit` and `continueValue` in the context with their
-// respective values so they are retrieved by the endpoints that need it
+// respective values, so they are retrieved by the endpoints that need it
 func Middleware() gin.HandlerFunc {
 	return func(context *gin.Context) {
-		// We always a default limit because we don't want to return
+		// We always use a default limit because we don't want to return
 		// large collections if users don't remember to specify a limit
 		limitString := context.DefaultQuery(limitKey, defaultLimit)
 		continueToken := context.Query(continueKey)
@@ -94,7 +94,8 @@ func Middleware() gin.HandlerFunc {
 			continueTimestamp, err := time.Parse(time.RFC3339, continueDate)
 			if err != nil {
 				log.Printf("Error: %s", err)
-				abort.Abort(context, fmt.Sprintf("second element of the continue token does not match '%s'", time.RFC3339), http.StatusBadRequest)
+				abort.Abort(context, fmt.Sprintf("second element of the continue token '%s' does not match '%s'",
+					continueDate, time.RFC3339), http.StatusBadRequest)
 				return
 			}
 

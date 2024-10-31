@@ -78,12 +78,12 @@ func TestMiddleware(t *testing.T) {
 		},
 		{
 			name:               "invalid second part of continue",
-			query:              fmt.Sprintf("/?continue=%s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("1 %s", time.Now().Format(time.DateOnly))))),
+			query:              fmt.Sprintf("/?continue=%s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("1 %s", "2024-11-08")))),
 			expectedLimit:      "",
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
-			expectedBody:       `{"message":"second element of the continue token does not match '2006-01-02T15:04:05Z07:00'"}`,
+			expectedBody:       `{"message":"second element of the continue token '2024-11-08' does not match '2006-01-02T15:04:05Z07:00'"}`,
 		},
 		{
 			name:               "valid limit and continue",

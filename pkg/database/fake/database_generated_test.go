@@ -279,3 +279,30 @@ func TestWriteUrls(t *testing.T) {
 		})
 	}
 }
+
+func TestQueryLogURLs(t *testing.T) {
+
+	tests := []struct {
+		name     string
+		kind     string
+		expected int
+	}{
+		{
+			name:     "Logs from one pod",
+			kind:     "Pod",
+			expected: 1,
+		},
+		{
+			name:     "Logs from another resource",
+			kind:     "Job",
+			expected: len(testLogUrls),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := NewFakeDatabase(testResources, testLogUrls)
+			urls, _ := db.QueryLogURLs(context.Background(), tt.kind, "", "", "")
+			assert.Equal(t, tt.expected, len(urls))
+		})
+	}
+}

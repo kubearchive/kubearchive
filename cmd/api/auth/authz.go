@@ -6,15 +6,16 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/kubearchive/kubearchive/cmd/api/abort"
 	"github.com/kubearchive/kubearchive/pkg/cache"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/gin-gonic/gin"
 	apiAuthnv1 "k8s.io/api/authentication/v1"
 	apiAuthzv1 "k8s.io/api/authorization/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientAuthzv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
@@ -36,44 +37,59 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface, cache *c
 			verb = "get"
 		}
 
-		sarSpec := apiAuthzv1.SubjectAccessReviewSpec{
-			User:   userInfo.Username,
-			Groups: userInfo.Groups,
-			ResourceAttributes: &apiAuthzv1.ResourceAttributes{
-				Namespace: c.Param("namespace"),
-				Group:     c.Param("group"),
-				Version:   c.Param("version"),
-				Resource:  c.Param("resourceType"),
-				Name:      c.Param("name"),
-				Verb:      verb,
-			},
+		sarSpecs := []apiAuthzv1.SubjectAccessReviewSpec{
+			{
+				User:   userInfo.Username,
+				Groups: userInfo.Groups,
+				ResourceAttributes: &apiAuthzv1.ResourceAttributes{
+					Namespace: c.Param("namespace"),
+					Group:     c.Param("group"),
+					Version:   c.Param("version"),
+					Resource:  c.Param("resourceType"),
+					Name:      c.Param("name"),
+					Verb:      verb,
+				},
+			}}
+
+		if strings.HasSuffix(c.Request.URL.Path, "/log") {
+			logSpec := apiAuthzv1.SubjectAccessReviewSpec{
+				User:   userInfo.Username,
+				Groups: userInfo.Groups,
+				ResourceAttributes: &apiAuthzv1.ResourceAttributes{
+					Namespace: c.Param("namespace"),
+					Version:   "v1",
+					Resource:  "pods/log",
+					Verb:      "get",
+				},
+			}
+			sarSpecs = append(sarSpecs, logSpec)
 		}
 
-		allowed := cache.Get(sarSpec.String())
-		if allowed != nil {
-			if allowed != true {
-				abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
+		for _, sarSpec := range sarSpecs {
+			allowed := cache.Get(sarSpec.String())
+			if allowed != nil {
+				if allowed != true {
+					abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+				continue
+			}
+			sar, err := sari.Create(c.Request.Context(), &apiAuthzv1.SubjectAccessReview{
+				Spec: sarSpec,
+			}, metav1.CreateOptions{})
+
+			if err != nil {
+				abort.Abort(c, fmt.Sprintf("Unexpected error on SAR: %s", err.Error()), http.StatusInternalServerError)
 				return
 			}
 
-			c.Next()
-			return
-		}
+			cache.Set(sarSpec.String(), sar.Status.Allowed, cacheExpirationAuthorized)
 
-		sar, err := sari.Create(c.Request.Context(), &apiAuthzv1.SubjectAccessReview{
-			Spec: sarSpec,
-		}, metav1.CreateOptions{})
-
-		if err != nil {
-			abort.Abort(c, fmt.Sprintf("Unexpected error on SAR: %s", err.Error()), http.StatusInternalServerError)
-			return
-		}
-
-		cache.Set(sarSpec.String(), sar.Status.Allowed, cacheExpirationAuthorized)
-
-		if !sar.Status.Allowed {
-			cache.Set(sarSpec.String(), sar.Status.Allowed, cacheExpirationUnauthorized)
-			abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
+			if !sar.Status.Allowed {
+				cache.Set(sarSpec.String(), sar.Status.Allowed, cacheExpirationUnauthorized)
+				abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
+				return
+			}
 		}
 	}
 }

@@ -81,10 +81,12 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	apisGroup.GET("/:group/:version/:resourceType", controller.GetAllResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name", controller.GetNamespacedResourceByName)
+	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name/log", controller.GetLogURLsByResourceName)
 
 	apiGroup.GET("/:version/:resourceType", controller.GetAllCoreResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedCoreResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name", controller.GetNamespacedCoreResourceByName)
+	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name/log", controller.GetLogURLsByCoreResourceName)
 
 	return &Server{
 		router:    router,

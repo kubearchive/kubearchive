@@ -6,11 +6,14 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+var ResourceNotFoundError = errors.New("resource not found")
 
 type newDatabaseFunc func(map[string]string) DBInterface
 
@@ -20,6 +23,8 @@ type DBInfoInterface interface {
 	GetDriverName() string
 	GetConnectionString() string
 
+	GetUUIDSQL() string
+
 	GetResourcesLimitedSQL() string
 	GetResourcesLimitedContinueSQL() string
 
@@ -28,15 +33,26 @@ type DBInfoInterface interface {
 
 	GetNamespacedResourceByNameSQL() string
 
+	GetLogURLsByPodNameSQL() string
+	GetOwnedResourcesSQL() string
+	GetLogURLsSQL() string
+
 	GetWriteResourceSQL() string
 	GetWriteUrlSQL() string
 	GetDeleteUrlsSQL() string
+}
+
+// DBParamParser need to be implemented by every database driver compatible with KubeArchive
+type DBParamParser interface {
+	// ParseParams transform the given args to accepted parameters for parametrized queries
+	ParseParams(query string, args ...any) (string, []any, error)
 }
 
 type DBInterface interface {
 	QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error)
 	QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error)
 	QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (*unstructured.Unstructured, error)
+	QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error)
 
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
 	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, logs ...models.LogTuple) error
@@ -45,8 +61,9 @@ type DBInterface interface {
 }
 
 type Database struct {
-	db   *sql.DB
-	info DBInfoInterface
+	db          *sql.DB
+	info        DBInfoInterface
+	paramParser DBParamParser
 }
 
 func NewDatabase() (DBInterface, error) {
@@ -69,31 +86,37 @@ func (db *Database) Ping(ctx context.Context) error {
 }
 
 func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
-	args := []string{kind, apiVersion, limit}
-	query := db.info.GetResourcesLimitedSQL()
+	var pq *paramQuery
 
 	if continueId != "" && continueDate != "" {
-		query = db.info.GetResourcesLimitedContinueSQL()
-		args = []string{kind, apiVersion, continueDate, continueId, limit}
+		pq = db.newParamQuery(db.info.GetResourcesLimitedContinueSQL())
+		pq.addStringParams(kind, apiVersion, continueDate, continueId, limit)
+	} else {
+		pq = db.newParamQuery(db.info.GetResourcesLimitedSQL())
+		pq.addStringParams(kind, apiVersion, limit)
 	}
 
-	return db.performResourceQuery(ctx, query, args...)
+	return db.performResourceQuery(ctx, pq)
 }
 
 func (db *Database) QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
-	args := []string{kind, apiVersion, namespace, limit}
-	query := db.info.GetNamespacedResourcesLimitedSQL()
+	var pq *paramQuery
 
 	if continueId != "" && continueDate != "" {
-		query = db.info.GetNamespacedResourcesLimitedContinueSQL()
-		args = []string{kind, apiVersion, namespace, continueDate, continueId, limit}
+		pq = db.newParamQuery(db.info.GetNamespacedResourcesLimitedContinueSQL())
+		pq.addStringParams(kind, apiVersion, namespace, continueDate, continueId, limit)
+	} else {
+		pq = db.newParamQuery(db.info.GetNamespacedResourcesLimitedSQL())
+		pq.addStringParams(kind, apiVersion, namespace, limit)
 	}
 
-	return db.performResourceQuery(ctx, query, args...)
+	return db.performResourceQuery(ctx, pq)
 }
 
 func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (*unstructured.Unstructured, error) {
-	resources, _, _, err := db.performResourceQuery(ctx, db.info.GetNamespacedResourceByNameSQL(), kind, apiVersion, namespace, name)
+	pq := db.newParamQuery(db.info.GetNamespacedResourceByNameSQL())
+	pq.addStringParams(kind, apiVersion, namespace, name)
+	resources, _, _, err := db.performResourceQuery(ctx, pq)
 	if err != nil {
 		return nil, err
 	}
@@ -103,43 +126,96 @@ func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, api
 	} else if len(resources) == 1 {
 		return resources[0], err
 	} else {
-		return nil, fmt.Errorf("More than one resource found")
+		return nil, fmt.Errorf("more than one resource found")
 	}
 }
 
-func (db *Database) performResourceQuery(ctx context.Context, query string, args ...string) ([]*unstructured.Unstructured, int64, string, error) {
-	castedArgs := make([]interface{}, len(args))
-	for i, v := range args {
-		castedArgs[i] = v
+func (db *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error) {
+
+	strQueryPerformer := newQueryPerformer[string](db.db)
+	if kind == "Pod" {
+		pq := db.newParamQuery(db.info.GetLogURLsByPodNameSQL())
+		pq.addStringParams(apiVersion, namespace, name)
+		return strQueryPerformer.performQuery(ctx, pq)
 	}
 
-	rows, err := db.db.QueryContext(ctx, query, castedArgs...)
-	if err != nil {
-		return nil, 0, "", err
+	var uuid string
+	err := db.db.QueryRowContext(ctx, db.info.GetUUIDSQL(), kind, apiVersion, namespace, name).Scan(&uuid)
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return []string{}, ResourceNotFoundError
 	}
-	defer func(rows *sql.Rows) {
-		err = rows.Close()
-	}(rows)
+
+	if err != nil {
+		return nil, err
+	}
+
+	podUuids, err := db.getOwnedPodsUuids(ctx, []string{uuid}, []string{})
+	if err != nil {
+		return nil, err
+	}
+
+	pq := db.newParamQuery(db.info.GetLogURLsSQL())
+	pq.addStringArrayParam(podUuids)
+	return strQueryPerformer.performQuery(ctx, pq)
+}
+
+func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids, podUuids []string) ([]string, error) {
+
+	type uuidKind struct {
+		Uuid string `json:"uuid"`
+		Kind string `json:"kind"`
+	}
+
+	if len(ownersUuids) == 0 {
+		return podUuids, nil
+	} else {
+		pq := db.newParamQuery(db.info.GetOwnedResourcesSQL())
+		pq.addStringArrayParam(ownersUuids)
+		parsedRows, err := newQueryPerformer[uuidKind](db.db).performQuery(ctx, pq)
+		if err != nil {
+			return nil, err
+		}
+		ownersUuids = make([]string, 0)
+		for _, row := range parsedRows {
+			if row.Kind == "Pod" {
+				podUuids = append(podUuids, row.Uuid)
+			} else {
+				ownersUuids = append(ownersUuids, row.Uuid)
+			}
+		}
+		return db.getOwnedPodsUuids(ctx, ownersUuids, podUuids)
+	}
+}
+
+func (db *Database) performResourceQuery(ctx context.Context, pq *paramQuery) ([]*unstructured.Unstructured, int64, string, error) {
+	type resourceFields struct {
+		Date  string       `json:"created_at"`
+		Id    int64        `json:"id"`
+		Bytes sql.RawBytes `json:"data"`
+	}
+
 	var resources []*unstructured.Unstructured
+
+	parsedRows, err := newQueryPerformer[resourceFields](db.db).performQuery(ctx, pq)
+
 	if err != nil {
 		return resources, 0, "", err
 	}
-	var date string
-	var id int64
-	for rows.Next() {
-		var b sql.RawBytes
-		if err := rows.Scan(&date, &id, &b); err != nil {
-			return resources, 0, "", err
-		}
 
-		r, err := models.UnstructuredFromByteSlice([]byte(b))
+	if len(parsedRows) == 0 {
+		return resources, 0, "", err
+	}
+	lastRow := parsedRows[len(parsedRows)-1]
+
+	for _, parsedRow := range parsedRows {
+		r, err := models.UnstructuredFromByteSlice([]byte(parsedRow.Bytes))
 		if err != nil {
 			return resources, 0, "", err
 		}
 		resources = append(resources, r)
 	}
-
-	return resources, id, date, nil
+	return resources, lastRow.Id, lastRow.Date, nil
 }
 
 func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
@@ -237,6 +313,10 @@ func (db *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstruct
 		return fmt.Errorf("commit to database failed and the transaction was rolled back: %w", commitErr)
 	}
 	return nil
+}
+
+func (db *Database) newParamQuery(query string) *paramQuery {
+	return &paramQuery{query: query, dbArrayParser: db.paramParser}
 }
 
 func (db *Database) CloseDB() error {

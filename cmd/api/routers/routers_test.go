@@ -36,10 +36,42 @@ func setupRouter(db database.DBInterface, core bool) *gin.Engine {
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetAllResources)
 	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType", ctrl.GetAllResources)
 	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name", ctrl.GetNamespacedResourceByName)
+	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name/log", ctrl.GetLogURLsByResourceName)
 	router.GET("/api/:version/:resourceType", ctrl.GetAllCoreResources)
 	router.GET("/api/:version/namespace/:namespace/:resourceType", ctrl.GetNamespacedCoreResources)
 	router.GET("/api/:version/namespace/:namespace/:resourceType/:name", ctrl.GetNamespacedCoreResourceByName)
+	router.GET("/api/:version/namespace/:namespace/:resourceType/:name/log", ctrl.GetLogURLsByCoreResourceName)
 	return router
+}
+
+func TestGetCoreResourcesLogURLs(t *testing.T) {
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), true)
+
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespace/ns/pods/my-pod/log", nil)
+	router.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusOK, res.Code)
+	var urls []string
+	if err := json.NewDecoder(res.Body).Decode(&urls); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, []string{testLogUrls[0].Url}, urls)
+}
+
+func TestGetResourcesLogURLs(t *testing.T) {
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), false)
+
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/apis/batch/v1/namespace/ns/cronjobs/my-cronjob/log", nil)
+	router.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusOK, res.Code)
+	var urls []string
+	if err := json.NewDecoder(res.Body).Decode(&urls); err != nil {
+		t.Fatal(err)
+	}
+	assert.Equal(t, len(testLogUrls), len(urls))
 }
 
 func TestGetAllResources(t *testing.T) {

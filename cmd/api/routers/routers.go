@@ -45,7 +45,7 @@ func (c *Controller) GetAllResources(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	limit, uuid, date := pagination.GetValuesFromContext(context)
+	limit, id, date := pagination.GetValuesFromContext(context)
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
@@ -53,13 +53,13 @@ func (c *Controller) GetAllResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastUUID, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, apiVersion, limit, uuid, date)
+	resources, lastId, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, apiVersion, limit, id, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	continueToken := pagination.CreateToken(lastUUID, lastDate)
+	continueToken := pagination.CreateToken(lastId, lastDate)
 	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 
@@ -68,7 +68,7 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 	version := context.Param("version")
 	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	namespace := context.Param("namespace")
-	limit, uuid, date := pagination.GetValuesFromContext(context)
+	limit, id, date := pagination.GetValuesFromContext(context)
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
@@ -76,13 +76,13 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastUUID, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, apiVersion, namespace, limit, uuid, date)
+	resources, lastId, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, apiVersion, namespace, limit, id, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	continueToken := pagination.CreateToken(lastUUID, lastDate)
+	continueToken := pagination.CreateToken(lastId, lastDate)
 	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 
@@ -110,7 +110,7 @@ func (c *Controller) GetNamespacedResourceByName(context *gin.Context) {
 
 func (c *Controller) GetAllCoreResources(context *gin.Context) {
 	version := context.Param("version")
-	limit, uuid, date := pagination.GetValuesFromContext(context)
+	limit, id, date := pagination.GetValuesFromContext(context)
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
@@ -118,20 +118,20 @@ func (c *Controller) GetAllCoreResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastUUID, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, version, limit, uuid, date)
+	resources, lastId, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, version, limit, id, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	continueToken := pagination.CreateToken(lastUUID, lastDate)
+	continueToken := pagination.CreateToken(lastId, lastDate)
 	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 
 func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 	version := context.Param("version")
 	namespace := context.Param("namespace")
-	limit, uuid, date := pagination.GetValuesFromContext(context)
+	limit, id, date := pagination.GetValuesFromContext(context)
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
@@ -139,13 +139,13 @@ func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastUUID, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, version, namespace, limit, uuid, date)
+	resources, lastId, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, version, namespace, limit, id, date)
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	continueToken := pagination.CreateToken(lastUUID, lastDate)
+	continueToken := pagination.CreateToken(lastId, lastDate)
 	context.JSON(http.StatusOK, NewList(resources, continueToken))
 }
 

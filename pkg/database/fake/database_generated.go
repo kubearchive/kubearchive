@@ -65,26 +65,26 @@ func (f *Database) TestConnection(env map[string]string) error {
 	return f.err
 }
 
-func (f *Database) QueryResources(ctx context.Context, kind, version, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
+func (f *Database) QueryResources(ctx context.Context, kind, version, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
 	resources := f.filterResourcesByKindAndApiVersion(kind, version)
 	var date string
-	var uuid string
+	var id int64
 	if len(resources) > 0 {
 		date = resources[len(resources)-1].GetCreationTimestamp().Format(time.RFC3339)
-		uuid = string(resources[len(resources)-1].GetUID())
+		id = int64(len(resources))
 	}
-	return resources, date, uuid, f.err
+	return resources, id, date, f.err
 }
 
-func (f *Database) QueryNamespacedResources(ctx context.Context, kind, version, namespace, limit, continueUUID, continueDate string) ([]*unstructured.Unstructured, string, string, error) {
+func (f *Database) QueryNamespacedResources(ctx context.Context, kind, version, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
 	resources := f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace)
 	var date string
-	var uuid string
+	var id int64
 	if len(resources) > 0 {
 		date = resources[len(resources)-1].GetCreationTimestamp().Format(time.RFC3339)
-		uuid = string(resources[len(resources)-1].GetUID())
+		id = int64(len(resources))
 	}
-	return resources, date, uuid, f.err
+	return resources, id, date, f.err
 }
 
 func (f *Database) QueryNamespacedResourceByName(ctx context.Context, kind, version, namespace, name string) (*unstructured.Unstructured, error) {

@@ -27,23 +27,23 @@ func (info PostgreSQLDatabaseInfo) GetConnectionString() string {
 }
 
 func (info PostgreSQLDatabaseInfo) GetResourcesLimitedSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 ORDER BY data->'metadata'->>'creationTimestamp', uuid LIMIT $3"
+	return "SELECT data->'metadata'->>'creationTimestamp', id, data FROM resource WHERE kind=$1 AND api_version=$2 ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $3"
 }
 
 func (info PostgreSQLDatabaseInfo) GetResourcesLimitedContinueSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 AND (data->'metadata'->>'creationTimestamp', uuid) > ($3, $4) ORDER BY data->'metadata'->>'creationTimestamp', uuid LIMIT $5"
+	return "SELECT data->'metadata'->>'creationTimestamp', id, data FROM resource WHERE kind=$1 AND api_version=$2 AND (data->'metadata'->>'creationTimestamp', id) < ($3, $4) ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $5"
 }
 
 func (info PostgreSQLDatabaseInfo) GetNamespacedResourcesLimitedSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 ORDER BY data->'metadata'->>'creationTimestamp', uuid LIMIT $4"
+	return "SELECT data->'metadata'->>'creationTimestamp', id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $4"
 }
 
 func (info PostgreSQLDatabaseInfo) GetNamespacedResourcesLimitedContinueSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND (data->'metadata'->>'creationTimestamp', uuid) > ($4, $5) ORDER BY data->'metadata'->>'creationTimestamp', uuid LIMIT $6"
+	return "SELECT data->'metadata'->>'creationTimestamp', id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND (data->'metadata'->>'creationTimestamp', id) < ($4, $5) ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $6"
 }
 
 func (info PostgreSQLDatabaseInfo) GetNamespacedResourceByNameSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp', uuid, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND name=$4"
+	return "SELECT data->'metadata'->>'creationTimestamp', id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND name=$4"
 }
 
 func (info PostgreSQLDatabaseInfo) GetWriteResourceSQL() string {

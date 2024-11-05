@@ -3,7 +3,6 @@ package database
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
 	"encoding/json"
 	"log/slog"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -82,7 +80,7 @@ func TestQueryResources(t *testing.T) {
 
 					rows := sqlmock.NewRows(columns)
 					if ttt.data {
-						rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testPodResource))
+						rows.AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource))
 					}
 					mock.ExpectQuery(expectedQuery).WithArgs(kind, podApiVersion, "100").WillReturnRows(rows)
 
@@ -114,7 +112,7 @@ func TestQueryNamespacedResources(t *testing.T) {
 
 					rows := sqlmock.NewRows(columns)
 					if ttt.data {
-						rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testPodResource))
+						rows.AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource))
 					}
 					mock.ExpectQuery(expectedQuery).WithArgs(kind, podApiVersion, namespace, "100").WillReturnRows(rows)
 
@@ -145,7 +143,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 
 					rows := sqlmock.NewRows(columns)
 					if ttt.data {
-						rows.AddRow("2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testPodResource))
+						rows.AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource))
 					}
 					mock.ExpectQuery(expectedQuery).WithArgs(kind, version, namespace, podName).WillReturnRows(rows)
 
@@ -172,8 +170,9 @@ func TestQueryNamespacedResourceByNameMoreThanOne(t *testing.T) {
 			db, mock := NewMock()
 			tt.database.db = db
 
-			row := []driver.Value{"2024-04-05T09:58:03Z", uuid.New().String(), json.RawMessage(testPodResource)}
-			rows := sqlmock.NewRows(columns).AddRow(row...).AddRow(row...)
+			rows := sqlmock.NewRows(columns).
+				AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource)).
+				AddRow("2024-04-05T09:58:03Z", 2, json.RawMessage(testPodResource))
 			mock.ExpectQuery(expectedQuery).WithArgs(kind, version, namespace, podName).WillReturnRows(rows)
 
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)

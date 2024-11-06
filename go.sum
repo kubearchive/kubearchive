@@ -875,8 +875,8 @@ k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 h1:pUdcCO1Lk/tbT5ztQWOBi5HBgbBP1
 k8s.io/utils v0.0.0-20240711033017-18e509b52bc8/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 knative.dev/eventing v0.43.0 h1:GELHZ0yYosMeV78l4alMsd7HJciEu6a3T2C5l7MPi3Y=
 knative.dev/eventing v0.43.0/go.mod h1:pdrF+bEUfRkNn9ifWXS7DoVj5W31gA5KQVd8iwplXUo=
-knative.dev/pkg v0.0.0-20241026180704-25f6002b00f3 h1:uUSDGlOIkdPT4svjlhi+JEnP2Ufw7AM/F5QDYiEL02U=
-knative.dev/pkg v0.0.0-20241026180704-25f6002b00f3/go.mod h1:FeMbTLlxQqSASwlRCrYEOsZ0OKUgSj52qxhECwYCJsw=
+knative.dev/pkg v0.0.0-20241106013442-0a99635c789e h1:Ksol0kNFrbJ9YfEsrRP60XGJS7eYAx6YLLji0fmxv/g=
+knative.dev/pkg v0.0.0-20241106013442-0a99635c789e/go.mod h1:FeMbTLlxQqSASwlRCrYEOsZ0OKUgSj52qxhECwYCJsw=
 nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=

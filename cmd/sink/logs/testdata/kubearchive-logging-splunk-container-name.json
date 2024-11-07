@@ -2,6 +2,7 @@
   "apiVersion": "v1",
   "data": {
     "CONTAINER": "spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"{CONTAINER_NAME}\"",
+    "CONTAINER_NAME": "This value should get overwritten :)",
     "LOG_URL": "http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}",
     "POD": "spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"{POD_ID}\"",
     "POD_ID": "cel:metadata.uid"

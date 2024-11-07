@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kubearchive/kubearchive/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -28,15 +29,16 @@ func CreateTestResources() []*unstructured.Unstructured {
 
 func CreateTestLogUrls() []LogUrlRow {
 	ret := make([]LogUrlRow, 0)
-	ret = append(ret, LogUrlRow{Uuid: types.UID("abc-123-xyz"), Url: "fake.com"})
-	ret = append(ret, LogUrlRow{Uuid: types.UID("abc-123-xyz"), Url: "fake.org"})
-	ret = append(ret, LogUrlRow{Uuid: types.UID("asdf-1234-fdsa"), Url: "fake.org"})
+	ret = append(ret, LogUrlRow{Uuid: types.UID("abc-123-xyz"), Url: "fake.com", ContainerName: "container-1"})
+	ret = append(ret, LogUrlRow{Uuid: types.UID("abc-123-xyz"), Url: "fake.org", ContainerName: "container-2"})
+	ret = append(ret, LogUrlRow{Uuid: types.UID("asdf-1234-fdsa"), Url: "fake.org", ContainerName: "foo"})
 	return ret
 }
 
 type LogUrlRow struct {
-	Uuid types.UID
-	Url  string
+	Uuid          types.UID
+	Url           string
+	ContainerName string
 }
 
 type Database struct {
@@ -133,7 +135,7 @@ func (f *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstr
 	return nil
 }
 
-func (f *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, urls ...string) error {
+func (f *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, logs ...models.LogTuple) error {
 	newLogUrls := make([]LogUrlRow, 0)
 	for _, row := range f.logUrl {
 		if k8sObj.GetUID() != row.Uuid {
@@ -142,8 +144,8 @@ func (f *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructu
 	}
 	f.logUrl = newLogUrls
 
-	for _, url := range urls {
-		f.logUrl = append(f.logUrl, LogUrlRow{Uuid: k8sObj.GetUID(), Url: url})
+	for _, url := range logs {
+		f.logUrl = append(f.logUrl, LogUrlRow{Uuid: k8sObj.GetUID(), Url: url.Url, ContainerName: url.ContainerName})
 	}
 	return nil
 }

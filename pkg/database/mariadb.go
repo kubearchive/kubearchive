@@ -56,7 +56,7 @@ func (info MariaDBDatabaseInfo) GetWriteResourceSQL() string {
 }
 
 func (info MariaDBDatabaseInfo) GetWriteUrlSQL() string {
-	return "INSERT INTO log_url (uuid, url) VALUES (?, ?)"
+	return "INSERT INTO log_url (uuid, url, container_name) VALUES (?, ?, ?)"
 }
 
 func (info MariaDBDatabaseInfo) GetDeleteUrlsSQL() string {

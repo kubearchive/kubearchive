@@ -1,6 +1,6 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
-package log_urls
+package logurls
 
 import (
 	"context"
@@ -12,17 +12,19 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types/traits"
 	ocel "github.com/kubearchive/kubearchive/pkg/cel"
+	"github.com/kubearchive/kubearchive/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
-	VARIABLE_REGEX string = "\\{([A-Za-z0-9_]+)\\}"
-	LOG_URL        string = "LOG_URL"
+	variableRegex string = "\\{([A-Za-z0-9_]+)\\}"
+	logURL        string = "LOG_URL"
+	ContainerName string = "CONTAINER_NAME"
 )
 
-func GenerateLogURLs(ctx context.Context, cm map[string]interface{}, data *unstructured.Unstructured) ([]string, error) {
-	urls := []string{}
-	r, err := regexp.Compile(VARIABLE_REGEX)
+func GenerateLogURLs(ctx context.Context, cm map[string]interface{}, data *unstructured.Unstructured) ([]models.LogTuple, error) {
+	urls := []models.LogTuple{}
+	r, err := regexp.Compile(variableRegex)
 	if err != nil {
 		return urls, fmt.Errorf("Could not compile Regex: %w", err)
 	}
@@ -39,7 +41,7 @@ func GenerateLogURLs(ctx context.Context, cm map[string]interface{}, data *unstr
 
 	var vmaps = generateSubstitutionMaps(m)
 	for _, vmap := range vmaps {
-		urls = append(urls, interpolate(vmap[LOG_URL], vmap, r))
+		urls = append(urls, interpolate(vmap[logURL], vmap, r))
 	}
 	return urls, nil
 }
@@ -82,11 +84,11 @@ func generateSubstitutionMaps(m map[string]interface{}) []map[string]string {
 	return vmaps
 }
 
-func interpolate(val string, env map[string]string, r *regexp.Regexp) string {
+func interpolate(val string, env map[string]string, r *regexp.Regexp) models.LogTuple {
 	matches := r.FindAllStringSubmatch(val, -1)
 	if matches == nil {
 		// Finished, nothing more to substitute.
-		return val
+		return models.LogTuple{ContainerName: env[ContainerName], Url: val}
 	}
 
 	for _, m := range matches {

@@ -68,7 +68,10 @@ SET default_table_access_method = heap;
 CREATE TABLE public.log_url (
     id bigint NOT NULL,
     uuid uuid NOT NULL,
-    url text NOT NULL
+    url text NOT NULL,
+    container_name text NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
 );
 
 
@@ -94,6 +97,12 @@ ALTER SEQUENCE public.log_url_id_seq OWNER TO kubearchive;
 
 ALTER SEQUENCE public.log_url_id_seq OWNED BY public.log_url.id;
 
+
+--
+-- Name: resource set_timestamp; Type: TRIGGER; Schema: public; Owner: kubearchive
+--
+
+CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.log_url FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
 
 --
 -- Name: resource; Type: TABLE; Schema: public; Owner: kubearchive

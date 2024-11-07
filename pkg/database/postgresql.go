@@ -53,7 +53,7 @@ func (info PostgreSQLDatabaseInfo) GetWriteResourceSQL() string {
 }
 
 func (info PostgreSQLDatabaseInfo) GetWriteUrlSQL() string {
-	return "INSERT INTO log_url (uuid, url) VALUES ($1, $2)"
+	return "INSERT INTO log_url (uuid, url, container_name) VALUES ($1, $2, $3)"
 }
 
 func (info PostgreSQLDatabaseInfo) GetDeleteUrlsSQL() string {

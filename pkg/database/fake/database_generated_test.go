@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -222,12 +223,15 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 func TestWriteUrls(t *testing.T) {
 	k8sObj := &unstructured.Unstructured{}
 	k8sObj.SetUID(types.UID("abc-123-xyz"))
-	newUrls := []string{"https://github.com/kubearchive", "https://example.com"}
+	newUrls := []models.LogTuple{
+		{Url: "https://github.com/kubearchive", ContainerName: "container-1"},
+		{Url: "https://example.com", ContainerName: "container-2"},
+	}
 	tests := []struct {
 		name           string
 		initialLogUrls []LogUrlRow
 		obj            *unstructured.Unstructured
-		newUrls        []string
+		newUrls        []models.LogTuple
 		expected       []LogUrlRow
 	}{
 		{
@@ -236,8 +240,8 @@ func TestWriteUrls(t *testing.T) {
 			obj:            k8sObj,
 			newUrls:        newUrls,
 			expected: []LogUrlRow{
-				{Uuid: k8sObj.GetUID(), Url: newUrls[0]},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[1]},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName},
 			},
 		},
 		{
@@ -249,8 +253,8 @@ func TestWriteUrls(t *testing.T) {
 			newUrls: newUrls,
 			expected: []LogUrlRow{
 				{Uuid: types.UID("asdf-1234-fdsa"), Url: "https://fake.com"},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[0]},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[1]},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName},
 			},
 		},
 		{
@@ -259,9 +263,9 @@ func TestWriteUrls(t *testing.T) {
 			obj:            k8sObj,
 			newUrls:        newUrls,
 			expected: []LogUrlRow{
-				{Uuid: types.UID("asdf-1234-fdsa"), Url: "fake.org"},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[0]},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[1]},
+				{Uuid: types.UID("asdf-1234-fdsa"), Url: "fake.org", ContainerName: "foo"},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName},
 			},
 		},
 	}

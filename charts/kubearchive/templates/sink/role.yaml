@@ -2,7 +2,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ tpl .Values.sink.watchRole . }}
+  name: "{{ tpl .Values.sink.watchRole . }}"
+  labels:
+    app.kubernetes.io/name: "{{ tpl .Values.sink.watchRole . }}"
+    app.kubernetes.io/component: sink
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "{{ .Values.releaseVersion }}"
 rules:
   - apiGroups:
       - ""

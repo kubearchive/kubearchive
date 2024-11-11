@@ -4,6 +4,11 @@ kind: Certificate
 metadata:
   name: "{{ tpl .Values.apiServer.cert . }}"
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: "{{ tpl .Values.apiServer.cert . }}"
+    app.kubernetes.io/component: api-server
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "{{ .Values.releaseVersion }}"
 spec:
   isCA: false
   commonName: {{ tpl .Values.apiServer.name . }}

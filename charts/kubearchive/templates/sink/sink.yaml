@@ -2,8 +2,13 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ tpl .Values.sink.name . }}
+  name: "{{ tpl .Values.sink.name . }}"
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: "{{ tpl .Values.sink.name . }}"
+    app.kubernetes.io/component: sink
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "{{ .Values.releaseVersion }}"
 spec:
   replicas: {{ .Values.sink.replicas }}
   selector:
@@ -53,8 +58,13 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: {{ tpl .Values.sink.name . }}
+  name: "{{ tpl .Values.sink.name . }}"
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: "{{ tpl .Values.sink.name . }}"
+    app.kubernetes.io/component: sink
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "{{ .Values.releaseVersion }}"
 spec:
   selector:
     app: {{ tpl .Values.sink.name . }}

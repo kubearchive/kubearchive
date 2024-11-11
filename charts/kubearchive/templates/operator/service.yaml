@@ -5,14 +5,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  labels:
-    app.kubernetes.io/name: {{ .Release.Name }}
-    app.kubernetes.io/instance: {{ tpl .Values.operator.name . }}
-    app.kubernetes.io/component: webhook
-    app.kubernetes.io/created-by: {{ tpl .Values.operator.name . }}
-    app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
   name: "{{ tpl .Values.operator.name . }}-webhooks"
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: "{{ tpl .Values.operator.name . }}-webhooks"
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "{{ .Values.releaseVersion }}"
 spec:
   ports:
     - port: {{ $port }}

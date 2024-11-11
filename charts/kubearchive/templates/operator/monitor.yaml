@@ -5,16 +5,13 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  labels:
-    control-plane: {{ $controlPlane }}
-    app.kubernetes.io/name: {{ .Release.Name }}
-    app.kubernetes.io/instance: {{ $metrics }}
-    app.kubernetes.io/component: metrics
-    app.kubernetes.io/created-by: {{ tpl .Values.operator.name . }}
-    app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
-    app.kubernetes.io/managed-by: kustomize
   name: {{ $metrics }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $metrics }}
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "{{ .Values.releaseVersion }}"
 spec:
   endpoints:
     - path: /metrics

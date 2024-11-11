@@ -60,7 +60,7 @@ bash cmd/operator/generate.sh
 
 TMP=$(mktemp --suffix=.yaml -t kubearchive-not-resolved-XXXX)
 
-helm template kubearchive charts/kubearchive -n kubearchive --include-crds > ${TMP}
+helm template kubearchive charts/kubearchive -n kubearchive --include-crds --set releaseVersion=${NEXT_VERSION} > ${TMP}
 ko resolve -f ${TMP} --base-import-paths --tags=${NEXT_VERSION} > kubearchive.yaml
 
 git push

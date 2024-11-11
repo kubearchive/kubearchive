@@ -4,13 +4,12 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  labels:
-    app.kubernetes.io/name: {{ .Release.Name }}
-    app.kubernetes.io/instance: {{ $configEditor }}
-    app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: {{ tpl .Values.operator.name . }}
-    app.kubernetes.io/part-of: {{ tpl .Values.operator.name . }}
   name: {{ $configEditor }}
+  labels:
+    app.kubernetes.io/name: {{ $configEditor }}
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "{{ .Values.releaseVersion }}"
 rules:
   - apiGroups:
       - kubearchive.kubearchive.org

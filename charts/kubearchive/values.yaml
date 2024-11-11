@@ -61,3 +61,5 @@ database:
   dbName: "kubearchive"
   dbUser: "kubearchive"
   dbPassword: "Databas3Passw0rd"  # notsecret
+
+releaseVersion: ""

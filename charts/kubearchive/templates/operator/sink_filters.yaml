@@ -4,3 +4,8 @@ kind: ConfigMap
 metadata:
   name: sink-filters
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: sink-filters
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "{{ .Values.releaseVersion }}"

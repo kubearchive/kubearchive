@@ -13,11 +13,15 @@ cd ${SCRIPT_DIR}/..
 
 PODS=$(kubectl -n kubearchive get pods | grep -E -v "NAME|No resources|apiserversource" |& awk '{print $1}')
 
+# Extract the release version
+RELEASE_VERSION=$(cat VERSION)
+echo ${RELEASE_VERSION}
+
 YAML=$(mktemp --suffix=.yaml -t kubearchive-XXX)
 TMP=$(mktemp --suffix=.yaml -t kubearchive-not-resolved-XXXX)
 
 bash cmd/operator/generate.sh
-helm template kubearchive charts/kubearchive -n kubearchive --include-crds > ${TMP}
+helm template kubearchive charts/kubearchive -n kubearchive --include-crds --set releaseVersion=${RELEASE_VERSION} > ${TMP}
 ko resolve -f ${TMP} --base-import-paths > ${YAML}
 kubectl apply -n kubearchive -f ${YAML}
 

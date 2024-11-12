@@ -4,6 +4,7 @@
 package routers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -108,6 +109,30 @@ func (c *Controller) GetNamespacedResourceByName(context *gin.Context) {
 	context.JSON(http.StatusOK, resource)
 }
 
+func (c *Controller) GetLogURLsByResourceName(context *gin.Context) {
+	group := context.Param("group")
+	version := context.Param("version")
+	apiVersion := fmt.Sprintf("%s/%s", group, version)
+	namespace := context.Param("namespace")
+	name := context.Param("name")
+
+	kind, err := discovery.GetAPIResourceKind(context)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	logURLs, err := c.Database.QueryLogURLs(context.Request.Context(), kind, apiVersion, namespace, name)
+	if errors.Is(err, database.ResourceNotFoundError) {
+		abort.Abort(context, err.Error(), http.StatusNotFound)
+	}
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	context.JSON(http.StatusOK, logURLs)
+}
+
 func (c *Controller) GetAllCoreResources(context *gin.Context) {
 	version := context.Param("version")
 	limit, id, date := pagination.GetValuesFromContext(context)
@@ -167,6 +192,30 @@ func (c *Controller) GetNamespacedCoreResourceByName(context *gin.Context) {
 	}
 
 	context.JSON(http.StatusOK, resource)
+}
+
+func (c *Controller) GetLogURLsByCoreResourceName(context *gin.Context) {
+	version := context.Param("version")
+	namespace := context.Param("namespace")
+	name := context.Param("name")
+
+	kind, err := discovery.GetAPIResourceKind(context)
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	logURLs, err := c.Database.QueryLogURLs(context.Request.Context(), kind, version, namespace, name)
+	if errors.Is(err, database.ResourceNotFoundError) {
+		abort.Abort(context, err.Error(), http.StatusNotFound)
+	}
+	if err != nil {
+		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	context.JSON(http.StatusOK, logURLs)
+
 }
 
 // Livez returns current server configuration as we don't have a clear deadlock indicator

@@ -11,7 +11,7 @@ import (
 )
 
 func CreateTestResources() []*unstructured.Unstructured {
-	ret := []*unstructured.Unstructured{}
+	var ret []*unstructured.Unstructured
 	crontab := &unstructured.Unstructured{}
 	crontab.SetKind("Crontab")
 	crontab.SetAPIVersion("stable.example.com/v1")
@@ -76,6 +76,17 @@ func (f *Database) QueryResources(ctx context.Context, kind, version, limit, con
 		id = int64(len(resources))
 	}
 	return resources, id, date, f.err
+}
+
+func (f *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error) {
+	if kind == "Pod" {
+		return []string{f.logUrl[0].Url}, f.err
+	}
+	var urls []string
+	for _, l := range f.logUrl {
+		urls = append(urls, l.Url)
+	}
+	return urls, f.err
 }
 
 func (f *Database) QueryNamespacedResources(ctx context.Context, kind, version, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {

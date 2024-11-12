@@ -503,7 +503,7 @@ func getUrl(client *http.Client, token string, url string) (*unstructured.Unstru
 	}
 
 	if response.StatusCode != http.StatusOK {
-		fmt.Printf("The HTTP status returned is not OK, %s\n", response.Status)
+		fmt.Printf("The HTTP status returned is not OK, %s - %s \n", response.Status, string(body))
 		return nil, fmt.Errorf("%d", response.StatusCode)
 	}
 
@@ -513,6 +513,6 @@ func getUrl(client *http.Client, token string, url string) (*unstructured.Unstru
 		fmt.Printf("Couldn't unmarshal JSON, %s\n", err)
 		return nil, err
 	}
-
+	fmt.Printf("The HTTP status returned is OK, %s - %s \n", response.Status, string(body))
 	return &data, nil
 }

@@ -60,7 +60,6 @@ func (kac *KubeArchiveConfig) ValidateUpdate(old runtime.Object) (admission.Warn
 		return nil, fmt.Errorf("Cannot update KubeArchiveConfig resource named '%s'.", kubearchiveResourceName)
 	}
 
-
 	return kac.validateCELExpressions()
 }
 

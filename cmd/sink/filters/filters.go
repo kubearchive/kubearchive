@@ -95,12 +95,12 @@ func (f *Filters) changeGlobalFilters(stringResources map[string]string) error {
 	deleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	archiveOnDeleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	for namespace, kacResources := range stringResources {
-		nsArchive, nsDelete, nsArchiveOnDelete, err := f.createFilters(namespace, kacResources, globalArchive, globalDelete, globalArchiveOnDelete)
+		nsArchive, nsDelete, nsArchiveOnDelete, nsErr := f.createFilters(namespace, kacResources, globalArchive, globalDelete, globalArchiveOnDelete)
 		maps.Copy(archiveMap, nsArchive)
 		maps.Copy(deleteMap, nsDelete)
 		maps.Copy(archiveOnDeleteMap, nsArchiveOnDelete)
-		if err != nil {
-			errList = append(errList, err)
+		if nsErr != nil {
+			errList = append(errList, nsErr)
 		}
 	}
 	err = errors.Join(errList...)

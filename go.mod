@@ -1,6 +1,6 @@
 module github.com/kubearchive/kubearchive
 
-go 1.22.0
+go 1.22.7
 
 toolchain go1.23.3
 
@@ -36,7 +36,7 @@ require (
 	k8s.io/client-go v0.31.2
 	k8s.io/klog/v2 v2.130.1
 	knative.dev/eventing v0.43.1
-	knative.dev/pkg v0.0.0-20241111070503-7b333a046a23
+	knative.dev/pkg v0.0.0-20241112094440-47a6f9fc2e7d
 	sigs.k8s.io/controller-runtime v0.19.1
 )
 
@@ -158,7 +158,7 @@ require (
 	google.golang.org/api v0.183.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241104194629-dd2ea8efbc28 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241104194629-dd2ea8efbc28 // indirect
-	google.golang.org/grpc v1.67.1 // indirect
+	google.golang.org/grpc v1.68.0 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -75,7 +76,7 @@ func TestPodQueryLogURLs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			expectedQuery := regexp.QuoteMeta(tt.database.info.GetLogURLsByPodNameSQL())
 			db, mock := NewMock()
-			tt.database.db = db
+			tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 			rows := sqlmock.NewRows([]string{"url"})
 			rows.AddRow("mock-url-container1")
@@ -96,11 +97,11 @@ func TestLogURLsFromNonExistentResource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
-			tt.database.db = db
+			tt.database.db = sqlx.NewDb(db, "sqlmock")
 			rows := sqlmock.NewRows([]string{"uuid"})
 			mock.ExpectQuery(regexp.QuoteMeta(tt.database.info.GetUUIDSQL())).WithArgs(kind, cronJobApiVersion, namespace, cronJobName).WillReturnRows(rows)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
 			logUrls, err := tt.database.QueryLogURLs(ctx, kind, cronJobApiVersion, namespace, cronJobName)
@@ -114,7 +115,7 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
-			tt.database.db = db
+			tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 			// Get UUID query
 			rows := sqlmock.NewRows([]string{"uuid"})
@@ -143,7 +144,7 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 			query, args, _ = tt.database.paramParser.ParseParams(regexp.QuoteMeta(tt.database.info.GetLogURLsSQL()), []string{"mock-uuid-pod1", "mock-uuid-pod2"})
 			mock.ExpectQuery(query).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
 			logUrls, err := tt.database.QueryLogURLs(ctx, kind, cronJobApiVersion, namespace, cronJobName)
@@ -168,7 +169,7 @@ func TestQueryResources(t *testing.T) {
 			for _, ttt := range subtests {
 				t.Run(ttt.name, func(t *testing.T) {
 					db, mock := NewMock()
-					tt.database.db = db
+					tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 					rows := sqlmock.NewRows(resourceQueryColumns)
 					if ttt.data {
@@ -202,7 +203,7 @@ func TestQueryNamespacedResources(t *testing.T) {
 			for _, ttt := range subtests {
 				t.Run(ttt.name, func(t *testing.T) {
 					db, mock := NewMock()
-					tt.database.db = db
+					tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 					rows := sqlmock.NewRows(resourceQueryColumns)
 					if ttt.data {
@@ -233,7 +234,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 			for _, ttt := range subtests {
 				t.Run(ttt.name, func(t *testing.T) {
 					db, mock := NewMock()
-					tt.database.db = db
+					tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 					rows := sqlmock.NewRows(resourceQueryColumns)
 					if ttt.data {
@@ -262,7 +263,7 @@ func TestQueryNamespacedResourceByNameMoreThanOne(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			expectedQuery := regexp.QuoteMeta(tt.database.info.GetNamespacedResourceByNameSQL())
 			db, mock := NewMock()
-			tt.database.db = db
+			tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 			rows := sqlmock.NewRows(resourceQueryColumns).
 				AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource)).
@@ -283,7 +284,7 @@ func TestPing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
-			tt.database.db = db
+			tt.database.db = sqlx.NewDb(db, "sqlmock")
 			mock.ExpectPing()
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 			defer cancel()

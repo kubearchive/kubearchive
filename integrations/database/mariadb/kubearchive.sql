@@ -1,4 +1,4 @@
-/*!999999\- enable the sandbox mode */ 
+/*!999999\- enable the sandbox mode */
 -- MariaDB dump 10.19  Distrib 10.11.8-MariaDB, for Linux (x86_64)
 --
 -- Host: 127.0.0.1    Database: kubearchive
@@ -46,6 +46,22 @@ CREATE TABLE `resource` (
   `data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`data`)),
   PRIMARY KEY (`uuid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+
+--
+-- Table structure for table `log_urls`
+--
+
+DROP TABLE IF EXISTS `log_url`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `log_url` (
+  `uuid` uuid NOT NULL,
+  `url` text NOT NULL,
+  `container_name` text NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
@@ -60,6 +76,10 @@ DELIMITER ;;
 /*!50003 CREATE*/ /*!50017 DEFINER=`root`@`%`*/ /*!50003 TRIGGER set_timestamp
   BEFORE update ON resource FOR EACH ROW
     UPDATE resource SET resource.updated_at = now() */;;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`%`*/ /*!50003 TRIGGER set_timestamp
+  BEFORE update ON log_url FOR EACH ROW
+    UPDATE log_url SET log_url.updated_at = now() */;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;

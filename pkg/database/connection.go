@@ -10,9 +10,10 @@ import (
 
 	"github.com/XSAM/otelsql"
 	"github.com/avast/retry-go/v4"
+	"github.com/jmoiron/sqlx"
 )
 
-func establishConnection(driver, connectionString string) *sql.DB {
+func establishConnection(driver, connectionString string) *sqlx.DB {
 	configs := []retry.Option{
 		retry.Attempts(10),
 		retry.OnRetry(func(n uint, err error) {
@@ -36,5 +37,5 @@ func establishConnection(driver, connectionString string) *sql.DB {
 		return nil
 	}
 	log.Println("Successfully connected to the database")
-	return conn
+	return sqlx.NewDb(conn, driver)
 }

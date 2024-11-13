@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -61,7 +62,7 @@ type DBInterface interface {
 }
 
 type Database struct {
-	db          *sql.DB
+	db          *sqlx.DB
 	info        DBInfoInterface
 	paramParser DBParamParser
 }
@@ -140,7 +141,7 @@ func (db *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespac
 	}
 
 	var uuid string
-	err := db.db.QueryRowContext(ctx, db.info.GetUUIDSQL(), kind, apiVersion, namespace, name).Scan(&uuid)
+	err := db.db.GetContext(ctx, &uuid, db.info.GetUUIDSQL(), kind, apiVersion, namespace, name)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return []string{}, ResourceNotFoundError
@@ -163,8 +164,8 @@ func (db *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespac
 func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids, podUuids []string) ([]string, error) {
 
 	type uuidKind struct {
-		Uuid string `json:"uuid"`
-		Kind string `json:"kind"`
+		Uuid string
+		Kind string
 	}
 
 	if len(ownersUuids) == 0 {
@@ -190,9 +191,9 @@ func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids, podUuids
 
 func (db *Database) performResourceQuery(ctx context.Context, pq *paramQuery) ([]*unstructured.Unstructured, int64, string, error) {
 	type resourceFields struct {
-		Date  string       `json:"created_at"`
-		Id    int64        `json:"id"`
-		Bytes sql.RawBytes `json:"data"`
+		Date     string `db:"created_at"`
+		Id       int64  `db:"id"`
+		Resource []byte `db:"data"`
 	}
 
 	var resources []*unstructured.Unstructured
@@ -209,9 +210,9 @@ func (db *Database) performResourceQuery(ctx context.Context, pq *paramQuery) ([
 	lastRow := parsedRows[len(parsedRows)-1]
 
 	for _, parsedRow := range parsedRows {
-		r, err := models.UnstructuredFromByteSlice([]byte(parsedRow.Bytes))
-		if err != nil {
-			return resources, 0, "", err
+		r, errConversion := models.UnstructuredFromByteSlice(parsedRow.Resource)
+		if errConversion != nil {
+			return resources, 0, "", errConversion
 		}
 		resources = append(resources, r)
 	}

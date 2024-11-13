@@ -28,6 +28,6 @@ and the "Design" section in the sidebar.
 
 You can get in touch with the KubeArchive team at:
 
-* [Slack](https://kubernetes.slack.com/archives/C07MB5YBVCL) to get an invite go [here](https://slack.k8s.io/)
-* [KubeArchive mailing list](https://groups.google.com/g/kubearchive)
-* [KubeArchive Developers mailing list](https://groups.google.com/g/kubearchive-developers)
+* link:https://kubernetes.slack.com/archives/C07MB5YBVCL[Slack] (to get an invite go link:https://slack.k8s.io/[here])
+* link:https://groups.google.com/g/kubearchive[KubeArchive mailing list]
+* link:https://groups.google.com/g/kubearchive-developers[KubeArchive Developers mailing list]

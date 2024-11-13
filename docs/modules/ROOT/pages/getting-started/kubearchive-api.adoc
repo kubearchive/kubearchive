@@ -1,0 +1,64 @@
+= Accessing KubeArchive
+
+This document explains how to access KubeArchive after installing it
+in your cluster.
+
+[NOTE]
+====
+This document only covers the basic development scenario, the process
+may be different for a production cluster.
+====
+
+== Port Forward KubeArchive
+
+After installing, KubeArchive creates different services. Use [command]`kubectl` to forward the port of the KubeArchive API:
+
+[source,bash]
+----
+kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081
+----
+
+== Authentication and Authorization
+
+KubeArchive delegates authentication and authorization to the Kubernetes
+RBAC service. In order to retrieve resources from KubeArchive,
+you need to pass an identity when you make a request. The easiest
+way is to use a service account. Create one and assign it permissions,
+for example:
+
+[source,bash]
+----
+kubectl create serviceaccount \
+    kubearchive-view --namespace default
+
+kubectl create role kubearchive-view-pods \
+    --verb=get,list --resource=pods --namespace default
+
+kubectl create rolebinding kubearchive-view-pods \
+    --serviceaccount=default:kubearchive-view \
+    --role=kubearchive-view-pods --namespace default
+
+kubectl auth can-i list pods \
+    --as=system:serviceaccount:default:kubearchive-view --namespace default
+----
+
+== Query KubeArchive
+
+After creating the service account and configuring its access, generate a token
+and use it to query KubeArchive:
+
+[source,bash]
+----
+$ export SA_TOKEN=$(kubectl create token kubearchive-view --namespace default)
+$ curl --insecure \
+    -H "Authorization: Bearer ${SA_TOKEN}" \
+    https://localhost:8081/api/v1/namespaces/default/pods
+
+{"apiVersion":"v1","items":null,"kind":"List","metadata":{"continue":"","resourceVersion":""}}
+----
+
+== Next steps
+
+Continue reading
+xref:getting-started/configuration.adoc[]
+to learn how to use KubeArchive to archive and delete resources.

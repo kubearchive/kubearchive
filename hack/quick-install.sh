@@ -14,7 +14,7 @@ export CERT_MANAGER_VERSION=v1.9.1
 export KNATIVE_EVENTING_VERSION=v1.15.0
 
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml
-kubectl apply -f https://github.com/knative/eventing/releases/download/knative-${KNATIVE_EVENTING_VERSION}/eventing-core.yaml
+kubectl apply -f https://github.com/knative/eventing/releases/download/knative-${KNATIVE_EVENTING_VERSION}/eventing.yaml
 kubectl rollout status deployment --namespace=cert-manager --timeout=30s
 kubectl rollout status deployment --namespace=knative-eventing --timeout=30s
 

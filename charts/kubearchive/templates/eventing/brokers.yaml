@@ -1,0 +1,29 @@
+---
+apiVersion: eventing.knative.dev/v1
+kind: Broker
+metadata:
+  name: {{ .Release.Name }}-broker
+  namespace: {{ .Release.Namespace }}
+spec:
+  delivery:
+    retry: 4
+    backoffPolicy: exponential
+    # ISO 8601 format
+    backoffDelay: PT0.5S
+    deadLetterSink:
+      ref:
+        apiVersion: eventing.knative.dev/v1
+        kind: Broker
+        name: {{ .Release.Name }}-dls
+---
+apiVersion: eventing.knative.dev/v1
+kind: Broker
+metadata:
+  name: {{ .Release.Name }}-dls
+  namespace: {{ .Release.Namespace }}
+spec:
+  delivery:
+    retry: 4
+    backoffPolicy: exponential
+    # ISO 8601 format
+    backoffDelay: PT0.5S

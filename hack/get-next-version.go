@@ -36,7 +36,7 @@ func main() {
 	}
 
 	var releaseNotes map[string]any
-	if err := json.Unmarshal(releaseNotesBytes, &releaseNotes); err != nil {
+	if err = json.Unmarshal(releaseNotesBytes, &releaseNotes); err != nil {
 		panic(err)
 	}
 

@@ -113,9 +113,9 @@ func main() {
 		os.Exit(1)
 	}
 	defer func(db database.DBInterface) {
-		err := db.CloseDB()
-		if err != nil {
-			slog.Error("Could not close the database connection", "error", err.Error())
+		deferErr := db.CloseDB()
+		if deferErr != nil {
+			slog.Error("Could not close the database connection", "error", deferErr.Error())
 		} else {
 			slog.Info("Connection closed successfully")
 		}

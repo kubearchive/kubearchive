@@ -492,7 +492,7 @@ func (r *KubeArchiveConfigReconciler) reconcileFilterConfigMap(ctx context.Conte
 	cm := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: k9eNs}, cm)
 	if err == nil {
-		cm, err := r.desiredFilterConfigMap(ctx, kaconfig, cm)
+		cm, err = r.desiredFilterConfigMap(ctx, kaconfig, cm)
 		if err != nil {
 			log.Error(err, "Unable to get desired ConfigMap "+SinkFilterConfigMapName)
 			return cm, err
@@ -503,7 +503,7 @@ func (r *KubeArchiveConfigReconciler) reconcileFilterConfigMap(ctx context.Conte
 			return cm, err
 		}
 	} else if errors.IsNotFound(err) {
-		cm, err := r.desiredFilterConfigMap(ctx, kaconfig, nil)
+		cm, err = r.desiredFilterConfigMap(ctx, kaconfig, nil)
 		if err != nil {
 			log.Error(err, "Unable to get desired filter ConfigMap "+SinkFilterConfigMapName)
 			return cm, err

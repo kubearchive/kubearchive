@@ -80,9 +80,6 @@ func Start(serviceName string) error {
 		metric.WithResource(res),
 		metric.WithReader(metric.NewPeriodicReader(metricExporter)),
 	)
-	if err != nil {
-		return err
-	}
 
 	otel.SetMeterProvider(mp)
 	err = host.Start(host.WithMeterProvider(mp))

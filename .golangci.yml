@@ -11,6 +11,15 @@ linters:
     - goimports
     - gosec
     - nilerr
+    - nilnil
     - usestdlibvars
     - wastedassign
     - unparam
+linters-settings:
+  govet:
+    enable-all: false
+    disable-all: false
+    enable:
+      - loopclosure
+      - nilness
+      - shadow

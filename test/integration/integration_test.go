@@ -28,6 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"knative.dev/eventing/test/lib/resources"
 )
 
 func TestMain(m *testing.M) {
@@ -194,6 +196,41 @@ func TestArchiveAndRead(t *testing.T) {
 		t.Fatal(errClient)
 	}
 
+	// Configure the log url generator
+	loggingConfigName := "kubearchive-splunk"
+	_, kaConfigErr := clientset.CoreV1().ConfigMaps("kubearchive").Create(context.Background(),
+		resources.ConfigMap("kubearchive-config", "kubearchive", map[string]string{
+			"logging-configmap-name": loggingConfigName,
+		}),
+		metav1.CreateOptions{})
+
+	if kaConfigErr != nil && kaConfigErr.Error() != "configmaps \"kubearchive-config\" already exists" {
+		t.Fatal(kaConfigErr)
+	}
+
+	logUrlConfig := map[string]string{
+		"POD_ID":    "cel:metadata.uid",
+		"POD":       "spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"{POD_ID}\"",
+		"CONTAINER": "spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"{CONTAINER_NAME}\"",
+		"LOG_URL":   "http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}",
+	}
+	_, kaLoggingErr := clientset.CoreV1().ConfigMaps("kubearchive").Create(context.Background(),
+		resources.ConfigMap(loggingConfigName, "kubearchive", logUrlConfig),
+		metav1.CreateOptions{})
+
+	if kaLoggingErr != nil && kaLoggingErr.Error() != fmt.Sprintf("configmaps \"%s\" already exists", loggingConfigName) {
+		t.Fatal(kaLoggingErr)
+	}
+
+	// Restart the sink to get the config applied
+	annotation := fmt.Sprintf(`{"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}}}`, time.Now().Format("20060102150405"))
+	_, errSinkPatch := clientset.AppsV1().Deployments("kubearchive").Patch(context.Background(),
+		"kubearchive-sink", types.StrategicMergePatchType, []byte(annotation), metav1.PatchOptions{})
+
+	if errSinkPatch != nil {
+		t.Fatal(errSinkPatch)
+	}
+
 	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
 	_, errNamespace := clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -316,6 +353,56 @@ func TestArchiveAndRead(t *testing.T) {
 	if retryErr != nil {
 		t.Fatal(retryErr)
 	}
+
+	// Query cronjob log urls
+	url = fmt.Sprintf("https://localhost:8081/apis/batch/v1/namespaces/%s/cronjobs/generate-log-1/log", namespaceName)
+	request, errRequest = http.NewRequest("GET", url, nil)
+	if errRequest != nil {
+		fmt.Printf("could not create a request, %s", errRequest)
+		t.Fatal(errRequest)
+	}
+	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.Status.Token))
+	fmt.Printf("HTTP request: %s\n", request.URL.RequestURI())
+
+	retryErr = retry.Do(func() error {
+		response, errResp := clientHTTP.Do(request)
+		if errResp != nil {
+			fmt.Printf("Couldn't get a response HTTP, %s\n", errResp)
+			return errResp
+		}
+		defer response.Body.Close()
+
+		body, errReadAll := io.ReadAll(response.Body)
+		if errReadAll != nil {
+			fmt.Printf("Couldn't read Body, %s\n", errReadAll)
+			return errReadAll
+		}
+
+		if response.StatusCode != http.StatusOK {
+			fmt.Printf("The HTTP status returned is not OK, %s\n", response.Status)
+			return errors.New(response.Status)
+		}
+		var logUrls []string
+		errJson := json.Unmarshal([]byte(body), &logUrls)
+		if errJson != nil {
+			return errJson
+		}
+
+		fmt.Printf("Log URLs: %s\n", logUrls)
+
+		if len(logUrls) == 0 {
+			return errors.New("could not retrieve the cronjob pod log urls")
+		}
+		if !strings.HasPrefix(logUrls[0], "http://127.0.0.1:8111/app/search/search?q=search") {
+			return errors.New("unexpected content in log url")
+		}
+		return nil
+	}, retry.Attempts(20))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+
 }
 
 func TestPagination(t *testing.T) {

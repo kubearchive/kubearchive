@@ -37,7 +37,7 @@ require (
 	k8s.io/client-go v0.31.2
 	k8s.io/klog/v2 v2.130.1
 	knative.dev/eventing v0.43.1
-	knative.dev/pkg v0.0.0-20241112094440-47a6f9fc2e7d
+	knative.dev/pkg v0.0.0-20241115112044-215048add14b
 	sigs.k8s.io/controller-runtime v0.19.1
 )
 
@@ -155,7 +155,7 @@ require (
 	golang.org/x/term v0.26.0 // indirect
 	golang.org/x/text v0.20.0 // indirect
 	golang.org/x/time v0.6.0 // indirect
-	golang.org/x/tools v0.26.0 // indirect
+	golang.org/x/tools v0.27.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/api v0.183.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241104194629-dd2ea8efbc28 // indirect

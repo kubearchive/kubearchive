@@ -29,8 +29,8 @@ const (
 // GetValuesFromContext is a helper function for routes to retrieve the
 // information needed. This is kept here, so it's close to the function
 // that sets these values in the context (Middleware)
-func GetValuesFromContext(context *gin.Context) (string, string, string) {
-	return context.GetString(limitKey), context.GetString(continueIdKey), context.GetString(continueDateKey)
+func GetValuesFromContext(context *gin.Context) (int, string, string) {
+	return context.GetInt(limitKey), context.GetString(continueIdKey), context.GetString(continueDateKey)
 }
 
 func CreateToken(uuid int64, date string) string {
@@ -54,7 +54,6 @@ func Middleware() gin.HandlerFunc {
 		limitString := context.DefaultQuery(limitKey, defaultLimit)
 		continueToken := context.Query(continueKey)
 
-		var limit string
 		limitInteger, err := strconv.Atoi(limitString)
 		if err != nil {
 			abort.Abort(context, fmt.Errorf("limit '%s' could not be converted to integer", limitString), http.StatusBadRequest)
@@ -64,9 +63,6 @@ func Middleware() gin.HandlerFunc {
 			abort.Abort(context, fmt.Errorf("limit '%s' exceeds the maximum allowed '%d'", limitString, maxAllowedLimit), http.StatusBadRequest)
 			return
 		}
-		// We reserialize to avoid SQL injection. There is the possibility the
-		// value is a valid integer, but in SQL does something else.
-		limit = strconv.Itoa(limitInteger)
 
 		var continueDate string
 		var continueId string
@@ -107,7 +103,7 @@ func Middleware() gin.HandlerFunc {
 
 		// Pass the values using the context, these should be retrieved
 		// using `GetValuesFromContext`
-		context.Set(limitKey, limit)
+		context.Set(limitKey, limitInteger)
 		context.Set(continueDateKey, continueDate)
 		context.Set(continueIdKey, continueId)
 	}

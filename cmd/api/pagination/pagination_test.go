@@ -16,7 +16,7 @@ func TestMiddleware(t *testing.T) {
 	tests := []struct {
 		name               string
 		query              string
-		expectedLimit      string
+		expectedLimit      int
 		expectedInt64      string
 		expectedDate       string
 		expectedStatusCode int
@@ -25,7 +25,7 @@ func TestMiddleware(t *testing.T) {
 		{
 			name:               "default limit is applied",
 			query:              "/",
-			expectedLimit:      "100",
+			expectedLimit:      100,
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusOK,
@@ -34,7 +34,7 @@ func TestMiddleware(t *testing.T) {
 		{
 			name:               "invalid limit",
 			query:              "/?limit=abc",
-			expectedLimit:      "",
+			expectedLimit:      0,
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
@@ -43,7 +43,7 @@ func TestMiddleware(t *testing.T) {
 		{
 			name:               "valid limit",
 			query:              "/?limit=250",
-			expectedLimit:      "250",
+			expectedLimit:      250,
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusOK,
@@ -52,7 +52,7 @@ func TestMiddleware(t *testing.T) {
 		{
 			name:               "limit too large",
 			query:              "/?limit=2000",
-			expectedLimit:      "",
+			expectedLimit:      0,
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
@@ -61,7 +61,7 @@ func TestMiddleware(t *testing.T) {
 		{
 			name:               "invalid continue",
 			query:              "/?continue=abc",
-			expectedLimit:      "",
+			expectedLimit:      0,
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
@@ -70,7 +70,7 @@ func TestMiddleware(t *testing.T) {
 		{
 			name:               "invalid first part of continue",
 			query:              fmt.Sprintf("/?continue=%s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("abc %s", time.Now().Format(time.RFC3339))))),
-			expectedLimit:      "",
+			expectedLimit:      0,
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
@@ -79,7 +79,7 @@ func TestMiddleware(t *testing.T) {
 		{
 			name:               "invalid second part of continue",
 			query:              fmt.Sprintf("/?continue=%s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("1 %s", "2024-11-08")))),
-			expectedLimit:      "",
+			expectedLimit:      0,
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
@@ -88,7 +88,7 @@ func TestMiddleware(t *testing.T) {
 		{
 			name:               "valid limit and continue",
 			query:              fmt.Sprintf("/?limit=250&continue=%s", base64.StdEncoding.EncodeToString([]byte("1 2024-10-22T08:13:52+02:00"))),
-			expectedLimit:      "250",
+			expectedLimit:      250,
 			expectedInt64:      "1",
 			expectedDate:       "2024-10-22T08:13:52+02:00",
 			expectedStatusCode: http.StatusOK,

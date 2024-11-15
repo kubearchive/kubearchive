@@ -4,104 +4,107 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
-	"reflect"
 
+	"github.com/huandu/go-sqlbuilder"
+	"github.com/jmoiron/sqlx"
+	"github.com/kubearchive/kubearchive/pkg/database/facade"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
 func init() {
 	RegisteredDatabases["postgresql"] = NewPostgreSQLDatabase
+	RegisteredDBCreators["postgresql"] = NewPostgreSQLCreator
 }
 
-type PostgreSQLDatabaseInfo struct {
+type PostgreSQLCreator struct {
 	env map[string]string
 }
 
-func (info PostgreSQLDatabaseInfo) GetDriverName() string {
+func NewPostgreSQLCreator(env map[string]string) facade.DBCreator {
+	return PostgreSQLCreator{env: env}
+}
+
+func (creator PostgreSQLCreator) GetDriverName() string {
 	return "postgres"
 }
 
-func (info PostgreSQLDatabaseInfo) GetConnectionString() string {
-	return fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable", info.env[DbUserEnvVar],
-		info.env[DbPasswordEnvVar], info.env[DbNameEnvVar], info.env[DbHostEnvVar], info.env[DbPortEnvVar])
+func (creator PostgreSQLCreator) GetConnectionString() string {
+	return fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable", creator.env[DbUserEnvVar],
+		creator.env[DbPasswordEnvVar], creator.env[DbNameEnvVar], creator.env[DbHostEnvVar], creator.env[DbPortEnvVar])
 }
 
-func (info PostgreSQLDatabaseInfo) GetResourcesLimitedSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp' as created_at, id, data FROM resource WHERE kind=$1 AND api_version=$2 ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $3"
+type PostgreSQLSelector struct {
+	facade.PartialDBSelectorImpl
 }
 
-func (info PostgreSQLDatabaseInfo) GetResourcesLimitedContinueSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp' as created_at, id, data FROM resource WHERE kind=$1 AND api_version=$2 AND (data->'metadata'->>'creationTimestamp', id) < ($3, $4) ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $5"
+func (PostgreSQLSelector) ResourceSelector() *sqlbuilder.SelectBuilder {
+	sb := sqlbuilder.NewSelectBuilder()
+	return sb.Select(
+		sb.As("data->'metadata'->>'creationTimestamp'", "created_at"),
+		"id",
+		"data",
+	).From("resource")
 }
 
-func (info PostgreSQLDatabaseInfo) GetNamespacedResourcesLimitedSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp' as created_at, id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $4"
+type PostgreSQLFilter struct {
+	facade.PartialDBFilterImpl
 }
 
-func (info PostgreSQLDatabaseInfo) GetNamespacedResourcesLimitedContinueSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp' as created_at, id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND (data->'metadata'->>'creationTimestamp', id) < ($4, $5) ORDER BY data->'metadata'->>'creationTimestamp' DESC, id DESC LIMIT $6"
+func (PostgreSQLFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string {
+	return cond.Var(sqlbuilder.Build(
+		"(data->'metadata'->>'creationTimestamp', id) < ($?, $?)",
+		continueDate, continueId,
+	))
 }
 
-func (info PostgreSQLDatabaseInfo) GetNamespacedResourceByNameSQL() string {
-	return "SELECT data->'metadata'->>'creationTimestamp' as created_at, id, data FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND name=$4"
+func (PostgreSQLFilter) OwnerFilter(cond sqlbuilder.Cond, owners []string) string {
+	return cond.Var(sqlbuilder.Build(
+		"jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| $?",
+		pq.Array(owners),
+	))
 }
 
-func (info PostgreSQLDatabaseInfo) GetUUIDSQL() string {
-	return "SELECT uuid FROM resource WHERE kind=$1 AND api_version=$2 AND namespace=$3 AND name=$4"
+type PostgreSQLSorter struct{}
+
+func (PostgreSQLSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {
+	return sb.OrderBy("data->'metadata'->>'creationTimestamp' DESC", "id DESC")
 }
 
-func (info PostgreSQLDatabaseInfo) GetOwnedResourcesSQL() string {
-	return "SELECT uuid, kind FROM resource WHERE jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| $1"
+type PostgreSQLInserter struct {
+	facade.PartialDBInserterImpl
 }
 
-func (info PostgreSQLDatabaseInfo) GetLogURLsByPodNameSQL() string {
-	return "SELECT log.url FROM log_url log JOIN resource res ON log.uuid = res.uuid WHERE res.kind='Pod' AND res.api_version=$1 AND res.namespace=$2 AND res.name = $3"
-}
-
-func (info PostgreSQLDatabaseInfo) GetLogURLsSQL() string {
-	return "SELECT url FROM log_url WHERE uuid = any($1)"
-}
-
-func (info PostgreSQLDatabaseInfo) GetWriteResourceSQL() string {
-	return "INSERT INTO resource (uuid, api_version, kind, name, namespace, resource_version, cluster_deleted_ts, data) " +
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8) " +
-		"ON CONFLICT(uuid) DO UPDATE SET name=$4, namespace=$5, resource_version=$6, cluster_deleted_ts=$7, data=$8"
-}
-
-func (info PostgreSQLDatabaseInfo) GetWriteUrlSQL() string {
-	return "INSERT INTO log_url (uuid, url, container_name) VALUES ($1, $2, $3)"
-}
-
-func (info PostgreSQLDatabaseInfo) GetDeleteUrlsSQL() string {
-	return "DELETE FROM log_url WHERE uuid=$1"
-}
-
-type PostgreSQLParamParser struct{}
-
-// ParseParams in PostgreSQL transform the given arrays as pq.Array because the driver
-// accepts array parameters for prepared statements
-func (PostgreSQLParamParser) ParseParams(query string, args ...any) (string, []any, error) {
-	var parsedArgs []any
-	for _, arg := range args {
-		switch reflect.TypeOf(arg).Kind() {
-		case reflect.Slice:
-			parsedArgs = append(parsedArgs, pq.Array(arg))
-		default:
-			parsedArgs = append(parsedArgs, arg)
-		}
-	}
-	return query, parsedArgs, nil
+func (PostgreSQLInserter) ResourceInserter(
+	uuid, apiVersion, kind, name, namespace, version string,
+	clusterDeletedTs sql.NullString,
+	data []byte,
+) *sqlbuilder.InsertBuilder {
+	ib := sqlbuilder.NewInsertBuilder()
+	ib.InsertInto("resource")
+	ib.Cols("uuid", "api_version", "kind", "name", "namespace", "resource_version", "cluster_deleted_ts", "data")
+	ib.Values(uuid, apiVersion, kind, name, namespace, version, clusterDeletedTs, data)
+	ib.SQL(ib.Var(sqlbuilder.Build(
+		"ON CONFLICT(uuid) DO UPDATE SET name=$?, namespace=$?, resource_version=$?, cluster_deleted_ts=$?, data=$?",
+		name, namespace, version, clusterDeletedTs, data,
+	)))
+	return ib
 }
 
 type PostgreSQLDatabase struct {
 	*Database
 }
 
-func NewPostgreSQLDatabase(env map[string]string) DBInterface {
-	info := PostgreSQLDatabaseInfo{env: env}
-	paramParser := PostgreSQLParamParser{}
-	db := establishConnection(info.GetDriverName(), info.GetConnectionString())
-	return PostgreSQLDatabase{&Database{db: db, info: info, paramParser: paramParser}}
+func NewPostgreSQLDatabase(conn *sqlx.DB) DBInterface {
+	return PostgreSQLDatabase{&Database{
+		DB:       conn,
+		Flavor:   sqlbuilder.PostgreSQL,
+		Selector: PostgreSQLSelector{},
+		Filter:   PostgreSQLFilter{},
+		Sorter:   PostgreSQLSorter{},
+		Inserter: PostgreSQLInserter{},
+		Deleter:  facade.DBDeleterImpl{},
+	}}
 }

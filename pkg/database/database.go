@@ -9,49 +9,24 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
+	"github.com/kubearchive/kubearchive/pkg/database/facade"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var ResourceNotFoundError = errors.New("resource not found")
 
-type newDatabaseFunc func(map[string]string) DBInterface
+type newDatabaseFunc func(*sqlx.DB) DBInterface
+type newDBCreatorFunc func(map[string]string) facade.DBCreator
 
 var RegisteredDatabases = make(map[string]newDatabaseFunc)
-
-type DBInfoInterface interface {
-	GetDriverName() string
-	GetConnectionString() string
-
-	GetUUIDSQL() string
-
-	GetResourcesLimitedSQL() string
-	GetResourcesLimitedContinueSQL() string
-
-	GetNamespacedResourcesLimitedSQL() string
-	GetNamespacedResourcesLimitedContinueSQL() string
-
-	GetNamespacedResourceByNameSQL() string
-
-	GetLogURLsByPodNameSQL() string
-	GetOwnedResourcesSQL() string
-	GetLogURLsSQL() string
-
-	GetWriteResourceSQL() string
-	GetWriteUrlSQL() string
-	GetDeleteUrlsSQL() string
-}
-
-// DBParamParser need to be implemented by every database driver compatible with KubeArchive
-type DBParamParser interface {
-	// ParseParams transform the given args to accepted parameters for parametrized queries
-	ParseParams(query string, args ...any) (string, []any, error)
-}
+var RegisteredDBCreators = make(map[string]newDBCreatorFunc)
 
 type DBInterface interface {
-	QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error)
-	QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error)
+	QueryResources(ctx context.Context, kind, apiVersion, continueId, continueDate string, limit int) ([]*unstructured.Unstructured, int64, string, error)
+	QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, continueId, continueDate string, limit int) ([]*unstructured.Unstructured, int64, string, error)
 	QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (*unstructured.Unstructured, error)
 	QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error)
 
@@ -62,9 +37,13 @@ type DBInterface interface {
 }
 
 type Database struct {
-	db          *sqlx.DB
-	info        DBInfoInterface
-	paramParser DBParamParser
+	DB       *sqlx.DB
+	Flavor   sqlbuilder.Flavor
+	Selector facade.DBSelector
+	Filter   facade.DBFilter
+	Sorter   facade.DBSorter
+	Inserter facade.DBInserter
+	Deleter  facade.DBDeleter
 }
 
 func NewDatabase() (DBInterface, error) {
@@ -72,55 +51,76 @@ func NewDatabase() (DBInterface, error) {
 	if err != nil {
 		return nil, err
 	}
-	var database DBInterface
-	if f, ok := RegisteredDatabases[env[DbKindEnvVar]]; ok {
-		database = f(env)
+
+	var creator facade.DBCreator
+	if c, ok := RegisteredDBCreators[env[DbKindEnvVar]]; ok {
+		creator = c(env)
 	} else {
-		panic(fmt.Sprintf("No database registered with name %s", env[DbKindEnvVar]))
+		return nil, fmt.Errorf("no database registered with name '%s'", env[DbKindEnvVar])
+	}
+
+	conn := establishConnection(creator.GetDriverName(), creator.GetConnectionString())
+
+	var database DBInterface
+	if init, ok := RegisteredDatabases[env[DbKindEnvVar]]; ok {
+		database = init(conn)
+	} else {
+		return nil, fmt.Errorf("no database registered with name '%s'", env[DbKindEnvVar])
 	}
 
 	return database, nil
 }
 
 func (db *Database) Ping(ctx context.Context) error {
-	return db.db.PingContext(ctx)
+	return db.DB.PingContext(ctx)
 }
 
-func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
-	var pq *paramQuery
+func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, continueId, continueDate string, limit int,
+) ([]*unstructured.Unstructured, int64, string, error) {
+	sb := db.Selector.ResourceSelector()
+	sb.Where(
+		db.Filter.KindFilter(sb.Cond, kind),
+		db.Filter.ApiVersionFilter(sb.Cond, apiVersion),
+	)
 
 	if continueId != "" && continueDate != "" {
-		pq = db.newParamQuery(db.info.GetResourcesLimitedContinueSQL())
-		pq.addStringParams(kind, apiVersion, continueDate, continueId, limit)
-	} else {
-		pq = db.newParamQuery(db.info.GetResourcesLimitedSQL())
-		pq.addStringParams(kind, apiVersion, limit)
+		sb.Where(db.Filter.CreationTSAndIDFilter(sb.Cond, continueDate, continueId))
 	}
 
-	return db.performResourceQuery(ctx, pq)
+	sb = db.Sorter.CreationTSAndIDSorter(sb)
+	sb.Limit(limit)
+
+	return db.performResourceQuery(ctx, sb)
 }
 
-func (db *Database) QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
-	var pq *paramQuery
+func (db *Database) QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, continueId, continueDate string, limit int) ([]*unstructured.Unstructured, int64, string, error) {
+	sb := db.Selector.ResourceSelector()
+	sb.Where(
+		db.Filter.KindFilter(sb.Cond, kind),
+		db.Filter.ApiVersionFilter(sb.Cond, apiVersion),
+		db.Filter.NamespaceFilter(sb.Cond, namespace),
+	)
 
 	if continueId != "" && continueDate != "" {
-		pq = db.newParamQuery(db.info.GetNamespacedResourcesLimitedContinueSQL())
-		pq.addStringParams(kind, apiVersion, namespace, continueDate, continueId, limit)
-	} else {
-		pq = db.newParamQuery(db.info.GetNamespacedResourcesLimitedSQL())
-		pq.addStringParams(kind, apiVersion, namespace, limit)
+		sb.Where(db.Filter.CreationTSAndIDFilter(sb.Cond, continueDate, continueId))
 	}
 
-	return db.performResourceQuery(ctx, pq)
+	sb = db.Sorter.CreationTSAndIDSorter(sb)
+	sb.Limit(limit)
+
+	return db.performResourceQuery(ctx, sb)
 }
 
 func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (*unstructured.Unstructured, error) {
-	pq := db.newParamQuery(db.info.GetNamespacedResourceByNameSQL())
-	pq.addStringParams(kind, apiVersion, namespace, name)
-	resources, _, _, err := db.performResourceQuery(ctx, pq)
-	if err != nil {
-		return nil, err
-	}
+	sb := db.Selector.ResourceSelector()
+	sb.Where(
+		db.Filter.KindFilter(sb.Cond, kind),
+		db.Filter.ApiVersionFilter(sb.Cond, apiVersion),
+		db.Filter.NamespaceFilter(sb.Cond, namespace),
+		db.Filter.NameFilter(sb.Cond, name),
+	)
+
+	resources, _, _, err := db.performResourceQuery(ctx, sb)
 
 	if len(resources) == 0 {
 		return nil, err
@@ -133,15 +133,26 @@ func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, api
 
 func (db *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error) {
 
-	strQueryPerformer := newQueryPerformer[string](db.db)
+	strQueryPerformer := newQueryPerformer[string](db.DB, db.Flavor)
 	if kind == "Pod" {
-		pq := db.newParamQuery(db.info.GetLogURLsByPodNameSQL())
-		pq.addStringParams(apiVersion, namespace, name)
-		return strQueryPerformer.performQuery(ctx, pq)
+		sb := db.Selector.UrlFromResourceSelector()
+		sb.Where(
+			db.Filter.KindFilter(sb.Cond, kind),
+			db.Filter.ApiVersionFilter(sb.Cond, apiVersion),
+			db.Filter.NamespaceFilter(sb.Cond, namespace),
+			db.Filter.NameFilter(sb.Cond, name),
+		)
+		return strQueryPerformer.performQuery(ctx, sb)
 	}
 
-	var uuid string
-	err := db.db.GetContext(ctx, &uuid, db.info.GetUUIDSQL(), kind, apiVersion, namespace, name)
+	sb := db.Selector.UUIDResourceSelector()
+	sb.Where(
+		db.Filter.KindFilter(sb.Cond, kind),
+		db.Filter.ApiVersionFilter(sb.Cond, apiVersion),
+		db.Filter.NamespaceFilter(sb.Cond, namespace),
+		db.Filter.NameFilter(sb.Cond, name),
+	)
+	uuid, err := strQueryPerformer.performSingleRowQuery(ctx, sb)
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return []string{}, ResourceNotFoundError
@@ -152,13 +163,16 @@ func (db *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespac
 	}
 
 	podUuids, err := db.getOwnedPodsUuids(ctx, []string{uuid}, []string{})
+	if len(podUuids) == 0 {
+		return []string{}, ResourceNotFoundError
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	pq := db.newParamQuery(db.info.GetLogURLsSQL())
-	pq.addStringArrayParam(podUuids)
-	return strQueryPerformer.performQuery(ctx, pq)
+	sb = db.Selector.UrlSelector()
+	sb.Where(db.Filter.UuidsFilter(sb.Cond, podUuids))
+	return strQueryPerformer.performQuery(ctx, sb)
 }
 
 func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids, podUuids []string) ([]string, error) {
@@ -171,9 +185,9 @@ func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids, podUuids
 	if len(ownersUuids) == 0 {
 		return podUuids, nil
 	} else {
-		pq := db.newParamQuery(db.info.GetOwnedResourcesSQL())
-		pq.addStringArrayParam(ownersUuids)
-		parsedRows, err := newQueryPerformer[uuidKind](db.db).performQuery(ctx, pq)
+		sb := db.Selector.OwnedResourceSelector()
+		sb.Where(db.Filter.OwnerFilter(sb.Cond, ownersUuids))
+		parsedRows, err := newQueryPerformer[uuidKind](db.DB, db.Flavor).performQuery(ctx, sb)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +203,7 @@ func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids, podUuids
 	}
 }
 
-func (db *Database) performResourceQuery(ctx context.Context, pq *paramQuery) ([]*unstructured.Unstructured, int64, string, error) {
+func (db *Database) performResourceQuery(ctx context.Context, sb *sqlbuilder.SelectBuilder) ([]*unstructured.Unstructured, int64, string, error) {
 	type resourceFields struct {
 		Date     string `db:"created_at"`
 		Id       int64  `db:"id"`
@@ -198,7 +212,7 @@ func (db *Database) performResourceQuery(ctx context.Context, pq *paramQuery) ([
 
 	var resources []*unstructured.Unstructured
 
-	parsedRows, err := newQueryPerformer[resourceFields](db.db).performQuery(ctx, pq)
+	parsedRows, err := newQueryPerformer[resourceFields](db.DB, db.Flavor).performQuery(ctx, sb)
 
 	if err != nil {
 		return resources, 0, "", err
@@ -220,14 +234,12 @@ func (db *Database) performResourceQuery(ctx context.Context, pq *paramQuery) ([
 }
 
 func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
-	tx, err := db.db.BeginTx(ctx, nil)
+	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)
 	}
-	_, execErr := tx.ExecContext(
-		ctx,
-		db.info.GetWriteResourceSQL(),
-		k8sObj.GetUID(),
+	query, args := db.Inserter.ResourceInserter(
+		string(k8sObj.GetUID()),
 		k8sObj.GetAPIVersion(),
 		k8sObj.GetKind(),
 		k8sObj.GetName(),
@@ -235,6 +247,11 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 		k8sObj.GetResourceVersion(),
 		models.OptionalTimestamp(k8sObj.GetDeletionTimestamp()),
 		data,
+	).BuildWithFlavor(db.Flavor)
+	_, execErr := tx.ExecContext(
+		ctx,
+		query,
+		args...,
 	)
 	if execErr != nil {
 		rollbackErr := tx.Rollback()
@@ -256,19 +273,18 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 
 // WriteUrls deletes urls for k8sObj before writing urls to prevent duplicates
 func (db *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, logs ...models.LogTuple) error {
-	tx, err := db.db.BeginTx(ctx, nil)
+	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf(
 			"could not begin transaction to write urls for resource %s: %w",
-			k8sObj.GetUID(),
+			string(k8sObj.GetUID()),
 			err,
 		)
 	}
-	_, execErr := tx.ExecContext(
-		ctx,
-		db.info.GetDeleteUrlsSQL(),
-		k8sObj.GetUID(),
-	)
+	delBuilder := db.Deleter.UrlDeleter()
+	delBuilder.Where(db.Filter.UuidFilter(delBuilder.Cond, string(k8sObj.GetUID())))
+	query, args := delBuilder.BuildWithFlavor(db.Flavor)
+	_, execErr := tx.ExecContext(ctx, query, args...)
 	if execErr != nil {
 		rollbackErr := tx.Rollback()
 		if rollbackErr != nil {
@@ -282,14 +298,13 @@ func (db *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstruct
 	}
 
 	for _, log := range logs {
-		_, execErr := tx.ExecContext(
-			ctx,
-			db.info.GetWriteUrlSQL(),
-			k8sObj.GetUID(),
+		logQuery, logArgs := db.Inserter.UrlInserter(
+			string(k8sObj.GetUID()),
 			log.Url,
 			log.ContainerName,
-		)
-		if execErr != nil {
+		).BuildWithFlavor(db.Flavor)
+		_, logQueryErr := tx.ExecContext(ctx, logQuery, logArgs...)
+		if logQueryErr != nil {
 			rollbackErr := tx.Rollback()
 			if rollbackErr != nil {
 				return fmt.Errorf(
@@ -316,10 +331,6 @@ func (db *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstruct
 	return nil
 }
 
-func (db *Database) newParamQuery(query string) *paramQuery {
-	return &paramQuery{query: query, dbArrayParser: db.paramParser}
-}
-
 func (db *Database) CloseDB() error {
-	return db.db.Close()
+	return db.DB.Close()
 }

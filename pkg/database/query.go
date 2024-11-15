@@ -6,52 +6,29 @@ package database
 import (
 	"context"
 
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 )
 
-type paramQuery struct {
-	query         string
-	arguments     []any
-	dbArrayParser DBParamParser
-	hasArray      bool
-}
-
-func (q *paramQuery) addStringParams(args ...string) {
-	for _, arg := range args {
-		q.arguments = append(q.arguments, arg)
-	}
-}
-
-func (q *paramQuery) addStringArrayParam(arg []string) {
-	q.hasArray = true
-	q.arguments = append(q.arguments, arg)
-}
-
-func (q *paramQuery) parse() (string, []any, error) {
-	if !q.hasArray {
-		return q.query, q.arguments, nil
-	} else {
-		return q.dbArrayParser.ParseParams(q.query, q.arguments...)
-	}
-}
-
 type queryPerformer[T any] struct {
-	db *sqlx.DB
+	db     *sqlx.DB
+	flavor sqlbuilder.Flavor
 }
 
-func newQueryPerformer[T any](db *sqlx.DB) queryPerformer[T] {
-	return queryPerformer[T]{db}
+func newQueryPerformer[T any](db *sqlx.DB, flavor sqlbuilder.Flavor) queryPerformer[T] {
+	return queryPerformer[T]{db, flavor}
 }
 
-func (q queryPerformer[T]) performQuery(ctx context.Context, paramQuery *paramQuery) ([]T, error) {
-	query, args, err := paramQuery.parse()
-	if err != nil {
-		return nil, err
-	}
+func (q queryPerformer[T]) performSingleRowQuery(ctx context.Context, builder sqlbuilder.Builder) (T, error) {
+	var t T
+	query, args := builder.BuildWithFlavor(q.flavor)
+	err := q.db.GetContext(ctx, &t, query, args...)
+	return t, err
+}
+
+func (q queryPerformer[T]) performQuery(ctx context.Context, builder sqlbuilder.Builder) ([]T, error) {
 	var res []T
-	err = q.db.SelectContext(ctx, &res, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	return res, nil
+	query, args := builder.BuildWithFlavor(q.flavor)
+	err := q.db.SelectContext(ctx, &res, query, args...)
+	return res, err
 }

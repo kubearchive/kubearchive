@@ -93,19 +93,20 @@ In this example the following happens:
 
 == Configuring Log URL Generation
 
-Logging URL generation in KubeArchive is controlled using a `ConfigMap` in
-the KubeArchive installation namespace.  URLs are generated using parameters
-that allow the URL to point to the specific log file associated with the
-given `Pod`. This `ConfigMap` requires a single entry, LOG_URL, whose string
-value will be interpolated using the other variables defined in the `ConfigMap`.
-For example, take this `ConfigMap` for Splunk:
+Logging URL generation in KubeArchive is controlled using the `ConfigMap`
+named `kubearchive-logging` in the KubeArchive installation namespace.
+URLs are generated using parameters that allow the URL to point to the
+specific log file associated with the given `Pod`. This `ConfigMap`
+requires a single entry, LOG_URL, whose string value will be interpolated
+using the other variables defined in the `ConfigMap`.  For example, take
+this `ConfigMap` for Splunk:
 [source,yaml]
 ----
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubearchive-splunk
+  name: kubearchive-logging
   namespace: kubearchive
 data:
   POD_ID: cel:metadata.uid
@@ -132,28 +133,11 @@ The variable `CONTAINER_NAME` is provided automatically by KubeArchive and can b
 requires the name of the container.
 ====
 
-== KubeArchive Configuration
-
-Once the logging `ConfigMap` has been installed in the KubeArchive installation
-namespace, KubeArchive needs to be configured to recognize and use it.
-
-This is done by adding the `logging-configmap-name` to the `kubearchive-config` `ConfigMap` in
-the same namespace:
-
-----
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: kubearchive-config
-data:
-  logging-configmap-name: splunk-logging
-----
-
 [IMPORTANT]
 ====
-The KubeArchive Sink is not aware of changes to the `kubearchive-config` `ConfigMap`. After making changes to
-`kubearchive-config`, the KubeArchive Sink must be restarted. The following command can be used to perform the restart:
+The KubeArchive Sink is not aware of changes to the `kubearchive-logging` `ConfigMap`. After
+making changes to `kubearchive-logging`, the KubeArchive Sink must be restarted. The following
+command can be used to perform the restart:
 
 ```
 kubectl rollout restart deployment --selector=app=kubearchive-sink
@@ -166,29 +150,25 @@ KubeArchive currently integrates with both Splunk and Elasticsearch
 
 === Elasticsearch
 
-Following is a sample `ConfigMap` that generates log URLs for Elasticsearch. Note the
-ElasticSearch requires a data view be defined in order to see logs in Kibana. In this
-example the data view ID is hard-coded as DATA_VIEW_ID in the `ConfigMap`. This value
-needs to be changed to one appropriate for the Elasticsearch installation being used
-by KubeArchive.
+Following is a sample `ConfigMap` that generates log URLs for Elasticsearch.
 [source,yaml]
 ----
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: es-logging
+  name: kubearchive-logging
   namespace: kubearchive
 data:
-  # A data view for fluentd must be created and the ID provided here.
-  DATA_VIEW_ID: "035bffd1-b4b5-4123-af57-d89368cabfd8"
+  # NOTE: CONTAINER_NAME is provided at URL generation time by KubeArchive.
   POD_ID: "cel:metadata.uid"
-  LOG_URL: "https://localhost:5601/app/discover#/?_a=(columns:!(),dataSource:(dataViewId:'{DATA_VIEW_ID}',type:dataView),filters:!(('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:_index,negate:!f,params:(query:fluentd),type:phrase),query:(match_phrase:(_index:fluentd))),('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:kubernetes.pod_id,negate:!f,params:(query:'{POD_ID}'),type:phrase),query:(match_phrase:(kubernetes.pod_id:'{POD_ID}'))),('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'{DATA_VIEW_ID}',key:kubernetes.container_name,negate:!f,params:(query:{CONTAINER_NAME}),type:phrase),query:(match_phrase:(kubernetes.container_name:{CONTAINER_NAME})))),interval:auto,query:(language:kuery,query:''),sort:!())"
+  LOG_URL: "https://localhost:9200/fluentd/_search?_source_includes=message&size=10000&sort=_doc&q=kubernetes.pod_id:{POD_ID}%20AND%20kubernetes.container_name:{CONTAINER_NAME}"
+  LOG_URL_JSONPATH: "$.hits.hits[*]._source.message"
 ----
 
 === Splunk
 
-Following is a sample `ConfigMap` for Splunk.
+Following is a sample `ConfigMap` for generating URLs for Splunk.
 
 [source,yaml]
 ----
@@ -196,11 +176,11 @@ Following is a sample `ConfigMap` for Splunk.
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: splunk-logging
+  name: kubearchive-logging
   namespace: kubearchive
 data:
-  CONTAINER: 'spath "kubernetes.container_name" | search "kubernetes.container_name"="{CONTAINER_NAME}"'
-  POD: 'spath "kubernetes.pod_id" | search "kubernetes.pod_id"="{POD_ID}"'
+  # NOTE: CONTAINER_NAME is provided at URL generation time by KubeArchive.
   POD_ID: "cel:metadata.uid"
-  LOG_URL: "http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}"
+  LOG_URL: "https://localhost:8089/services/search/jobs/export?search=search%20%2A%20%7C%20spath%20%22kubernetes.pod_id%22%20%7C%20search%20%22kubernetes.pod_id%22%3D%22{POD_ID}%22%20%7C%20spath%20%22kubernetes.container_name%22%20%7C%20search%20%22kubernetes.container_name%22%3D%22{CONTAINER_NAME}%22%20%7C%20sort%20time%20%7C%20table%20%22message%22&output_mode=json"
+  LOG_URL_JSONPATH: "$[*].result.message"
 ----

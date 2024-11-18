@@ -1,0 +1,7 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-logging
+  namespace: {{ .Release.Namespace }}
+data:

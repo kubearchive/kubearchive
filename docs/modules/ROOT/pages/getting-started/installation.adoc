@@ -30,6 +30,18 @@ psql -h database.example.com -U username ... -f kubearchive.sql
 This file creates a PostgreSQL schema, a table for KubeArchive and other stuff KubeArchive
 requires.
 
+== Configure Knative Eventing
+
+KubeArchive uses a broker to avoid missing Kubernetes resource updates. By default it is an `MTChannelBasedBroker`, but
+the broker type can be changed if desired.
+
+[IMPORTANT]
+====
+Knative Eventing strongly recommends using one of the
+link:https://knative.dev/docs/eventing/brokers/broker-types/[other broker types]
+in production environments.
+====
+
 == Install and Configure KubeArchive
 
 . Apply the release YAML to install KubeArchive:

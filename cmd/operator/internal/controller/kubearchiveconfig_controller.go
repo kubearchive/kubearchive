@@ -39,9 +39,12 @@ const (
 	ApiServerSourceLabelValue = "true"
 )
 
-var k9eNs = os.Getenv("KUBEARCHIVE_NAMESPACE")
-var a13eName = k9eNs + "-a13e"
-var k9eSinkName = k9eNs + "-sink"
+var (
+	k9eNs         = os.Getenv("KUBEARCHIVE_NAMESPACE")
+	a13eName      = k9eNs + "-a13e"
+	k9eSinkName   = k9eNs + "-sink"
+	k9eBrokerName = k9eNs + "-broker"
+)
 
 // KubeArchiveConfigReconciler reconciles a KubeArchiveConfig object
 type KubeArchiveConfigReconciler struct {
@@ -468,9 +471,9 @@ func (r *KubeArchiveConfigReconciler) desiredA13e(resources []sourcesv1.APIVersi
 			SourceSpec: duckv1.SourceSpec{
 				Sink: duckv1.Destination{
 					Ref: &duckv1.KReference{
-						APIVersion: "v1",
-						Kind:       "Service",
-						Name:       k9eSinkName,
+						APIVersion: "eventing.knative.dev/v1",
+						Kind:       "Broker",
+						Name:       k9eBrokerName,
 						Namespace:  k9eNs,
 					},
 				},

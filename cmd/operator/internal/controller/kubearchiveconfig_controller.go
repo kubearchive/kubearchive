@@ -42,8 +42,8 @@ const (
 var (
 	k9eNs         = os.Getenv("KUBEARCHIVE_NAMESPACE")
 	a13eName      = k9eNs + "-a13e"
-	k9eSinkName   = k9eNs + "-sink"
-	k9eBrokerName = k9eNs + "-broker"
+	k9eSinkName   = "kubearchive-sink"
+	k9eBrokerName = "kubearchive-broker"
 )
 
 // KubeArchiveConfigReconciler reconciles a KubeArchiveConfig object

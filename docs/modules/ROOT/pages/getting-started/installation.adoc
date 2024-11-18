@@ -30,6 +30,50 @@ psql -h database.example.com -U username ... -f kubearchive.sql
 This file creates a PostgreSQL schema, a table for KubeArchive and other stuff KubeArchive
 requires.
 
+== Configure Knative Eventing
+
+By default, Knative Eventing use `MTChannelBasedBroker` as the class for any Broker that does not explicitly define its
+class and uses `InMemoryChannel` as the backing channel implementation. Knative Eventing strongly recommends using a
+native broker implementation for production workloads instead. We recommend the Apache Kafka Broker.
+
+. If you need a Kafka cluster, follow the
+link:https://strimzi.io/docs/operators/latest/deploying#con-strimzi-installation-methods_str[Strimzi deployment instructions]
+. Follow the
+link:https://knative.dev/docs/eventing/brokers/broker-types/kafka-broker/#installation[Knative Eventing Kafka Broker installation instructions]
+. Create a ConfigMap named kafka-broker-config in the knative-eventing namespace. Use
+link:https://knative.dev/docs/eventing/brokers/broker-types/kafka-broker/#configure-a-kafka-broker[this ConfigMap]
+as a guide.
+. Update the config-br-defaults ConfigMap in the knative-eventing namespace
++
+[source,bash]
+----
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-br-defaults
+  namespace: knative-eventing
+data:
+  default-br-config: |
+    clusterDefault:
+      brokerClass: MTChannelBasedBroker
+      apiVersion: v1
+      kind: ConfigMap
+      name: config-br-default-channel
+      namespace: knative-eventing
+    namespaceDefaults:
+      kubearchive:
+        brokerClass: Kafka
+        apiVersion: v1
+        kind: ConfigMap
+        name: kafka-broker-config
+        namespace: knative-eventing
+EOF
+----
+
+Knative Eventing supports other Broker types as well. You can learn more about them
+link:https://knative.dev/docs/eventing/brokers/broker-types/[here]
+
 == Install and Configure KubeArchive
 
 . Apply the release YAML to install KubeArchive:

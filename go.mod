@@ -7,7 +7,7 @@ toolchain go1.23.3
 require (
 	github.com/Cyprinus12138/otelgin v1.0.2
 	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/Masterminds/semver/v3 v3.3.0
+	github.com/Masterminds/semver/v3 v3.3.1
 	github.com/XSAM/otelsql v0.35.0
 	github.com/avast/retry-go/v4 v4.6.0
 	github.com/cloudevents/sdk-go/observability/opentelemetry/v2 v2.15.2
@@ -36,7 +36,7 @@ require (
 	k8s.io/cli-runtime v0.31.2
 	k8s.io/client-go v0.31.2
 	k8s.io/klog/v2 v2.130.1
-	knative.dev/eventing v0.43.1
+	knative.dev/eventing v0.43.2
 	knative.dev/pkg v0.0.0-20241118074447-a7fd9b10bb9f
 	sigs.k8s.io/controller-runtime v0.19.1
 )

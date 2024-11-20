@@ -123,8 +123,8 @@ func (sink *Sink) writeResource(ctx context.Context, obj *unstructured.Unstructu
 			"id", event.ID(),
 		)
 	}
-	// only write logs for k8s resources likes pods that have them
-	if strings.ToLower(obj.GetKind()) == "pod" {
+	// only write logs for k8s resources likes pods that have them and UrlBuilder is configured
+	if sink.logUrlBuilder != nil && strings.ToLower(obj.GetKind()) == "pod" {
 		sink.writeLogs(ctx, obj)
 	}
 }
@@ -248,7 +248,7 @@ func main() {
 		os.Exit(1)
 	}
 	defer stopUpdating()
-	builder, err := logs.NewUrlBuilder(context.Background(), clientset)
+	builder, err := logs.NewUrlBuilder()
 	if err != nil {
 		slog.Error("Could not enable log url creation", "error", err)
 	}

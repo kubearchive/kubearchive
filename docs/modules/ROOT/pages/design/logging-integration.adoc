@@ -104,8 +104,8 @@ the integration is the successful generation of a URL to access the log for a
 specific `Pod` in the logging system. URLs will ONLY be generated for `Pods`.
 
 To support multiple logging systems, the URLs must be able to be parameterized
-based on the logging system. This is done via a `ConfigMap` named for the
-logging system being implemented. This `ConfigMap` requires a single entry,
+based on the logging system. This is done via a `ConfigMap` named
+`kubearchive-logging`. This `ConfigMap` requires a single entry,
 LOG_URL, whose string value will be interpolated using the other variables
 defined in the `ConfigMap`.  For example, take this `ConfigMap` for Splunk:
 [source,yaml]
@@ -114,13 +114,13 @@ defined in the `ConfigMap`.  For example, take this `ConfigMap` for Splunk:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubearchive-splunk
+  name: kubearchive-logging
   namespace: kubearchive
 data:
-  POD_ID: cel:metadata.uid
-  POD: 'spath "kubernetes.pod_id" | search "kubernetes.pod_id"="{POD_ID}"'
-  CONTAINER: 'spath "kubernetes.container_name" | search "kubernetes.container_name"="{CONTAINER_NAME}"'
-  LOG_URL: http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}
+  # NOTE: CONTAINER_NAME is provided at URL generation time by KubeArchive.
+  POD_ID: "cel:metadata.uid"
+  LOG_URL: "https://localhost:8089/services/search/jobs/export?search=search%20%2A%20%7C%20spath%20%22kubernetes.pod_id%22%20%7C%20search%20%22kubernetes.pod_id%22%3D%22{POD_ID}%22%20%7C%20spath%20%22kubernetes.container_name%22%20%7C%20search%20%22kubernetes.container_name%22%3D%22{CONTAINER_NAME}%22%20%7C%20sort%20time%20%7C%20table%20%22message%22&output_mode=json"
+  LOG_URL_JSONPATH: "$.hits.hits[*]._source.message"
 ----
 The value of each variable is either a string or a CEL expression. A value that
 begins with the prefix "cel:" will be evaluated as a CEL expression against the
@@ -131,12 +131,20 @@ So when generating the logging URL to be stored when a `Pod` is archived,
 the following steps are done:
 
 1. A map is created and populated all non-CEL expression key-value pairs from the `ConfigMap`.
-1. The key `CONTAINER_NAME` with the value `cel:spec.containers.map(m, m.name)` is add to the
+1. The key `CONTAINER_NAME` with the value `cel:spec.containers.map(m, m.name)` is added to the
    map. If the `ConfigMap` contained the key `CONTAINER_NAME`, its value is overwritten
 1. All variables containing CEL expression variables are added to the map, and the
    value for each of these variables is the value returned by evaluating the CEL expression.
 1. The value for LOG_URL is then interpolated recursively using this map until no more
    substitutions are done, resulting in the final URL to the log in the logging system.
+
+[IMPORTANT]
+====
+If the `ConfigMap` contains a key `LOG_URL_JSONPATH`, this JSONPath expression is applied
+by the API server or CLI to the output of the response body in order to extract the
+raw log body, which is then returned
+====
+
 
 == Implementation
 
@@ -146,6 +154,7 @@ The KubeArchive database will have a table named `log_url` with three fields:
 
 1. A `uuid` field which is a foreign key to `resource.uuid`.
 1. A `url` field which is the URL for one of the logs.
+1. A `container_name` field which indicates the container that generated the log.
 
 The `uuid` field should point back to a `Pod` entry in the `resource` table.
 
@@ -159,8 +168,8 @@ The sink should first delete any existing entries in the `log_url` table for the
 `Pod` being archived. Earlier archival requests may have already created records
 in the `log_url` table, and they should be removed to avoid duplicates.
 
-The sink will also need to mount and use the `ConfigMap` for logging as detailed
-in the <<Configuration>> section. Additionally, the sink will overwrite the ConfigMap
+The sink will mount and use the `kubearchive-logging` `ConfigMap`
+for logging. Additionally, the sink will overwrite the `ConfigMap`
 value for `CONTAINER_NAME` as described in the <<generating_log_urls>> section.
 
 === CLI
@@ -170,38 +179,25 @@ The CLI will implement a `logs` command similar to `kubectl logs`.
 ----
 ka logs resource name
 ----
-This command will return the URLs of the logs associated with the resource of type name. For
+This command will return the log contents for the the default container in the `Pod`.
 example:
 [source,bash]
 ----
-ka logs PipelineRun generate-logs-9fkp8 -n generate-logs-pipelines
+ka logs PipelineRun generate-logs-9fkp8 -n generate-logs-pipelines -c generate
 ----
-This will return all the log URLs associated with the `PipelineRun` named "generate-logs-9fkp8".
+This will return the log URLs associated with the `PipelineRun` named "generate-logs-9fkp8"
+for the container "generate".
 
 The CLI will have to traverse the owner references to gather all of the logs associated
 with the given resource. Note that logs could be queried for any resource. Most
 resource will not have any logs associated with them or their descendents, but queries on
 logs for `TaskRuns` and `Pods` are possible.
 
+The CLI will perform post-processing on the output from the response to
+log URL in order to get the actual log output. This post-processing is a JSONPath expression
+to be applied to the response body.  This post-processing only needs to be done if the
+pre-defined entry `LOG_URL_JSONPATH` is contained in the logging `ConfigMap`.
+
 === API
 
-The API needs to providate a mechanism similar to the CLI for retrieving log URLs.
-
-=== Configuration
-
-KubeArchive will need to have a `ConfigMap` for configuring logging (and potentially
-other things). This `ConfigMap` should be named `kubearchive-config` and reside in the
-installation namespace.
-[source,yaml]
-----
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: kubearchive-config
-  namespace: kubearchive
-data:
-  logging-configmap-name: kubearchive-splunk
-----
-The sink should check this `ConfigMap`, and if it exists and the `logging-configmap-name` key
-is set, it should mount that `ConfigMap` and use it for generating log URLs.
+The API will provide a mechanism similar to the CLI for retrieving log file contents.

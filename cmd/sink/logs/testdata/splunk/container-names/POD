@@ -1,0 +1,1 @@
+spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"{POD_ID}\"

@@ -33,8 +33,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
-	k8s.io/cli-runtime v0.31.2
-	k8s.io/client-go v0.31.2
+	k8s.io/cli-runtime v0.31.3
+	k8s.io/client-go v0.31.3
 	k8s.io/klog/v2 v2.130.1
 	knative.dev/eventing v0.43.2
 	knative.dev/pkg v0.0.0-20241118074447-a7fd9b10bb9f

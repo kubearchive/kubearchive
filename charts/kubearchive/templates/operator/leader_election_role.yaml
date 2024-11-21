@@ -1,3 +1,5 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
 # permissions to do leader election.
 {{- $leaderElection := tpl "{{ tpl .Values.operator.name . }}-leader-election" . -}}
 ---

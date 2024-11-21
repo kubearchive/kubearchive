@@ -522,11 +522,12 @@ func TestPagination(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(list.Items) >= 20 {
+		// We want to wait until everything is stored in the DB to avoid out of order inserts
+		if len(list.Items) >= 30 {
 			return nil
 		}
 		return errors.New("could not retrieve Pods from the API")
-	}, retry.Attempts(20), retry.MaxDelay(4*time.Second))
+	}, retry.Attempts(30), retry.MaxDelay(4*time.Second))
 
 	if err != nil {
 		t.Fatal(err)

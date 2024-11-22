@@ -1,0 +1,272 @@
+{
+  "kind": "$kind",
+  "spec": {
+    "volumes": [
+      {
+        "name": "kube-api-access-qxksf",
+        "projected": {
+          "sources": [
+            {
+              "serviceAccountToken": {
+                "path": "token",
+                "expirationSeconds": 3607
+              }
+            },
+            {
+              "configMap": {
+                "name": "kube-root-ca.crt",
+                "items": [{ "key": "ca.crt", "path": "ca.crt" }]
+              }
+            },
+            {
+              "downwardAPI": {
+                "items": [
+                  {
+                    "path": "namespace",
+                    "fieldRef": {
+                      "fieldPath": "metadata.namespace",
+                      "apiVersion": "v1"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultMode": 420
+        }
+      }
+    ],
+    "nodeName": "kind-control-plane",
+    "priority": 0,
+    "dnsPolicy": "ClusterFirst",
+    "containers": [
+      {
+        "name": "busybox",
+        "image": "busybox",
+        "command": ["date"],
+        "resources": {},
+        "volumeMounts": [
+          {
+            "name": "kube-api-access-qxksf",
+            "readOnly": true,
+            "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount"
+          }
+        ],
+        "imagePullPolicy": "Always",
+        "terminationMessagePath": "/dev/termination-log",
+        "terminationMessagePolicy": "File"
+      }
+    ],
+    "tolerations": [
+      {
+        "key": "node.kubernetes.io/not-ready",
+        "effect": "NoExecute",
+        "operator": "Exists",
+        "tolerationSeconds": 300
+      },
+      {
+        "key": "node.kubernetes.io/unreachable",
+        "effect": "NoExecute",
+        "operator": "Exists",
+        "tolerationSeconds": 300
+      }
+    ],
+    "restartPolicy": "Never",
+    "schedulerName": "default-scheduler",
+    "serviceAccount": "default",
+    "securityContext": {},
+    "preemptionPolicy": "PreemptLowerPriority",
+    "enableServiceLinks": true,
+    "serviceAccountName": "default",
+    "terminationGracePeriodSeconds": 30
+  },
+  "status": {
+    "phase": "Succeeded",
+    "podIP": "10.244.0.20",
+    "hostIP": "10.89.0.4",
+    "podIPs": [{ "ip": "10.244.0.20" }],
+    "hostIPs": [{ "ip": "10.89.0.4" }],
+    "qosClass": "BestEffort",
+    "startTime": "$create_timestamp",
+    "conditions": [
+      {
+        "type": "PodReadyToStartContainers",
+        "status": "False",
+        "lastProbeTime": null,
+        "lastTransitionTime": "2024-09-27T09:06:30Z"
+      },
+      {
+        "type": "Initialized",
+        "reason": "PodCompleted",
+        "status": "True",
+        "lastProbeTime": null,
+        "lastTransitionTime": "2024-09-27T09:06:09Z"
+      },
+      {
+        "type": "Ready",
+        "reason": "PodCompleted",
+        "status": "False",
+        "lastProbeTime": null,
+        "lastTransitionTime": "2024-09-27T09:06:09Z"
+      },
+      {
+        "type": "ContainersReady",
+        "reason": "PodCompleted",
+        "status": "False",
+        "lastProbeTime": null,
+        "lastTransitionTime": "2024-09-27T09:06:09Z"
+      },
+      {
+        "type": "PodScheduled",
+        "status": "True",
+        "lastProbeTime": null,
+        "lastTransitionTime": "2024-09-27T09:06:09Z"
+      }
+    ],
+    "containerStatuses": [
+      {
+        "name": "busybox",
+        "image": "docker.io/library/busybox:latest",
+        "ready": false,
+        "state": {
+          "terminated": {
+            "reason": "Completed",
+            "exitCode": 0,
+            "startedAt": "2024-09-27T09:06:28Z",
+            "finishedAt": "2024-09-27T09:06:28Z",
+            "containerID": "containerd://4fa109146f77632b176979ee0084d7a93c4159363bf38b2bfc28738274e425e8"
+          }
+        },
+        "imageID": "docker.io/library/busybox@sha256:c230832bd3b0be59a6c47ed64294f9ce71e91b327957920b6929a0caa8353140",
+        "started": false,
+        "lastState": {},
+        "containerID": "containerd://4fa109146f77632b176979ee0084d7a93c4159363bf38b2bfc28738274e425e8",
+        "restartCount": 0
+      }
+    ]
+  },
+  "metadata": {
+    "uid": "$pod_uuid",
+    "name": "$pod_name",
+    "labels": {
+      "job-name": "busybox-1",
+      "controller-uid": "$owner_uuid",
+      "batch.kubernetes.io/job-name": "busybox-1",
+      "batch.kubernetes.io/controller-uid": "$owner_uuid"
+    },
+    "namespace": "$namespace",
+    "generateName": "busybox-1-",
+    "managedFields": [
+      {
+        "time": "2024-09-27T09:06:09Z",
+        "manager": "kube-controller-manager",
+        "fieldsV1": {
+          "f:spec": {
+            "f:dnsPolicy": {},
+            "f:containers": {
+              "k:{\"name\":\"busybox\"}": {
+                ".": {},
+                "f:name": {},
+                "f:image": {},
+                "f:command": {},
+                "f:resources": {},
+                "f:imagePullPolicy": {},
+                "f:terminationMessagePath": {},
+                "f:terminationMessagePolicy": {}
+              }
+            },
+            "f:restartPolicy": {},
+            "f:schedulerName": {},
+            "f:securityContext": {},
+            "f:enableServiceLinks": {},
+            "f:terminationGracePeriodSeconds": {}
+          },
+          "f:metadata": {
+            "f:labels": {
+              ".": {},
+              "f:job-name": {},
+              "f:controller-uid": {},
+              "f:batch.kubernetes.io/job-name": {},
+              "f:batch.kubernetes.io/controller-uid": {}
+            },
+            "f:generateName": {},
+            "f:ownerReferences": { ".": {}, "k:{\"uid\":\"$owner_uuid\"}": {} }
+          }
+        },
+        "operation": "Update",
+        "apiVersion": "v1",
+        "fieldsType": "FieldsV1"
+      },
+      {
+        "time": "2024-09-27T09:06:30Z",
+        "manager": "kubelet",
+        "fieldsV1": {
+          "f:status": {
+            "f:phase": {},
+            "f:podIP": {},
+            "f:hostIP": {},
+            "f:podIPs": {
+              ".": {},
+              "k:{\"ip\":\"10.244.0.20\"}": { ".": {}, "f:ip": {} }
+            },
+            "f:hostIPs": {},
+            "f:startTime": {},
+            "f:conditions": {
+              "k:{\"type\":\"Ready\"}": {
+                ".": {},
+                "f:type": {},
+                "f:reason": {},
+                "f:status": {},
+                "f:lastProbeTime": {},
+                "f:lastTransitionTime": {}
+              },
+              "k:{\"type\":\"Initialized\"}": {
+                ".": {},
+                "f:type": {},
+                "f:reason": {},
+                "f:status": {},
+                "f:lastProbeTime": {},
+                "f:lastTransitionTime": {}
+              },
+              "k:{\"type\":\"ContainersReady\"}": {
+                ".": {},
+                "f:type": {},
+                "f:reason": {},
+                "f:status": {},
+                "f:lastProbeTime": {},
+                "f:lastTransitionTime": {}
+              },
+              "k:{\"type\":\"PodReadyToStartContainers\"}": {
+                ".": {},
+                "f:type": {},
+                "f:status": {},
+                "f:lastProbeTime": {},
+                "f:lastTransitionTime": {}
+              }
+            },
+            "f:containerStatuses": {}
+          }
+        },
+        "operation": "Update",
+        "apiVersion": "v1",
+        "fieldsType": "FieldsV1",
+        "subresource": "status"
+      }
+    ],
+    "ownerReferences": [
+      {
+        "uid": "$owner_uuid",
+        "kind": "Job",
+        "name": "busybox-1",
+        "apiVersion": "batch/v1",
+        "controller": true,
+        "blockOwnerDeletion": true
+      }
+    ],
+    "resourceVersion": "$resource_version",
+    "creationTimestamp": "$create_timestamp",
+    "deletionTimestamp": "$delete_timestamp",
+    "deletionGracePeriodSeconds": 0
+  },
+  "apiVersion": "$version"
+}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/host"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
@@ -23,6 +24,7 @@ import (
 
 // the name of the environment variable that will determine if instrumentation needs to be started
 const OtelStartEnvVar = "KUBEARCHIVE_OTEL_MODE"
+const OtelMetricsInterval = "KUBEARCHIVE_METRICS_INTERVAL"
 
 var tp *trace.TracerProvider
 
@@ -76,9 +78,19 @@ func Start(serviceName string) error {
 	if err != nil {
 		return err
 	}
+
+	metricsInterval := 1 * time.Minute // Default
+	metricsIntervalRaw := os.Getenv(OtelMetricsInterval)
+	if metricsIntervalRaw != "" {
+		metricsInterval, err = time.ParseDuration(metricsIntervalRaw)
+		if err != nil {
+			return err
+		}
+	}
+
 	mp := metric.NewMeterProvider(
 		metric.WithResource(res),
-		metric.WithReader(metric.NewPeriodicReader(metricExporter)),
+		metric.WithReader(metric.NewPeriodicReader(metricExporter, metric.WithInterval(metricsInterval))),
 	)
 
 	otel.SetMeterProvider(mp)

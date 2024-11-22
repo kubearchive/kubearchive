@@ -1,0 +1,11 @@
+{{- range .items }}
+Deployment: {{ .metadata.name }}
+{{- range .spec.template.spec.containers }}
+    Container: {{ .name }}
+        requests.cpu: {{ .resources.requests.cpu }}
+        requests.memory: {{ .resources.requests.memory }}
+        limits.cpu: {{ .resources.limits.cpu }}
+        limits.memory: {{ .resources.limits.memory }}
+
+{{- end }}
+{{ end }}

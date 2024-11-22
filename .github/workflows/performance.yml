@@ -1,0 +1,61 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: Performance
+run-name: Performance Tests
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "00 03 * * *"  # 3 AM UTC
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  setup:
+    uses: ./.github/workflows/log_run_details.yml
+  integration:
+    name: KubeArchive Performance Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Display Go version
+        run: go version
+      - name: Install latest kubectl
+        run: |
+          set -x
+          curl -Lo ./kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x ./kubectl
+          sudo mv kubectl /usr/local/bin
+      - name: Install KinD
+        run: |
+          set -x
+
+          # Disable swap otherwise memory enforcement doesn't work
+          # See: https://kubernetes.slack.com/archives/CEKK1KTN2/p1600009955324200
+          sudo swapoff -a
+          sudo rm -f /swapfile
+
+          curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.21.0/kind-$(uname)-amd64
+          chmod +x ./kind
+          sudo mv kind /usr/local/bin
+      - name: Install ko
+        uses: ko-build/setup-ko@v0.7
+      - name: Create KinD cluster
+        run: kind create cluster
+      - name: Install KubeArchive
+        run: |
+          export KO_DOCKER_REPO="kind.local"
+          bash hack/quick-install.sh
+      - name: Peformance Tests
+        run: |
+          bash test/performance/run.sh
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v4
+        with:
+          name: results
+          path: perf-results/

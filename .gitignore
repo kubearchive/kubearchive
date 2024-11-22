@@ -24,8 +24,9 @@ go.work
 *.crt
 *.pem
 
-# Python environment for yamllint
+# Python stuff
 venv/
+__pycache__/
 
 # Helm generated files
 charts/generated/
@@ -41,3 +42,6 @@ zz_generated.*
 bin/
 release-notes.md
 release-notes.json
+
+# Performance
+perf-results/*

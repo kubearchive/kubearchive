@@ -2,13 +2,12 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.0 (Debian 17.0-1.pgdg110+1)
--- Dumped by pg_dump version 17.0 (Debian 17.0-1.pgdg110+1)
+-- Dumped from database version 16.2 (Debian 16.2-1.pgdg110+2)
+-- Dumped by pg_dump version 16.2 (Debian 16.2-1.pgdg110+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -32,7 +31,6 @@ ALTER DATABASE kubearchive OWNER TO kubearchive;
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -97,12 +95,6 @@ ALTER SEQUENCE public.log_url_id_seq OWNER TO kubearchive;
 
 ALTER SEQUENCE public.log_url_id_seq OWNED BY public.log_url.id;
 
-
---
--- Name: resource set_timestamp; Type: TRIGGER; Schema: public; Owner: kubearchive
---
-
-CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.log_url FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
 
 --
 -- Name: resource; Type: TABLE; Schema: public; Owner: kubearchive
@@ -231,6 +223,13 @@ CREATE INDEX resource_kind_idx ON public.resource USING btree (kind, api_version
 --
 
 CREATE INDEX resource_kind_namespace_idx ON public.resource USING btree (kind, api_version, namespace);
+
+
+--
+-- Name: log_url set_timestamp; Type: TRIGGER; Schema: public; Owner: kubearchive
+--
+
+CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.log_url FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
 
 
 --

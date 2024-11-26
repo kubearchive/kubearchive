@@ -212,13 +212,6 @@ CREATE INDEX log_url_uuid_idx ON public.resource USING btree (uuid);
 
 
 --
--- Name: resource_kind_idx; Type: INDEX; Schema: public; Owner: kubearchive
---
-
-CREATE INDEX resource_kind_idx ON public.resource USING btree (kind, api_version);
-
-
---
 -- Name: resource_kind_namespace_idx; Type: INDEX; Schema: public; Owner: kubearchive
 --
 

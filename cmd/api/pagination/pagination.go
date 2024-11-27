@@ -5,6 +5,7 @@ package pagination
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -56,11 +57,11 @@ func Middleware() gin.HandlerFunc {
 		var limit string
 		limitInteger, err := strconv.Atoi(limitString)
 		if err != nil {
-			abort.Abort(context, fmt.Sprintf("limit '%s' could not be converted to integer", limitString), http.StatusBadRequest)
+			abort.Abort(context, fmt.Errorf("limit '%s' could not be converted to integer", limitString), http.StatusBadRequest)
 			return
 		}
 		if limitInteger > maxAllowedLimit {
-			abort.Abort(context, fmt.Sprintf("limit '%s' exceeds the maximum allowed '%d'", limitString, maxAllowedLimit), http.StatusBadRequest)
+			abort.Abort(context, fmt.Errorf("limit '%s' exceeds the maximum allowed '%d'", limitString, maxAllowedLimit), http.StatusBadRequest)
 			return
 		}
 		// We reserialize to avoid SQL injection. There is the possibility the
@@ -72,13 +73,13 @@ func Middleware() gin.HandlerFunc {
 		if continueToken != "" {
 			continueBytes, err := base64.StdEncoding.DecodeString(continueToken)
 			if err != nil {
-				abort.Abort(context, "could not decode the continuation token", http.StatusBadRequest)
+				abort.Abort(context, errors.New("could not decode the continuation token"), http.StatusBadRequest)
 				return
 			}
 
 			continueParts := strings.Split(string(continueBytes), " ")
 			if len(continueParts) != 2 {
-				abort.Abort(context, "expected two elements on the continue token, received a different amount", http.StatusBadRequest)
+				abort.Abort(context, errors.New("expected two elements on the continue token, received a different amount"), http.StatusBadRequest)
 				return
 			}
 
@@ -86,7 +87,7 @@ func Middleware() gin.HandlerFunc {
 			// Because the id is an int64 we need to use `ParseInt`
 			_, err = strconv.ParseInt(continueId, 10, 64)
 			if err != nil {
-				abort.Abort(context, "first element of the continue token is not a valid int64", http.StatusBadRequest)
+				abort.Abort(context, errors.New("first element of the continue token is not a valid int64"), http.StatusBadRequest)
 				return
 			}
 
@@ -94,7 +95,7 @@ func Middleware() gin.HandlerFunc {
 			continueTimestamp, err := time.Parse(time.RFC3339, continueDate)
 			if err != nil {
 				log.Printf("Error: %s", err)
-				abort.Abort(context, fmt.Sprintf("second element of the continue token '%s' does not match '%s'",
+				abort.Abort(context, fmt.Errorf("second element of the continue token '%s' does not match '%s'",
 					continueDate, time.RFC3339), http.StatusBadRequest)
 				return
 			}

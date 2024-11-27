@@ -4,6 +4,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -23,12 +24,12 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface, cache *c
 	return func(c *gin.Context) {
 		usr, ok := c.Get("user")
 		if !ok {
-			abort.Abort(c, "user not found in context", http.StatusInternalServerError)
+			abort.Abort(c, errors.New("user not found in context"), http.StatusInternalServerError)
 			return
 		}
 		userInfo, ok := usr.(apiAuthnv1.UserInfo)
 		if !ok {
-			abort.Abort(c, fmt.Sprintf("unexpected user type in context: %T", usr), http.StatusInternalServerError)
+			abort.Abort(c, fmt.Errorf("unexpected user type in context: %T", usr), http.StatusInternalServerError)
 			return
 		}
 
@@ -69,7 +70,7 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface, cache *c
 			allowed := cache.Get(sarSpec.String())
 			if allowed != nil {
 				if allowed != true {
-					abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
+					abort.Abort(c, errors.New("unauthorized"), http.StatusUnauthorized)
 					return
 				}
 				continue
@@ -79,7 +80,7 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface, cache *c
 			}, metav1.CreateOptions{})
 
 			if err != nil {
-				abort.Abort(c, fmt.Sprintf("Unexpected error on SAR: %s", err.Error()), http.StatusInternalServerError)
+				abort.Abort(c, fmt.Errorf("unexpected error on SAR: %w", err), http.StatusInternalServerError)
 				return
 			}
 
@@ -87,7 +88,7 @@ func RBACAuthorization(sari clientAuthzv1.SubjectAccessReviewInterface, cache *c
 
 			if !sar.Status.Allowed {
 				cache.Set(sarSpec.String(), sar.Status.Allowed, cacheExpirationUnauthorized)
-				abort.Abort(c, "Unauthorized", http.StatusUnauthorized)
+				abort.Abort(c, errors.New("unauthorized"), http.StatusUnauthorized)
 				return
 			}
 		}

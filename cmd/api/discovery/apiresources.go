@@ -38,14 +38,14 @@ func GetAPIResource(client rest.Interface, cache *cache.Cache) gin.HandlerFunc {
 		if result.Error() != nil {
 			status := 0
 			result.StatusCode(&status)
-			abort.Abort(c, fmt.Errorf("Unable to retrieve information from '%s', error: %w", discoveryURL, result.Error()).Error(), status)
+			abort.Abort(c, fmt.Errorf("unable to retrieve information from '%s', error: %w", discoveryURL, result.Error()), status)
 			return
 		}
 
 		resources := &metav1.APIResourceList{}
 		err := result.Into(resources)
 		if err != nil {
-			abort.Abort(c, fmt.Errorf("Unable to deserialize result from '%s', error: %w", discoveryURL, err).Error(), http.StatusInternalServerError)
+			abort.Abort(c, fmt.Errorf("unable to deserialize result from '%s', error: %w", discoveryURL, err), http.StatusInternalServerError)
 			return
 		}
 
@@ -57,7 +57,7 @@ func GetAPIResource(client rest.Interface, cache *cache.Cache) gin.HandlerFunc {
 			}
 		}
 		abort.Abort(c,
-			fmt.Sprintf("Unable to find the API resource %s in the Kubernetes cluster", resourceName),
+			fmt.Errorf("unable to find the API resource %s in the Kubernetes cluster", resourceName),
 			http.StatusBadRequest)
 	}
 }

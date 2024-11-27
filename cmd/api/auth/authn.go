@@ -37,14 +37,14 @@ func Authentication(tri clientAuthnv1.TokenReviewInterface, cache *cache.Cache, 
 	return func(c *gin.Context) {
 		token, err := extractBearerToken(c.GetHeader("Authorization"))
 		if err != nil {
-			abort.Abort(c, err.Error(), http.StatusBadRequest)
+			abort.Abort(c, err, http.StatusBadRequest)
 			return
 		}
 
 		userInfo := cache.Get(token)
 		if userInfo != nil {
 			if userInfo == false { // Unauthenticated
-				abort.Abort(c, "Authentication failed", http.StatusUnauthorized)
+				abort.Abort(c, errors.New("authentication failed"), http.StatusUnauthorized)
 				return
 			}
 
@@ -59,11 +59,11 @@ func Authentication(tri clientAuthnv1.TokenReviewInterface, cache *cache.Cache, 
 			},
 		}, metav1.CreateOptions{})
 		if err != nil {
-			abort.Abort(c, fmt.Sprintf("Unexpected error on TokenReview: %s", err.Error()), http.StatusInternalServerError)
+			abort.Abort(c, fmt.Errorf("unexpected error on TokenReview: %w", err), http.StatusInternalServerError)
 			return
 		}
 		if !tr.Status.Authenticated {
-			abort.Abort(c, "Authentication failed", http.StatusUnauthorized)
+			abort.Abort(c, errors.New("authentication failed"), http.StatusUnauthorized)
 			cache.Set(token, false, cacheExpirationUnauthorized)
 			return
 		}

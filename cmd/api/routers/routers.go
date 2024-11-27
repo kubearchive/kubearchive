@@ -50,13 +50,13 @@ func (c *Controller) GetAllResources(context *gin.Context) {
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
 	resources, lastId, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, apiVersion, limit, id, date)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -73,13 +73,13 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
 	resources, lastId, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, apiVersion, namespace, limit, id, date)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -96,13 +96,13 @@ func (c *Controller) GetNamespacedResourceByName(context *gin.Context) {
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
 	resource, err := c.Database.QueryNamespacedResourceByName(context.Request.Context(), kind, apiVersion, namespace, name)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -118,15 +118,15 @@ func (c *Controller) GetLogURLsByResourceName(context *gin.Context) {
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 	logURLs, err := c.Database.QueryLogURLs(context.Request.Context(), kind, apiVersion, namespace, name)
 	if errors.Is(err, database.ResourceNotFoundError) {
-		abort.Abort(context, err.Error(), http.StatusNotFound)
+		abort.Abort(context, err, http.StatusNotFound)
 	}
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -139,13 +139,13 @@ func (c *Controller) GetAllCoreResources(context *gin.Context) {
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
 	resources, lastId, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, version, limit, id, date)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -160,13 +160,13 @@ func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
 	resources, lastId, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, version, namespace, limit, id, date)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -181,13 +181,13 @@ func (c *Controller) GetNamespacedCoreResourceByName(context *gin.Context) {
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
 	resource, err := c.Database.QueryNamespacedResourceByName(context.Request.Context(), kind, version, namespace, name)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -201,16 +201,16 @@ func (c *Controller) GetLogURLsByCoreResourceName(context *gin.Context) {
 
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
 	logURLs, err := c.Database.QueryLogURLs(context.Request.Context(), kind, version, namespace, name)
 	if errors.Is(err, database.ResourceNotFoundError) {
-		abort.Abort(context, err.Error(), http.StatusNotFound)
+		abort.Abort(context, err, http.StatusNotFound)
 	}
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusInternalServerError)
+		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -239,7 +239,7 @@ func (c *Controller) Livez(context *gin.Context) {
 func (c *Controller) Readyz(context *gin.Context) {
 	err := c.Database.Ping(context.Request.Context())
 	if err != nil {
-		abort.Abort(context, err.Error(), http.StatusServiceUnavailable)
+		abort.Abort(context, err, http.StatusServiceUnavailable)
 		return
 	}
 	context.JSON(http.StatusOK, gin.H{"message": "ready"})

@@ -4,10 +4,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/Cyprinus12138/otelgin"
@@ -117,18 +120,49 @@ func main() {
 		if deferErr != nil {
 			slog.Error("Could not close the database connection", "error", deferErr.Error())
 		} else {
-			slog.Info("Connection closed successfully")
+			slog.Info("Database connection closed successfully")
 		}
 	}(db)
 
 	controller := routers.Controller{Database: db, CacheConfiguration: *cacheExpirations}
-
 	server := NewServer(getKubernetesClient(), controller, memCache, cacheExpirations)
-	err = server.router.RunTLS("0.0.0.0:8081", "/etc/kubearchive/ssl/tls.crt", "/etc/kubearchive/ssl/tls.key")
+	httpServer := http.Server{
+		Addr:    "0.0.0.0:8081",
+		Handler: server.router.Handler(),
+		// We do not accept bodies yet, because we are read-only, so we set a
+		// small timeout for headers and complete request. This prevents the
+		// SlowLoris attack (see Wikipedia) by closing open connections fast
+		ReadHeaderTimeout: 2 * time.Second,
+		ReadTimeout:       2 * time.Second,
+	}
+
+	go func() {
+		shutdownErr := httpServer.ListenAndServeTLS("/etc/kubearchive/ssl/tls.crt", "/etc/kubearchive/ssl/tls.key")
+		if shutdownErr != nil && shutdownErr != http.ErrServerClosed {
+			slog.Error("Error listening", "error", shutdownErr.Error())
+			os.Exit(1)
+		}
+	}()
+
+	// This blocks until `quitChan` gets a signal injected by `signal.Notify`.
+	// After the injection the execution continues and the shutdown happens.
+	quitChan := make(chan os.Signal, 1)
+	signal.Notify(quitChan, syscall.SIGINT, syscall.SIGTERM)
+	<-quitChan
+
+	slog.Info("Shutting down server")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err = httpServer.Shutdown(ctx)
 	if err != nil {
-		slog.Error("Could not run server on localhost", "error", err.Error())
+		slog.Error("Error shutting down the server", "error", err.Error())
 		os.Exit(1)
 	}
+
+	// This blocks until the context expires
+	<-ctx.Done()
+	slog.Debug("Shutdown reached timeout")
 }
 
 func getCacheExpirations() (*routers.CacheExpirations, error) {

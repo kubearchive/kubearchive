@@ -8,6 +8,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
@@ -27,7 +29,7 @@ var RegisteredDBCreators = make(map[string]newDBCreatorFunc)
 type DBInterface interface {
 	QueryResources(ctx context.Context, kind, apiVersion, namespace,
 		name, continueId, continueDate string, limit int) ([]string, int64, string, error)
-	QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error)
+	QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error)
 
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
 	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error
@@ -97,9 +99,20 @@ func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, namesp
 	return db.performResourceQuery(ctx, sb)
 }
 
-func (db *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error) {
+type uuidKindDate struct {
+	Uuid string `db:"uuid"`
+	Kind string `db:"kind"`
+	Date string `db:"created_at"`
+}
 
+func (db *Database) QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error) {
+
+	type logURLJsonPath struct {
+		LogURL   string `db:"url"`
+		JsonPath string `db:"json_path"`
+	}
 	strQueryPerformer := newQueryPerformer[string](db.DB, db.Flavor)
+	logQueryPerformer := newQueryPerformer[logURLJsonPath](db.DB, db.Flavor)
 	if kind == "Pod" {
 		sb := db.Selector.UrlFromResourceSelector()
 		sb.Where(
@@ -108,7 +121,15 @@ func (db *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespac
 			db.Filter.NamespaceFilter(sb.Cond, namespace),
 			db.Filter.NameFilter(sb.Cond, name),
 		)
-		return strQueryPerformer.performQuery(ctx, sb)
+		logUrls, err := logQueryPerformer.performQuery(ctx, sb)
+		if err != nil {
+			return "", "", err
+		}
+		if len(logUrls) >= 1 {
+			return logUrls[0].LogURL, logUrls[0].JsonPath, nil
+		} else {
+			return "", "", ResourceNotFoundError
+		}
 	}
 
 	sb := db.Selector.UUIDResourceSelector()
@@ -121,46 +142,55 @@ func (db *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespac
 	uuid, err := strQueryPerformer.performSingleRowQuery(ctx, sb)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		return []string{}, ResourceNotFoundError
+		return "", "", ResourceNotFoundError
 	}
 
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
 
-	podUuids, err := db.getOwnedPodsUuids(ctx, []string{uuid}, []string{})
-	if len(podUuids) == 0 {
-		return []string{}, ResourceNotFoundError
-	}
+	pods, err := db.getOwnedPodsUuids(ctx, []string{uuid}, []uuidKindDate{})
 	if err != nil {
-		return nil, err
+		return "", "", err
 	}
+	if len(pods) == 0 {
+		return "", "", ResourceNotFoundError
+	}
+
+	// Get the most recent pod from owned by the provided resource
+	slices.SortFunc(pods, func(a, b uuidKindDate) int {
+		return strings.Compare(b.Date, a.Date)
+	})
 
 	sb = db.Selector.UrlSelector()
-	sb.Where(db.Filter.UuidsFilter(sb.Cond, podUuids))
-	return strQueryPerformer.performQuery(ctx, sb)
+	sb.Where(db.Filter.UuidsFilter(sb.Cond, []string{pods[0].Uuid}))
+	logUrls, err := logQueryPerformer.performQuery(ctx, sb)
+	if err != nil {
+		return "", "", err
+	}
+	if len(logUrls) >= 1 {
+		return logUrls[0].LogURL, logUrls[0].JsonPath, nil
+	} else {
+		return "", "", ResourceNotFoundError
+	}
 }
 
-func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids, podUuids []string) ([]string, error) {
-
-	type uuidKind struct {
-		Uuid string
-		Kind string
-	}
+func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids []string, podUuids []uuidKindDate,
+) ([]uuidKindDate, error) {
 
 	if len(ownersUuids) == 0 {
 		return podUuids, nil
 	} else {
 		sb := db.Selector.OwnedResourceSelector()
 		sb.Where(db.Filter.OwnerFilter(sb.Cond, ownersUuids))
-		parsedRows, err := newQueryPerformer[uuidKind](db.DB, db.Flavor).performQuery(ctx, sb)
+		parsedRows, err := newQueryPerformer[uuidKindDate](db.DB, db.Flavor).performQuery(ctx, sb)
 		if err != nil {
 			return nil, err
 		}
 		ownersUuids = make([]string, 0)
 		for _, row := range parsedRows {
 			if row.Kind == "Pod" {
-				podUuids = append(podUuids, row.Uuid)
+				podUuids = append(podUuids, row)
 			} else {
 				ownersUuids = append(ownersUuids, row.Uuid)
 			}

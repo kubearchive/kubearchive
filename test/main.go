@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,7 +18,10 @@ import (
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/portforward"
+	"k8s.io/client-go/transport/spdy"
 	"k8s.io/client-go/util/homedir"
 
 	corev1 "k8s.io/api/core/v1"
@@ -84,13 +89,59 @@ func DeleteResources(resources ...string) error {
 	return nil
 }
 
-func GetKubernetesClient() (*kubernetes.Clientset, *dynamic.DynamicClient, error) {
+func GetKubernetesConfig() (*rest.Config, error) {
 	var kubeconfig string
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = filepath.Join(home, ".kube", "config")
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	return clientcmd.BuildConfigFromFlags("", kubeconfig)
+}
+
+// PortForward forwards the given ports until the retrieved channel is closed
+func PortForward(ports []string, pod, ns string) (chan struct{}, error) {
+	config, err := GetKubernetesConfig()
+	if err != nil {
+		return nil, err
+	}
+	roundTripper, upgrader, err := spdy.RoundTripperFor(config)
+	if err != nil {
+		return nil, err
+	}
+
+	path := fmt.Sprintf("/api/v1/namespaces/%s/pods/%s/portforward", ns, pod)
+	hostIP := strings.TrimLeft(config.Host, "htps:/")
+	serverURL := url.URL{Scheme: "https", Path: path, Host: hostIP}
+
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: roundTripper}, http.MethodPost, &serverURL)
+
+	stopChan, readyChan := make(chan struct{}, 1), make(chan struct{}, 1)
+	out, errOut := new(bytes.Buffer), new(bytes.Buffer)
+	forwarder, err := portforward.New(dialer, ports, stopChan, readyChan, out, errOut)
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		if errForward := forwarder.ForwardPorts(); err != nil {
+			panic(errForward)
+		}
+	}()
+	var errReady error
+	func() {
+		for range readyChan { // Kubernetes will close this channel when it has something to tell us.
+		}
+		if len(errOut.String()) != 0 {
+			errReady = errors.New(errOut.String())
+		} else if len(out.String()) != 0 {
+			fmt.Println(out.String())
+		}
+	}()
+	return stopChan, errReady
+}
+
+func GetKubernetesClient() (*kubernetes.Clientset, *dynamic.DynamicClient, error) {
+
+	config, err := GetKubernetesConfig()
 	if err != nil {
 		return nil, nil, err
 	}

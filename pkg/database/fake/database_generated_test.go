@@ -1,5 +1,6 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package fake
 
 import (
@@ -15,6 +16,7 @@ import (
 
 var testResources = CreateTestResources()
 var testLogUrls = CreateTestLogUrls()
+var testJsonPath = "$."
 
 func TestNewFakeDatabase(t *testing.T) {
 	tests := []struct {
@@ -35,7 +37,7 @@ func TestNewFakeDatabase(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := NewFakeDatabase(tt.resources, tt.logUrls)
+			db := NewFakeDatabase(tt.resources, tt.logUrls, testJsonPath)
 			assert.Equal(t, tt.resources, db.resources)
 			assert.Equal(t, tt.logUrls, db.logUrl)
 		})
@@ -74,7 +76,7 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := NewFakeDatabase(testResources, testLogUrls)
+			db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
 			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, "", "", "", "", 100)
 			expected := make([]string, 0)
 			if len(tt.expected) != 0 {
@@ -134,7 +136,7 @@ func TestQueryResources(t *testing.T) {
 			expected:  testResources[1:2],
 		},
 	}
-	db := NewFakeDatabase(testResources, testLogUrls)
+	db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -226,7 +228,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := NewFakeDatabase(tt.testData, testLogUrls)
+			db := NewFakeDatabase(tt.testData, testLogUrls, testJsonPath)
 			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace,
 				tt.resourceName, "", "", 100)
 			expected := make([]string, 0)
@@ -303,7 +305,7 @@ func TestWriteUrls(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := NewFakeDatabase(testResources, tt.initialLogUrls)
+			db := NewFakeDatabase(testResources, tt.initialLogUrls, testJsonPath)
 			err := db.WriteUrls(context.Background(), tt.obj, tt.jsonPath, tt.newUrls...)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.expected, db.logUrl)
@@ -316,24 +318,25 @@ func TestQueryLogURLs(t *testing.T) {
 	tests := []struct {
 		name     string
 		kind     string
-		expected int
+		expected string
 	}{
 		{
 			name:     "Logs from one pod",
 			kind:     "Pod",
-			expected: 1,
+			expected: "fake.com",
 		},
 		{
 			name:     "Logs from another resource",
 			kind:     "Job",
-			expected: len(testLogUrls),
+			expected: "fake.com",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := NewFakeDatabase(testResources, testLogUrls)
-			urls, _ := db.QueryLogURLs(context.Background(), tt.kind, "", "", "")
-			assert.Equal(t, tt.expected, len(urls))
+			db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
+			url, jsonPath, _ := db.QueryLogURL(context.Background(), tt.kind, "", "", "")
+			assert.Equal(t, tt.expected, url)
+			assert.Equal(t, testJsonPath, jsonPath)
 		})
 	}
 }

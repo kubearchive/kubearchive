@@ -86,7 +86,7 @@ func TestPodQueryLogURLs(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrls, err := tt.database.QueryLogURLs(ctx, "Pod", podApiVersion, namespace, podName)
+			logUrls, err := tt.database.QueryLogURL(ctx, "Pod", podApiVersion, namespace, podName)
 			assert.Equal(t, 2, len(logUrls))
 			assert.NoError(t, err)
 		})
@@ -104,7 +104,7 @@ func TestLogURLsFromNonExistentResource(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrls, err := tt.database.QueryLogURLs(ctx, kind, cronJobApiVersion, namespace, cronJobName)
+			logUrls, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName)
 			assert.Equal(t, 0, len(logUrls))
 			assert.Error(t, err, "resource not found")
 		})
@@ -147,7 +147,7 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrls, err := tt.database.QueryLogURLs(ctx, kind, cronJobApiVersion, namespace, cronJobName)
+			logUrls, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName)
 			assert.Equal(t, 2, len(logUrls))
 			assert.NoError(t, err)
 		})

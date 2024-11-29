@@ -121,16 +121,16 @@ func (c *Controller) GetLogURLsByResourceName(context *gin.Context) {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	logURLs, err := c.Database.QueryLogURLs(context.Request.Context(), kind, apiVersion, namespace, name)
+	logURL, err := c.Database.QueryLogURL(context.Request.Context(), kind, apiVersion, namespace, name)
 	if errors.Is(err, database.ResourceNotFoundError) {
 		abort.Abort(context, err.Error(), http.StatusNotFound)
+		return
 	}
 	if err != nil {
 		abort.Abort(context, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	context.JSON(http.StatusOK, logURLs)
+	context.Set("logURL", logURL)
 }
 
 func (c *Controller) GetAllCoreResources(context *gin.Context) {
@@ -205,7 +205,7 @@ func (c *Controller) GetLogURLsByCoreResourceName(context *gin.Context) {
 		return
 	}
 
-	logURLs, err := c.Database.QueryLogURLs(context.Request.Context(), kind, version, namespace, name)
+	logURL, err := c.Database.QueryLogURL(context.Request.Context(), kind, version, namespace, name)
 	if errors.Is(err, database.ResourceNotFoundError) {
 		abort.Abort(context, err.Error(), http.StatusNotFound)
 	}
@@ -214,7 +214,7 @@ func (c *Controller) GetLogURLsByCoreResourceName(context *gin.Context) {
 		return
 	}
 
-	context.JSON(http.StatusOK, logURLs)
+	context.Set("logURL", logURL)
 
 }
 

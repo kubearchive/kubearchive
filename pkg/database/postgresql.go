@@ -53,7 +53,7 @@ func (info PostgreSQLDatabaseInfo) GetUUIDSQL() string {
 }
 
 func (info PostgreSQLDatabaseInfo) GetOwnedResourcesSQL() string {
-	return "SELECT uuid, kind FROM resource WHERE jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| $1"
+	return "SELECT uuid, kind, data->'metadata'->>'creationTimestamp' as created_at FROM resource WHERE jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| $1"
 }
 
 func (info PostgreSQLDatabaseInfo) GetLogURLsByPodNameSQL() string {
@@ -61,7 +61,7 @@ func (info PostgreSQLDatabaseInfo) GetLogURLsByPodNameSQL() string {
 }
 
 func (info PostgreSQLDatabaseInfo) GetLogURLsSQL() string {
-	return "SELECT url FROM log_url WHERE uuid = any($1)"
+	return "SELECT url FROM log_url WHERE uuid::text = any($1)"
 }
 
 func (info PostgreSQLDatabaseInfo) GetWriteResourceSQL() string {

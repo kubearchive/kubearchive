@@ -56,8 +56,7 @@ func (info MariaDBDatabaseInfo) GetUUIDSQL() string {
 }
 
 func (info MariaDBDatabaseInfo) GetOwnedResourcesSQL() string {
-	// TODO test
-	return "SELECT uuid, kind FROM resource WHERE JSON_OVERLAPS(JSON_EXTRACT(data, '$.metadata.ownerReferences.**.uid'), JSON_ARRAY(?))"
+	return "SELECT uuid, kind, JSON_VALUE(data, '$.metadata.creationTimestamp') AS created_at FROM resource WHERE JSON_OVERLAPS(JSON_EXTRACT(data, '$.metadata.ownerReferences.**.uid'), JSON_ARRAY(?))"
 }
 
 func (info MariaDBDatabaseInfo) GetLogURLsByPodNameSQL() string {

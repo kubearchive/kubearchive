@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -53,7 +54,7 @@ type DBInterface interface {
 	QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error)
 	QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error)
 	QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (*unstructured.Unstructured, error)
-	QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error)
+	QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, error)
 
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
 	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, logs ...models.LogTuple) error
@@ -131,56 +132,73 @@ func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, api
 	}
 }
 
-func (db *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error) {
+type uuidKindDate struct {
+	Uuid string `db:"uuid"`
+	Kind string `db:"kind"`
+	Date string `db:"created_at"`
+}
+
+func (db *Database) QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, error) {
 
 	strQueryPerformer := newQueryPerformer[string](db.db)
 	if kind == "Pod" {
 		pq := db.newParamQuery(db.info.GetLogURLsByPodNameSQL())
 		pq.addStringParams(apiVersion, namespace, name)
-		return strQueryPerformer.performQuery(ctx, pq)
+		logUrls, err := strQueryPerformer.performQuery(ctx, pq)
+		if err != nil {
+			return "", err
+		}
+		if len(logUrls) == 0 {
+			return "", ResourceNotFoundError
+		}
+		return logUrls[0], nil
 	}
 
 	var uuid string
 	err := db.db.GetContext(ctx, &uuid, db.info.GetUUIDSQL(), kind, apiVersion, namespace, name)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		return []string{}, ResourceNotFoundError
+		return "", ResourceNotFoundError
 	}
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	podUuids, err := db.getOwnedPodsUuids(ctx, []string{uuid}, []string{})
+	pods, err := db.getOwnedPodsUuids(ctx, []string{uuid}, []uuidKindDate{})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
+
+	// Get the most recent pod from owned by the provided resource
+	sort.Slice(pods, func(i, j int) bool {
+		return pods[i].Date > pods[j].Date
+	})
 
 	pq := db.newParamQuery(db.info.GetLogURLsSQL())
-	pq.addStringArrayParam(podUuids)
-	return strQueryPerformer.performQuery(ctx, pq)
+	pq.addStringArrayParam([]string{pods[0].Uuid})
+	logUrls, err := strQueryPerformer.performQuery(ctx, pq)
+	if err != nil {
+		return "", err
+	}
+	return logUrls[0], nil
 }
 
-func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids, podUuids []string) ([]string, error) {
-
-	type uuidKind struct {
-		Uuid string
-		Kind string
-	}
+func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids []string, podUuids []uuidKindDate) ([]uuidKindDate, error) {
 
 	if len(ownersUuids) == 0 {
 		return podUuids, nil
 	} else {
 		pq := db.newParamQuery(db.info.GetOwnedResourcesSQL())
 		pq.addStringArrayParam(ownersUuids)
-		parsedRows, err := newQueryPerformer[uuidKind](db.db).performQuery(ctx, pq)
+		parsedRows, err := newQueryPerformer[uuidKindDate](db.db).performQuery(ctx, pq)
 		if err != nil {
 			return nil, err
 		}
 		ownersUuids = make([]string, 0)
 		for _, row := range parsedRows {
 			if row.Kind == "Pod" {
-				podUuids = append(podUuids, row.Uuid)
+				podUuids = append(podUuids, row)
 			} else {
 				ownersUuids = append(ownersUuids, row.Uuid)
 			}

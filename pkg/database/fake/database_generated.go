@@ -1,5 +1,6 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package fake
 
 import (
@@ -47,11 +48,12 @@ type LogUrlRow struct {
 type Database struct {
 	resources []*unstructured.Unstructured
 	logUrl    []LogUrlRow
+	jsonPath  string
 	err       error
 }
 
-func NewFakeDatabase(testResources []*unstructured.Unstructured, testLogs []LogUrlRow) *Database {
-	return &Database{testResources, testLogs, nil}
+func NewFakeDatabase(testResources []*unstructured.Unstructured, testLogs []LogUrlRow, jsonPath string) *Database {
+	return &Database{testResources, testLogs, jsonPath, nil}
 }
 
 func NewFakeDatabaseWithError(err error) *Database {
@@ -59,14 +61,14 @@ func NewFakeDatabaseWithError(err error) *Database {
 		resources []*unstructured.Unstructured
 		logUrls   []LogUrlRow
 	)
-	return &Database{resources, logUrls, err}
+	return &Database{resources, logUrls, "", err}
 }
 
-func (f *Database) Ping(ctx context.Context) error {
+func (f *Database) Ping(_ context.Context) error {
 	return f.err
 }
 
-func (f *Database) TestConnection(env map[string]string) error {
+func (f *Database) TestConnection(_ map[string]string) error {
 	return f.err
 }
 
@@ -74,15 +76,11 @@ func (f *Database) queryResources(_ context.Context, kind, version, _, _ string,
 	return f.filterResourcesByKindAndApiVersion(kind, version)
 }
 
-func (f *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error) {
-	if kind == "Pod" {
-		return []string{f.logUrl[0].Url}, f.err
+func (f *Database) QueryLogURL(_ context.Context, _, _, _, _ string) (string, string, error) {
+	if len(f.logUrl) == 0 {
+		return "", "", f.err
 	}
-	var urls []string
-	for _, l := range f.logUrl {
-		urls = append(urls, l.Url)
-	}
-	return urls, f.err
+	return f.logUrl[0].Url, f.jsonPath, f.err
 }
 
 func (f *Database) QueryResources(ctx context.Context, kind, version, namespace, name,
@@ -152,12 +150,12 @@ func (f *Database) filterResourceByKindApiVersionNamespaceAndName(kind, apiVersi
 	return filteredResources
 }
 
-func (f *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
+func (f *Database) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte) error {
 	f.resources = append(f.resources, k8sObj)
 	return nil
 }
 
-func (f *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error {
+func (f *Database) WriteUrls(_ context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error {
 	newLogUrls := make([]LogUrlRow, 0)
 	for _, row := range f.logUrl {
 		if k8sObj.GetUID() != row.Uuid {

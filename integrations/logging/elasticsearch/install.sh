@@ -32,5 +32,5 @@ kubectl wait --namespace=${NAMESPACE} --for=jsonpath='{.status.health}'=green ki
 KUBEARCHIVE_NS="kubearchive"
 if kubectl get ns ${KUBEARCHIVE_NS} >& /dev/null; then
     ELASTIC_PWD=$(kubectl -n ${NAMESPACE} get secret kubearchive-es-elastic-user -o=jsonpath='{.data.elastic}')
-    kubectl patch -n ${KUBEARCHIVE_NS} secret kubearchive-logging -p "{\"data\": {\"password\": \"${ELASTIC_PWD}\"}}"
+    kubectl patch -n ${KUBEARCHIVE_NS} secret kubearchive-logging -p "{\"data\": {\"PASSWORD\": \"${ELASTIC_PWD}\"}}"
 fi

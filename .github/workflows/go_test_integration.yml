@@ -57,5 +57,4 @@ jobs:
       - name: Test Go code
         run: |
           export KO_DOCKER_REPO="kind.local"
-          kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081 &
           go test -count=1 -v ./test/integration -tags=integration

@@ -30,8 +30,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"knative.dev/eventing/test/lib/resources"
 )
 
 func TestMain(m *testing.M) {
@@ -41,8 +39,8 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// This test is redundant with the kubectl rollout status from the hack/quick-install.sh
-// but it serves as a valid integration test, not a dummy that is not testing anything real.
+// TestKubeArchiveDeployments is redundant with the kubectl rollout status from the hack/quick-install.sh
+// ,but it serves as a valid integration test, not a dummy that is not testing anything real.
 func TestKubeArchiveDeployments(t *testing.T) {
 	client, _, err := test.GetKubernetesClient()
 	if err != nil {
@@ -50,9 +48,9 @@ func TestKubeArchiveDeployments(t *testing.T) {
 	}
 
 	retryErr := retry.Do(func() error {
-		deployments, err := client.AppsV1().Deployments("kubearchive").List(context.Background(), metav1.ListOptions{})
-		if err != nil {
-			return fmt.Errorf("Failed to get Deployments from the 'kubearchive' namespace: %w", err)
+		deployments, errList := client.AppsV1().Deployments("kubearchive").List(context.Background(), metav1.ListOptions{})
+		if errList != nil {
+			return fmt.Errorf("Failed to get Deployments from the 'kubearchive' namespace: %w", errList)
 		}
 
 		if len(deployments.Items) == 0 {
@@ -78,7 +76,7 @@ func TestKubeArchiveDeployments(t *testing.T) {
 	}
 }
 
-// This test verifies the database connection retries using the Sink component.
+// TestDatabaseConnection verifies the database connection retries using the Sink component.
 func TestDatabaseConnection(t *testing.T) {
 	clientset, _, err := test.GetKubernetesClient()
 	if err != nil {
@@ -90,7 +88,7 @@ func TestDatabaseConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Fence database
+	// Fence database to make it unavailable - https://cloudnative-pg.io/documentation/1.24/fencing/
 	clusterResource := schema.GroupVersionResource{Group: "postgresql.cnpg.io", Version: "v1", Resource: "clusters"}
 	resource, err := dynclient.Resource(clusterResource).Namespace("postgresql").Get(context.Background(), "kubearchive", metav1.GetOptions{})
 	if err != nil {
@@ -198,31 +196,32 @@ func TestArchiveAndRead(t *testing.T) {
 		t.Fatal(errClient)
 	}
 
-	// Configure the log url generator
-	loggingConfigName := "kubearchive-logging"
-	logUrlConfig := map[string]string{
-		"POD_ID":    "cel:metadata.uid",
-		"POD":       "spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"{POD_ID}\"",
-		"CONTAINER": "spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"{CONTAINER_NAME}\"",
-		"LOG_URL":   "http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}",
+	// Install splunk
+	cmdInstallSplunk := exec.Command("bash", "../../integrations/logging/splunk/install.sh")
+	outputInstallSplunk, errScriptSplunk := cmdInstallSplunk.CombinedOutput()
+	if errScriptSplunk != nil {
+		fmt.Println("Could not run the splunk installer: ", errScriptSplunk)
+		t.Fatal(errScriptSplunk)
 	}
-	_, kaLoggingErr := clientset.CoreV1().ConfigMaps("kubearchive").Update(context.Background(),
-		resources.ConfigMap(loggingConfigName, "kubearchive", logUrlConfig),
-		metav1.UpdateOptions{})
+	fmt.Println("Output: ", string(outputInstallSplunk))
 
-	if kaLoggingErr != nil {
-		t.Fatal(kaLoggingErr)
+	// Forward api service port
+	pods, err := clientset.CoreV1().Pods("kubearchive").List(context.Background(), metav1.ListOptions{
+		LabelSelector: "app=kubearchive-api-server",
+		FieldSelector: "status.phase=Running",
+	})
+	fmt.Println(fmt.Sprintf("Pod to forward: %s", pods.Items[0].Name))
+	if err != nil {
+		t.Fatal(err)
 	}
-
-	// Restart the sink to get the config applied
-	annotation := fmt.Sprintf(`{"spec": {"template": {"metadata": {"annotations": {"kubectl.kubernetes.io/restartedAt": "%s"}}}}}`, time.Now().Format("20060102150405"))
-	_, errSinkPatch := clientset.AppsV1().Deployments("kubearchive").Patch(context.Background(),
-		"kubearchive-sink", types.StrategicMergePatchType, []byte(annotation), metav1.PatchOptions{})
-
-	if errSinkPatch != nil {
-		t.Fatal(errSinkPatch)
+	portForward, errPortForward := test.PortForward([]string{"8081:8081"}, pods.Items[0].Name, "kubearchive")
+	if errPortForward != nil {
+		t.Fatal(errPortForward)
 	}
 
+	defer close(portForward)
+
+	// Create test namespace
 	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
 	_, errNamespace := clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
@@ -240,6 +239,7 @@ func TestArchiveAndRead(t *testing.T) {
 			t.Fatal(errNamespace)
 		}
 	})
+
 	// Call the log-generator.
 	namespaceCmd := fmt.Sprintf("--namespace=%s", namespaceName)
 	cmd := exec.Command("bash", "../log-generators/cronjobs/install.sh", namespaceCmd, "--num-jobs=1")
@@ -274,6 +274,8 @@ func TestArchiveAndRead(t *testing.T) {
 	}
 
 	// Retrieve the objects from the DB using the API.
+
+	// Set up the http client with cert
 	secret, errSecret := clientset.CoreV1().Secrets("kubearchive").Get(context.Background(), "kubearchive-api-server-tls", metav1.GetOptions{})
 	if errSecret != nil {
 		t.Fatal(errSecret)
@@ -346,7 +348,14 @@ func TestArchiveAndRead(t *testing.T) {
 		t.Fatal(retryErr)
 	}
 
-	// Query cronjob log urls
+	// Remove cronjob to stop generating more pods
+	errDel := clientset.BatchV1().CronJobs(namespaceName).Delete(context.Background(), "generate-log-1", metav1.DeleteOptions{})
+	if errDel != nil {
+		t.Fatal(errDel)
+	}
+
+	// Retrieve cronjob logs
+
 	url = fmt.Sprintf("https://localhost:8081/apis/batch/v1/namespaces/%s/cronjobs/generate-log-1/log", namespaceName)
 	request, errRequest = http.NewRequest("GET", url, nil)
 	if errRequest != nil {
@@ -371,22 +380,13 @@ func TestArchiveAndRead(t *testing.T) {
 		}
 
 		if response.StatusCode != http.StatusOK {
+			fmt.Printf("HTTP body: %s\n", body)
 			fmt.Printf("The HTTP status returned is not OK, %s\n", response.Status)
 			return errors.New(response.Status)
 		}
-		var logUrls []string
-		errJson := json.Unmarshal([]byte(body), &logUrls)
-		if errJson != nil {
-			return errJson
-		}
 
-		fmt.Printf("Log URLs: %s\n", logUrls)
-
-		if len(logUrls) == 0 {
-			return errors.New("could not retrieve the cronjob pod log urls")
-		}
-		if !strings.HasPrefix(logUrls[0], "http://127.0.0.1:8111/app/search/search?q=search") {
-			return errors.New("unexpected content in log url")
+		if len(body) == 0 {
+			return errors.New("could not retrieve the cronjob pod log")
 		}
 		return nil
 	}, retry.Attempts(20))
@@ -507,6 +507,17 @@ func TestPagination(t *testing.T) {
 			},
 		},
 	}
+
+	// Forward api service port
+	pods, err := clientset.CoreV1().Pods("kubearchive").List(context.Background(), metav1.ListOptions{LabelSelector: "app=kubearchive-api-server"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	portForward, errPortForward := test.PortForward([]string{"8081"}, pods.Items[0].Name, "kubearchive")
+	if errPortForward != nil {
+		t.Fatal(errPortForward)
+	}
+	defer close(portForward)
 
 	url := fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods", namespaceName)
 	err = retry.Do(func() error {

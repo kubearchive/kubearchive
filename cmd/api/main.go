@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/auth"
 	"github.com/kubearchive/kubearchive/cmd/api/discovery"
+	"github.com/kubearchive/kubearchive/cmd/api/logging"
 	"github.com/kubearchive/kubearchive/cmd/api/pagination"
 	"github.com/kubearchive/kubearchive/cmd/api/routers"
 	"github.com/kubearchive/kubearchive/pkg/cache"
@@ -59,7 +60,8 @@ func getKubernetesClient() *kubernetes.Clientset {
 	return client
 }
 
-func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, cache *cache.Cache, cacheExpirations *routers.CacheExpirations) *Server {
+func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, cache *cache.Cache,
+	cacheExpirations *routers.CacheExpirations) *Server {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(middleware.Logger)
@@ -70,10 +72,10 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	groups := [...]*gin.RouterGroup{apisGroup, apiGroup}
 	// Set up middleware for each group
 	for _, group := range groups {
-		group.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews(), cache, cacheExpirations.Authorized, cacheExpirations.Unauthorized))
-		group.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache, cacheExpirations.Authorized, cacheExpirations.Unauthorized))
-		// TODO - Probably want to use cache for the discovery client
-		// See https://pkg.go.dev/k8s.io/client-go/discovery/cached/disk#NewCachedDiscoveryClientForConfig
+		group.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews(), cache,
+			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
+		group.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache,
+			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 		group.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient(), cache))
 		group.Use(pagination.Middleware())
 	}
@@ -81,15 +83,19 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	router.GET("/livez", controller.Livez)
 	router.GET("/readyz", controller.Readyz)
 
+	creds, credsErr := logging.GetKubeArchiveLoggingCredentials()
+
 	apisGroup.GET("/:group/:version/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
-	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name/log", controller.GetResourceLogs)
+	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name/log",
+		logging.SetLoggingCredentials(creds, credsErr), controller.GetLogURL, logging.LogRetrieval())
 
 	apiGroup.GET("/:version/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
-	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name/log", controller.GetResourceLogs)
+	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name/log",
+		logging.SetLoggingCredentials(creds, credsErr), controller.GetLogURL, logging.LogRetrieval())
 
 	return &Server{
 		router:    router,

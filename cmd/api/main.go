@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/auth"
 	"github.com/kubearchive/kubearchive/cmd/api/discovery"
+	"github.com/kubearchive/kubearchive/cmd/api/logging"
 	"github.com/kubearchive/kubearchive/cmd/api/pagination"
 	"github.com/kubearchive/kubearchive/cmd/api/routers"
 	"github.com/kubearchive/kubearchive/pkg/cache"
@@ -81,15 +82,24 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	router.GET("/livez", controller.Livez)
 	router.GET("/readyz", controller.Readyz)
 
+	// TODO Replace this test config for loading the kubearchive-logging configmap
+	testLoggingConfig := map[string]string{
+		"USER":      "admin",
+		"PASSWORD":  "nfmBkeiahoys4rZav7zJAH4l", // notsecret
+		"JSON_PATH": "$.result.message",
+	}
+
 	apisGroup.GET("/:group/:version/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
-	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name/log", controller.GetResourceLogs)
+	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name/log",
+		controller.GetLogURL, logging.LogRetrieval(testLoggingConfig))
 
 	apiGroup.GET("/:version/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
-	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name/log", controller.GetResourceLogs)
+	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name/log",
+		controller.GetLogURL, logging.LogRetrieval(testLoggingConfig))
 
 	return &Server{
 		router:    router,

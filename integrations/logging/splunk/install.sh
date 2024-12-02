@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
 
 # From https://kube-logging.dev/docs/examples/splunk/
 #

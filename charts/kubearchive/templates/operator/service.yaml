@@ -1,3 +1,5 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
 {{- $controlPlane := "controller-manager" -}}
 {{- $port := 443 -}}
 {{- $targetPort := 9443 -}}

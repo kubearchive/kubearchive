@@ -54,3 +54,17 @@ jobs:
         with:
           yamllint_strict: false
           yamllint_comment: false
+  license-checker:
+    name: License Checker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '21'
+      - name: Install License Checker
+        run: npm install --global @kt3k/license-checker
+      - name: Run License Checker
+        run: license_checker

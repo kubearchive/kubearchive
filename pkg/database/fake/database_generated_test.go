@@ -75,7 +75,7 @@ func TestQueryResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(testResources, testLogUrls)
-			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, "", "", "")
+			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, "", "", 100)
 			assert.Equal(t, tt.expected, filteredResources)
 			assert.Nil(t, err)
 		})
@@ -127,7 +127,7 @@ func TestQueryNamespacedResources(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filteredResources, _, _, err := db.QueryNamespacedResources(context.TODO(), tt.kind, tt.version, tt.namespace, "", "", "")
+			filteredResources, _, _, err := db.QueryNamespacedResources(context.TODO(), tt.kind, tt.version, tt.namespace, "", "", 100)
 			assert.Equal(t, tt.expected, filteredResources)
 			assert.Nil(t, err)
 		})

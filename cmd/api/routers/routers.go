@@ -54,7 +54,7 @@ func (c *Controller) GetAllResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastId, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, apiVersion, limit, id, date)
+	resources, lastId, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, apiVersion, id, date, limit)
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
 		return
@@ -77,7 +77,7 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastId, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, apiVersion, namespace, limit, id, date)
+	resources, lastId, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, apiVersion, namespace, id, date, limit)
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
 		return
@@ -143,7 +143,7 @@ func (c *Controller) GetAllCoreResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastId, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, version, limit, id, date)
+	resources, lastId, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, version, id, date, limit)
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
 		return
@@ -164,7 +164,7 @@ func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 		return
 	}
 
-	resources, lastId, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, version, namespace, limit, id, date)
+	resources, lastId, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, version, namespace, id, date, limit)
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
 		return

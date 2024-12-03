@@ -69,7 +69,7 @@ func (f *Database) TestConnection(env map[string]string) error {
 	return f.err
 }
 
-func (f *Database) QueryResources(ctx context.Context, kind, version, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
+func (f *Database) QueryResources(ctx context.Context, kind, version, continueId, continueDate string, limit int) ([]*unstructured.Unstructured, int64, string, error) {
 	resources := f.filterResourcesByKindAndApiVersion(kind, version)
 	var date string
 	var id int64
@@ -91,7 +91,7 @@ func (f *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace
 	return urls, f.err
 }
 
-func (f *Database) QueryNamespacedResources(ctx context.Context, kind, version, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
+func (f *Database) QueryNamespacedResources(ctx context.Context, kind, version, namespace, continueId, continueDate string, limit int) ([]*unstructured.Unstructured, int64, string, error) {
 	resources := f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace)
 	var date string
 	var id int64

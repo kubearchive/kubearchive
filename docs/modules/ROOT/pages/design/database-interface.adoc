@@ -1,0 +1,105 @@
+= Database Interface
+
+== Overview
+
+This page documents the proposal for the structure and content of `pkg/database` to achieve the following goals:
+
+* Reduce the friction when adding support to a new DBMS(Database Management System).
+* Enable overriding the default read/write operations for a specific DBMS.
+* Expose the filters (`WHERE` clauses) and sorters (`ORDER BY` clauses) separately from the rest of the `SQL` statements
+so they can be plugged in and out of the different queries.
+* Reduce the maintenance of the codebase.
+* Increase the readability of the codebase.
+
+== Proposal
+
+The two pillars of this proposal are:
+
+* Definition of interfaces that need to be implementing when adding support to a new DBMS.
+* Usage of a SQL Builder.
+
+=== Database Interfaces
+
+To add a new DBMS the following interfaces must be implemented:
+
+`DBInterface`::
+Include the methods that should be used by the rest of the KubeArchive application.
+Encapsulates the business logic related to the different read/write database operations:
+`QueryResources`, `WriteResources`, `WriteUrls`, `QueryLogUrls`, etc.
+
+`DBCreator`::
+Include the methods `GetDriverName()` and `GetConnectionString()`.
+They are used for establishing the database connection in the `DBInterface` constructor.
+
+`DBSelector`::
+Encapsulate the different `SELECT` SQL statements without the `WHERE` and `ORDER BY` clauses.
+
+`DBFilter`::
+Encapsulate the different `WHERE` SQL clauses that can be used in `SELECT`, `DELETE` or `UPDATE` statements.
+
+`DBSorter`::
+Encapsulate the different `ORDER BY` clauses.
+
+`DBInserter`::
+Encapsulate the different `INSERT` SQL statements.
+
+`DBDeleter`::
+Encapsulate the different `DELETE` SQL statement without the `WHERE` clauses.
+
+==== Additional requirements for new DBMS
+
+* Add a `DBInterface` constructor function to the `RegisteredDatabases` map assigned to a key with the driver name.
+The function receive no parameters.
+* Add a `DBCreator` constructor function.
+The function receives a map parameter with all the environment variables.
+These are meant to be used in the `GetConnectionString()` method.
+
+=== SQL Builder
+
+The
+link:https://pkg.go.dev/github.com/huandu/go-sqlbuilder[go-sqlbuilder]
+library is used to combine the different SQL pieces into one.
+
+This library supports:
+
+* Building parametrized queries based on different database flavors.
+* Adding custom SQL functions that can be specific of a DBMS.
+
+==== SQL Builders in Database Interfaces
+
+`go-sqlbuilder` expose different `sqlbuilders`:
+
+* `SelectBuilder`
+* `InsertBuilder`
+* `DeleteBuilder`
+
+Combined with the Database Interfaces the following guidelines should be applied:
+
+* All the exposed `DBSelector` functions should return a `SelectBuilder`
+* All the exposed `DBInserter` functions should return a `InsertBuilder`
+* All the exposed `DBDeleter` functions should return a `DeleteBuilder`
+
+`ORDER BY` clauses are only allowed in `SELECT` statements so:
+
+* All the exposed `DBSorter` functions should receive a `SelectBuilder` and return it properly modified.
+
+`WHERE` clauses are allowed in several `sqlbuilders` but all of them include a `Cond` object that keeps
+track of the different arguments and expressions involved so:
+
+* All the exposed `DBFilter` functions should receive a `Cond` object of a `sqlbuilder` and should be
+used to create the returned expression as a string.
+
+==== Common code
+
+Using `go-sqlbuilder` allows the creation of a lot of SQL statements in the same way for different DBMS.
+
+To prevent having duplicated code, along with some of the interfaces a total or a partial implementation
+of the methods that don't depend on specific DBMS functions will be provided.
+
+Then the DBMS implementation can inherit from the Partials and skip some of the method implementations unless
+overwriting them is required.
+
+=== Currently supported DBMS
+
+KubeArchive currently supports `PostgreSQL` and `MariaDB`.
+Examples of those implementations can be found in the `pkg/database` go package.

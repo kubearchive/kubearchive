@@ -2,7 +2,7 @@ module github.com/kubearchive/kubearchive
 
 go 1.22.7
 
-toolchain go1.23.3
+toolchain go1.23.4
 
 require (
 	github.com/Cyprinus12138/otelgin v1.0.2

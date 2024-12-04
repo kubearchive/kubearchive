@@ -20,9 +20,6 @@ var _ = Describe("controller", Ordered, func() {
 	BeforeAll(func() {
 		Skip("NYI")
 
-		By("installing prometheus operator")
-		Expect(utils.InstallPrometheusOperator()).To(Succeed())
-
 		By("installing the cert-manager")
 		Expect(utils.InstallCertManager()).To(Succeed())
 
@@ -32,9 +29,6 @@ var _ = Describe("controller", Ordered, func() {
 	})
 
 	AfterAll(func() {
-		By("uninstalling the Prometheus manager bundle")
-		utils.UninstallPrometheusOperator()
-
 		By("uninstalling the cert-manager bundle")
 		utils.UninstallCertManager()
 

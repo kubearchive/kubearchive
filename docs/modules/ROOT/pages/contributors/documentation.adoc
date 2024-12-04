@@ -1,0 +1,91 @@
+= Documentation Style
+
+When contributing documentation to KubeArchive you are expected to follow
+the guidelines listed below:
+
+* Use present tense, instead of future or past.
+* Use the active voice, instead of the passive voice.
+* Use the second and third persons, instead of first person.
+* Use positive phrases, instead of negative phrases.
+* Use cautious language, instead of making claims.
+* Do not recommend.
+* Use english abbreviations, instead of latin abbreviations.
+
+== Tense
+
+Use present tense whenever possible:
+
+NO: When configured in this way KubeArchive will delete resources.
+
+YES: When configured in this way KubeArchive deletes resources.
+
+== Voice
+
+Use active voice as much as possible, as its usually more direct than the passive:
+
+NO: This feature is configured in the ConfigMap.
+
+YES: Configure this feature in the ConfigMap.
+
+NO: Resources are deleted by KubeArchive when `deleteWhen` is configured.
+
+YES: KubeArchive deletes resources when you configure `deleteWhen`.
+
+== Persons
+
+Avoid first person and use second to interact with the reader and third to describe
+things:
+
+NO: We create the following `KubeArchiveConfig` resource.
+
+YES: Create the following `KubeArchiveConfig` resource.
+
+NO: Execute the file we provide.
+
+YES: Execute the file provided.
+
+== Positive Phrases
+
+Use positive phrases as negative ones are sometimes confusing, most notably when they
+contain two negatives:
+
+NO: Do not set the field when its value is redundant.
+
+YES: Set the field if its value is different to avoid redundancy.
+
+NO: If the feature is not configured KubeArchive does not delete resources.
+
+YES: If the feature is configured KubeArchive deletes resources.
+
+== Claims and Recommendations
+
+Use a "cautious" language when talking about some topics as performance, benefits, best
+practices or security:
+
+NO: KubeArchive improves the performance of your Kubernetes cluster.
+
+YES: KubeArchive can improve the performance of your Kubernetes cluster.
+
+NO: It is recommended that you increase the number of API replicas when facing performance problems.
+
+YES: When facing performance problems, increase the number of API replicas.
+
+NO: The default value is set to X. We recommend Y.
+
+YES: The default value is set to X. Increase it to Y to avoid occasional problems.
+
+== Latin Abbreviations
+
+Use the english abbreviations instead of their latin counterparts.
+
+NO: Used to login with ko (e.g. "quay.io")
+
+YES: Used to login with ko (for example "quay.io")
+
+NO: These are style rules (syntax, indentation, naming, etc.)
+
+YES: These are style rules (syntax, indentation, naming, and so on)
+
+YES: These are style rules (syntax, indentation, naming, and other rules)
+
+NO: against the body of the cloud event (that is the resource)

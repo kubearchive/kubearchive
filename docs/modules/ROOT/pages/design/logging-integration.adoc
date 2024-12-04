@@ -124,7 +124,7 @@ data:
 ----
 The value of each variable is either a string or a CEL expression. A value that
 begins with the prefix "cel:" will be evaluated as a CEL expression against the
-body of the cloud event (i.e. the resource) to determine the real value of that
+body of the cloud event (that is the resource) to determine the real value of that
 variable used in the substitution. For example:
 
 So when generating the logging URL to be stored when a `Pod` is archived,

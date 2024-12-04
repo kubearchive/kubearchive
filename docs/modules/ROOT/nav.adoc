@@ -14,6 +14,7 @@
 ** xref:contributors/release.adoc[]
 ** xref:contributors/secret-rotation.adoc[]
 ** xref:contributors/naming-conventions.adoc[]
+** xref:contributors/documentation.adoc[]
 
 * Reference
 ** xref:reference/database.adoc[]

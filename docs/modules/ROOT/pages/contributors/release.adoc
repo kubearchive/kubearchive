@@ -134,8 +134,8 @@ Add the following secrets to your fork:
 
 Add the following variables to your fork:
 
-* `OCI_REGISTRY`: used to login with Ko (e.g. "quay.io").
-* `OCI_REPOSITORY`: used to push images (e.g. "quay.io/username")
+* `OCI_REGISTRY`: used to login with Ko (for example "quay.io").
+* `OCI_REPOSITORY`: used to push images (for example "quay.io/username")
 
 Then execute the release workflow from the branch you are making changes to.
 

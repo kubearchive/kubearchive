@@ -4,6 +4,7 @@ package fake
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -69,7 +70,7 @@ func (f *Database) TestConnection(env map[string]string) error {
 	return f.err
 }
 
-func (f *Database) QueryResources(ctx context.Context, kind, version, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
+func (f *Database) QueryResources(ctx context.Context, kind, version, limit, continueId, continueDate string) ([]string, int64, string, error) {
 	resources := f.filterResourcesByKindAndApiVersion(kind, version)
 	var date string
 	var id int64
@@ -77,7 +78,17 @@ func (f *Database) QueryResources(ctx context.Context, kind, version, limit, con
 		date = resources[len(resources)-1].GetCreationTimestamp().Format(time.RFC3339)
 		id = int64(len(resources))
 	}
-	return resources, id, date, f.err
+
+	stringResources := []string{}
+	for _, resource := range resources {
+		stringResource, err := json.Marshal(resource)
+		if err != nil {
+			// We can panic because this is meant for testing
+			panic(err.Error())
+		}
+		stringResources = append(stringResources, string(stringResource))
+	}
+	return stringResources, id, date, f.err
 }
 
 func (f *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error) {
@@ -91,7 +102,7 @@ func (f *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace
 	return urls, f.err
 }
 
-func (f *Database) QueryNamespacedResources(ctx context.Context, kind, version, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
+func (f *Database) QueryNamespacedResources(ctx context.Context, kind, version, namespace, limit, continueId, continueDate string) ([]string, int64, string, error) {
 	resources := f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace)
 	var date string
 	var id int64
@@ -99,18 +110,33 @@ func (f *Database) QueryNamespacedResources(ctx context.Context, kind, version, 
 		date = resources[len(resources)-1].GetCreationTimestamp().Format(time.RFC3339)
 		id = int64(len(resources))
 	}
-	return resources, id, date, f.err
+
+	stringResources := make([]string, len(resources))
+	for ix, resource := range resources {
+		stringResource, err := json.Marshal(resource)
+		if err != nil {
+			// We can panic because this is meant for testing
+			panic(err.Error())
+		}
+		stringResources[ix] = string(stringResource)
+	}
+
+	return stringResources, id, date, f.err
 }
 
-func (f *Database) QueryNamespacedResourceByName(ctx context.Context, kind, version, namespace, name string) (*unstructured.Unstructured, error) {
+func (f *Database) QueryNamespacedResourceByName(ctx context.Context, kind, version, namespace, name string) (string, error) {
 	resources := f.filterResourceByKindApiVersionNamespaceAndName(kind, version, namespace, name)
 	if len(resources) > 1 {
-		return nil, fmt.Errorf("More than one resource found")
+		return "", fmt.Errorf("More than one resource found")
 	}
 	if len(resources) == 0 {
-		return nil, f.err
+		return "", f.err
 	}
-	return resources[0], f.err
+	stringResource, err := json.Marshal(resources[0])
+	if err != nil {
+		panic(err.Error())
+	}
+	return string(stringResource), f.err
 }
 
 func (f *Database) filterResourcesByKindAndApiVersion(kind, apiVersion string) []*unstructured.Unstructured {

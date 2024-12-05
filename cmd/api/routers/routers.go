@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +17,6 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/api/pagination"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/observability"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type CacheExpirations struct {
@@ -29,17 +29,7 @@ type Controller struct {
 	CacheConfiguration CacheExpirations
 }
 
-// We roll our own List because we don't want to wrap resources
-// into runtime.RawExtension. We will need more fields for
-// pagination, but they are simple. If they are not, we can
-// start using corev1.List{}. See "kubectl get" code to see
-// how Lists are built.
-type List struct {
-	ApiVersion string                       `json:"apiVersion"`
-	Items      []*unstructured.Unstructured `json:"items"`
-	Kind       string                       `json:"kind"`
-	Metadata   map[string]string            `json:"metadata"`
-}
+const listString = `{"kind": "List", "apiVersion": "v1", "metadata": {"continue": "%s"}, "items": [%s]}`
 
 // GetAllResources responds with the list of resources of a specific type across all namespaces
 func (c *Controller) GetAllResources(context *gin.Context) {
@@ -61,7 +51,7 @@ func (c *Controller) GetAllResources(context *gin.Context) {
 	}
 
 	continueToken := pagination.CreateToken(lastId, lastDate)
-	context.JSON(http.StatusOK, NewList(resources, continueToken))
+	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
 }
 
 func (c *Controller) GetNamespacedResources(context *gin.Context) {
@@ -84,7 +74,7 @@ func (c *Controller) GetNamespacedResources(context *gin.Context) {
 	}
 
 	continueToken := pagination.CreateToken(lastId, lastDate)
-	context.JSON(http.StatusOK, NewList(resources, continueToken))
+	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
 }
 
 func (c *Controller) GetNamespacedResourceByName(context *gin.Context) {
@@ -106,7 +96,7 @@ func (c *Controller) GetNamespacedResourceByName(context *gin.Context) {
 		return
 	}
 
-	context.JSON(http.StatusOK, resource)
+	context.String(http.StatusOK, resource)
 }
 
 func (c *Controller) GetLogURLsByResourceName(context *gin.Context) {
@@ -150,7 +140,7 @@ func (c *Controller) GetAllCoreResources(context *gin.Context) {
 	}
 
 	continueToken := pagination.CreateToken(lastId, lastDate)
-	context.JSON(http.StatusOK, NewList(resources, continueToken))
+	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
 }
 
 func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
@@ -171,7 +161,7 @@ func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
 	}
 
 	continueToken := pagination.CreateToken(lastId, lastDate)
-	context.JSON(http.StatusOK, NewList(resources, continueToken))
+	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
 }
 
 func (c *Controller) GetNamespacedCoreResourceByName(context *gin.Context) {
@@ -191,7 +181,7 @@ func (c *Controller) GetNamespacedCoreResourceByName(context *gin.Context) {
 		return
 	}
 
-	context.JSON(http.StatusOK, resource)
+	context.String(http.StatusOK, resource)
 }
 
 func (c *Controller) GetLogURLsByCoreResourceName(context *gin.Context) {
@@ -243,17 +233,4 @@ func (c *Controller) Readyz(context *gin.Context) {
 		return
 	}
 	context.JSON(http.StatusOK, gin.H{"message": "ready"})
-}
-
-// NewList creates a new List struct with apiVersion "v1",
-// kind "List" and resource Version "". These values
-// can be deserialized into any metav1.<Kind>List safely
-func NewList(resources []*unstructured.Unstructured, continueValue string) List {
-	metadata := map[string]string{"resourceVersion": "", "continue": continueValue}
-	return List{
-		ApiVersion: "v1",
-		Kind:       "List",
-		Items:      resources,
-		Metadata:   metadata,
-	}
 }

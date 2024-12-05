@@ -1,6 +1,6 @@
 [
   {
-    "Url": "http://127.0.0.1:8111/app/search/search?q=search * | spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"4df2df3f-7397-4a63-86b4-9f5f1ff84f99\" | spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"generate\"",
+    "Url": "http://127.0.0.1:8111/app/search/search?q=search * | spath \\\"kubernetes.pod_id\\\" | search \\\"kubernetes.pod_id\\\"=\\\"4df2df3f-7397-4a63-86b4-9f5f1ff84f99\\\" | spath \\\"kubernetes.container_name\\\" | search \\\"kubernetes.container_name\\\"=\\\"generate\\\"",
     "ContainerName": "generate"
   }
 ]

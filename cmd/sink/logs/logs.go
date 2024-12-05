@@ -5,17 +5,16 @@ package logs
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log/slog"
+	"os"
 	"strings"
 
 	ocel "github.com/kubearchive/kubearchive/pkg/cel"
+	"github.com/kubearchive/kubearchive/pkg/files"
 	"github.com/kubearchive/kubearchive/pkg/logurls"
 	"github.com/kubearchive/kubearchive/pkg/models"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -23,80 +22,48 @@ const (
 	containerNameCel = "cel:spec.containers.map(m, m.name)"
 )
 
-var (
-	configCmRef = corev1.ObjectReference{
-		Kind:      "ConfigMap",
-		Name:      "kubearchive-config",
-		Namespace: "kubearchive",
-	}
-	loggingCmRef = corev1.ObjectReference{
-		Kind:      "ConfigMap",
-		Namespace: "kubearchive",
-	}
-	loggingCmSelector = corev1.ConfigMapKeySelector{
-		Key: "logging-configmap-name",
-	}
-)
-
-func getKubeArchiveLoggingCm(ctx context.Context, kubeClient kubernetes.Interface) *corev1.ConfigMap {
-	emptyCm := &corev1.ConfigMap{Data: map[string]string{}}
-	kaConfigCm, err := kubeClient.CoreV1().ConfigMaps(configCmRef.Namespace).Get(
-		ctx,
-		configCmRef.Name,
-		metav1.GetOptions{},
-	)
-	if err != nil {
-		slog.Warn(
-			"error while getting ConfigMap",
-			"ConfigMap",
-			fmt.Sprintf("%s/%s", configCmRef.Namespace, configCmRef.Name),
-			"error",
-			err.Error(),
-		)
-		return emptyCm
-	}
-	var exists bool
-	loggingCmRef.Name, exists = kaConfigCm.Data[loggingCmSelector.Key]
+func getKubeArchiveLoggingConfig() (map[string]string, error) {
+	loggingDir, exists := os.LookupEnv(files.LoggingDirEnvVar)
 	if !exists {
-		slog.Warn("logging ConfigMap not provided", "key", loggingCmSelector.Key)
-		return emptyCm
+		return nil, errors.New("Environment variable not set: " + files.LoggingDirEnvVar)
 	}
-	loggingCm, err := kubeClient.CoreV1().ConfigMaps(loggingCmRef.Namespace).Get(
-		ctx,
-		loggingCmRef.Name,
-		metav1.GetOptions{},
-	)
+	configFiles, err := files.FilesInDir(loggingDir)
 	if err != nil {
-		slog.Warn(
-			"error while getting ConfigMap",
-			"ConfigMap",
-			fmt.Sprintf("%s/%s", loggingCmRef.Namespace, loggingCmRef.Name),
-			"error",
-			err.Error(),
-		)
-		return emptyCm
+		return nil, fmt.Errorf("Could not read logging config: %w", err)
 	}
-	return loggingCm
+	if len(configFiles) == 0 {
+		return nil, errors.New("Logging Config is empty. To configure logging update the kubearchive-logging ConfigMap")
+	}
+
+	loggingConf, err := files.LoggingConfigFromFiles(configFiles)
+	if err != nil {
+		return nil, fmt.Errorf("Could not get value for logging config: %w", err)
+	}
+	return loggingConf, nil
 }
 
 type UrlBuilder struct {
 	logMap map[string]interface{}
 }
 
-func NewUrlBuilder(ctx context.Context, kubeClient kubernetes.Interface) (*UrlBuilder, error) {
-	if kubeClient == nil {
-		return &UrlBuilder{}, fmt.Errorf("Cannot create UrlBuilder with nil kubernetes client")
+func NewUrlBuilder() (*UrlBuilder, error) {
+	loggingConf, err := getKubeArchiveLoggingConfig()
+	if err != nil {
+		return nil, err
 	}
-	loggingCm := getKubeArchiveLoggingCm(ctx, kubeClient)
+	_, exists := loggingConf[logurls.LogURL]
+	if !exists {
+		return nil, errors.New("Invalid logging config. The kubearchive-logging ConfigMap must have a key 'LOG_URL'")
+	}
 	// Set CONTAINER_NAME and overwrite it if already defined
-	loggingCm.Data[logurls.ContainerName] = containerNameCel
+	loggingConf[logurls.ContainerName] = containerNameCel
 	logMap := make(map[string]interface{})
-	for key, val := range loggingCm.Data {
+	for key, val := range loggingConf {
 		celExpr, isCelExpr := strings.CutPrefix(val, celPrefix)
 		if isCelExpr {
 			celProg, err := ocel.CompileCELExpr(celExpr)
 			if err != nil {
-				return &UrlBuilder{}, fmt.Errorf(
+				return nil, fmt.Errorf(
 					"Cannot create UrlBuilder. CEL expression '%s' does not compile: %w",
 					celExpr,
 					err,

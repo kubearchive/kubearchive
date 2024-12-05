@@ -199,28 +199,18 @@ func TestArchiveAndRead(t *testing.T) {
 	}
 
 	// Configure the log url generator
-	loggingConfigName := "kubearchive-splunk"
-	_, kaConfigErr := clientset.CoreV1().ConfigMaps("kubearchive").Create(context.Background(),
-		resources.ConfigMap("kubearchive-config", "kubearchive", map[string]string{
-			"logging-configmap-name": loggingConfigName,
-		}),
-		metav1.CreateOptions{})
-
-	if kaConfigErr != nil && kaConfigErr.Error() != "configmaps \"kubearchive-config\" already exists" {
-		t.Fatal(kaConfigErr)
-	}
-
+	loggingConfigName := "kubearchive-logging"
 	logUrlConfig := map[string]string{
 		"POD_ID":    "cel:metadata.uid",
 		"POD":       "spath \"kubernetes.pod_id\" | search \"kubernetes.pod_id\"=\"{POD_ID}\"",
 		"CONTAINER": "spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"{CONTAINER_NAME}\"",
 		"LOG_URL":   "http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}",
 	}
-	_, kaLoggingErr := clientset.CoreV1().ConfigMaps("kubearchive").Create(context.Background(),
+	_, kaLoggingErr := clientset.CoreV1().ConfigMaps("kubearchive").Update(context.Background(),
 		resources.ConfigMap(loggingConfigName, "kubearchive", logUrlConfig),
-		metav1.CreateOptions{})
+		metav1.UpdateOptions{})
 
-	if kaLoggingErr != nil && kaLoggingErr.Error() != fmt.Sprintf("configmaps \"%s\" already exists", loggingConfigName) {
+	if kaLoggingErr != nil {
 		t.Fatal(kaLoggingErr)
 	}
 

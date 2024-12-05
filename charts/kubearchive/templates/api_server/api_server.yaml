@@ -35,7 +35,8 @@ spec:
               # See recommendations at https://tip.golang.org/doc/gc-guide#Memory_limit
               memory: 230Mi
             limits:
-              cpu: 200m
+              # Currently the API is sitting at 630m on performance tests
+              cpu: 700m
               memory: 256Mi
           volumeMounts:
             - name: tls-secret

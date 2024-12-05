@@ -50,9 +50,9 @@ type DBParamParser interface {
 }
 
 type DBInterface interface {
-	QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error)
-	QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error)
-	QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (*unstructured.Unstructured, error)
+	QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]string, int64, string, error)
+	QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]string, int64, string, error)
+	QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (string, error)
 	QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error)
 
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
@@ -86,7 +86,7 @@ func (db *Database) Ping(ctx context.Context) error {
 	return db.db.PingContext(ctx)
 }
 
-func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
+func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]string, int64, string, error) {
 	var pq *paramQuery
 
 	if continueId != "" && continueDate != "" {
@@ -100,7 +100,7 @@ func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, limit,
 	return db.performResourceQuery(ctx, pq)
 }
 
-func (db *Database) QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]*unstructured.Unstructured, int64, string, error) {
+func (db *Database) QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]string, int64, string, error) {
 	var pq *paramQuery
 
 	if continueId != "" && continueDate != "" {
@@ -114,20 +114,20 @@ func (db *Database) QueryNamespacedResources(ctx context.Context, kind, apiVersi
 	return db.performResourceQuery(ctx, pq)
 }
 
-func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (*unstructured.Unstructured, error) {
+func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (string, error) {
 	pq := db.newParamQuery(db.info.GetNamespacedResourceByNameSQL())
 	pq.addStringParams(kind, apiVersion, namespace, name)
 	resources, _, _, err := db.performResourceQuery(ctx, pq)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	if len(resources) == 0 {
-		return nil, err
+		return "", err
 	} else if len(resources) == 1 {
 		return resources[0], err
 	} else {
-		return nil, fmt.Errorf("more than one resource found")
+		return "", fmt.Errorf("more than one resource found")
 	}
 }
 
@@ -189,14 +189,14 @@ func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids, podUuids
 	}
 }
 
-func (db *Database) performResourceQuery(ctx context.Context, pq *paramQuery) ([]*unstructured.Unstructured, int64, string, error) {
+func (db *Database) performResourceQuery(ctx context.Context, pq *paramQuery) ([]string, int64, string, error) {
 	type resourceFields struct {
 		Date     string `db:"created_at"`
 		Id       int64  `db:"id"`
-		Resource []byte `db:"data"`
+		Resource string `db:"data"`
 	}
 
-	var resources []*unstructured.Unstructured
+	var resources []string
 
 	parsedRows, err := newQueryPerformer[resourceFields](db.db).performQuery(ctx, pq)
 
@@ -210,11 +210,7 @@ func (db *Database) performResourceQuery(ctx context.Context, pq *paramQuery) ([
 	lastRow := parsedRows[len(parsedRows)-1]
 
 	for _, parsedRow := range parsedRows {
-		r, errConversion := models.UnstructuredFromByteSlice(parsedRow.Resource)
-		if errConversion != nil {
-			return resources, 0, "", errConversion
-		}
-		resources = append(resources, r)
+		resources = append(resources, parsedRow.Resource)
 	}
 	return resources, lastRow.Id, lastRow.Date, nil
 }

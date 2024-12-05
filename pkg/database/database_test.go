@@ -249,9 +249,9 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 
 					resource, err := tt.database.QueryNamespacedResourceByName(ctx, kind, version, namespace, podName)
 					if ttt.numResources == 0 {
-						assert.Nil(t, resource)
+						assert.Equal(t, "", resource)
 					} else {
-						assert.NotNil(t, resource)
+						assert.NotEqual(t, "", resource)
 					}
 					assert.NoError(t, err)
 				})
@@ -276,7 +276,7 @@ func TestQueryNamespacedResourceByNameMoreThanOne(t *testing.T) {
 			defer cancel()
 
 			resource, err := tt.database.QueryNamespacedResourceByName(ctx, kind, version, namespace, podName)
-			assert.Nil(t, resource)
+			assert.Equal(t, "", resource)
 			assert.EqualError(t, err, "more than one resource found")
 		})
 	}

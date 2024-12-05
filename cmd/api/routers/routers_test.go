@@ -23,6 +23,10 @@ var testLogUrls = fake.CreateTestLogUrls()
 var nonCoreResources = testResources[:1]
 var coreResources = testResources[1:2]
 
+type List struct {
+	Items []*unstructured.Unstructured
+}
+
 func setupRouter(db database.DBInterface, core bool) *gin.Engine {
 	router := gin.Default()
 	ctrl := Controller{Database: db}

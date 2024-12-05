@@ -164,7 +164,7 @@ func sliceOfAny2sliceOfValue(values []any) []driver.Value {
 	return parsedValues
 }
 
-func TestQueryResources(t *testing.T) {
+func TestQueryResourcesWithoutNamespace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			expectedQuery := regexp.QuoteMeta(tt.database.info.GetResourcesLimitedSQL())
@@ -182,7 +182,7 @@ func TestQueryResources(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 					defer cancel()
 
-					resources, lastId, _, err := tt.database.QueryResources(ctx, kind, version, "100", "", "")
+					resources, lastId, _, err := tt.database.QueryResources(ctx, kind, version, "", "", "100", "", "")
 					if ttt.numResources == 0 {
 						assert.Nil(t, resources)
 						assert.Equal(t, int64(0), lastId)
@@ -198,7 +198,7 @@ func TestQueryResources(t *testing.T) {
 	}
 }
 
-func TestQueryNamespacedResources(t *testing.T) {
+func TestQueryResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			expectedQuery := regexp.QuoteMeta(tt.database.info.GetNamespacedResourcesLimitedSQL())
@@ -216,7 +216,7 @@ func TestQueryNamespacedResources(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 					defer cancel()
 
-					resources, _, _, err := tt.database.QueryNamespacedResources(ctx, kind, version, namespace, "100", "", "")
+					resources, _, _, err := tt.database.QueryResources(ctx, kind, version, namespace, "", "100", "", "")
 					if ttt.numResources == 0 {
 						assert.Nil(t, resources)
 					} else {
@@ -247,37 +247,15 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 					defer cancel()
 
-					resource, err := tt.database.QueryNamespacedResourceByName(ctx, kind, version, namespace, podName)
+					resources, _, _, err := tt.database.QueryResources(ctx, kind, version, namespace, podName, "", "", "")
 					if ttt.numResources == 0 {
-						assert.Equal(t, "", resource)
+						assert.Empty(t, resources)
 					} else {
-						assert.NotEqual(t, "", resource)
+						assert.NotEmpty(t, resources)
 					}
 					assert.NoError(t, err)
 				})
 			}
-		})
-	}
-}
-
-func TestQueryNamespacedResourceByNameMoreThanOne(t *testing.T) {
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			expectedQuery := regexp.QuoteMeta(tt.database.info.GetNamespacedResourceByNameSQL())
-			db, mock := NewMock()
-			tt.database.db = sqlx.NewDb(db, "sqlmock")
-
-			rows := sqlmock.NewRows(resourceQueryColumns).
-				AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource)).
-				AddRow("2024-04-05T09:58:03Z", 2, json.RawMessage(testPodResource))
-			mock.ExpectQuery(expectedQuery).WithArgs(kind, version, namespace, podName).WillReturnRows(rows)
-
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-			defer cancel()
-
-			resource, err := tt.database.QueryNamespacedResourceByName(ctx, kind, version, namespace, podName)
-			assert.Equal(t, "", resource)
-			assert.EqualError(t, err, "more than one resource found")
 		})
 	}
 }

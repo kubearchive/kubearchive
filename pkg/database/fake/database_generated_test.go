@@ -5,7 +5,6 @@ package fake
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -43,7 +42,7 @@ func TestNewFakeDatabase(t *testing.T) {
 	}
 }
 
-func TestQueryResources(t *testing.T) {
+func TestQueryResourcesWithoutNamespace(t *testing.T) {
 	existingKind := testResources[1].GetKind()
 	existingVersion := testResources[1].GetAPIVersion()
 
@@ -76,7 +75,7 @@ func TestQueryResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(testResources, testLogUrls)
-			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, "", "", "")
+			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, "", "", "", "", "")
 			expected := []string{}
 			if len(tt.expected) != 0 {
 				for _, resource := range tt.expected {
@@ -94,7 +93,7 @@ func TestQueryResources(t *testing.T) {
 	}
 }
 
-func TestQueryNamespacedResources(t *testing.T) {
+func TestQueryResources(t *testing.T) {
 	existingKind := testResources[1].GetKind()
 	existingVersion := testResources[1].GetAPIVersion()
 	existingNamespace := testResources[1].GetNamespace()
@@ -139,7 +138,7 @@ func TestQueryNamespacedResources(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filteredResources, _, _, err := db.QueryNamespacedResources(context.TODO(), tt.kind, tt.version, tt.namespace, "", "", "")
+			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace, "", "", "", "")
 			expected := []string{}
 			if len(tt.expected) != 0 {
 				for _, resource := range tt.expected {
@@ -170,7 +169,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 		resourceName string
 		testData     []*unstructured.Unstructured
 		err          error
-		expected     *unstructured.Unstructured
+		expected     []*unstructured.Unstructured
 	}{
 		{
 			name:         "No matching resources by kind",
@@ -220,31 +219,23 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 			resourceName: existingName,
 			testData:     testResources,
 			err:          nil,
-			expected:     testResources[1],
-		},
-		{
-			name:         "More than one matching resources",
-			kind:         existingKind,
-			version:      existingVersion,
-			namespace:    existingNamespace,
-			resourceName: existingName,
-			testData:     append(testResources, testResources...),
-			err:          fmt.Errorf("More than one resource found"),
-			expected:     nil,
+			expected:     testResources[1:],
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(tt.testData, testLogUrls)
-			filteredResources, err := db.QueryNamespacedResourceByName(context.TODO(), tt.kind, tt.version, tt.namespace, tt.resourceName)
-			expected := ""
+			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace, tt.resourceName, "", "", "")
+			expected := []string{}
 			if tt.expected != nil {
-				b, jsonErr := json.Marshal(tt.expected)
-				if jsonErr != nil {
-					t.Fatal(jsonErr)
+				for _, exp := range tt.expected {
+					b, jsonErr := json.Marshal(exp)
+					if jsonErr != nil {
+						t.Fatal(jsonErr)
+					}
+					expected = append(expected, string(b))
 				}
-				expected = string(b)
 			}
 
 			assert.Equal(t, expected, filteredResources)

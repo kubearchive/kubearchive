@@ -1,0 +1,1 @@
+spath \"kubernetes.container_name\" | search \"kubernetes.container_name\"=\"{CONTAINER_NAME}\"

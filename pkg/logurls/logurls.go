@@ -18,7 +18,7 @@ import (
 
 const (
 	variableRegex string = "\\{([A-Za-z0-9_]+)\\}"
-	logURL        string = "LOG_URL"
+	LogURL        string = "LOG_URL"
 	ContainerName string = "CONTAINER_NAME"
 )
 
@@ -41,7 +41,7 @@ func GenerateLogURLs(ctx context.Context, cm map[string]interface{}, data *unstr
 
 	var vmaps = generateSubstitutionMaps(m)
 	for _, vmap := range vmaps {
-		urls = append(urls, interpolate(vmap[logURL], vmap, r))
+		urls = append(urls, interpolate(vmap[LogURL], vmap, r))
 	}
 	return urls, nil
 }

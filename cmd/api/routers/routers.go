@@ -31,22 +31,40 @@ type Controller struct {
 
 const listString = `{"kind": "List", "apiVersion": "v1", "metadata": {"continue": "%s"}, "items": [%s]}`
 
-// GetAllResources responds with the list of resources of a specific type across all namespaces
-func (c *Controller) GetAllResources(context *gin.Context) {
-	group := context.Param("group")
-	version := context.Param("version")
-	apiVersion := fmt.Sprintf("%s/%s", group, version)
+func (c *Controller) GetResources(context *gin.Context) {
 	limit, id, date := pagination.GetValuesFromContext(context)
-
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
-	resources, lastId, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, apiVersion, limit, id, date)
+	group := context.Param("group")
+	version := context.Param("version")
+	namespace := context.Param("namespace")
+	name := context.Param("name")
+
+	apiVersion := version
+	if group != "" {
+		apiVersion = fmt.Sprintf("%s/%s", group, version)
+	}
+
+	// We send namespace even if its an empty string (non-namespaced resources) the Database
+	// knows what to do
+	resources, lastId, lastDate, err := c.Database.QueryResources(
+		context.Request.Context(), kind, apiVersion, namespace, name, limit, id, date)
+
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
+		return
+	}
+
+	if name != "" {
+		if len(resources) > 1 {
+			abort.Abort(context, errors.New("more than one resource found"), http.StatusInternalServerError)
+			return
+		}
+		context.String(http.StatusOK, resources[0])
 		return
 	}
 
@@ -54,64 +72,25 @@ func (c *Controller) GetAllResources(context *gin.Context) {
 	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
 }
 
-func (c *Controller) GetNamespacedResources(context *gin.Context) {
-	group := context.Param("group")
-	version := context.Param("version")
-	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	namespace := context.Param("namespace")
-	limit, id, date := pagination.GetValuesFromContext(context)
-
+func (c *Controller) GetResourceLogs(context *gin.Context) {
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
 
-	resources, lastId, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, apiVersion, namespace, limit, id, date)
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-
-	continueToken := pagination.CreateToken(lastId, lastDate)
-	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
-}
-
-func (c *Controller) GetNamespacedResourceByName(context *gin.Context) {
 	group := context.Param("group")
 	version := context.Param("version")
-	apiVersion := fmt.Sprintf("%s/%s", group, version)
 	namespace := context.Param("namespace")
 	name := context.Param("name")
 
-	kind, err := discovery.GetAPIResourceKind(context)
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
+	apiVersion := version
+	if group != "" {
+		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
-	resource, err := c.Database.QueryNamespacedResourceByName(context.Request.Context(), kind, apiVersion, namespace, name)
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-
-	context.String(http.StatusOK, resource)
-}
-
-func (c *Controller) GetLogURLsByResourceName(context *gin.Context) {
-	group := context.Param("group")
-	version := context.Param("version")
-	apiVersion := fmt.Sprintf("%s/%s", group, version)
-	namespace := context.Param("namespace")
-	name := context.Param("name")
-
-	kind, err := discovery.GetAPIResourceKind(context)
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-	logURLs, err := c.Database.QueryLogURLs(context.Request.Context(), kind, apiVersion, namespace, name)
+	logURLs, err := c.Database.QueryLogURLs(
+		context.Request.Context(), kind, apiVersion, namespace, name)
 	if errors.Is(err, database.ResourceNotFoundError) {
 		abort.Abort(context, err, http.StatusNotFound)
 	}
@@ -121,91 +100,6 @@ func (c *Controller) GetLogURLsByResourceName(context *gin.Context) {
 	}
 
 	context.JSON(http.StatusOK, logURLs)
-}
-
-func (c *Controller) GetAllCoreResources(context *gin.Context) {
-	version := context.Param("version")
-	limit, id, date := pagination.GetValuesFromContext(context)
-
-	kind, err := discovery.GetAPIResourceKind(context)
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-
-	resources, lastId, lastDate, err := c.Database.QueryResources(context.Request.Context(), kind, version, limit, id, date)
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-
-	continueToken := pagination.CreateToken(lastId, lastDate)
-	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
-}
-
-func (c *Controller) GetNamespacedCoreResources(context *gin.Context) {
-	version := context.Param("version")
-	namespace := context.Param("namespace")
-	limit, id, date := pagination.GetValuesFromContext(context)
-
-	kind, err := discovery.GetAPIResourceKind(context)
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-
-	resources, lastId, lastDate, err := c.Database.QueryNamespacedResources(context.Request.Context(), kind, version, namespace, limit, id, date)
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-
-	continueToken := pagination.CreateToken(lastId, lastDate)
-	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
-}
-
-func (c *Controller) GetNamespacedCoreResourceByName(context *gin.Context) {
-	version := context.Param("version")
-	namespace := context.Param("namespace")
-	name := context.Param("name")
-
-	kind, err := discovery.GetAPIResourceKind(context)
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-
-	resource, err := c.Database.QueryNamespacedResourceByName(context.Request.Context(), kind, version, namespace, name)
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-
-	context.String(http.StatusOK, resource)
-}
-
-func (c *Controller) GetLogURLsByCoreResourceName(context *gin.Context) {
-	version := context.Param("version")
-	namespace := context.Param("namespace")
-	name := context.Param("name")
-
-	kind, err := discovery.GetAPIResourceKind(context)
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-
-	logURLs, err := c.Database.QueryLogURLs(context.Request.Context(), kind, version, namespace, name)
-	if errors.Is(err, database.ResourceNotFoundError) {
-		abort.Abort(context, err, http.StatusNotFound)
-	}
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-
-	context.JSON(http.StatusOK, logURLs)
-
 }
 
 // Livez returns current server configuration as we don't have a clear deadlock indicator

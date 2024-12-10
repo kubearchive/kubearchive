@@ -50,9 +50,8 @@ type DBParamParser interface {
 }
 
 type DBInterface interface {
-	QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]string, int64, string, error)
-	QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]string, int64, string, error)
-	QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (string, error)
+	QueryResources(ctx context.Context, kind, apiVersion, namespace,
+		name, limit, continueId, continueDate string) ([]string, int64, string, error)
 	QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error)
 
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
@@ -86,49 +85,33 @@ func (db *Database) Ping(ctx context.Context) error {
 	return db.db.PingContext(ctx)
 }
 
-func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, limit, continueId, continueDate string) ([]string, int64, string, error) {
-	var pq *paramQuery
+func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, namespace,
+	name, limit, continueId, continueDate string) ([]string, int64, string, error) {
+	// To simplify the logic, we don't use `else` and instead override `pq` when needed
+	pq := db.newParamQuery(db.info.GetResourcesLimitedSQL())
+	pq.addStringParams(kind, apiVersion, limit)
+
+	if namespace != "" {
+		pq = db.newParamQuery(db.info.GetNamespacedResourcesLimitedSQL())
+		pq.addStringParams(kind, apiVersion, namespace, limit)
+
+		if name != "" {
+			pq = db.newParamQuery(db.info.GetNamespacedResourceByNameSQL())
+			pq.addStringParams(kind, apiVersion, namespace, name)
+		}
+	}
 
 	if continueId != "" && continueDate != "" {
 		pq = db.newParamQuery(db.info.GetResourcesLimitedContinueSQL())
 		pq.addStringParams(kind, apiVersion, continueDate, continueId, limit)
-	} else {
-		pq = db.newParamQuery(db.info.GetResourcesLimitedSQL())
-		pq.addStringParams(kind, apiVersion, limit)
+
+		if namespace != "" {
+			pq = db.newParamQuery(db.info.GetNamespacedResourcesLimitedContinueSQL())
+			pq.addStringParams(kind, apiVersion, namespace, continueDate, continueId, limit)
+		}
 	}
 
 	return db.performResourceQuery(ctx, pq)
-}
-
-func (db *Database) QueryNamespacedResources(ctx context.Context, kind, apiVersion, namespace, limit, continueId, continueDate string) ([]string, int64, string, error) {
-	var pq *paramQuery
-
-	if continueId != "" && continueDate != "" {
-		pq = db.newParamQuery(db.info.GetNamespacedResourcesLimitedContinueSQL())
-		pq.addStringParams(kind, apiVersion, namespace, continueDate, continueId, limit)
-	} else {
-		pq = db.newParamQuery(db.info.GetNamespacedResourcesLimitedSQL())
-		pq.addStringParams(kind, apiVersion, namespace, limit)
-	}
-
-	return db.performResourceQuery(ctx, pq)
-}
-
-func (db *Database) QueryNamespacedResourceByName(ctx context.Context, kind, apiVersion, namespace, name string) (string, error) {
-	pq := db.newParamQuery(db.info.GetNamespacedResourceByNameSQL())
-	pq.addStringParams(kind, apiVersion, namespace, name)
-	resources, _, _, err := db.performResourceQuery(ctx, pq)
-	if err != nil {
-		return "", err
-	}
-
-	if len(resources) == 0 {
-		return "", err
-	} else if len(resources) == 1 {
-		return resources[0], err
-	} else {
-		return "", fmt.Errorf("more than one resource found")
-	}
 }
 
 func (db *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error) {

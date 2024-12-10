@@ -81,15 +81,15 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	router.GET("/livez", controller.Livez)
 	router.GET("/readyz", controller.Readyz)
 
-	apisGroup.GET("/:group/:version/:resourceType", controller.GetAllResources)
-	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedResources)
-	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name", controller.GetNamespacedResourceByName)
-	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name/log", controller.GetLogURLsByResourceName)
+	apisGroup.GET("/:group/:version/:resourceType", controller.GetResources)
+	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetResources)
+	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
+	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name/log", controller.GetResourceLogs)
 
-	apiGroup.GET("/:version/:resourceType", controller.GetAllCoreResources)
-	apiGroup.GET("/:version/namespaces/:namespace/:resourceType", controller.GetNamespacedCoreResources)
-	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name", controller.GetNamespacedCoreResourceByName)
-	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name/log", controller.GetLogURLsByCoreResourceName)
+	apiGroup.GET("/:version/:resourceType", controller.GetResources)
+	apiGroup.GET("/:version/namespaces/:namespace/:resourceType", controller.GetResources)
+	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
+	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name/log", controller.GetResourceLogs)
 
 	return &Server{
 		router:    router,

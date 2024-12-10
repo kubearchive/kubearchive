@@ -37,14 +37,14 @@ func setupRouter(db database.DBInterface, core bool) *gin.Engine {
 			c.Set("apiResourceKind", "Crontab")
 		}
 	})
-	router.GET("/apis/:group/:version/:resourceType", ctrl.GetAllResources)
-	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType", ctrl.GetAllResources)
-	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name", ctrl.GetNamespacedResourceByName)
-	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name/log", ctrl.GetLogURLsByResourceName)
-	router.GET("/api/:version/:resourceType", ctrl.GetAllCoreResources)
-	router.GET("/api/:version/namespace/:namespace/:resourceType", ctrl.GetNamespacedCoreResources)
-	router.GET("/api/:version/namespace/:namespace/:resourceType/:name", ctrl.GetNamespacedCoreResourceByName)
-	router.GET("/api/:version/namespace/:namespace/:resourceType/:name/log", ctrl.GetLogURLsByCoreResourceName)
+	router.GET("/apis/:group/:version/:resourceType", ctrl.GetResources)
+	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType", ctrl.GetResources)
+	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name", ctrl.GetResources)
+	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name/log", ctrl.GetResourceLogs)
+	router.GET("/api/:version/:resourceType", ctrl.GetResources)
+	router.GET("/api/:version/namespace/:namespace/:resourceType", ctrl.GetResources)
+	router.GET("/api/:version/namespace/:namespace/:resourceType/:name", ctrl.GetResources)
+	router.GET("/api/:version/namespace/:namespace/:resourceType/:name/log", ctrl.GetResourceLogs)
 	return router
 }
 
@@ -78,7 +78,7 @@ func TestGetResourcesLogURLs(t *testing.T) {
 	assert.Equal(t, len(testLogUrls), len(urls))
 }
 
-func TestGetAllResources(t *testing.T) {
+func TestGetResources(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), false)
 
 	res := httptest.NewRecorder()
@@ -122,6 +122,18 @@ func TestGetNamespacedResourcesByName(t *testing.T) {
 		t.Fail()
 	}
 	assert.Equal(t, nonCoreResources[0], resource)
+}
+
+func TestGetNamespacedResourcesByNameMoreThanOne(t *testing.T) {
+	customResources := append(testResources, testResources[0])
+	router := setupRouter(fake.NewFakeDatabase(customResources, testLogUrls), false)
+
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs/test", nil)
+	router.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusInternalServerError, res.Code)
+	assert.Contains(t, res.Body.String(), "more than one resource found")
 }
 
 func TestGetResourcesEmpty(t *testing.T) {
@@ -201,7 +213,7 @@ func TestNoAPIResourceInContextError(t *testing.T) {
 	// Setting a router without a middleware that sets the api resource
 	router := gin.Default()
 	ctrl := Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls)}
-	router.GET("/api/:version/:resourceType", ctrl.GetAllCoreResources)
+	router.GET("/api/:version/:resourceType", ctrl.GetResources)
 
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)

@@ -88,6 +88,7 @@ CREATE TABLE public.log_url (
     uuid uuid NOT NULL,
     url text NOT NULL,
     container_name text NOT NULL,
+	json_path text,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL
 );

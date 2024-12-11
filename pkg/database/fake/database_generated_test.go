@@ -253,10 +253,12 @@ func TestWriteUrls(t *testing.T) {
 		{Url: "https://github.com/kubearchive", ContainerName: "container-1"},
 		{Url: "https://example.com", ContainerName: "container-2"},
 	}
+	jsonPath := "$.hits.hits[*]._source.message"
 	tests := []struct {
 		name           string
 		initialLogUrls []LogUrlRow
 		obj            *unstructured.Unstructured
+		jsonPath       string
 		newUrls        []models.LogTuple
 		expected       []LogUrlRow
 	}{
@@ -264,10 +266,11 @@ func TestWriteUrls(t *testing.T) {
 			name:           "Insert log urls into empty table",
 			initialLogUrls: []LogUrlRow{},
 			obj:            k8sObj,
+			jsonPath:       jsonPath,
 			newUrls:        newUrls,
 			expected: []LogUrlRow{
-				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName, JsonPath: jsonPath},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName, JsonPath: jsonPath},
 			},
 		},
 		{
@@ -275,23 +278,25 @@ func TestWriteUrls(t *testing.T) {
 			initialLogUrls: []LogUrlRow{
 				{Uuid: types.UID("asdf-1234-fdsa"), Url: "https://fake.com"},
 			},
-			obj:     k8sObj,
-			newUrls: newUrls,
+			obj:      k8sObj,
+			jsonPath: jsonPath,
+			newUrls:  newUrls,
 			expected: []LogUrlRow{
 				{Uuid: types.UID("asdf-1234-fdsa"), Url: "https://fake.com"},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName, JsonPath: jsonPath},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName, JsonPath: jsonPath},
 			},
 		},
 		{
 			name:           "Insert log urls into table with uuid matches",
 			initialLogUrls: testLogUrls,
 			obj:            k8sObj,
+			jsonPath:       jsonPath,
 			newUrls:        newUrls,
 			expected: []LogUrlRow{
 				{Uuid: types.UID("asdf-1234-fdsa"), Url: "fake.org", ContainerName: "foo"},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName, JsonPath: jsonPath},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName, JsonPath: jsonPath},
 			},
 		},
 	}
@@ -299,7 +304,7 @@ func TestWriteUrls(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(testResources, tt.initialLogUrls)
-			err := db.WriteUrls(context.Background(), tt.obj, tt.newUrls...)
+			err := db.WriteUrls(context.Background(), tt.obj, tt.jsonPath, tt.newUrls...)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.expected, db.logUrl)
 		})

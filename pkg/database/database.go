@@ -30,7 +30,7 @@ type DBInterface interface {
 	QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error)
 
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
-	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, logs ...models.LogTuple) error
+	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error
 	Ping(ctx context.Context) error
 	CloseDB() error
 }
@@ -234,7 +234,12 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 }
 
 // WriteUrls deletes urls for k8sObj before writing urls to prevent duplicates
-func (db *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, logs ...models.LogTuple) error {
+func (db *Database) WriteUrls(
+	ctx context.Context,
+	k8sObj *unstructured.Unstructured,
+	jsonPath string,
+	logs ...models.LogTuple,
+) error {
 	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf(
@@ -264,6 +269,7 @@ func (db *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstruct
 			string(k8sObj.GetUID()),
 			log.Url,
 			log.ContainerName,
+			jsonPath,
 		).BuildWithFlavor(db.Flavor)
 		_, logQueryErr := tx.ExecContext(ctx, logQuery, logArgs...)
 		if logQueryErr != nil {

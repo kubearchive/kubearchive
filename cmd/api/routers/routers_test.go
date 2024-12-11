@@ -27,6 +27,10 @@ type List struct {
 	Items []*unstructured.Unstructured
 }
 
+func retrieveLogURL(c *gin.Context) {
+	c.JSON(http.StatusOK, c.GetString("logURL"))
+}
+
 func setupRouter(db database.DBInterface, core bool) *gin.Engine {
 	router := gin.Default()
 	ctrl := Controller{Database: db}
@@ -40,11 +44,13 @@ func setupRouter(db database.DBInterface, core bool) *gin.Engine {
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetResources)
 	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType", ctrl.GetResources)
 	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name", ctrl.GetResources)
-	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name/log", ctrl.GetResourceLogs)
+	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name/log",
+		ctrl.GetLogURL, retrieveLogURL)
 	router.GET("/api/:version/:resourceType", ctrl.GetResources)
 	router.GET("/api/:version/namespace/:namespace/:resourceType", ctrl.GetResources)
 	router.GET("/api/:version/namespace/:namespace/:resourceType/:name", ctrl.GetResources)
-	router.GET("/api/:version/namespace/:namespace/:resourceType/:name/log", ctrl.GetResourceLogs)
+	router.GET("/api/:version/namespace/:namespace/:resourceType/:name/log",
+		ctrl.GetLogURL, retrieveLogURL)
 	return router
 }
 
@@ -56,11 +62,11 @@ func TestGetCoreResourcesLogURLs(t *testing.T) {
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
-	var urls []string
-	if err := json.NewDecoder(res.Body).Decode(&urls); err != nil {
+	var url string
+	if err := json.NewDecoder(res.Body).Decode(&url); err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, []string{testLogUrls[0].Url}, urls)
+	assert.Equal(t, testLogUrls[0].Url, url)
 }
 
 func TestGetResourcesLogURLs(t *testing.T) {
@@ -71,11 +77,11 @@ func TestGetResourcesLogURLs(t *testing.T) {
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
-	var urls []string
-	if err := json.NewDecoder(res.Body).Decode(&urls); err != nil {
+	var url string
+	if err := json.NewDecoder(res.Body).Decode(&url); err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, len(testLogUrls), len(urls))
+	assert.NotNil(t, url)
 }
 
 func TestGetResources(t *testing.T) {

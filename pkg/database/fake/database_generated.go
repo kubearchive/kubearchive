@@ -73,15 +73,15 @@ func (f *Database) queryResources(_ context.Context, kind, version, _, _ string,
 	return f.filterResourcesByKindAndApiVersion(kind, version)
 }
 
-func (f *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace, name string) ([]string, error) {
+func (f *Database) QueryLogURL(ctx context.Context, kind, _, _, _ string) (string, error) {
 	if kind == "Pod" {
-		return []string{f.logUrl[0].Url}, f.err
+		return f.logUrl[0].Url, f.err
 	}
 	var urls []string
 	for _, l := range f.logUrl {
 		urls = append(urls, l.Url)
 	}
-	return urls, f.err
+	return urls[0], f.err
 }
 
 func (f *Database) QueryResources(ctx context.Context, kind, version, namespace, name,

@@ -110,8 +110,8 @@ func TestPodQueryLogURLs(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrls, err := tt.database.QueryLogURLs(ctx, "Pod", podApiVersion, namespace, podName)
-			assert.Equal(t, 2, len(logUrls))
+			logUrl, err := tt.database.QueryLogURL(ctx, "Pod", podApiVersion, namespace, podName)
+			assert.Equal(t, "mock-url-container1", logUrl)
 			assert.NoError(t, err)
 		})
 	}
@@ -136,7 +136,7 @@ func TestLogURLsFromNonExistentResource(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrls, err := tt.database.QueryLogURLs(ctx, kind, cronJobApiVersion, namespace, cronJobName)
+			logUrls, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName)
 			assert.Equal(t, 0, len(logUrls))
 			assert.Error(t, err, "resource not found")
 		})
@@ -159,12 +159,12 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 				tt.database.Filter.NamespaceFilter(sb.Cond, namespace),
 				tt.database.Filter.NameFilter(sb.Cond, cronJobName),
 			)
-			query, _ := sb.BuildWithFlavor(tt.database.Flavor)
-			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(kind, cronJobApiVersion, namespace, cronJobName).WillReturnRows(rows)
+			query, args := sb.BuildWithFlavor(tt.database.Flavor)
+			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 			sb = tt.database.Selector.OwnedResourceSelector()
 			sb.Where(tt.database.Filter.OwnerFilter(sb.Cond, []string{"mock-uuid-cronjob"}))
-			query, args := sb.BuildWithFlavor(tt.database.Flavor)
+			query, args = sb.BuildWithFlavor(tt.database.Flavor)
 
 			// Get owned job
 			rows = sqlmock.NewRows([]string{"kind", "uuid"})
@@ -182,18 +182,18 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 
 			// Get pods log urls
 			rows = sqlmock.NewRows([]string{"url"})
-			rows.AddRow("mock-log-url-pod1")
-			rows.AddRow("mock-log-url-pod2")
+			rows.AddRow("mock-log-url-pod1-container1")
+			rows.AddRow("mock-log-url-pod1-container2")
 			sb = tt.database.Selector.UrlSelector()
-			sb.Where(tt.database.Filter.UuidsFilter(sb.Cond, []string{"mock-uuid-pod1", "mock-uuid-pod2"}))
+			sb.Where(tt.database.Filter.UuidsFilter(sb.Cond, []string{"mock-uuid-pod1"}))
 			query, args = sb.BuildWithFlavor(tt.database.Flavor)
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrls, err := tt.database.QueryLogURLs(ctx, kind, cronJobApiVersion, namespace, cronJobName)
-			assert.Equal(t, 2, len(logUrls))
+			logUrl, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName)
+			assert.Equal(t, "mock-log-url-pod1-container1", logUrl)
 			assert.NoError(t, err)
 		})
 	}

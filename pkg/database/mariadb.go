@@ -48,6 +48,15 @@ func (MariaDBSelector) ResourceSelector() *sqlbuilder.SelectBuilder {
 	).From("resource")
 }
 
+func (MariaDBSelector) OwnedResourceSelector() *sqlbuilder.SelectBuilder {
+	sb := sqlbuilder.NewSelectBuilder()
+	return sb.Select(
+		"uuid",
+		"kind",
+		sb.As("JSON_VALUE(data, '$.metadata.creationTimestamp')", "created_at"),
+	).From("resource")
+}
+
 type MariaDBFilter struct {
 	facade.PartialDBFilterImpl
 }

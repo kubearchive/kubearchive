@@ -49,10 +49,10 @@ func (c *Controller) GetResources(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
-	// We send namespace even if its an empty string (non-namespaced resources) the Database
+	// We send namespace even if it's an empty string (non-namespaced resources) the Database
 	// knows what to do
 	resources, lastId, lastDate, err := c.Database.QueryResources(
-		context.Request.Context(), kind, apiVersion, namespace, name, limit, id, date)
+		context.Request.Context(), kind, apiVersion, namespace, name, id, date, limit)
 
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)

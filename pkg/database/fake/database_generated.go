@@ -69,7 +69,7 @@ func (f *Database) TestConnection(env map[string]string) error {
 	return f.err
 }
 
-func (f *Database) queryResources(_ context.Context, kind, version, _, _, _ string) []*unstructured.Unstructured {
+func (f *Database) queryResources(_ context.Context, kind, version, _, _ string, _ int) []*unstructured.Unstructured {
 	return f.filterResourcesByKindAndApiVersion(kind, version)
 }
 
@@ -84,7 +84,8 @@ func (f *Database) QueryLogURLs(ctx context.Context, kind, apiVersion, namespace
 	return urls, f.err
 }
 
-func (f *Database) QueryResources(ctx context.Context, kind, version, namespace, name, limit, continueId, continueDate string) ([]string, int64, string, error) {
+func (f *Database) QueryResources(ctx context.Context, kind, version, namespace, name,
+	continueId, continueDate string, limit int) ([]string, int64, string, error) {
 	var resources []*unstructured.Unstructured
 
 	if name != "" {
@@ -92,7 +93,7 @@ func (f *Database) QueryResources(ctx context.Context, kind, version, namespace,
 	} else if namespace != "" {
 		resources = f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace)
 	} else {
-		resources = f.queryResources(ctx, kind, version, limit, continueId, continueDate)
+		resources = f.queryResources(ctx, kind, version, continueId, continueDate, limit)
 	}
 
 	var date string
@@ -115,7 +116,8 @@ func (f *Database) QueryResources(ctx context.Context, kind, version, namespace,
 	return stringResources, id, date, f.err
 }
 
-func (f *Database) queryNamespacedResourceByName(_ context.Context, kind, version, namespace, name string) []*unstructured.Unstructured {
+func (f *Database) queryNamespacedResourceByName(_ context.Context, kind, version, namespace, name string,
+) []*unstructured.Unstructured {
 	return f.filterResourceByKindApiVersionNamespaceAndName(kind, version, namespace, name)
 }
 

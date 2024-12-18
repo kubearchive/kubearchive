@@ -41,6 +41,7 @@ type LogUrlRow struct {
 	Uuid          types.UID
 	Url           string
 	ContainerName string
+	JsonPath      string
 }
 
 type Database struct {
@@ -156,7 +157,7 @@ func (f *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstr
 	return nil
 }
 
-func (f *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, logs ...models.LogTuple) error {
+func (f *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error {
 	newLogUrls := make([]LogUrlRow, 0)
 	for _, row := range f.logUrl {
 		if k8sObj.GetUID() != row.Uuid {
@@ -166,7 +167,7 @@ func (f *Database) WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructu
 	f.logUrl = newLogUrls
 
 	for _, url := range logs {
-		f.logUrl = append(f.logUrl, LogUrlRow{Uuid: k8sObj.GetUID(), Url: url.Url, ContainerName: url.ContainerName})
+		f.logUrl = append(f.logUrl, LogUrlRow{Uuid: k8sObj.GetUID(), Url: url.Url, ContainerName: url.ContainerName, JsonPath: jsonPath})
 	}
 	return nil
 }

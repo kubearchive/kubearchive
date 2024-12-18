@@ -1,0 +1,49 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: Performance Recap
+run-name: Performance Recap
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * 0"  # Each sunday at 0 UTC
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  setup:
+    uses: ./.github/workflows/log_run_details.yml
+  integration:
+    name: KubeArchive Performance Recap
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Cache Performance resulst
+        uses: actions/cache@v4
+        with:
+          key: performance-results
+          path: |
+            ./merge
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Display Go version
+        run: go version
+      - name: Run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p merge/
+          rm -f merge/workflowruns.json
+          go run test/performance/merge/main.go
+          echo -e "# Create CPU\n" >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}
+          cat ./merge/create-cpu.csv >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}
+          echo -e "# Create Memory\n" >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}
+          cat ./merge/create-memory.csv >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}
+          echo -e "# Get CPU\n" >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}
+          cat ./merge/get-cpu.csv >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}
+          echo -e "# Get Memory\n" >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}
+          cat ./merge/get-memory.csv >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}

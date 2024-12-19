@@ -91,6 +91,10 @@ func (sink *Sink) writeLogs(ctx context.Context, obj *unstructured.Unstructured)
 		slog.Error("Could not build log urls for object", "objectID", obj.GetUID(), "err", err)
 		return
 	}
+	if len(urls) == 0 {
+		slog.Info("No log urls were generated for object", "objectID", obj.GetUID())
+		return
+	}
 	err = sink.Db.WriteUrls(logCtx, obj, sink.logUrlBuilder.GetJsonPath(), urls...)
 	if err != nil {
 		slog.Error("Failed to write log urls for object to the database", "objectID", obj.GetUID(), "err", err)

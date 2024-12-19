@@ -263,13 +263,20 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 	return nil
 }
 
-// WriteUrls deletes urls for k8sObj before writing urls to prevent duplicates
+// WriteUrls deletes urls for k8sObj before writing urls to prevent duplicates. If logs is empty or nil all urls for
+// k8sObj will be deleted from the database and will not be replaced
 func (db *Database) WriteUrls(
 	ctx context.Context,
 	k8sObj *unstructured.Unstructured,
 	jsonPath string,
 	logs ...models.LogTuple,
 ) error {
+	// The sink performs checks before WriteUrls is called, which currently make it not possible for this check to
+	// evaluate to true during normal program execution. This check is here purely as a safeguard.
+	if k8sObj == nil {
+		return errors.New("Cannot write log urls to the database when k8sObj is nil")
+	}
+
 	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf(

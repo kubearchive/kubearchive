@@ -240,6 +240,13 @@ func (db *Database) WriteUrls(
 	jsonPath string,
 	logs ...models.LogTuple,
 ) error {
+	if k8sObj == nil {
+		return errors.New("Cannot write log urls to the database when k8sObj is nil")
+	}
+	if len(logs) == 0 {
+		return errors.New("Cannot write log urls to the database when no logs are provided")
+	}
+
 	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf(

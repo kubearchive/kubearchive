@@ -866,12 +866,12 @@ honnef.co/go/tools v0.0.1-2020.1.3/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9
 honnef.co/go/tools v0.0.1-2020.1.4/go.mod h1:X/FiERA/W4tHapMX5mGpAtMSVEeEUOyHaw9vFzvIQ3k=
 k8s.io/api v0.32.0 h1:OL9JpbvAU5ny9ga2fb24X8H6xQlVp+aJMFlgtQjR9CE=
 k8s.io/api v0.32.0/go.mod h1:4LEwHZEf6Q/cG96F3dqR965sYOfmPM7rq81BLgsE0p0=
-k8s.io/apiextensions-apiserver v0.31.0 h1:fZgCVhGwsclj3qCw1buVXCV6khjRzKC5eCFt24kyLSk=
-k8s.io/apiextensions-apiserver v0.31.0/go.mod h1:b9aMDEYaEe5sdK+1T0KU78ApR/5ZVp4i56VacZYEHxk=
+k8s.io/apiextensions-apiserver v0.31.4 h1:FxbqzSvy92Ca9DIs5jqot883G0Ln/PGXfm/07t39LS0=
+k8s.io/apiextensions-apiserver v0.31.4/go.mod h1:hIW9YU8UsqZqIWGG99/gsdIU0Ar45Qd3A12QOe/rvpg=
 k8s.io/apimachinery v0.32.0 h1:cFSE7N3rmEEtv4ei5X6DaJPHHX0C+upp+v5lVPiEwpg=
 k8s.io/apimachinery v0.32.0/go.mod h1:GpHVgxoKlTxClKcteaeuF1Ul/lDVb74KpZcxcmLDElE=
-k8s.io/apiserver v0.31.0 h1:p+2dgJjy+bk+B1Csz+mc2wl5gHwvNkC9QJV+w55LVrY=
-k8s.io/apiserver v0.31.0/go.mod h1:KI9ox5Yu902iBnnyMmy7ajonhKnkeZYJhTZ/YI+WEMk=
+k8s.io/apiserver v0.31.4 h1:JbtnTaXVYEAYIHJil6Wd74Wif9sd8jVcBw84kwEmp7o=
+k8s.io/apiserver v0.31.4/go.mod h1:JJjoTjZ9PTMLdIFq7mmcJy2B9xLN3HeAUebW6xZyIP0=
 k8s.io/cli-runtime v0.32.0 h1:dP+OZqs7zHPpGQMCGAhectbHU2SNCuZtIimRKTv2T1c=
 k8s.io/cli-runtime v0.32.0/go.mod h1:Mai8ht2+esoDRK5hr861KRy6z0zHsSTYttNVJXgP3YQ=
 k8s.io/client-go v0.32.0 h1:DimtMcnN/JIKZcrSrstiwvvZvLjG0aSxy8PxN8IChp8=
@@ -884,8 +884,8 @@ k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 h1:M3sRQVHv7vB20Xc2ybTt7ODCeFj6J
 k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 knative.dev/eventing v0.43.3 h1:xt10rMoe6t1hFPPrnsR5NYe/vWRXQqLgRK8lS6n5mU8=
 knative.dev/eventing v0.43.3/go.mod h1:pdrF+bEUfRkNn9ifWXS7DoVj5W31gA5KQVd8iwplXUo=
-knative.dev/pkg v0.0.0-20250109131202-4ba3f1b39dbf h1:b1N1fbncJoj37B+l53KEIllA3iPeXtEcdk4eZ0xcXlc=
-knative.dev/pkg v0.0.0-20250109131202-4ba3f1b39dbf/go.mod h1:C2dxK66GlycMOS0SKqv0SMAnWkxsYbG4hkH32Xg1qD0=
+knative.dev/pkg v0.0.0-20250109162516-23c15c0870b1 h1:hfO/ScPC4KzB/Vps//ogJca/C/wPOdX4uoLeK3MYWK8=
+knative.dev/pkg v0.0.0-20250109162516-23c15c0870b1/go.mod h1:1ccT95POmsSUnHcBtZ05/OtYfaDsE1tN9x59sKY0wts=
 nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=
 rsc.io/binaryregexp v0.2.0/go.mod h1:qTv7/COck+e2FymRvadv62gMdZztPaShugOCi3I+8D8=
 rsc.io/quote/v3 v3.1.0/go.mod h1:yEA65RcK8LyAZtP9Kv3t0HmxON59tX3rD+tICJqUlj0=

@@ -5,6 +5,7 @@ package fake
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -261,6 +262,7 @@ func TestWriteUrls(t *testing.T) {
 		jsonPath       string
 		newUrls        []models.LogTuple
 		expected       []LogUrlRow
+		error          error
 	}{
 		{
 			name:           "Insert log urls into empty table",
@@ -272,6 +274,7 @@ func TestWriteUrls(t *testing.T) {
 				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName, JsonPath: jsonPath},
 				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName, JsonPath: jsonPath},
 			},
+			error: nil,
 		},
 		{
 			name: "Insert log urls into table with no uuid matches",
@@ -286,6 +289,7 @@ func TestWriteUrls(t *testing.T) {
 				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName, JsonPath: jsonPath},
 				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName, JsonPath: jsonPath},
 			},
+			error: nil,
 		},
 		{
 			name:           "Insert log urls into table with uuid matches",
@@ -298,6 +302,16 @@ func TestWriteUrls(t *testing.T) {
 				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName, JsonPath: jsonPath},
 				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName, JsonPath: jsonPath},
 			},
+			error: nil,
+		},
+		{
+			name:           "Nil k8sObj returns error with no change to database",
+			initialLogUrls: testLogUrls,
+			obj:            nil,
+			jsonPath:       jsonPath,
+			newUrls:        newUrls,
+			expected:       testLogUrls,
+			error:          errors.New("Cannot write log urls to the database when k8sObj is nil"),
 		},
 	}
 
@@ -305,8 +319,8 @@ func TestWriteUrls(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(testResources, tt.initialLogUrls)
 			err := db.WriteUrls(context.Background(), tt.obj, tt.jsonPath, tt.newUrls...)
-			assert.Nil(t, err)
 			assert.Equal(t, tt.expected, db.logUrl)
+			assert.Equal(t, tt.error, err)
 		})
 	}
 }

@@ -25,7 +25,7 @@ func fakeServer(k8sClient kubernetes.Interface, cache *cache.Cache) *Server {
 		// It may be related to https://github.com/kubernetes/kubernetes/issues/126850 so keeping deprecated.
 		k8sClient = fakeK8s.NewSimpleClientset()
 	}
-	controller := routers.Controller{Database: fakeDB.NewFakeDatabase(nil, nil)}
+	controller := routers.Controller{Database: fakeDB.NewFakeDatabase(nil, nil, "")}
 	expirations := &routers.CacheExpirations{Authorized: 1 * time.Second, Unauthorized: 1 * time.Second}
 	return NewServer(k8sClient, controller, cache, expirations)
 }
@@ -46,26 +46,34 @@ func TestMiddlewareConfigured(t *testing.T) {
 	testCases := []struct {
 		name               string
 		path               string
-		hasControllerRoute bool
 		expectedMiddleware []string
 	}{
 		{
 			name:               "Root group",
 			path:               "/",
-			hasControllerRoute: false,
 			expectedMiddleware: []string{"otelgin.Middleware"},
 		},
 		{
 			name:               "API group",
 			path:               "/api/v1/jobs",
-			hasControllerRoute: true,
 			expectedMiddleware: []string{"otelgin.Middleware", "Authentication", "RBACAuthorization", "GetAPIResource"},
 		},
 		{
 			name:               "APIs group",
 			path:               "/apis/apps/v1/deployments",
-			hasControllerRoute: true,
 			expectedMiddleware: []string{"otelgin.Middleware", "Authentication", "RBACAuthorization", "GetAPIResource"},
+		},
+		{
+			name: "Logs APIs group",
+			path: "/apis/apps/v1/namespaces/ns/deployments/my-deploy/log",
+			expectedMiddleware: []string{"otelgin.Middleware", "Authentication", "RBACAuthorization", "GetAPIResource",
+				"SetLoggingCredentials", "LogRetrieval"},
+		},
+		{
+			name: "Logs API group",
+			path: "/api/v1/namespaces/ns/pods/my-pod/log",
+			expectedMiddleware: []string{"otelgin.Middleware", "Authentication", "RBACAuthorization", "GetAPIResource",
+				"SetLoggingCredentials", "LogRetrieval"},
 		},
 	}
 

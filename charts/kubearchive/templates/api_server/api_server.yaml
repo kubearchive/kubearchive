@@ -25,6 +25,9 @@ spec:
         - name: tls-secret
           secret:
             secretName: {{ tpl .Values.apiServer.secret . }}
+        - name: logging-secret
+          secret:
+            secretName: kubearchive-logging
       containers:
         - name: {{ tpl .Values.apiServer.name . }}
           image: {{ required "An API Server container image is required" .Values.apiServer.image }}
@@ -42,6 +45,8 @@ spec:
             - name: tls-secret
               readOnly: true
               mountPath: /etc/kubearchive/ssl/
+            - mountPath: /data/logging
+              name: logging-secret
           envFrom:
             # Provide DB URL, user, password, database and port as env vars
             - secretRef:
@@ -67,6 +72,8 @@ spec:
               value: "{{ .Values.apiServer.cache.expirationAuthenticated }}"
             - name: CACHE_EXPIRATION_UNAUTHORIZED
               value: "{{ .Values.apiServer.cache.expirationUnauthenticated }}"
+            - name: KUBEARCHIVE_LOGGING_DIR
+              value: /data/logging
           livenessProbe:
             httpGet:
               path: /livez

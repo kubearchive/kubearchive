@@ -72,7 +72,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
 }
 
-func (c *Controller) GetResourceLogs(context *gin.Context) {
+func (c *Controller) GetLogURL(context *gin.Context) {
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
@@ -89,7 +89,7 @@ func (c *Controller) GetResourceLogs(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
-	logURLs, err := c.Database.QueryLogURLs(
+	logURL, jsonPath, err := c.Database.QueryLogURL(
 		context.Request.Context(), kind, apiVersion, namespace, name)
 	if errors.Is(err, database.ResourceNotFoundError) {
 		abort.Abort(context, err, http.StatusNotFound)
@@ -99,7 +99,8 @@ func (c *Controller) GetResourceLogs(context *gin.Context) {
 		return
 	}
 
-	context.JSON(http.StatusOK, logURLs)
+	context.Set("logURL", logURL)
+	context.Set("jsonPath", jsonPath)
 }
 
 // Livez returns current server configuration as we don't have a clear deadlock indicator

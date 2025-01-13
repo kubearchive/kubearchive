@@ -1,0 +1,38 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "kubearchive-ca"
+  namespace: kubearchive
+spec:
+  selfSigned: {}
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "kubearchive-ca"
+  namespace: kubearchive
+spec:
+  isCA: true
+  commonName: kubearchive-ca-certificate
+  secretName: "kubearchive-ca"
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: "kubearchive-ca"
+    kind: Issuer
+    group: cert-manager.io
+
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "kubearchive"
+  namespace: kubearchive
+spec:
+  ca:
+    secretName: "kubearchive-ca"

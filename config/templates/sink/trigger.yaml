@@ -1,0 +1,16 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: kubearchive-sink
+  namespace: kubearchive
+spec:
+  broker: kubearchive-broker
+  subscriber:
+    ref:
+      apiVersion: v1
+      kind: Service
+      name: kubearchive-sink

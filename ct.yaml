@@ -1,9 +1,0 @@
-# Copyright KubeArchive Authors
-# SPDX-License-Identifier: Apache-2.0
----
-chart-dirs:
-  - charts
-lint-conf: ".yamllint.yml"
-validate-maintainers: false
-check-version-increment: false
-helm-lint-extra-args: "--strict"

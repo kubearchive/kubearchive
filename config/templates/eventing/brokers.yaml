@@ -1,0 +1,32 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+apiVersion: eventing.knative.dev/v1
+kind: Broker
+metadata:
+  name: kubearchive-broker
+  namespace: kubearchive
+spec:
+  delivery:
+    retry: 4
+    backoffPolicy: exponential
+    # ISO 8601 format
+    backoffDelay: PT0.5S
+    deadLetterSink:
+      ref:
+        apiVersion: eventing.knative.dev/v1
+        kind: Broker
+        name: kubearchive-dls
+---
+apiVersion: eventing.knative.dev/v1
+kind: Broker
+metadata:
+  name: kubearchive-dls
+  namespace: kubearchive
+spec:
+  delivery:
+    retry: 4
+    backoffPolicy: exponential
+    # ISO 8601 format
+    backoffDelay: PT0.5S

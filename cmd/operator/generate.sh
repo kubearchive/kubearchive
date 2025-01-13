@@ -16,7 +16,7 @@ cd ${SCRIPT_DIR}
 
 # Generate CRD.
 echo "Generating CRD."
-${LOCALBIN}/controller-gen crd paths="./..." output:dir=../../charts/kubearchive/crds
+${LOCALBIN}/controller-gen crd paths="./..." output:dir=../../config/crds
 
 PATCH=$(mktemp -t crd.XXXXXXXX)
 cat << EOF > ${PATCH}
@@ -30,7 +30,7 @@ webhook:
   conversionReviewVersions:
   - v1
 EOF
-CRD="../../charts/kubearchive/crds/kubearchive.kubearchive.org_kubearchiveconfigs.yaml"
+CRD="../../config/crds/kubearchive.kubearchive.org_kubearchiveconfigs.yaml"
 yq -i '.metadata.annotations."cert-manager.io/inject-ca-from"="kubearchive/kubearchive-operator-certificate"' ${CRD}
 yq -i ".spec.conversion = load(\"${PATCH}\")" ${CRD}
 
@@ -38,9 +38,8 @@ rm -f ${PATCH}
 
 # Generate role.
 echo "Generating role."
-${LOCALBIN}/controller-gen rbac:roleName="replaceme" \
-    paths="./..." output:stdout | \
-    sed -e 's/replaceme/{{ tpl .Values.operator.name . }}/' > ../../charts/kubearchive/templates/operator/role.yaml
+${LOCALBIN}/controller-gen rbac:roleName="kubearchive-operator" \
+    paths="./..." output:stdout > ../../config/templates/operator/role.yaml
 
 echo "Generating deep copy code."
 # Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.

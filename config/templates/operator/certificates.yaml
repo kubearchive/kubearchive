@@ -1,0 +1,21 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "kubearchive-operator-certificate"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-operator-certificate"
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+spec:
+  dnsNames:
+    - "kubearchive-operator-webhooks.kubearchive.svc"
+    - "kubearchive-operator-webhooks.kubearchive.svc.cluster.local"
+  issuerRef:
+    kind: Issuer
+    name: kubearchive
+  secretName: kubearchive-operator-tls

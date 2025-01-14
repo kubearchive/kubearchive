@@ -1,0 +1,28 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+# permissions for end users to view kubearchiveconfigs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubearchive-operator-config-viewer
+  labels:
+    app.kubernetes.io/name: kubearchive-operator-config-viewer
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+rules:
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs/status
+    verbs:
+      - get

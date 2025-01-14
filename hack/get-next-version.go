@@ -15,13 +15,11 @@ import (
 type flags struct {
 	CurrentVersion   string
 	ReleaseNotesFile string
-	HelmChart        bool
 }
 
 var defaultValues = &flags{
 	CurrentVersion:   "v0.0.0",
 	ReleaseNotesFile: "./release-notes.json",
-	HelmChart:        false,
 }
 
 func main() {

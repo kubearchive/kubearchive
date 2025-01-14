@@ -1,0 +1,32 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+# Permissions for end users to edit kubearchiveconfigs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubearchive-operator-config-editor
+  labels:
+    app.kubernetes.io/name: kubearchive-operator-config-editor
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+rules:
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs/status
+    verbs:
+      - get

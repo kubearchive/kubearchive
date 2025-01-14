@@ -1,0 +1,12 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubearchive
+  labels:
+    app.kubernetes.io/name: kubearchive
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"

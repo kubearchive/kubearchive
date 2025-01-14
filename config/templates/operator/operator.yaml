@@ -1,0 +1,91 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "kubearchive-operator"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-operator"
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+        - name: manager
+          args:
+            - --health-probe-bind-address=:8081
+            - --leader-elect
+          env:
+            - name: KUBEARCHIVE_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: KUBEARCHIVE_OTEL_MODE
+              value: "disabled"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: ""
+            - name: OTEL_GO_X_DEPRECATED_RUNTIME_METRICS
+              value: "false"
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+          image: ko://github.com/kubearchive/kubearchive/cmd/operator
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          ports:
+            - containerPort: 9443
+              name: webhook-server
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: cert
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: kubearchive-operator
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: kubearchive-operator-tls

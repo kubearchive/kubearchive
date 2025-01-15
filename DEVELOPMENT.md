@@ -49,7 +49,7 @@ Install these tools:
 
 ## Update KubeArchive
 
-After you make changes to the code use Helm to redeploy KubeArchive:
+After you make changes to the code use the script to redeploy KubeArchive:
 
 ```bash
    hack/kubearchive-install.sh

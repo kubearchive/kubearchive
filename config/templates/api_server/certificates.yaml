@@ -1,0 +1,36 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "kubearchive-api-server-certificate"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-api-server-certificate"
+    app.kubernetes.io/component: api-server
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+spec:
+  isCA: false
+  commonName: kubearchive-api-server
+  secretName: "kubearchive-api-server-tls"
+  duration: 720h  # 30 days
+  renewBefore: 360h  # 15 days
+  subject:
+    organizations:
+      - kubearchive
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  usages:
+    - digital signature
+    - key encipherment
+  dnsNames:
+    - localhost
+    - kubearchive-api-server
+    - "kubearchive-api-server.kubearchive.svc"
+  issuerRef:
+    name: "kubearchive"
+    kind: Issuer
+    group: cert-manager.io

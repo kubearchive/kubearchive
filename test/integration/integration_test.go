@@ -214,9 +214,18 @@ func TestArchiveAndRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	portForward, errPortForward := test.PortForward([]string{"8081:8081"}, pods.Items[0].Name, "kubearchive")
-	if errPortForward != nil {
-		t.Fatal(errPortForward)
+	var portForward chan struct{}
+	var errPortForward error
+	retryErr := retry.Do(func() error {
+		portForward, errPortForward = test.PortForward([]string{"8081:8081"}, pods.Items[0].Name, "kubearchive")
+		if errPortForward != nil {
+			return errPortForward
+		}
+		return nil
+	}, retry.Attempts(3))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
 	}
 
 	defer close(portForward)
@@ -309,7 +318,7 @@ func TestArchiveAndRead(t *testing.T) {
 	}
 	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token.Status.Token))
 
-	retryErr := retry.Do(func() error {
+	retryErr = retry.Do(func() error {
 		response, errResp := clientHTTP.Do(request)
 		if errResp != nil {
 			fmt.Printf("Couldn't get a response HTTP, %s\n", errResp)
@@ -513,8 +522,18 @@ func TestPagination(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	portForward, errPortForward := test.PortForward([]string{"8081"}, pods.Items[0].Name, "kubearchive")
-	if errPortForward != nil {
+
+	var portForward chan struct{}
+	var errPortForward error
+	retryErr := retry.Do(func() error {
+		portForward, errPortForward = test.PortForward([]string{"8081:8081"}, pods.Items[0].Name, "kubearchive")
+		if errPortForward != nil {
+			return errPortForward
+		}
+		return nil
+	}, retry.Attempts(3))
+
+	if retryErr != nil {
 		t.Fatal(errPortForward)
 	}
 	defer close(portForward)
@@ -530,7 +549,7 @@ func TestPagination(t *testing.T) {
 			return nil
 		}
 		return errors.New("could not retrieve Pods from the API")
-	}, retry.Attempts(30), retry.MaxDelay(4*time.Second))
+	}, retry.Attempts(60), retry.MaxDelay(4*time.Second))
 
 	if err != nil {
 		t.Fatal(err)

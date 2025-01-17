@@ -4,6 +4,7 @@
 package v1alpha1
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -13,65 +14,89 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
-	cel "github.com/kubearchive/kubearchive/pkg/cel"
+	"github.com/kubearchive/kubearchive/pkg/cel"
 )
-
-const kubearchiveResourceName = "kubearchive"
 
 // log is for logging in this package.
 var kubearchiveconfiglog = logf.Log.WithName("kubearchiveconfig-resource")
 
-// SetupWebhookWithManager will setup the manager to manage the webhooks
-func (kac *KubeArchiveConfig) SetupWebhookWithManager(mgr ctrl.Manager) error {
+func SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
-		For(kac).
+		For(&KubeArchiveConfig{}).
+		WithValidator(&KubeArchiveConfigCustomValidator{kubearchiveResourceName: "kubearchive"}).
+		WithDefaulter(&KubeArchiveConfigCustomDefaulter{}).
 		Complete()
 }
 
 //+kubebuilder:webhook:path=/mutate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs,verbs=create;update,versions=v1alpha1,name=mkubearchiveconfig.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Defaulter = &KubeArchiveConfig{}
+type KubeArchiveConfigCustomDefaulter struct{}
 
-// Default implements webhook.Defaulter so a webhook will be registered for the type
-func (kac *KubeArchiveConfig) Default() {
+var _ webhook.CustomDefaulter = &KubeArchiveConfigCustomDefaulter{}
+
+// Default implements webhook.CustomDefaulter so a webhook will be registered for the type
+func (kaccd *KubeArchiveConfigCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
+	kac, ok := obj.(*KubeArchiveConfig)
+	if !ok {
+		return fmt.Errorf("expected an KubeArchiveConfig object but got %T", obj)
+	}
 	kubearchiveconfiglog.Info("default", "namespace", kac.Namespace, "name", kac.Name)
+	return nil
 }
 
 //+kubebuilder:webhook:path=/validate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs,verbs=create;update,versions=v1alpha1,name=vkubearchiveconfig.kb.io,admissionReviewVersions=v1
 
-var _ webhook.Validator = &KubeArchiveConfig{}
+type KubeArchiveConfigCustomValidator struct {
+	kubearchiveResourceName string
+}
 
-// ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (kac *KubeArchiveConfig) ValidateCreate() (admission.Warnings, error) {
+var _ webhook.CustomValidator = &KubeArchiveConfigCustomValidator{}
+
+// ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type
+func (kaccv *KubeArchiveConfigCustomValidator) ValidateCreate(
+	_ context.Context, obj runtime.Object,
+) (admission.Warnings, error) {
+	kac, ok := obj.(*KubeArchiveConfig)
+	if !ok {
+		return nil, fmt.Errorf("expected an KubeArchiveConfig object but got %T", obj)
+	}
 	kubearchiveconfiglog.Info("validate create", "namespace", kac.Namespace, "name", kac.Name)
 
-	if kac.Name != kubearchiveResourceName {
-		return nil, fmt.Errorf("The KubeArchiveConfig resource must be named '%s'.", kubearchiveResourceName)
-	}
-
-	return kac.validateCELExpressions()
+	return kaccv.validateKAC(kac)
 }
 
-// ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (kac *KubeArchiveConfig) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+// ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type
+func (kaccv *KubeArchiveConfigCustomValidator) ValidateUpdate(
+	_ context.Context, _ runtime.Object, new runtime.Object,
+) (admission.Warnings, error) {
+	kac, ok := new.(*KubeArchiveConfig)
+	if !ok {
+		return nil, fmt.Errorf("expected an KubeArchiveConfig object but got %T", new)
+	}
 	kubearchiveconfiglog.Info("validate update", "namespace", kac.Namespace, "name", kac.Name)
 
-	if kac.Name != kubearchiveResourceName {
-		return nil, fmt.Errorf("Cannot update KubeArchiveConfig resource named '%s'.", kubearchiveResourceName)
-	}
-
-	return kac.validateCELExpressions()
+	return kaccv.validateKAC(kac)
 }
 
-// ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (kac *KubeArchiveConfig) ValidateDelete() (admission.Warnings, error) {
+// ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type
+func (kaccv *KubeArchiveConfigCustomValidator) ValidateDelete(
+	_ context.Context, new runtime.Object,
+) (admission.Warnings, error) {
+	kac, ok := new.(*KubeArchiveConfig)
+	if !ok {
+		return nil, fmt.Errorf("expected an KubeArchiveConfig object but got %T", new)
+	}
 	kubearchiveconfiglog.Info("validate delete", "namespace", kac.Namespace, "name", kac.Name)
 
 	return nil, nil
 }
 
-func (kac *KubeArchiveConfig) validateCELExpressions() (admission.Warnings, error) {
+func (kaccv *KubeArchiveConfigCustomValidator) validateKAC(kac *KubeArchiveConfig) (admission.Warnings, error) {
 	errList := make([]error, 0)
+	if kac.Name != kaccv.kubearchiveResourceName {
+		return nil, fmt.Errorf("invalid resource name '%s'",
+			kaccv.kubearchiveResourceName)
+	}
 	for _, resource := range kac.Spec.Resources {
 		if resource.ArchiveWhen != "" {
 			_, err := cel.CompileOrCELExpression(resource.ArchiveWhen)

@@ -154,7 +154,8 @@ func LogRetrieval() gin.HandlerFunc {
 		}
 
 		if !logsReturned {
-			abort.Abort(c, fmt.Errorf("no parsed logs for the json path: %s", jsonPathParser.String()),
+			abort.Abort(c, fmt.Errorf("no parsed logs for the json path: %s from logs in %s",
+				jsonPathParser.String(), logUrl),
 				http.StatusNotFound)
 		}
 	}

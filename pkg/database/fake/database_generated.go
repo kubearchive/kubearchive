@@ -6,6 +6,7 @@ package fake
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -156,6 +157,10 @@ func (f *Database) WriteResource(_ context.Context, k8sObj *unstructured.Unstruc
 }
 
 func (f *Database) WriteUrls(_ context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error {
+	if k8sObj == nil {
+		return errors.New("Cannot write log urls to the database when k8sObj is nil")
+	}
+
 	newLogUrls := make([]LogUrlRow, 0)
 	for _, row := range f.logUrl {
 		if k8sObj.GetUID() != row.Uuid {

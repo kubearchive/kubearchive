@@ -1,0 +1,68 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: kubearchive-mutating-webhook-configuration
+  labels:
+    app.kubernetes.io/name: kubearchive-mutating-webhook-configuration
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+  annotations:
+    cert-manager.io/inject-ca-from: kubearchive/kubearchive-operator-certificate
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: kubearchive-operator-webhooks
+        namespace: kubearchive
+        path: /mutate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
+    failurePolicy: Fail
+    name: mkubearchiveconfig.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - kubearchiveconfigs
+    sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: kubearchive-validating-webhook-configuration
+  labels:
+    app.kubernetes.io/name: kubearchive-validating-webhook-configuration
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+  annotations:
+    cert-manager.io/inject-ca-from: kubearchive/kubearchive-operator-certificate
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: kubearchive-operator-webhooks
+        namespace: kubearchive
+        path: /validate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
+    failurePolicy: Fail
+    name: vkubearchiveconfig.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - kubearchiveconfigs
+    sideEffects: None

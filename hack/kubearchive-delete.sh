@@ -5,9 +5,4 @@
 set -o errexit
 set -o xtrace
 
-YAML=$(mktemp --suffix=.yaml -t kubearchive-XXX)
-
-helm template kubearchive charts/kubearchive -n kubearchive --include-crds  > ${YAML}
-kubectl delete -n kubearchive -f ${YAML}
-
-rm -f ${YAML}
+kubectl delete -k config/

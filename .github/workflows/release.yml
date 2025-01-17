@@ -29,10 +29,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: stable
-      - name: Setup Helm
-        uses: azure/setup-helm@v4.2.0
-        with:
-          version: latest
       - name: Install ko
         uses: ko-build/setup-ko@v0.8
       - name: Install 'release-notes'

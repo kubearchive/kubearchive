@@ -364,7 +364,8 @@ func TestArchiveAndRead(t *testing.T) {
 	}
 
 	// Retrieve cronjob logs
-
+	// NOTE that this will retrieve the url of the latest pod, but it would be more useful to get the logs from the first
+	// pod because that way the waiting for the logs to appear on splunk should be shorter.
 	url = fmt.Sprintf("https://localhost:8081/apis/batch/v1/namespaces/%s/cronjobs/generate-log-1/log", namespaceName)
 	request, errRequest = http.NewRequest("GET", url, nil)
 	if errRequest != nil {
@@ -397,13 +398,13 @@ func TestArchiveAndRead(t *testing.T) {
 		if len(body) == 0 {
 			return errors.New("could not retrieve the cronjob pod log")
 		}
+		fmt.Println("successfully retrieved logs")
 		return nil
 	}, retry.Attempts(20))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
 	}
-
 }
 
 func TestPagination(t *testing.T) {
@@ -539,43 +540,47 @@ func TestPagination(t *testing.T) {
 	defer close(portForward)
 
 	url := fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods", namespaceName)
+	var list *unstructured.UnstructuredList
+	var getUrlErr error
 	err = retry.Do(func() error {
-		list, err := getUrl(&clientHTTP, token.Status.Token, url)
-		if err != nil {
-			t.Fatal(err)
+		list, getUrlErr = getUrl(&clientHTTP, token.Status.Token, url)
+		if getUrlErr != nil {
+			t.Fatal(getUrlErr)
 		}
 		// We want to wait until everything is stored in the DB to avoid out of order inserts
 		if len(list.Items) >= 30 {
 			return nil
 		}
 		return errors.New("could not retrieve Pods from the API")
-	}, retry.Attempts(60), retry.MaxDelay(4*time.Second))
+	}, retry.Attempts(80), retry.MaxDelay(4*time.Second))
 
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	url = fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods?limit=10", namespaceName)
-	list, err := getUrl(&clientHTTP, token.Status.Token, url)
-	if err != nil {
-		t.Fatal(err)
+	initList, getUrlErrInitList := getUrl(&clientHTTP, token.Status.Token, url)
+	if getUrlErrInitList != nil {
+		t.Fatal(getUrlErrInitList)
 	}
-	assert.Equal(t, 10, len(list.Items))
+	assert.Equal(t, 10, len(initList.Items))
 
-	url = fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods?limit=10&continue=%s", namespaceName, list.GetContinue())
-	continueList, err := getUrl(&clientHTTP, token.Status.Token, url)
-	if err != nil {
-		t.Fatal(err)
+	url = fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods?limit=10&continue=%s", namespaceName, initList.GetContinue())
+	continueList, getUrlErrContinueList := getUrl(&clientHTTP, token.Status.Token, url)
+	if getUrlErrContinueList != nil {
+		t.Fatal(getUrlErrContinueList)
 	}
+	assert.Equal(t, 10, len(continueList.Items))
 
 	url = fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods?limit=20", namespaceName)
-	allList, err := getUrl(&clientHTTP, token.Status.Token, url)
-	if err != nil {
-		t.Fatal(err)
+	allList, getUrlErrAllList := getUrl(&clientHTTP, token.Status.Token, url)
+	if getUrlErrAllList != nil {
+		t.Fatal(getUrlErrAllList)
 	}
+	assert.Equal(t, 20, len(allList.Items))
 
 	var listNames []string
-	for _, item := range list.Items {
+	for _, item := range initList.Items {
 		listNames = append(listNames, item.GetName())
 	}
 
@@ -623,6 +628,6 @@ func getUrl(client *http.Client, token string, url string) (*unstructured.Unstru
 		fmt.Printf("Couldn't unmarshal JSON, %s\n", err)
 		return nil, err
 	}
-	fmt.Printf("The HTTP status returned is OK, %s - %s \n", response.Status, string(body))
+	fmt.Printf("The HTTP status returned is OK, %s, returned %d items\n", response.Status, len(data.Items))
 	return &data, nil
 }

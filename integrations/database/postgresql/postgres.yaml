@@ -7,6 +7,11 @@ metadata:
   name: kubearchive
 spec:
   instances: 1
+  postgresql:
+    # https://www.postgresql.org/docs/current/auth-pg-hba-conf.html
+    # columns: connection-type database user address auth-options
+    pg_hba:
+      - hostnossl  all  all  all  reject
   bootstrap:
     initdb:
       database: kubearchive

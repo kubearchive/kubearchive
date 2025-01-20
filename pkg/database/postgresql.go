@@ -32,7 +32,7 @@ func (creator PostgreSQLCreator) GetDriverName() string {
 }
 
 func (creator PostgreSQLCreator) GetConnectionString() string {
-	return fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=disable", creator.env[DbUserEnvVar],
+	return fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=require", creator.env[DbUserEnvVar],
 		creator.env[DbPasswordEnvVar], creator.env[DbNameEnvVar], creator.env[DbHostEnvVar], creator.env[DbPortEnvVar])
 }
 

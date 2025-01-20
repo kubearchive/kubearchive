@@ -132,7 +132,7 @@ func main() {
 		os.Exit(1)
 	}
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = (&kubearchiveapi.KubeArchiveConfig{}).SetupWebhookWithManager(mgr); err != nil {
+		if err = kubearchiveapi.SetupWebhookWithManager(mgr); err != nil {
 			slog.Error("unable to create webhook", "webhook", "KubeArchiveConfig", "err", err)
 			os.Exit(1)
 		}

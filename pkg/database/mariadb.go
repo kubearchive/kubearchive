@@ -75,6 +75,36 @@ func (MariaDBFilter) OwnerFilter(cond sqlbuilder.Cond, uuids []string) string {
 	))
 }
 
+func (MariaDBFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+	// TODO
+	return ""
+}
+
+func (MariaDBFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+	// TODO
+	return ""
+}
+
+func (MariaDBFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+	// TODO
+	return ""
+}
+
+func (MariaDBFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+	// TODO
+	return ""
+}
+
+func (MariaDBFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+	// TODO
+	return ""
+}
+
+func (MariaDBFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+	// TODO
+	return ""
+}
+
 type MariaDBSorter struct{}
 
 func (MariaDBSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {

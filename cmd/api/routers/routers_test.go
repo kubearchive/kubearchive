@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -54,6 +55,88 @@ func setupRouter(db database.DBInterface, core bool) *gin.Engine {
 	router.GET("/api/:version/namespace/:namespace/:resourceType/:name/log",
 		ctrl.GetLogURL, retrieveLogURL)
 	return router
+}
+
+func TestLabelSelectorQueryParameter(t *testing.T) {
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), false)
+	tests := []struct {
+		name          string
+		labelSelector string
+		expected      int
+	}{
+		{
+			name:          "empty label selector",
+			labelSelector: "",
+			expected:      200,
+		},
+		{
+			name:          "invalid label selector operator",
+			labelSelector: "app>kubearchive",
+			expected:      400,
+		},
+		{
+			name:          "valid exists default operator",
+			labelSelector: "app",
+			expected:      200,
+		},
+		{
+			name:          "invalid exists operator",
+			labelSelector: "exists app",
+			expected:      400,
+		},
+		{
+			name:          "valid not exists operator",
+			labelSelector: "!app",
+			expected:      200,
+		},
+		{
+			name:          "valid equals operator",
+			labelSelector: "app=kubearchive",
+			expected:      200,
+		},
+		{
+			name:          "invalid equals operator",
+			labelSelector: "app==kubearchive",
+			expected:      400,
+		},
+		{
+			name:          "valid not equals operator",
+			labelSelector: "app!=kubearchive",
+			expected:      200,
+		},
+		{
+			name:          "valid in operator",
+			labelSelector: "app in (kubearchive, postgresql)",
+			expected:      200,
+		},
+		{
+			name:          "valid notin operator",
+			labelSelector: "app notin (kubearchive, postgresql)",
+			expected:      200,
+		},
+		{
+			name:          "invalid notin operator",
+			labelSelector: "app not in (kubearchive, postgresql)",
+			expected:      400,
+		},
+		{
+			name:          "all operators",
+			labelSelector: "environment, !control-plane, app.kubernetes.io/part-of=kubernetes, environment!= dev, app in (kubearchive-api-server, kubearchive-sink), version notin (0.1, 0.2)",
+			expected:      200,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(
+				http.MethodGet,
+				fmt.Sprintf("/apis/batch/v1/namespace/ns/cronjobs?labelSelector=%s", url.QueryEscape(tt.labelSelector)),
+				nil,
+			)
+			router.ServeHTTP(res, req)
+			assert.Equal(t, tt.expected, res.Code)
+		})
+	}
 }
 
 func TestGetCoreResourcesLogURLs(t *testing.T) {

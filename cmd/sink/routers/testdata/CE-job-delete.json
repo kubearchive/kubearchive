@@ -1,0 +1,168 @@
+{
+  "specversion": "1.0",
+  "type": "dev.knative.apiserver.resource.delete",
+  "source": "http://localhost",
+  "subject": "/apis/batch/v1/namespaces/generate-logs-cronjobs/jobs/generate-log-1-28968184",
+  "id": "cbec9e69-accf-4dfd-a22b-e9947376e01c",
+  "time": "2025-01-28T19:04:03.880155449Z",
+  "datacontenttype": "application/json",
+  "apiversion": "batch/v1",
+  "kind": "Job",
+  "knativearrivaltime": "2025-01-28T19:04:03.880549164Z",
+  "name": "generate-log-1-28968184",
+  "namespace": "generate-logs-cronjobs",
+  "data": {
+    "apiVersion": "batch/v1",
+    "kind": "Job",
+    "metadata": {
+      "annotations": {
+        "batch.kubernetes.io/cronjob-scheduled-timestamp": "2025-01-28T19:04:00Z"
+      },
+      "creationTimestamp": "2025-01-28T19:04:00Z",
+      "generation": 1,
+      "labels": {
+        "batch.kubernetes.io/controller-uid": "7f52e30d-8220-488c-b175-702fb08d2b60",
+        "batch.kubernetes.io/job-name": "generate-log-1-28968184",
+        "controller-uid": "7f52e30d-8220-488c-b175-702fb08d2b60",
+        "job-name": "generate-log-1-28968184"
+      },
+      "managedFields": [
+        {
+          "apiVersion": "batch/v1",
+          "fieldsType": "FieldsV1",
+          "fieldsV1": {
+            "f:metadata": {
+              "f:annotations": {
+                ".": {},
+                "f:batch.kubernetes.io/cronjob-scheduled-timestamp": {}
+              },
+              "f:ownerReferences": {
+                ".": {},
+                "k:{\"uid\":\"055673eb-27ff-4afa-9def-f128bdf6f460\"}": {}
+              }
+            },
+            "f:spec": {
+              "f:backoffLimit": {},
+              "f:completionMode": {},
+              "f:completions": {},
+              "f:manualSelector": {},
+              "f:parallelism": {},
+              "f:podReplacementPolicy": {},
+              "f:suspend": {},
+              "f:template": {
+                "f:spec": {
+                  "f:containers": {
+                    "k:{\"name\":\"generate\"}": {
+                      ".": {},
+                      "f:args": {},
+                      "f:image": {},
+                      "f:imagePullPolicy": {},
+                      "f:name": {},
+                      "f:resources": {},
+                      "f:terminationMessagePath": {},
+                      "f:terminationMessagePolicy": {}
+                    }
+                  },
+                  "f:dnsPolicy": {},
+                  "f:restartPolicy": {},
+                  "f:schedulerName": {},
+                  "f:securityContext": {},
+                  "f:terminationGracePeriodSeconds": {}
+                }
+              }
+            }
+          },
+          "manager": "kube-controller-manager",
+          "operation": "Update",
+          "time": "2025-01-28T19:04:00Z"
+        },
+        {
+          "apiVersion": "batch/v1",
+          "fieldsType": "FieldsV1",
+          "fieldsV1": {
+            "f:status": {
+              "f:active": {},
+              "f:ready": {},
+              "f:startTime": {},
+              "f:terminating": {},
+              "f:uncountedTerminatedPods": {}
+            }
+          },
+          "manager": "kube-controller-manager",
+          "operation": "Update",
+          "subresource": "status",
+          "time": "2025-01-28T19:04:03Z"
+        }
+      ],
+      "name": "generate-log-1-28968184",
+      "namespace": "generate-logs-cronjobs",
+      "ownerReferences": [
+        {
+          "apiVersion": "batch/v1",
+          "blockOwnerDeletion": true,
+          "controller": true,
+          "kind": "CronJob",
+          "name": "generate-log-1",
+          "uid": "055673eb-27ff-4afa-9def-f128bdf6f460"
+        }
+      ],
+      "resourceVersion": "4363",
+      "uid": "7f52e30d-8220-488c-b175-702fb08d2b60"
+    },
+    "spec": {
+      "backoffLimit": 6,
+      "completionMode": "NonIndexed",
+      "completions": 1,
+      "manualSelector": false,
+      "parallelism": 1,
+      "podReplacementPolicy": "TerminatingOrFailed",
+      "selector": {
+        "matchLabels": {
+          "batch.kubernetes.io/controller-uid": "7f52e30d-8220-488c-b175-702fb08d2b60"
+        }
+      },
+      "suspend": false,
+      "template": {
+        "metadata": {
+          "creationTimestamp": null,
+          "labels": {
+            "batch.kubernetes.io/controller-uid": "7f52e30d-8220-488c-b175-702fb08d2b60",
+            "batch.kubernetes.io/job-name": "generate-log-1-28968184",
+            "controller-uid": "7f52e30d-8220-488c-b175-702fb08d2b60",
+            "job-name": "generate-log-1-28968184"
+          }
+        },
+        "spec": {
+          "containers": [
+            {
+              "args": [
+                "-n",
+                "1024",
+                "-d",
+                "20ms"
+              ],
+              "image": "quay.io/kubearchive/mingrammer/flog",
+              "imagePullPolicy": "IfNotPresent",
+              "name": "generate",
+              "resources": {},
+              "terminationMessagePath": "/dev/termination-log",
+              "terminationMessagePolicy": "File"
+            }
+          ],
+          "dnsPolicy": "ClusterFirst",
+          "restartPolicy": "OnFailure",
+          "schedulerName": "default-scheduler",
+          "securityContext": {},
+          "terminationGracePeriodSeconds": 30
+        }
+      }
+    },
+    "status": {
+      "active": 1,
+      "ready": 1,
+      "startTime": "2025-01-28T19:04:00Z",
+      "terminating": 0,
+      "uncountedTerminatedPods": {}
+    }
+  }
+}

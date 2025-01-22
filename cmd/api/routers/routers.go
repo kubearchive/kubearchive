@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/cmd/api/abort"
 	"github.com/kubearchive/kubearchive/cmd/api/discovery"
 	"github.com/kubearchive/kubearchive/cmd/api/pagination"
+	"github.com/kubearchive/kubearchive/pkg/abort"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 )

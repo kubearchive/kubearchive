@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/cmd/api/abort"
+	"github.com/kubearchive/kubearchive/pkg/abort"
 )
 
 const (

@@ -446,6 +446,7 @@ func TestPagination(t *testing.T) {
 							"kind":       "Pod",
 						},
 						"archiveWhen": "true",
+						"deleteWhen":  "status.phase == 'Succeeded'",
 					},
 				},
 			},
@@ -467,8 +468,8 @@ func TestPagination(t *testing.T) {
 			RestartPolicy: corev1.RestartPolicyNever,
 			Containers: []corev1.Container{
 				corev1.Container{
-					Name:    "busybox",
-					Command: []string{"echo", "hello"},
+					Name:    "fedora",
+					Command: []string{"sleep", "10"},
 					Image:   "quay.io/fedora/fedora:latest",
 				},
 			},

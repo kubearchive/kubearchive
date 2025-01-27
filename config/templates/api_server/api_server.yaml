@@ -1,0 +1,105 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "kubearchive-api-server"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-api-server"
+    app.kubernetes.io/component: api-server
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: &labels
+      app: kubearchive-api-server
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      serviceAccountName: kubearchive-api-server
+      volumes:
+        - name: tls-secret
+          secret:
+            secretName: kubearchive-api-server-tls
+        - name: logging-secret
+          secret:
+            secretName: kubearchive-logging
+      containers:
+        - name: kubearchive-api-server
+          image: ko://github.com/kubearchive/kubearchive/cmd/api
+          resources:
+            requests:
+              cpu: 200m
+              # 90% of the limit
+              # See recommendations at https://tip.golang.org/doc/gc-guide#Memory_limit
+              memory: 230Mi
+            limits:
+              # Currently the API is sitting at 630m on performance tests
+              cpu: 700m
+              memory: 256Mi
+          volumeMounts:
+            - name: tls-secret
+              readOnly: true
+              mountPath: /etc/kubearchive/ssl/
+            - mountPath: /data/logging
+              name: logging-secret
+          envFrom:
+            # Provide DB URL, user, password, database and port as env vars
+            - secretRef:
+                name: kubearchive-database-credentials
+          env:
+            - name: GIN_MODE
+              value: "release"
+            - name: KUBEARCHIVE_OTEL_MODE
+              value: "disabled"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: ""
+            - name: OTEL_GO_X_DEPRECATED_RUNTIME_METRICS
+              value: "false"
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            - name: CACHE_EXPIRATION_AUTHORIZED
+              value: "10m"
+            - name: CACHE_EXPIRATION_UNAUTHORIZED
+              value: "1m"
+            - name: KUBEARCHIVE_LOGGING_DIR
+              value: /data/logging
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8081
+              scheme: HTTPS
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+              scheme: HTTPS
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: "kubearchive-api-server"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-api-server"
+    app.kubernetes.io/component: api-server
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+spec:
+  selector:
+    app: kubearchive-api-server
+  ports:
+    - protocol: TCP
+      port: 8081
+      targetPort: 8081
+      name: server

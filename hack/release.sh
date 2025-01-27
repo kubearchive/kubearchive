@@ -4,7 +4,6 @@
 #
 # Tools:
 # * ko: https://ko.build/
-# * helm: https://helm.sh/
 # * gh: https://cli.github.com/
 # * release-notes: https://github.com/kubernetes/release/blob/master/cmd/release-notes/README.md
 #
@@ -57,11 +56,7 @@ git tag -a "${NEXT_VERSION}" -m "Release ${NEXT_VERSION}"
 
 # Build and push
 bash cmd/operator/generate.sh
-
-TMP=$(mktemp --suffix=.yaml -t kubearchive-not-resolved-XXXX)
-
-helm template kubearchive charts/kubearchive -n kubearchive --include-crds --set releaseVersion=${NEXT_VERSION} > ${TMP}
-ko resolve -f ${TMP} --base-import-paths --tags=${NEXT_VERSION} > kubearchive.yaml
+kubectl kustomize config/ | envsubst | ko resolve -f - --base-import-paths --tags=${NEXT_VERSION} > kubearchive.yaml
 
 git push
 git push --tags

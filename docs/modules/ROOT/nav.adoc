@@ -13,7 +13,6 @@
 ** xref:contributors/guide.adoc[Guide]
 ** xref:contributors/release.adoc[]
 ** xref:contributors/secret-rotation.adoc[]
-** xref:contributors/naming-conventions.adoc[]
 ** xref:contributors/documentation.adoc[]
 
 * Reference

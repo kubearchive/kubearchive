@@ -23,4 +23,6 @@
 ** xref:integrations/logging.adoc[Logging Integrations]
 
 * Design
+** xref:design/decisions.adoc[]
 ** xref:design/logging-integration.adoc[]
+** xref:design/database-interface.adoc[]

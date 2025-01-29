@@ -7,6 +7,12 @@ metadata:
   name: splunk-output
 spec:
   splunkHec:
+    buffer:
+      # https://kube-logging.dev/docs/configuration/plugins/outputs/buffer/
+      timekey: 10s
+      timekey_wait: 1s
+      retry_exponential_backoff_base: "1.5"
+      retry_max_interval: 30s
     hec_host: splunk-single-standalone-headless
     insecure_ssl: true
     hec_port: 8088

@@ -14,7 +14,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
-func establishConnection(driver, connectionString string) *sqlx.DB {
+func establishConnection(driver, connectionString string) (*sqlx.DB, error) {
 	configs := []retry.Option{
 		retry.Attempts(10),
 		retry.OnRetry(func(n uint, err error) {
@@ -35,15 +35,15 @@ func establishConnection(driver, connectionString string) *sqlx.DB {
 		configs...)
 	if errRetry != nil {
 		log.Printf("Unable to connect to the database, error: %v", errRetry)
-		return nil
+		return nil, errRetry
 	}
 
 	err = otelsql.RegisterDBStatsMetrics(conn, otelsql.WithAttributes(semconv.DBSystemKey.String(driver)))
 	if err != nil {
 		log.Printf("Unable to instrument the DB properly, error: %v", err)
-		return nil
+		return nil, err
 	}
 
 	log.Println("Successfully connected to the database")
-	return sqlx.NewDb(conn, driver)
+	return sqlx.NewDb(conn, driver), nil
 }

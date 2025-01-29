@@ -60,7 +60,10 @@ func NewDatabase() (DBInterface, error) {
 		return nil, fmt.Errorf("no database registered with name '%s'", env[DbKindEnvVar])
 	}
 
-	conn := establishConnection(creator.GetDriverName(), creator.GetConnectionString())
+	conn, err := establishConnection(creator.GetDriverName(), creator.GetConnectionString())
+	if err != nil {
+		return nil, err
+	}
 
 	var database DBInterface
 	if init, ok := RegisteredDatabases[env[DbKindEnvVar]]; ok {

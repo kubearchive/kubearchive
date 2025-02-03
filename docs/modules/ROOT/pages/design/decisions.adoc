@@ -1,0 +1,374 @@
+= Design Decisions
+
+This document contains the design decisions we kept in a Google Doc before
+moving to GitHub. They are slightly based on
+link:https://medium.com/olzzio/y-statements-10eb07b5a177[Y-Statement] and
+link:https://adr.github.io/[ADRs]. There are newer decisions that were not
+written and stored and were added afterward, so dates are not accurate in
+some cases.
+
+== Disaster recovery feature
+Date: 2024-02-20
+
+Status: Accepted
+
+Reviewers: Marta Anon, Sam Koved, Greg Allen, Andrea Fernandez, Hector Martinez
+
+In the context of choosing if the project does backup and restore of Kubernetes
+resources, we decided that the project will not perform restore of Kubernetes objects.
+Doing backup and restore conveys the idea of using the project as a disaster recovery tool,
+something we don't want to do. There are other tools, like https://velero.io/, that do
+disaster recovery as their main goal.
+
+== Name selection
+Date: 2024-03-04
+
+Status: Accepted
+
+Reviewers: Marta Anon, Sam Koved, Greg Allen, Andrea Fernandez, Hector Martinez
+
+In the context of choosing a name for the project, we decided to go with KubeArchive
+because we did not have a better name. We accept that the name may evoke that the project
+features restoration.
+
+== Language selection
+Date: 2024-03-07
+
+Status: Accepted
+
+Reviewers: Marta Anon, Sam Koved, Greg Allen, Andrea Fernandez, Hector Martinez
+
+In the context of selecting a language to implement KubeArchive, there are multiple
+options. We decided to use Go because it is widely used in the Kubernetes ecosystem, it
+is lightweight, it is compiled, it is fast, and it has a big ecosystem from which we
+can use multiple libraries if needed. We accept that there are other suitable alternatives
+in which we have experience (Java or Python, for example), but have some downsides (bloating
+in Java and the interpreter in Python).
+
+== Repository structure
+Date: 2024-03-21
+
+Status: Accepted
+
+Reviewers: Marta Anon, Hector Martinez, Sam Koved
+
+Files live in the same repository by default, except cases where we decide otherwise.
+A common package exists to share common objects and functions between the different
+executables Kubearchive provides. The repository also includes the Helm charts for deployment.
+
+== API technology selection: REST vs gRPC
+Date: 2024-03-08
+
+Status: Accepted
+
+Reviewers: Marta Anon, Sam Koved, Greg Allen, Andrea Fernandez, Hector Martinez
+
+In the context of providing an API to access database content, facing two options of
+technology, REST and gRPC, we decided for REST to achieve a simpler, more decoupled API.
+We accept that the performance is worse than the gRPC alternative.
+
+A comparison between REST and gRPC can be found on this AWS page.
+
+== REST API Framework
+Date: 2024-04-18
+
+Status: Accepted
+
+Reviewers: Marta Anon Greg Allen M. Andrea Fernandez George Varsamis Chris Beer
+
+As stated in a previous decision we are going with go for the REST API component of kubearchive.
+
+We want to use a framework as it makes development, testing and readability easier.
+
+The framework must provide:
+* Good performance
+* Not enforced ORM (using the ORM separated from the API framework gives us more flexibility in case
+we want to try a different DB type in the future, like NoSQL MongoDB.
+* Large community
+* Support for middleware (we are going to need it for including the RBAC authorization)
+
+There are several frameworks in Go, here are some articles stating pros and cons:
+* link:https://medium.com/@stellarani.seeli/golang-frameworks-you-must-know-4023c35afb80[Gin, Beego, Fiber, Echo and GoFr]
+* link:https://www.monocubed.com/blog/golang-web-frameworks/[Gin, Beego, Fiber, Echo, Revel, Buffalo, Chi and Gorilla]
+
+Gin is the most popular one and complies with all the requirements so we are going with it.
+
+== Separate writes from reads
+Date: 2024-03-11
+
+Status: Accepted
+
+Reviewers: Marta Anon, Sam Koved, Greg Allen, Andrea Fernandez, Hector Martinez
+
+We have two different operations to do against a database, read and write, and we have two
+very different actors interacting with those systems, event system on write and user on read.
+We agreed to have (two) separate components for those interactions. This will help with the
+scalability on any interaction without compromising the other interaction. One thing we need
+to keep in mind is that it's easier if those components share part of the code, as
+deserialization of objects and similar code is shared.
+
+== Using APIServerSource as the source of resource changes and not being an operator
+Date: 2024-03-11
+
+Status: Accepted
+
+Reviewers: Marta Anon, Sam Koved, Greg Allen, Andrea Fernandez, Hector Martinez
+
+In the context of deciding how KubeArchive should receive updates about resources changing,
+there were two main options: be an operator and reconcile (read-only) resources or receive
+updates from another resource monitor system. We decided to use a resource monitor system.
+In our case, this is the APIServerSource from Knative Eventing (OpenShift Serverless),
+which sends events from any subscribed resource to a sink. This removes the need to craft
+our own code to get resource events, but it prevents us from fine-tuning in case it is needed.
+At some point, we also can fork the APIServerSource for our own needs.
+
+== Should KubeArchive delete the resources it archives?
+Date: 2024-03-11
+
+Status: Superseded 2024-04-08
+
+Reviewers: Marta Anon, Sam Koved, Greg Allen, Andrea Fernandez, Fernando Nasser, George Varsamis
+
+In the context of deciding if KubeArchive should delete resources it archives or not, we
+agreed that KubeArchive should not delete resources it archives. The reasoning is that
+KubeArchive would need knowledge about the domain to be able to determine when to delete
+something. This information would be difficult to convey to users, so we agreed not to delete
+the resources ourselves. We will archive resources, but the user is responsible for deleting them.
+
+== KubeArchive should be able to delete resources it archives
+Date: 2024-04-08, updated 2024-06-10
+
+Status: Accepted
+
+Reviewers: Marta Anon, Sam Koved, Greg Allen, Andrea Fernandez, Fernando Nasser, George Varsamis, Hector Martinez
+
+Kubearchive deletes the resources it archives because it aligns with the purposes of
+preventing performance issues. KubeArchive has a configuration option that allows users
+to introduce conditions that will trigger the deletion of the resources. For example if
+the "finished" status key is "true". Multiple conditions can be specified. This can be
+configured per resource kind and apiVersion. No configuration means the resources are not deleted.
+
+== Database
+Date: 2024-04-04
+
+Status: Accepted
+
+Reviewers: Greg Allen, Sam Koved, Marta Anon, George Varsamis
+
+KubeArchive uses Postgresql for its database.
+
+KubeArchive has a generic database layer, which should allow the details of the underlying
+database to be hidden and allow for a different database to be substituted.
+More information in KAR-6.
+
+== Deployment/Templating System
+Date: 2024-04-15
+
+Status: Superseded
+
+Reviewers: Greg Allen, Sam Koved, Marta Anon, George Varsamis
+
+For the first approach in development KubeArchive uses Helm to deploy and manage
+its Kubernetes resources. Kustomize may be used in addition to Helm if it makes sense.
+
+== Use an operator for automating the deployment and configuration of KubeArchive
+Date: 2024-04-09
+
+Status: Superseeded
+
+Reviewers: Marta Anon, Hector Martinez, Greg Allen,
+
+Kubearchive uses an operator to manage its installation and configuration because they
+are complex enough that Helm is not enough. The configuration is controlled by a custom resource.
+
+== Development Environment
+Date: 2024-04-04
+
+Status: Accepted
+
+Reviewers: Greg Allen, Sam Koved, Marta Anon, George Varsamis
+
+Kubearchive officially supports kind with podman as backend for development. Kubearchive
+also provides VS Code and IntelliJ configuration. Contributors are not forced to use these
+tools, these tools constitute our supported development environment.
+
+== Feature “archive everything now”
+Date: 2024-04-08
+
+Status: Accepted
+
+Reviewers: Marta Anon, Hector Martinez Lopez, Greg Allen
+
+Having an element in kubearchive that enables sending a command to archive the monitored
+resources without relying on the events sent by ApiServerSource would provide the following advantages:
+* Archive in-place resources after kubearchive is deployed
+* Fallback in case events are lost
+
+== Documentation language
+Date: 2024-04-08
+
+Status: Accepted
+
+Reviewers: Marta Anon, Hector Martinez, Chris Beer, Greg Allen, Andrea Fernandez, Fernando Nasser, George Varsamis
+
+Kubearchive will use Asciidoc and Antora for its documentation because it is what we are used to as a team.
+
+== Vision Statement
+Date: 2024-03-11
+
+Status: Writing
+
+Reviewers: Marta Anon, Sam Koved, Greg Allen, Andrea Fernandez, Hector Martinez, George Varsamis, Fernando Nasser, Chris Beer
+
+* Kubearchive has a one-way workflow. It stores resources from etcd in the DB but not the other way around.
+* Kubearchive can prune resources from etcd once they are archived
+* Kubearchive is integrated with etcd. When a user ask for a resource type he should see elements both in etcd and the archive DB.
+* Kubearchive can retrieve the logs stored in a backend like splunk.
+
+NOTE: “can” means that is configurable
+
+== Cache of authorization requests in kubearchive API
+Date: 2024-04-18
+
+Status: Accepted
+
+Reviewers:Marta Anon Greg Allen M. Andrea Fernandez George Varsamis Chris Beer, Hector Martinez
+
+The queries to kubearchive are probably going to be repeated for the same type of object
+from the same user/groups. This means that we could take advantage of caching the responses
+of the `subjectaccessreviews` endpoint of the k8s API.
+
+We will go with an in-memory caching. More information in KAR-4
+
+== KubeArchive archiving is condition-based
+Date: 2024-06-10
+
+Status: Accepted
+
+Reviewers: Marta, Greg, Andrea, Fernando, Sam, Hector
+
+KubeArchive has a configuration option that allows users to specify conditionals that will trigger
+the archival of that resource in that specific state. For example if the status key "state" is
+"Running". Multiple conditions for archival are allowed. No configuration provided means that
+there is no archival of resources. This can be configured per resource kind and apiVersion.
+
+== Cluster scope resources
+Date: 2024-06-10
+
+Status: Accepted
+
+Reviewers: Marta, Greg, Andrea, Fernando, Sam, Hector
+
+In relation to the processing of cluster scope resources we decided not to process them. Currently
+our use case is with namespaced resources and unless a strong case appears for cluster-scoped resources
+its implementation is complex enough for us to reject processing them.
+
+== Helm Chart Naming Conventions
+Date: 2024-06-25
+
+Status: Accepted
+
+Reviewers: Marta, Greg, Andrea, Fernando
+
+For naming the resources in the kubearchive Helm Chart we defined the following conventions:
+* A resource name won’t include the `Kind` of the resource in the name.
+* A resource name won’t be hardcoded. All the names should be templated from the `Values.yaml`
+* The resource name must include `kubearchive` as a prefix when it refers to a kubearchive
+resource. We will use the built-in object `Release.Name`
+* The templates will use the tpl function to reference a templated variable like “{{ Release.Name }}-<obj-name>
+
+== KubeArchive Helm Chart namespace
+Date: 2024-06-25
+
+Status: Accepted
+
+Reviewers: Marta, Greg, Andrea, Fernando
+
+The Helm Charts are another namespaced kubernetes resource.
+We don’t want to install the kubearchive chart in the `default` namespace, not create a
+specific namespace to allocate the chart, we want to use the `kubearchive` namespace to
+allocate the helm chart.
+
+For doing so, Helm provides an option in the install command (--create-namespace) that creates
+a namespace in the first step and stores the chart inside.
+
+== Usage of “required” function in the Helm templates
+Date: 2024-06-25
+
+Status: Accepted
+
+Reviewers: Marta, Greg, Andrea, Fernando
+
+Helm provides a required function to prevent having optional values (like labels or namespaces)
+empty after the `helm template` command.
+
+This is very useful to catch typos and similar errors in the CI phase.
+
+We will include them in the optional fields of the templates. The mandatory fields don’t need
+t (like name) as they will be notified with `helm lint` command (also run in the CI).
+
+== KubeArchive does not offer a database
+Date: 2024-07-05
+
+Status: Accepted
+
+Reviewers: Hector Martinez, Greg Allen, Sam Koved, Andrea Fernandez, Marta Anon
+
+KubeArchive does not deploy a database in normal conditions. KubeArchive does not want
+to manage or control the database of users. They need to provide their own database and
+configure KubeArchive to connect to it.
+
+Note: KubeArchive deploys a database for development purposes.
+
+== Single APIServerSource vs Multiple APIServerSource
+Date: 2024-09-02
+
+Status: Accepted
+
+Reviewers: Hector Martinez, Greg Allen, Sam Koved, Andrea Fernandez
+
+KubeArchive uses a single Knative API Server Source to get all the updates related to the
+resources the KubeArchive user wants. We used a multiple Knative API Server Source approach,
+but it involved deploying one instance per namespace, and that may lead to resource problems
+and it makes the process more complex. Using a single instance consumes less resources is
+simpler from the code point of view and it could be enough for our case. If performance is
+limitant with a single APIServerSource we can review this decision and go with multiple
+instances.
+
+== KubeArchive deployment using Kubernetes manifests, generated by Kustomize
+Date: 2025-01-01 (I can't recall the date)
+
+Status: Accepted
+
+Reviewers: Hector Martinez, Greg Allen, Sam Koved, Andrea Fernandez, Marta Anon
+
+After using Helm for a while we decided that the best way to reduce the complexity
+to install KubeArchive is to switch to use Kubernetes manifests. We used Helm to generate
+the Kubernetes Manifests for a while, but its template system made the files more complex
+to read, so we switched to use Kustomize for the manifest generation.
+
+== KubeArchive writes the Log URL on resource archival
+Date: 2025-01-01 (I can't recall the date)
+
+Status: Accepted
+
+Reviewers: Hector Martinez, Greg Allen, Sam Koved, Andrea Fernandez, Marta Anon
+
+KubeArchive stores the Log URL when the resource associated is persisted. This ensures that the URL
+continues to be valid regardless the change on the environment. For example if there is a new logging
+system, but the old still exists, KubeArchive will return valid Log URLs for old entries. If KubeArchive
+created the Log URLs upon read, all the old entries would have wrong URLs, forcing the migration
+of the logs to a new system.
+
+In the case users want to migrate old entries, they should rewrite the database entries themselves.
+
+== KubeArchive offer patches for SQL migration
+Date: 2025-01-27
+
+Status: Accepted
+
+Reviewers: Hector Martinez, Greg Allen, Sam Koved, Andrea Fernandez, Marta Anon
+
+KubeArchive offers a series of SQL patches to migrate the database schema from one version
+to the next. Additionally KubeArchive offers a single SQL file that should be used in new
+installations. The implementation will be decided after inspection of the different tools available.

@@ -1,7 +1,7 @@
 = Enabling Observability on KubeArchive
 
-KubeArchive is instrumented to emit observability data, specifically metrics and
-traces. This can be enabled and configured with two environment
+KubeArchive is instrumented to emit observability data: metrics,
+traces and logs. This can be enabled and configured with the following environment
 variables present on all of the KubeArchive components:
 
 * `KUBEARCHIVE_OTEL_MODE`: one of "enabled", "delegated" or "disabled". Defaults to
@@ -13,6 +13,10 @@ link:https://www.w3.org/TR/trace-context-2/#sampled-flag[W3 Trace Context `sampl
 Useful for observability in production.
 * `OTEL_EXPORTER_OTLP_ENDPOINT`: an OTLP compatible endpoint where traces are
     sent. By default it is set to an empty string.
+* `KUBEARCHIVE_OTLP_SEND_LOGS`: if set to "true" logs are sent to the
+    `OTEL_EXPOTER_OTLP_ENDPOINT` and not printed to stdout. Defaults to
+    "false", so logs are printed on stdout by default. When enabled, a single log line
+    is printed to stdout informing that logs will be redirected.
 
 To change these environment variables values, edit or patch the
 `kubearchive-api-server`, `kubearchive-sink` and `kubearchive-operator`

@@ -6,16 +6,21 @@ package observability
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
 
+	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/contrib/instrumentation/host"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
@@ -25,6 +30,7 @@ import (
 // the name of the environment variable that will determine if instrumentation needs to be started
 const OtelStartEnvVar = "KUBEARCHIVE_OTEL_MODE"
 const OtelMetricsInterval = "KUBEARCHIVE_METRICS_INTERVAL"
+const OtelLogsEnvVar = "KUBEARCHIVE_OTLP_SEND_LOGS"
 
 var tp *trace.TracerProvider
 
@@ -105,6 +111,27 @@ func Start(serviceName string) error {
 	}
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
+
+	if os.Getenv(OtelLogsEnvVar) == "true" {
+		slog.Info(fmt.Sprintf("'%s' is set to 'true' so logs will be redirected to the OTLP endpoint.", OtelLogsEnvVar))
+
+		logger := otelslog.NewLogger("root")
+		slog.SetDefault(logger)
+
+		exporter, err := otlploghttp.New(context.Background())
+		if err != nil {
+			return err
+		}
+		processor := log.NewBatchProcessor(exporter)
+
+		loggerProvider := log.NewLoggerProvider(
+			log.WithResource(res),
+			log.WithProcessor(processor),
+		)
+
+		global.SetLoggerProvider(loggerProvider)
+	}
+
 	return nil
 }
 

@@ -58,11 +58,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	klog.SetSlogLogger(slog.Default()) // klog is used by the election leader process
 	err := observability.Start(otelServiceName)
 	if err != nil {
 		log.Printf("Could not start OpenTelemetry: %s\n", err)
 	}
+
+	klog.SetSlogLogger(slog.Default()) // klog is used by the election leader process
 
 	var enableLeaderElection bool
 	var probeAddr string

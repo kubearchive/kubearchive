@@ -17,9 +17,9 @@ import (
 	ceClient "github.com/cloudevents/sdk-go/v2/client"
 	"github.com/cloudevents/sdk-go/v2/protocol"
 	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/cmd/api/abort"
 	"github.com/kubearchive/kubearchive/cmd/sink/filters"
 	"github.com/kubearchive/kubearchive/cmd/sink/logs"
+	"github.com/kubearchive/kubearchive/pkg/abort"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/kubearchive/kubearchive/pkg/observability"
@@ -251,10 +251,7 @@ func (c *Controller) CloudEventsHandler(ctx *gin.Context) {
 }
 
 func (c *Controller) Livez(ctx *gin.Context) {
-	observabilityConfig := os.Getenv(observability.OtelStartEnvVar)
-	if observabilityConfig == "" {
-		observabilityConfig = "disabled"
-	}
+	observabilityConfig := observability.Status()
 	ctx.JSON(http.StatusOK, gin.H{
 		"Code":          http.StatusOK,
 		"ginMode":       gin.Mode(),

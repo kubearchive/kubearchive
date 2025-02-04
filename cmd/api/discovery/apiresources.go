@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 
-	"github.com/kubearchive/kubearchive/cmd/api/abort"
+	"github.com/kubearchive/kubearchive/pkg/abort"
 	"github.com/kubearchive/kubearchive/pkg/cache"
 )
 

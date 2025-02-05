@@ -1,0 +1,187 @@
+{
+  "specversion": "1.0",
+  "type": "dev.knative.apiserver.resource.update",
+  "source": "http://localhost",
+  "subject": "/apis/batch/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-28806900-sp286",
+  "id": "cbec9e69-accf-4dfd-a22b-e9947376e01c",
+  "time": "2025-01-28T19:04:03.880155449Z",
+  "datacontenttype": "application/json",
+  "apiversion": "v1",
+  "kind": "Pod",
+  "knativearrivaltime": "2025-01-28T19:04:03.880549164Z",
+  "name": "generate-log-2-28806900-sp286",
+  "namespace": "generate-logs-cronjobs",
+  "data": {
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+      "creationTimestamp": "2024-10-08T19:00:00Z",
+      "finalizers": [
+        "batch.kubernetes.io/job-tracking"
+      ],
+      "generateName": "generate-log-1-28806900-",
+      "labels": {
+        "batch.kubernetes.io/controller-uid": "9b2849e4-c5af-4ff8-9bd1-61d06dba67ad",
+        "batch.kubernetes.io/job-name": "generate-log-1-28806900",
+        "controller-uid": "9b2849e4-c5af-4ff8-9bd1-61d06dba67ad",
+        "job-name": "generate-log-1-28806900"
+      },
+      "managedFields": [
+        {
+          "apiVersion": "v1",
+          "fieldsType": "FieldsV1",
+          "fieldsV1": {
+            "f:metadata": {
+              "f:finalizers": {
+                ".": {},
+                "v:\"batch.kubernetes.io/job-tracking\"": {}
+              },
+              "f:generateName": {},
+              "f:labels": {
+                ".": {},
+                "f:batch.kubernetes.io/controller-uid": {},
+                "f:batch.kubernetes.io/job-name": {},
+                "f:controller-uid": {},
+                "f:job-name": {}
+              },
+              "f:ownerReferences": {
+                ".": {},
+                "k:{\"uid\":\"9b2849e4-c5af-4ff8-9bd1-61d06dba67ad\"}": {}
+              }
+            },
+            "f:spec": {
+              "f:containers": {
+                "k:{\"name\":\"generate\"}": {
+                  ".": {},
+                  "f:args": {},
+                  "f:image": {},
+                  "f:imagePullPolicy": {},
+                  "f:name": {},
+                  "f:resources": {},
+                  "f:terminationMessagePath": {},
+                  "f:terminationMessagePolicy": {}
+                }
+              },
+              "f:dnsPolicy": {},
+              "f:enableServiceLinks": {},
+              "f:restartPolicy": {},
+              "f:schedulerName": {},
+              "f:securityContext": {},
+              "f:terminationGracePeriodSeconds": {}
+            }
+          },
+          "manager": "kube-controller-manager",
+          "operation": "Update",
+          "time": "2024-10-08T19:00:00Z"
+        }
+      ],
+      "name": "generate-log-2-28806900-sp286",
+      "namespace": "generate-logs-cronjobs",
+      "ownerReferences": [
+        {
+          "apiVersion": "batch/v1",
+          "blockOwnerDeletion": true,
+          "controller": true,
+          "kind": "Job",
+          "name": "generate-log-1-28806900",
+          "uid": "9b2849e4-c5af-4ff8-9bd1-61d06dba67ad"
+        }
+      ],
+      "resourceVersion": "34272",
+      "uid": "4df2df3f-7397-4a63-86b4-9f5f1ff84f99"
+    },
+    "spec": {
+      "containers": [
+        {
+          "args": [
+            "-n",
+            "1024",
+            "-d",
+            "20ms"
+          ],
+          "image": "quay.io/kubearchive/mingrammer/flog",
+          "imagePullPolicy": "IfNotPresent",
+          "name": "generate",
+          "resources": {},
+          "terminationMessagePath": "/dev/termination-log",
+          "terminationMessagePolicy": "File",
+          "volumeMounts": [
+            {
+              "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+              "name": "kube-api-access-n82dz",
+              "readOnly": true
+            }
+          ]
+        }
+      ],
+      "dnsPolicy": "ClusterFirst",
+      "enableServiceLinks": true,
+      "preemptionPolicy": "PreemptLowerPriority",
+      "priority": 0,
+      "restartPolicy": "OnFailure",
+      "schedulerName": "default-scheduler",
+      "securityContext": {},
+      "serviceAccount": "default",
+      "serviceAccountName": "default",
+      "terminationGracePeriodSeconds": 30,
+      "tolerations": [
+        {
+          "effect": "NoExecute",
+          "key": "node.kubernetes.io/not-ready",
+          "operator": "Exists",
+          "tolerationSeconds": 300
+        },
+        {
+          "effect": "NoExecute",
+          "key": "node.kubernetes.io/unreachable",
+          "operator": "Exists",
+          "tolerationSeconds": 300
+        }
+      ],
+      "volumes": [
+        {
+          "name": "kube-api-access-n82dz",
+          "projected": {
+            "defaultMode": 420,
+            "sources": [
+              {
+                "serviceAccountToken": {
+                  "expirationSeconds": 3607,
+                  "path": "token"
+                }
+              },
+              {
+                "configMap": {
+                  "items": [
+                    {
+                      "key": "ca.crt",
+                      "path": "ca.crt"
+                    }
+                  ],
+                  "name": "kube-root-ca.crt"
+                }
+              },
+              {
+                "downwardAPI": {
+                  "items": [
+                    {
+                      "fieldRef": {
+                        "apiVersion": "v1",
+                        "fieldPath": "metadata.namespace"
+                      },
+                      "path": "namespace"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "status": {
+      "phase": "Pending",
+      "qosClass": "BestEffort"
+    }
+  }
+}

@@ -72,7 +72,7 @@ func TestReceiveCloudEvents(t *testing.T) {
 		httpStatus int
 	}{
 		{
-			name:       "Valid CloudEvent",
+			name:       "Valid CloudEvent with kubernetes resource",
 			file:       "testdata/CE-job.json",
 			httpStatus: http.StatusOK,
 		},
@@ -80,6 +80,11 @@ func TestReceiveCloudEvents(t *testing.T) {
 			name:       "Request body is not a CloudEvent",
 			file:       "testdata/not-CE.json",
 			httpStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "Valid CloudEvent but data is not kubernetes resource",
+			file:       "testdata/CE-not-k8s.json",
+			httpStatus: http.StatusUnprocessableEntity,
 		},
 	}
 	for _, tt := range tests {
@@ -286,6 +291,19 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 			deletedObj:         pod,
 			clusterObjs:        objs,
 		},
+		{
+			name:               "Delete Pod that does not exist",
+			files:              []string{"testdata/CE-pod-does-not-exist.json"},
+			httpStatus:         http.StatusInternalServerError,
+			archive:            []string{},
+			delete:             []string{"Pod"},
+			archiveOnDelete:    []string{},
+			dbResourcesNumRows: 1, // second write won't occur because the delete operation fails
+			dbLogUrlsNumRows:   1,
+			shouldDelete:       false,
+			deletedObj:         nil,
+			clusterObjs:        objs,
+		},
 	}
 
 	for _, tt := range tests {
@@ -321,6 +339,340 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 					)
 					assert.Error(t, err)
 				}
+			}
+		})
+	}
+}
+
+func TestResourceWriteFails(t *testing.T) {
+	t.Setenv(files.LoggingDirEnvVar, "testdata/loggingconfig")
+
+	job := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "Job",
+			"apiVersion": "batch/v1",
+			"metadata": map[string]interface{}{
+				"name":      "generate-log-1-28968184",
+				"namespace": "generate-logs-cronjobs",
+			},
+		},
+	}
+	pod := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "Pod",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      "generate-log-1-28806900-sp286",
+				"namespace": "generate-logs-cronjobs",
+			},
+		},
+	}
+	objs := []runtime.Object{job, pod}
+
+	tests := []struct {
+		name            string
+		files           []string
+		httpStatus      int
+		archive         []string
+		delete          []string
+		archiveOnDelete []string
+		clusterObjs     []runtime.Object
+	}{
+		{
+			name:            "Archive Jobs from CloudEvents",
+			files:           []string{"testdata/CE-job.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{"Job"},
+			delete:          []string{},
+			archiveOnDelete: []string{},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "Archive Pod from CloudEvents with log urls",
+			files:           []string{"testdata/CE-pod-1-container.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{"Pod"},
+			delete:          []string{},
+			archiveOnDelete: []string{},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "Archive Pod with 3 containers from CloudEvents with log urls",
+			files:           []string{"testdata/CE-pod-3-container.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{"Pod"},
+			delete:          []string{},
+			archiveOnDelete: []string{},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "ArchiveOnDelete Jobs from CloudEvents",
+			files:           []string{"testdata/CE-job-delete.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{},
+			archiveOnDelete: []string{"Job"},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "ArchiveOnDelete Pod from CloudEvents with log urls",
+			files:           []string{"testdata/CE-pod-1-container-delete.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{},
+			archiveOnDelete: []string{"Pod"},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "ArchiveOnDelete Pod with 3 containers from CloudEvents with log urls",
+			files:           []string{"testdata/CE-pod-3-container-delete.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{},
+			archiveOnDelete: []string{"Pod"},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "Delete Job from CloudEvent",
+			files:           []string{"testdata/CE-job.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{"Job"},
+			archiveOnDelete: []string{},
+			clusterObjs:     objs,
+		},
+		{
+			name:            "Delete Pod from CloudEvent with log urls",
+			files:           []string{"testdata/CE-pod-1-container.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{"Pod"},
+			archiveOnDelete: []string{},
+			clusterObjs:     objs,
+		},
+		{
+			name:            "Delete Pod with 3 containers from CloudEvent with log urls",
+			files:           []string{"testdata/CE-pod-3-container.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{"Pod"},
+			archiveOnDelete: []string{},
+			clusterObjs:     objs,
+		},
+		{
+			name:            "Delete Pod that does not exist",
+			files:           []string{"testdata/CE-pod-does-not-exist.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{"Pod"},
+			archiveOnDelete: []string{},
+			clusterObjs:     objs,
+		},
+	}
+
+	testScheme := runtime.NewScheme()
+	err := metav1.AddMetaToScheme(testScheme)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	err = batchv1.AddToScheme(testScheme)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	err = corev1.AddToScheme(testScheme)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := fake.NewSimpleDynamicClient(testScheme, tt.clusterObjs...)
+			db := fakeDb.NewFakeDatabaseWithError(errors.New("test error"))
+			filter := fakeFilters.NewFilters(tt.archive, tt.delete, tt.archiveOnDelete)
+			builder, err := logs.NewUrlBuilder()
+			if err != nil {
+				assert.FailNow(t, err.Error())
+			}
+			router := setupRouter(t, db, filter, client, builder)
+			for _, file := range tt.files {
+				res := httptest.NewRecorder()
+				reader, err := os.Open(file)
+				if err != nil {
+					assert.FailNow(t, err.Error())
+				}
+				t.Cleanup(func() { reader.Close() })
+				req := httptest.NewRequest(http.MethodPost, "/", reader)
+				req.Header.Add("Content-Type", "application/cloudevents+json")
+				router.ServeHTTP(res, req)
+
+				assert.Equal(t, tt.httpStatus, res.Code)
+			}
+		})
+	}
+}
+
+func TestLogUrlWriteFails(t *testing.T) {
+	t.Setenv(files.LoggingDirEnvVar, "testdata/loggingconfig")
+
+	job := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "Job",
+			"apiVersion": "batch/v1",
+			"metadata": map[string]interface{}{
+				"name":      "generate-log-1-28968184",
+				"namespace": "generate-logs-cronjobs",
+			},
+		},
+	}
+	pod := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "Pod",
+			"apiVersion": "v1",
+			"metadata": map[string]interface{}{
+				"name":      "generate-log-1-28806900-sp286",
+				"namespace": "generate-logs-cronjobs",
+			},
+		},
+	}
+	objs := []runtime.Object{job, pod}
+
+	tests := []struct {
+		name            string
+		files           []string
+		httpStatus      int
+		archive         []string
+		delete          []string
+		archiveOnDelete []string
+		clusterObjs     []runtime.Object
+	}{
+		{
+			name:            "Archive Jobs from CloudEvents",
+			files:           []string{"testdata/CE-job.json"},
+			httpStatus:      http.StatusOK,
+			archive:         []string{"Job"},
+			delete:          []string{},
+			archiveOnDelete: []string{},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "Archive Pod from CloudEvents with log urls",
+			files:           []string{"testdata/CE-pod-1-container.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{"Pod"},
+			delete:          []string{},
+			archiveOnDelete: []string{},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "Archive Pod with 3 containers from CloudEvents with log urls",
+			files:           []string{"testdata/CE-pod-3-container.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{"Pod"},
+			delete:          []string{},
+			archiveOnDelete: []string{},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "ArchiveOnDelete Jobs from CloudEvents",
+			files:           []string{"testdata/CE-job-delete.json"},
+			httpStatus:      http.StatusOK,
+			archive:         []string{},
+			delete:          []string{},
+			archiveOnDelete: []string{"Job"},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "ArchiveOnDelete Pod from CloudEvents with log urls",
+			files:           []string{"testdata/CE-pod-1-container-delete.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{},
+			archiveOnDelete: []string{"Pod"},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "ArchiveOnDelete Pod with 3 containers from CloudEvents with log urls",
+			files:           []string{"testdata/CE-pod-3-container-delete.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{},
+			archiveOnDelete: []string{"Pod"},
+			clusterObjs:     []runtime.Object{},
+		},
+		{
+			name:            "Delete Job from CloudEvent",
+			files:           []string{"testdata/CE-job.json"},
+			httpStatus:      http.StatusOK,
+			archive:         []string{},
+			delete:          []string{"Job"},
+			archiveOnDelete: []string{},
+			clusterObjs:     objs,
+		},
+		{
+			name:            "Delete Pod from CloudEvent with log urls",
+			files:           []string{"testdata/CE-pod-1-container.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{"Pod"},
+			archiveOnDelete: []string{},
+			clusterObjs:     objs,
+		},
+		{
+			name:            "Delete Pod with 3 containers from CloudEvent with log urls",
+			files:           []string{"testdata/CE-pod-3-container.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{"Pod"},
+			archiveOnDelete: []string{},
+			clusterObjs:     objs,
+		},
+		{
+			name:            "Delete Pod that does not exist",
+			files:           []string{"testdata/CE-pod-does-not-exist.json"},
+			httpStatus:      http.StatusInternalServerError,
+			archive:         []string{},
+			delete:          []string{"Pod"},
+			archiveOnDelete: []string{},
+			clusterObjs:     objs,
+		},
+	}
+
+	testScheme := runtime.NewScheme()
+	err := metav1.AddMetaToScheme(testScheme)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	err = batchv1.AddToScheme(testScheme)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	err = corev1.AddToScheme(testScheme)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := fake.NewSimpleDynamicClient(testScheme, tt.clusterObjs...)
+			db := fakeDb.NewFakeDatabaseWithUrlError(errors.New("test error"))
+			filter := fakeFilters.NewFilters(tt.archive, tt.delete, tt.archiveOnDelete)
+			builder, err := logs.NewUrlBuilder()
+			if err != nil {
+				assert.FailNow(t, err.Error())
+			}
+			router := setupRouter(t, db, filter, client, builder)
+			for _, file := range tt.files {
+				res := httptest.NewRecorder()
+				reader, err := os.Open(file)
+				if err != nil {
+					assert.FailNow(t, err.Error())
+				}
+				t.Cleanup(func() { reader.Close() })
+				req := httptest.NewRequest(http.MethodPost, "/", reader)
+				req.Header.Add("Content-Type", "application/cloudevents+json")
+				router.ServeHTTP(res, req)
+
+				assert.Equal(t, tt.httpStatus, res.Code)
 			}
 		})
 	}

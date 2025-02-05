@@ -51,10 +51,11 @@ type Database struct {
 	logUrl    []LogUrlRow
 	jsonPath  string
 	err       error
+	urlErr    error
 }
 
 func NewFakeDatabase(testResources []*unstructured.Unstructured, testLogs []LogUrlRow, jsonPath string) *Database {
-	return &Database{testResources, testLogs, jsonPath, nil}
+	return &Database{testResources, testLogs, jsonPath, nil, nil}
 }
 
 func NewFakeDatabaseWithError(err error) *Database {
@@ -62,7 +63,15 @@ func NewFakeDatabaseWithError(err error) *Database {
 		resources []*unstructured.Unstructured
 		logUrls   []LogUrlRow
 	)
-	return &Database{resources, logUrls, "", err}
+	return &Database{resources, logUrls, "", err, nil}
+}
+
+func NewFakeDatabaseWithUrlError(err error) *Database {
+	var (
+		resources []*unstructured.Unstructured
+		logUrls   []LogUrlRow
+	)
+	return &Database{resources, logUrls, "", nil, err}
 }
 
 func (f *Database) Ping(_ context.Context) error {
@@ -152,11 +161,18 @@ func (f *Database) filterResourceByKindApiVersionNamespaceAndName(kind, apiVersi
 }
 
 func (f *Database) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte) error {
+	if f.err != nil {
+		return f.err
+	}
 	f.resources = append(f.resources, k8sObj)
 	return nil
 }
 
 func (f *Database) WriteUrls(_ context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error {
+	if f.urlErr != nil {
+		return f.urlErr
+	}
+
 	if k8sObj == nil {
 		return errors.New("Cannot write log urls to the database when k8sObj is nil")
 	}

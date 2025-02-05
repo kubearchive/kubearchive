@@ -1,0 +1,18 @@
+{
+  "specversion": "1.0",
+  "type": "dev.knative.apiserver.resource.update",
+  "source": "http://localhost",
+  "subject": "/apis/batch/v1/namespaces/generate-logs-cronjobs/jobs/generate-log-1-28968184",
+  "id": "cbec9e69-accf-4dfd-a22b-e9947376e01c",
+  "time": "2025-01-28T19:04:03.880155449Z",
+  "datacontenttype": "application/json",
+  "apiversion": "batch/v1",
+  "kind": "Job",
+  "knativearrivaltime": "2025-01-28T19:04:03.880549164Z",
+  "name": "generate-log-1-28968184",
+  "namespace": "generate-logs-cronjobs",
+  "data": {
+    "foo": "bar",
+    "fizz": "buzz"
+  }
+}

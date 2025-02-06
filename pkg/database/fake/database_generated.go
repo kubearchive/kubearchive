@@ -175,6 +175,14 @@ func (f *Database) WriteUrls(_ context.Context, k8sObj *unstructured.Unstructure
 	return nil
 }
 
+func (f *Database) NumResources() int {
+	return len(f.resources)
+}
+
+func (f *Database) NumLogUrls() int {
+	return len(f.logUrl)
+}
+
 func (f *Database) CloseDB() error {
 	return f.err
 }

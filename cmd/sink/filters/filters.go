@@ -39,6 +39,12 @@ func init() {
 	globalKey = os.Getenv(globalKeyEnvVar)
 }
 
+type Interface interface {
+	MustArchive(context.Context, *unstructured.Unstructured) bool
+	MustDelete(context.Context, *unstructured.Unstructured) bool
+	MustArchiveOnDelete(context.Context, *unstructured.Unstructured) bool
+}
+
 type Filters struct {
 	*sync.RWMutex
 	clientset       kubernetes.Interface

@@ -12,6 +12,9 @@ cd ${SCRIPT_DIR}
 
 NAMESPACE="splunk-operator"
 
+set -o errexit
+set -o xtrace
+
 kubectl apply -f https://github.com/splunk/splunk-operator/releases/download/2.6.0/splunk-operator-cluster.yaml \
 	--server-side --force-conflicts
 
@@ -22,6 +25,7 @@ helm upgrade --install --wait --create-namespace \
 kubectl -n ${NAMESPACE} apply -f .
 
 kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=90s
+kubectl wait -n ${NAMESPACE} pod --all --for=condition=ready --timeout=180s
 
 # If KubeArchive is installed, update the credentials and set the jsonpath
 KUBEARCHIVE_NS="kubearchive"

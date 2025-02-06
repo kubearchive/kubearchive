@@ -80,10 +80,9 @@ func SetLoggingCredentials(loggingCreds map[string]string, loggingCredsErr error
 // It should be called when user, password and logURL are set in the context.
 func LogRetrieval() gin.HandlerFunc {
 	// FIXME For now the queries to the logging backend server are done insecurely. Needed for the current test env.
-	// #nosec G402
 	client := http.Client{
 		Transport: otelhttp.NewTransport(&http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}), // #nosec G402
 		Timeout: 60 * time.Second,
 	}
 	return func(c *gin.Context) {

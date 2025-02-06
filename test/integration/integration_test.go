@@ -201,6 +201,7 @@ func TestArchiveAndRead(t *testing.T) {
 	outputInstallSplunk, errScriptSplunk := cmdInstallSplunk.CombinedOutput()
 	if errScriptSplunk != nil {
 		fmt.Println("Could not run the splunk installer: ", errScriptSplunk)
+		fmt.Println(string(outputInstallSplunk))
 		t.Fatal(errScriptSplunk)
 	}
 	fmt.Println("Output: ", string(outputInstallSplunk))

@@ -8,6 +8,7 @@
 ** xref:configuration/global-filters.adoc[Global Filters]
 ** xref:configuration/cache-expiration-time.adoc[Cache Expiration Time]
 ** xref:configuration/enable-observability.adoc[Enable Observability]
+** xref:configuration/kubearchive-logs.adoc[]
 
 * Contributors
 ** xref:contributors/guide.adoc[Guide]

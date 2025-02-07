@@ -13,6 +13,7 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/sink/routers"
 	"github.com/kubearchive/kubearchive/cmd/sink/server"
 	"github.com/kubearchive/kubearchive/pkg/database"
+	"github.com/kubearchive/kubearchive/pkg/logging"
 	kaObservability "github.com/kubearchive/kubearchive/pkg/observability"
 )
 
@@ -28,8 +29,12 @@ const (
 )
 
 func main() {
-	slog.Info("Starting KubeArchive Sink", "version", version, "commit", commit, "built", date)
+	if err := logging.ConfigureLogging(); err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
+	}
 
+	slog.Info("Starting KubeArchive Sink", "version", version, "commit", commit, "built", date)
 	err := kaObservability.Start(otelServiceName)
 	if err != nil {
 		slog.Error("Could not start tracing", "err", err.Error())

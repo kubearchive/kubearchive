@@ -28,6 +28,7 @@ import (
 	"github.com/go-logr/logr"
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/cmd/operator/internal/controller"
+	"github.com/kubearchive/kubearchive/pkg/logging"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
@@ -52,6 +53,11 @@ func init() {
 }
 
 func main() {
+	if err := logging.ConfigureLogging(); err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
+	}
+
 	klog.SetSlogLogger(slog.Default()) // klog is used by the election leader process
 	err := observability.Start(otelServiceName)
 	if err != nil {

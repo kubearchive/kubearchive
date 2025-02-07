@@ -22,6 +22,7 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/api/routers"
 	"github.com/kubearchive/kubearchive/pkg/cache"
 	"github.com/kubearchive/kubearchive/pkg/database"
+	kaLogging "github.com/kubearchive/kubearchive/pkg/logging"
 	"github.com/kubearchive/kubearchive/pkg/middleware"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -64,7 +65,10 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	cacheExpirations *routers.CacheExpirations) *Server {
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(middleware.Logger)
+	router.Use(middleware.Logger(middleware.LoggerConfig{PathLoggingLevel: map[string]string{
+		"/livez":  "DEBUG",
+		"/readyz": "DEBUG",
+	}}))
 	router.Use(otelgin.Middleware("")) // Empty string so the library sets the proper server
 
 	apiGroup := router.Group("/api")
@@ -104,6 +108,11 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 }
 
 func main() {
+	if err := kaLogging.ConfigureLogging(); err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
+	}
+
 	slog.Info("Starting KubeArchive API", "version", version, "commit", commit, "built", date)
 	err := observability.Start(otelServiceName)
 	if err != nil {

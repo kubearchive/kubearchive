@@ -3,30 +3,57 @@
 package middleware
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-func Logger(c *gin.Context) {
-	start := time.Now()
-	c.Next()
-	end := time.Now()
+type LoggerConfig struct {
+	PathLoggingLevel map[string]string // /livez=DEBUG for example
+}
 
-	path := c.Request.URL.Path
-	query := c.Request.URL.RawQuery
-	if query != "" {
-		path += "?" + query
+func Logger(conf LoggerConfig) gin.HandlerFunc {
+	pathLevels := map[string]slog.Level{}
+	for path, val := range conf.PathLoggingLevel {
+		var level slog.Level
+		err := level.UnmarshalText([]byte(val))
+		if err != nil {
+			slog.Warn("Log level does not exist, using 'INFO' instead.", "level", val, "path", path)
+			level = slog.LevelInfo
+		}
+
+		pathLevels[path] = level
 	}
 
-	slog.Info(
-		"Served request",
-		"method", c.Request.Method,
-		"status", c.Writer.Status(),
-		"latency", end.Sub(start),
-		"client", c.ClientIP(),
-		"path", path,
-		"errors", c.Errors.ByType(1).String(),
-	)
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+		end := time.Now()
+
+		path := c.Request.URL.Path
+		query := c.Request.URL.RawQuery
+		if query != "" {
+			path += "?" + query
+		}
+
+		logLevel, ok := pathLevels[path]
+		if !ok {
+			logLevel = slog.LevelInfo
+		}
+
+		slog.Log(
+			context.Background(), // They use `Background` in the slog implementation
+			logLevel,
+			"Served request",
+			"method", c.Request.Method,
+			"status", c.Writer.Status(),
+			"latency", end.Sub(start),
+			"client", c.ClientIP(),
+			"path", path,
+			"errors", c.Errors.ByType(1).String(),
+		)
+	}
+
 }

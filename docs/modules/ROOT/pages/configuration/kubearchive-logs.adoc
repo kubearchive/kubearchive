@@ -1,0 +1,25 @@
+= KubeArchive Logs
+
+This page refers to the logs produced by KubeArchive. To see how KubeArchive
+integrates with logging systems, check
+xref:integrations/logging.adoc[].
+
+== Environment variables
+
+KubeArchive supports the environment variable `LOG_LEVEL`, which is present
+on all its Deployments with a value of `"INFO"` by default. This variable
+specifies the minimum log level to be logged. To see debug logs, set it as
+`"DEBUG"` and rollout the Deployment. For example:
+
+[source,bash]
+----
+kubectl set -n kubearchive env deployment kubearchive-api-server LOG_LEVEL=DEBUG
+kubectl set -n kubearchive env deployment kubearchive-operator LOG_LEVEL=DEBUG
+kubectl set -n kubearchive env deployment kubearchive-sink LOG_LEVEL=DEBUG
+----
+
+[INFO]
+====
+The rollout of the Deployments happens automatically after using the
+command `kubectl set env`.
+====

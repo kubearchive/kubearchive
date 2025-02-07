@@ -29,6 +29,8 @@ spec:
             - --health-probe-bind-address=:8081
             - --leader-elect
           env:
+            - name: LOG_LEVEL
+              value: INFO
             - name: KUBEARCHIVE_NAMESPACE
               valueFrom:
                 fieldRef:

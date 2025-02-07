@@ -26,7 +26,7 @@ type Server struct {
 func NewServer(controller *routers.Controller) *Server {
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(middleware.Logger)
+	router.Use(middleware.Logger(middleware.LoggerConfig{}))
 	router.Use(otelgin.Middleware(""))
 
 	router.POST("/", controller.CloudEventsHandler)

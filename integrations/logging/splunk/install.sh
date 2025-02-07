@@ -25,7 +25,7 @@ helm upgrade --install --wait --create-namespace \
 kubectl -n ${NAMESPACE} apply -f .
 
 kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=90s
-kubectl wait -n ${NAMESPACE} pod --all --for=condition=ready --timeout=180s
+kubectl wait -n ${NAMESPACE} pod --all --for=condition=ready -l app.kubernetes.io/component!=fluentd-configcheck --timeout=180s
 
 # If KubeArchive is installed, update the credentials and set the jsonpath
 KUBEARCHIVE_NS="kubearchive"

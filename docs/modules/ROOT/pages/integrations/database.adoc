@@ -1,0 +1,197 @@
+= Database Integrations
+
+ifeval::["{page-component-display-version}" == "main"]
+:download-path: https://github.com/kubearchive/kubearchive/releases/latest/download
+endif::[]
+ifeval::["{page-component-display-version}" != "main"]
+:download-path: https://github.com/kubearchive/kubearchive/releases/download/{page-component-display-version}
+endif::[]
+
+== Overview
+
+KubeArchive requires a database to store resources.
+This document list the databases supported, how to set up the database schema
+and how to add new database integrations.
+
+=== PostgreSQL
+
+Currently, PostgreSQL is the only fully supported database engine.
+The KubeArchive integration test suite runs with the PostgreSQL version detailed in
+link:{download-path}/kubearchive.sql[the kubearchive.sql file].
+
+The PostgreSQL implementation is available
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/postgresql.go[here].
+
+The PostgreSQL schema is available
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/integrations/database/postgresql/kubearchive.sql[here]
+and in the
+link:{download-path}[release]
+as [filename]`kubearchive.sql`.
+
+=== MariaDB
+
+This integration is still in progress.
+
+The MariaDB implementation is available
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/mariadb.go[here].
+
+[#_configuration_and_customization]
+== Configuration and Customization
+
+=== Schema
+
+KubeArchive offers a [filename]`kubearchive.sql` file with the instructions to set up
+the schema as part of the installation process.
+
+[IMPORTANT]
+====
+The provided schema includes indexes.
+
+KubeArchive users should review and customize the indexes
+if needed based on the expected queries and the amount and
+distribution of the expected archived data.
+====
+
+The schema includes the creation of the database `kubearchive` owned by the `kubearchive` user.
+The schema expects the existence of a `kubearchive` database user fow owning this database.
+
+[IMPORTANT]
+====
+An account with admin privileges should run [filename]`kubearchive.sql`.
+
+[source, bash]
+----
+psql -U admin \ <1>
+-h database.example.com \ <2>
+-f kubearchive.sql
+----
+<1> The database admin account used to apply the schema. It can be different from the KubeArchive DB user.
+<2> The database URL
+====
+
+=== Database Credentials
+
+The `kubearchive-database-credentials` Secret stores the information to connect KubeArchive with the Database.
+
+The default content of this Secret when KubeArchive is installed is:
+
+[source, yaml]
+----
+kind: Secret
+type: Opaque
+metadata:
+  name: kubearchive-database-credentials
+  namespace: kubearchive
+stringData:
+  DATABASE_KIND: postgresql
+  DATABASE_PORT: "5432"
+  DATABASE_URL: "kubearchive-rw.postgresql.svc.cluster.local"
+  DATABASE_DB: "kubearchive"
+  DATABASE_USER: "kubearchive"
+  DATABASE_PASSWORD: "Databas3Passw0rd"  # notsecret
+----
+
+Update the secret with the specific values of your database and
+restart the pods accordingly to pick the new values.
+The command for changing the most common values, URL and password, is:
+
+[source, bash]
+----
+kubectl patch secret -n kubearchive kubearchive-database-credentials \
+--patch='{"stringData": {
+"DATABASE_URL": "database.example.com", <1>
+"DATABASE_PASSWORD": "password" <2>
+}}'
+----
+<1> The database URL
+<2> The database password
+
+[WARNING]
+====
+If you change the `DATABASE_USER` or the `DATABASE_DB` then you should accordingly update
+the schema provided within the KubeArchive release.
+====
+
+[IMPORTANT]
+====
+Don't forget to restart kubearchive sink and api as both access the database:
+
+[source, bash]
+----
+kubectl rollout -n kubearchive restart deployment kubearchive-sink kubearchive-api-server
+----
+====
+
+
+== Adding a New Database
+
+To add a new database integration follow the instructions:
+
+1. Create a new file under `pkg/database` named after the new database engine.
+2. Include an
+link:https://go.dev/doc/effective_go#init[init function]
+that:
+
+* Inserts in the
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L27[`RegisteredDBCreators`]
+map an entry keyed with the name of the DB type with a
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L24[`newDBCreatorFunc`]
+implementation as value.
+
+* Inserts in the
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L26[`RegisteredDatabases`]
+map an entry keyed with the name of the DB type with a
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L23[`newDatabaseFunc`]
+as value.
+
+=== The `newDBCreatorFunc`
+
+This function receives the set of environment variables with the database configuration and returns a
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/creator.go[`DBCreator`]
+implementation.
+
+The `DBCreator` should include `env` as a parameter so the `GetConnectionString` can access them.
+
+=== The `DBInterface` implementation returned by the `newDatabaseFunc`
+
+[NOTE]
+====
+This section includes the development guidelines expected by the KubeArchive maintainers.
+====
+
+The `DBInterface` should be a struct with
+link:https://github.com/kubearchive/kubearchive/blob/main/pkg/database/database.go#L40[`Database`]
+embedded.
+
+Make sure to implement the interfaces that are part of it:
+
+* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/deleter.go[DBDeleter]
+* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/filter.go[DBFilter]
+* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/inserter.go[DBInserter]
+* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/selector.go[DBSelector]
+* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/sorter.go[DBSorter]
+
+[NOTE]
+====
+All the interfaces work with objects from the
+link:https://pkg.go.dev/github.com/huandu/go-sqlbuilder[sqlbuilder Go library].
+Check out the docs to see how to work with them.
+====
+
+[TIP]
+====
+Some interfaces, like `DBDeleter`, have a default implementation.
+
+Other interfaces, like `DBFilter`, have a partial implementation.
+
+Those implementations may have the functionality that you need.
+Check them before implementing your own.
+====
+
+If the database interaction logic changes from the implementation in the `Database` struct,
+override the implementation of the affected functions.
+For example, a database that does not support upsert queries
+needs to implement `ResourceInserter` as a series of  `SELECT` and an `INSERT` statements.
+
+Take a look at the current database integrations and
+feel free to contribute to our code adding new database integrations!

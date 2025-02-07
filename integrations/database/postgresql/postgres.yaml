@@ -19,6 +19,6 @@ spec:
         name: kubearchive-user
       owner: kubearchive
   enableSuperuserAccess: true
-  imageName: ghcr.io/cloudnative-pg/postgresql:16.2
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.6
   storage:
     size: 1Gi

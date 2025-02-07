@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 16.2 (Debian 16.2-1.pgdg110+2)
--- Dumped by pg_dump version 16.2 (Debian 16.2-1.pgdg110+2)
+-- Dumped from database version 16.6 (Debian 16.6-1.pgdg110+1)
+-- Dumped by pg_dump version 16.3
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -88,7 +88,7 @@ CREATE TABLE public.log_url (
     uuid uuid NOT NULL,
     url text NOT NULL,
     container_name text NOT NULL,
-	json_path text,
+    json_path text,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now() NOT NULL
 );
@@ -264,3 +264,4 @@ ALTER TABLE ONLY public.log_url
 --
 -- PostgreSQL database dump complete
 --
+

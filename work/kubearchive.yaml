@@ -1,0 +1,1175 @@
+
+
+# Source: kubearchive-helm/crds/kubearchive.kubearchive.org_kubearchiveconfigs.yaml
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+    cert-manager.io/inject-ca-from: kubearchive/kubearchive-operator-certificate
+  name: kubearchiveconfigs.kubearchive.kubearchive.org
+spec:
+  group: kubearchive.kubearchive.org
+  names:
+    kind: KubeArchiveConfig
+    listKind: KubeArchiveConfigList
+    plural: kubearchiveconfigs
+    shortNames:
+      - kac
+      - kacs
+    singular: kubearchiveconfig
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: KubeArchiveConfig is the Schema for the kubearchiveconfigs API
+          properties:
+            apiVersion:
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+              type: string
+            kind:
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: KubeArchiveConfigSpec defines the desired state of KubeArchiveConfig
+              properties:
+                resources:
+                  items:
+                    properties:
+                      archiveOnDelete:
+                        type: string
+                      archiveWhen:
+                        type: string
+                      deleteWhen:
+                        type: string
+                      selector:
+                        description: APIVersionKindSelector is an APIVersion Kind tuple with a LabelSelector.
+                        properties:
+                          apiVersion:
+                            description: APIVersion - the API version of the resource to watch.
+                            type: string
+                          kind:
+                            description: |-
+                              Kind of the resource to watch.
+                              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+                            type: string
+                          selector:
+                            description: |-
+                              LabelSelector filters this source to objects to those resources pass the
+                              label selector.
+                              More info: http://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors
+                            properties:
+                              matchExpressions:
+                                description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
+                                items:
+                                  description: |-
+                                    A label selector requirement is a selector that contains values, a key, and an operator that
+                                    relates the key and values.
+                                  properties:
+                                    key:
+                                      description: key is the label key that the selector applies to.
+                                      type: string
+                                    operator:
+                                      description: |-
+                                        operator represents a key's relationship to a set of values.
+                                        Valid operators are In, NotIn, Exists and DoesNotExist.
+                                      type: string
+                                    values:
+                                      description: |-
+                                        values is an array of string values. If the operator is In or NotIn,
+                                        the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                        the values array must be empty. This array is replaced during a strategic
+                                        merge patch.
+                                      items:
+                                        type: string
+                                      type: array
+                                      x-kubernetes-list-type: atomic
+                                  required:
+                                    - key
+                                    - operator
+                                  type: object
+                                type: array
+                                x-kubernetes-list-type: atomic
+                              matchLabels:
+                                additionalProperties:
+                                  type: string
+                                description: |-
+                                  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                  map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                  operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                type: object
+                            type: object
+                            x-kubernetes-map-type: atomic
+                        required:
+                          - apiVersion
+                          - kind
+                        type: object
+                    type: object
+                  type: array
+              type: object
+            status:
+              description: KubeArchiveConfigStatus defines the observed state of KubeArchiveConfig
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        service:
+          namespace: kubearchive
+          name: webhook-service
+          path: /convert
+      conversionReviewVersions:
+        - v1
+---
+# Source: kubearchive-helm/templates/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubearchive
+---
+# Source: kubearchive-helm/templates/api_server/service_account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "kubearchive-api-server"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-api-server"
+    app.kubernetes.io/component: api-server
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+---
+# Source: kubearchive-helm/templates/operator/service_account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "kubearchive-operator"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-operator"
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+---
+# Source: kubearchive-helm/templates/sink/service_account.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "kubearchive-sink"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-sink"
+    app.kubernetes.io/component: sink
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+---
+# Source: kubearchive-helm/templates/database/database_secret.yaml
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: kubearchive-database-credentials
+  namespace: kubearchive
+data:
+  DATABASE_KIND: cG9zdGdyZXNxbA==
+  DATABASE_PORT: "NTQzMg=="
+  DATABASE_URL: "a3ViZWFyY2hpdmUtcncucG9zdGdyZXNxbC5zdmMuY2x1c3Rlci5sb2NhbA=="
+  DATABASE_DB: "a3ViZWFyY2hpdmU="
+  DATABASE_USER: "a3ViZWFyY2hpdmU="
+  DATABASE_PASSWORD: "RGF0YWJhczNQYXNzdzByZA=="
+---
+# Source: kubearchive-helm/templates/logging/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubearchive-logging
+  namespace: kubearchive
+type: Opaque
+data:
+  PASSWORD: Y2hhbmdlbWU= # notsecret
+  USER: YWRtaW4=
+---
+# Source: kubearchive-helm/templates/logging/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-logging
+  namespace: kubearchive
+data:
+---
+# Source: kubearchive-helm/templates/operator/sink_filters.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sink-filters
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: sink-filters
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+---
+# Source: kubearchive-helm/templates/api_server/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: "kubearchive-api-server"
+  labels:
+    app.kubernetes.io/name: "kubearchive-api-server"
+    app.kubernetes.io/component: api-server
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+rules:
+  - apiGroups:
+      - authorization.k8s.io
+      - authentication.k8s.io
+    resources:
+      - subjectaccessreviews
+      - tokenreviews
+    verbs:
+      - create
+---
+# Source: kubearchive-helm/templates/operator/kubearchiveconfig_editor_role.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+# permissions for end users to edit kubearchiveconfigs.---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubearchive-operator-config-editor
+  labels:
+    app.kubernetes.io/name: kubearchive-operator-config-editor
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+rules:
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs/status
+    verbs:
+      - get
+---
+# Source: kubearchive-helm/templates/operator/kubearchiveconfig_viewer_role.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+# permissions for end users to view kubearchiveconfigs.---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubearchive-operator-config-viewer
+  labels:
+    app.kubernetes.io/name: kubearchive-operator-config-viewer
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+rules:
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs/status
+    verbs:
+      - get
+---
+# Source: kubearchive-helm/templates/operator/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubearchive-operator
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - serviceaccounts
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - kubearchive.kubearchive.org
+    resources:
+      - kubearchiveconfigs/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - clusterroles
+      - rolebindings
+      - roles
+    verbs:
+      - bind
+      - create
+      - delete
+      - escalate
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - sources.knative.dev
+    resources:
+      - apiserversources
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - update
+      - watch
+---
+# Source: kubearchive-helm/templates/api_server/role_binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: "kubearchive-api-server"
+  labels:
+    app.kubernetes.io/name: "kubearchive-api-server"
+    app.kubernetes.io/component: api-server
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+subjects:
+  - kind: ServiceAccount
+    name: kubearchive-api-server
+    namespace: kubearchive
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubearchive-api-server
+---
+# Source: kubearchive-helm/templates/operator/role_binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubearchive-operator
+  labels:
+    app.kubernetes.io/name: kubearchive-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubearchive-operator
+subjects:
+  - kind: ServiceAccount
+    name: kubearchive-operator
+    namespace: kubearchive
+---
+# Source: kubearchive-helm/templates/operator/leader_election_role.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+# permissions to do leader election.---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kubearchive-operator-leader-election
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: kubearchive-operator-leader-election
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+---
+# Source: kubearchive-helm/templates/sink/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: "kubearchive-sink-watch"
+  labels:
+    app.kubernetes.io/name: "kubearchive-sink-watch"
+    app.kubernetes.io/component: sink
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+---
+# Source: kubearchive-helm/templates/operator/leader_election_role_binding.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kubearchive-operator-leader-election
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: kubearchive-operator-leader-election
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kubearchive-operator-leader-election
+subjects:
+  - kind: ServiceAccount
+    name: kubearchive-operator
+    namespace: kubearchive
+---
+# Source: kubearchive-helm/templates/sink/role_binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: "kubearchive-sink-watch"
+  labels:
+    app.kubernetes.io/name: "kubearchive-sink-watch"
+    app.kubernetes.io/component: sink
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+subjects:
+  - kind: ServiceAccount
+    name: kubearchive-sink
+    namespace: kubearchive
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kubearchive-sink-watch
+---
+# Source: kubearchive-helm/templates/api_server/api_server.yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: "kubearchive-api-server"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-api-server"
+    app.kubernetes.io/component: api-server
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+spec:
+  selector:
+    app: kubearchive-api-server
+  ports:
+    - protocol: TCP
+      port: 8081
+      targetPort: 8081
+      name: server
+---
+# Source: kubearchive-helm/templates/operator/service.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0---
+apiVersion: v1
+kind: Service
+metadata:
+  name: "kubearchive-operator-webhooks"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-operator-webhooks"
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+spec:
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 9443
+      name: webhook-server
+  selector:
+    control-plane: controller-manager
+---
+# Source: kubearchive-helm/templates/sink/sink.yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: "kubearchive-sink"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-sink"
+    app.kubernetes.io/component: sink
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+spec:
+  selector:
+    app: kubearchive-sink
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+# Source: kubearchive-helm/templates/api_server/api_server.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "kubearchive-api-server"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-api-server"
+    app.kubernetes.io/component: api-server
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: &labels
+      app: kubearchive-api-server
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      serviceAccountName: kubearchive-api-server
+      volumes:
+        - name: tls-secret
+          secret:
+            secretName: kubearchive-api-server-tls
+        - name: logging-secret
+          secret:
+            secretName: kubearchive-logging
+      containers:
+        - name: kubearchive-api-server
+          image: quay.io/kubearchive/api:v0.9.0@sha256:4d645ee170bb2bcb62cd5e63cd26bd4e87057e682823ea00df2914872263d98d
+          resources:
+            requests:
+              cpu: 200m
+              # 90% of the limit
+              # See recommendations at https://tip.golang.org/doc/gc-guide#Memory_limit
+              memory: 230Mi
+            limits:
+              # Currently the API is sitting at 630m on performance tests
+              cpu: 700m
+              memory: 256Mi
+          volumeMounts:
+            - name: tls-secret
+              readOnly: true
+              mountPath: /etc/kubearchive/ssl/
+            - mountPath: /data/logging
+              name: logging-secret
+          envFrom:
+            # Provide DB URL, user, password, database and port as env vars
+            - secretRef:
+                name: kubearchive-database-credentials
+          env:
+            - name: GIN_MODE
+              value: "release"
+            - name: KUBEARCHIVE_OTEL_MODE
+              value: "disabled"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: ""
+            - name: OTEL_GO_X_DEPRECATED_RUNTIME_METRICS
+              value: "false"
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            - name: CACHE_EXPIRATION_AUTHORIZED
+              value: "10m"
+            - name: CACHE_EXPIRATION_UNAUTHORIZED
+              value: "1m"
+            - name: KUBEARCHIVE_LOGGING_DIR
+              value: /data/logging
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8081
+              scheme: HTTPS
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+              scheme: HTTPS
+---
+# Source: kubearchive-helm/templates/operator/operator.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "kubearchive-operator"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-operator"
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        control-plane: controller-manager
+    spec:
+      containers:
+        - name: manager
+          args:
+            - --health-probe-bind-address=:8081
+            - --leader-elect
+          env:
+            - name: KUBEARCHIVE_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: KUBEARCHIVE_OTEL_MODE
+              value: "disabled"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: ""
+            - name: OTEL_GO_X_DEPRECATED_RUNTIME_METRICS
+              value: "false"
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+          image: "quay.io/kubearchive/operator/operator-bb1a6b76a0eb92b0313f33b750a76355:latest"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          ports:
+            - containerPort: 9443
+              name: webhook-server
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: cert
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: kubearchive-operator
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: kubearchive-operator-tls
+---
+# Source: kubearchive-helm/templates/sink/sink.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "kubearchive-sink"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-sink"
+    app.kubernetes.io/component: sink
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: &labels
+      app: kubearchive-sink
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      serviceAccountName: kubearchive-sink
+      volumes:
+        - name: logging-config
+          configMap:
+            name: kubearchive-logging
+      containers:
+        - name: kubearchive-sink
+          image: quay.io/kubearchive/sink:v0.9.0@sha256:1bf307c0862cd5ac95ca1edd3a7b2e1772acb8eef36ff91a5352729c2e7435d3
+          resources:
+            requests:
+              cpu: 200m
+              # 90% of the limit
+              # See recommendations at https://tip.golang.org/doc/gc-guide#Memory_limit
+              memory: 230Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          volumeMounts:
+            - mountPath: /data/logging
+              name: logging-config
+          envFrom:
+            # Provide DB URL, user, password, database and port as env vars
+            - secretRef:
+                name: kubearchive-database-credentials
+          env:
+            - name: KUBEARCHIVE_OTEL_MODE
+              value: "disabled"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: ""
+            - name: OTEL_GO_X_DEPRECATED_RUNTIME_METRICS
+              value: "false"
+            - name: GOMEMLIMIT
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.memory
+            - name: GOMAXPROCS
+              valueFrom:
+                resourceFieldRef:
+                  resource: limits.cpu
+            - name: KUBEARCHIVE_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: KUBEARCHIVE_LOGGING_DIR
+              value: /data/logging
+---
+
+
+# Source: kubearchive-helm/templates/api_server/api_server.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/api_server/certificates.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/api_server/role.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/api_server/role_binding.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/api_server/service_account.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/database/database_secret.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/eventing/brokers.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/logging/configmap.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/logging/secret.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/namespace.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/operator/certificates.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/operator/role_binding.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/operator/service_account.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/operator/sink_filters.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/sink/role.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/sink/role_binding.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/sink/service_account.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/sink/sink.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+
+
+# Source: kubearchive-helm/templates/sink/trigger.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+# Source: kubearchive-helm/templates/eventing/brokers.yaml
+apiVersion: eventing.knative.dev/v1
+kind: Broker
+metadata:
+  name: kubearchive-broker
+  namespace: kubearchive
+spec:
+  delivery:
+    retry: 4
+    backoffPolicy: exponential
+    # ISO 8601 format
+    backoffDelay: PT0.5S
+    deadLetterSink:
+      ref:
+        apiVersion: eventing.knative.dev/v1
+        kind: Broker
+        name: kubearchive-dls
+---
+# Source: kubearchive-helm/templates/eventing/brokers.yaml
+apiVersion: eventing.knative.dev/v1
+kind: Broker
+metadata:
+  name: kubearchive-dls
+  namespace: kubearchive
+spec:
+  delivery:
+    retry: 4
+    backoffPolicy: exponential
+    # ISO 8601 format
+    backoffDelay: PT0.5S
+---
+# Source: kubearchive-helm/templates/api_server/certificates.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "kubearchive-api-server-certificate"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-api-server-certificate"
+    app.kubernetes.io/component: api-server
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+spec:
+  isCA: false
+  commonName: kubearchive-api-server
+  secretName: "kubearchive-api-server-tls"
+  duration: 720h # 30 days
+  renewBefore: 360h # 15 days
+  subject:
+    organizations:
+      - kubearchive
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  usages:
+    - digital signature
+    - key encipherment
+  dnsNames:
+    - localhost
+    - kubearchive-api-server
+    - "kubearchive-api-server.kubearchive.svc"
+  issuerRef:
+    name: "kubearchive"
+    kind: Issuer
+    group: cert-manager.io
+---
+# Source: kubearchive-helm/templates/certificates.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "kubearchive-ca"
+  namespace: kubearchive
+spec:
+  isCA: true
+  commonName: kubearchive-ca-certificate
+  secretName: "kubearchive-ca"
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: "kubearchive-ca"
+    kind: Issuer
+    group: cert-manager.io
+---
+# Source: kubearchive-helm/templates/operator/certificates.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "kubearchive-operator-certificate"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-operator-certificate"
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+spec:
+  dnsNames:
+    - "kubearchive-operator-webhooks.kubearchive.svc"
+    - "kubearchive-operator-webhooks.kubearchive.svc.cluster.local"
+  issuerRef:
+    kind: Issuer
+    name: kubearchive
+  secretName: kubearchive-operator-tls
+---
+# Source: kubearchive-helm/templates/certificates.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "kubearchive-ca"
+  namespace: kubearchive
+spec:
+  selfSigned: {}
+---
+# Source: kubearchive-helm/templates/certificates.yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "kubearchive"
+  namespace: kubearchive
+spec:
+  ca:
+    secretName: "kubearchive-ca"
+---
+# Source: kubearchive-helm/templates/operator/webhooks.yaml
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: kubearchive-mutating-webhook-configuration
+  labels:
+    app.kubernetes.io/name: kubearchive-mutating-webhook-configuration
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+  annotations:
+    cert-manager.io/inject-ca-from: kubearchive/kubearchive-operator-certificate
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: kubearchive-operator-webhooks
+        namespace: kubearchive
+        path: /mutate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
+    failurePolicy: Fail
+    name: mkubearchiveconfig.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - kubearchiveconfigs
+    sideEffects: None
+---
+# Source: kubearchive-helm/templates/sink/trigger.yaml
+apiVersion: eventing.knative.dev/v1
+kind: Trigger
+metadata:
+  name: kubearchive-sink
+  namespace: kubearchive
+spec:
+  broker: kubearchive-broker
+  subscriber:
+    ref:
+      apiVersion: v1
+      kind: Service
+      name: kubearchive-sink
+---
+# Source: kubearchive-helm/templates/operator/webhooks.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: kubearchive-validating-webhook-configuration
+  labels:
+    app.kubernetes.io/name: kubearchive-validating-webhook-configuration
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "v0.9.0"
+  annotations:
+    cert-manager.io/inject-ca-from: kubearchive/kubearchive-operator-certificate
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: kubearchive-operator-webhooks
+        namespace: kubearchive
+        path: /validate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
+    failurePolicy: Fail
+    name: vkubearchiveconfig.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - kubearchiveconfigs
+    sideEffects: None
+
+---

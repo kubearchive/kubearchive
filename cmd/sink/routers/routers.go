@@ -58,23 +58,43 @@ func (c *Controller) writeLogs(ctx context.Context, obj *unstructured.Unstructur
 	defer cancel()
 	urls, err := c.LogUrlBuilder.Urls(logCtx, obj)
 	if err != nil {
-		slog.Error("Could not build log urls for object", "objectID", obj.GetUID(), "err", err)
+		slog.Error(
+			"Could not build log urls for resource",
+			"id", obj.GetUID(),
+			"kind", obj.GetKind(),
+			"namespace", obj.GetNamespace(),
+			"name", obj.GetName(),
+			"err", err,
+		)
 		return
 	}
 	if len(urls) == 0 {
-		slog.Info("No log urls were generated for object", "objectID", obj.GetUID())
+		slog.Info(
+			"No log urls were generated for object",
+			"id", obj.GetUID(),
+			"kind", obj.GetKind(),
+			"namespace", obj.GetNamespace(),
+			"name", obj.GetName(),
+		)
 		return
 	}
 	err = c.Db.WriteUrls(logCtx, obj, c.LogUrlBuilder.GetJsonPath(), urls...)
 	if err != nil {
-		slog.Error("Failed to write log urls for object to the database", "objectID", obj.GetUID(), "err", err)
+		slog.Error(
+			"Failed to write log urls for object to the database",
+			"id", obj.GetUID(),
+			"kind", obj.GetKind(),
+			"namespace", obj.GetNamespace(),
+			"name", obj.GetName(),
+			"err", err,
+		)
 	} else {
 		slog.Info(
 			"Successfully wrote log urls for object to the database",
-			"objectID",
-			obj.GetUID(),
-			"kind",
-			obj.GetKind(),
+			"id", obj.GetUID(),
+			"kind", obj.GetKind(),
+			"namespace", obj.GetNamespace(),
+			"name", obj.GetName(),
 		)
 	}
 }
@@ -86,14 +106,23 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 	if err != nil {
 		slog.Error(
 			"Failed to write object from cloudevent to the database",
-			"objectID", obj.GetUID(),
-			"id", event.ID(),
+			"event-id", event.ID(),
+			"event-type", event.Type(),
+			"id", obj.GetUID(),
+			"kind", obj.GetKind(),
+			"namespace", obj.GetNamespace(),
+			"name", obj.GetName(),
 			"err", err,
 		)
 	} else {
 		slog.Info(
 			"Successfully wrote object from cloudevent to the database",
-			"objectID", obj.GetUID(),
+			"event-id", event.ID(),
+			"event-type", event.Type(),
+			"id", obj.GetUID(),
+			"kind", obj.GetKind(),
+			"namespace", obj.GetNamespace(),
+			"name", obj.GetName(),
 			"id", event.ID(),
 		)
 	}
@@ -104,86 +133,96 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 }
 
 func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Event) {
-	slog.Info("Received cloudevent", "id", event.ID())
 	k8sObj, err := models.UnstructuredFromByteSlice(event.Data())
 	if err != nil {
-		slog.Error("Cloudevent is malformed and will not be processed", "id", event.ID(), "err", err)
+		slog.Error("Received malformed CloudEvent", "event-id", event.ID(), "err", err)
 		return
 	}
-	slog.Info(
-		"Cloudevent contains all required fields. Checking if its object needs to be archived",
-		"id", event.ID(),
-		"objectID", k8sObj.GetUID(),
-	)
 
 	if strings.HasSuffix(event.Type(), ".delete") {
-		slog.Info(
-			"The type of cloudevent is Delete. Checking if object needs to be archived",
-			"id", event.ID(),
-			"objectID", k8sObj.GetUID(),
-		)
 		if c.Filters.MustArchiveOnDelete(ctx, k8sObj) {
 			c.writeResource(ctx, k8sObj, event)
 			return
 		}
+
 		slog.Info(
-			"Object from cloudevent does not need to be archived after deletion",
-			"objectID", k8sObj.GetUID(),
-			"id", event.ID(),
+			"Resource was deleted, no action is needed",
+			"event-id", event.ID(),
+			"event-type", event.Type(),
+			"id", k8sObj.GetUID(),
+			"kind", k8sObj.GetKind(),
+			"namespace", k8sObj.GetNamespace(),
+			"name", k8sObj.GetName(),
 		)
 		return
 	}
+
 	if !c.Filters.MustArchive(ctx, k8sObj) {
 		slog.Info(
-			"Object from cloudevent does not need to be archived",
-			"objectID", k8sObj.GetUID(),
-			"id", event.ID(),
+			"Resource was updated, no action is needed",
+			"event-id", event.ID(),
+			"event-type", event.Type(),
+			"id", k8sObj.GetUID(),
+			"kind", k8sObj.GetKind(),
+			"namespace", k8sObj.GetNamespace(),
+			"name", k8sObj.GetName(),
 		)
 		return
 	}
-	slog.Info(
-		"Writing object from cloudevent into the database",
-		"objectID", k8sObj.GetUID(),
-		"id", event.ID(),
-	)
+
 	c.writeResource(ctx, k8sObj, event)
-	slog.Info(
-		"Checking if object from cloudevent needs to be deleted",
-		"objectID", k8sObj.GetUID(),
-		"id", event.ID(),
-	)
-	if c.Filters.MustDelete(ctx, k8sObj) {
-		slog.Info("Attempting to delete kubernetes object", "objectID", k8sObj.GetUID())
-		kind := k8sObj.GetObjectKind().GroupVersionKind()
-		resource, _ := meta.UnsafeGuessKindToResource(kind)     // we only need the plural resource
-		propagationPolicy := metav1.DeletePropagationBackground // can't get address of a const
-		k8sCtx, k8sCancel := context.WithTimeout(ctx, time.Second*5)
-		defer k8sCancel()
-		err = c.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).Delete(
-			k8sCtx,
-			k8sObj.GetName(),
-			metav1.DeleteOptions{PropagationPolicy: &propagationPolicy},
-		)
-		if err != nil {
-			slog.Error(
-				"Could not delete object",
-				"objectID", k8sObj.GetUID(),
-				"err", err,
-			)
-			return
-		}
-		slog.Info("Successfully requested kubernetes object be deleted", "objectID", k8sObj.GetUID())
-		deleteTs := metav1.Now()
-		k8sObj.SetDeletionTimestamp(&deleteTs)
-		slog.Info("Updating cluster_deleted_ts for kubernetes object", "objectID", k8sObj.GetUID())
-		c.writeResource(ctx, k8sObj, event)
-	} else {
+
+	if !c.Filters.MustDelete(ctx, k8sObj) {
 		slog.Info(
-			"Object from cloudevent does not need to be deleted",
-			"objectID", k8sObj.GetUID(),
-			"id", event.ID(),
+			"Resource was updated and archived",
+			"event-id", event.ID(),
+			"event-type", event.Type(),
+			"id", k8sObj.GetUID(),
+			"kind", k8sObj.GetKind(),
+			"namespace", k8sObj.GetNamespace(),
+			"name", k8sObj.GetName(),
 		)
+		return
 	}
+
+	kind := k8sObj.GetObjectKind().GroupVersionKind()
+	resource, _ := meta.UnsafeGuessKindToResource(kind)     // we only need the plural resource
+	propagationPolicy := metav1.DeletePropagationBackground // can't get address of a const
+	k8sCtx, k8sCancel := context.WithTimeout(ctx, time.Second*5)
+	defer k8sCancel()
+
+	err = c.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).Delete(
+		k8sCtx,
+		k8sObj.GetName(),
+		metav1.DeleteOptions{PropagationPolicy: &propagationPolicy},
+	)
+	if err != nil {
+		slog.Error(
+			"Error deleting a resource",
+			"event-id", event.ID(),
+			"event-type", event.Type(),
+			"id", k8sObj.GetUID(),
+			"kind", k8sObj.GetKind(),
+			"namespace", k8sObj.GetNamespace(),
+			"name", k8sObj.GetName(),
+			"err", err,
+		)
+		return
+	}
+
+	deleteTs := metav1.Now()
+	k8sObj.SetDeletionTimestamp(&deleteTs)
+	c.writeResource(ctx, k8sObj, event)
+
+	slog.Info(
+		"Resource was updated, archived and deleted from the cluster",
+		"event-id", event.ID(),
+		"event-type", event.Type(),
+		"id", k8sObj.GetUID(),
+		"kind", k8sObj.GetKind(),
+		"namespace", k8sObj.GetNamespace(),
+		"name", k8sObj.GetName(),
+	)
 }
 
 func (c *Controller) CloudEventsHandler(ctx *gin.Context) {

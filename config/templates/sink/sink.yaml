@@ -45,6 +45,8 @@ spec:
             - secretRef:
                 name: kubearchive-database-credentials
           env:
+            - name: GIN_MODE
+              value: release
             - name: LOG_LEVEL
               value: INFO
             - name: KUBEARCHIVE_OTEL_MODE

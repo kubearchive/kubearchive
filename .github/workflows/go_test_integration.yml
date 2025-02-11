@@ -54,6 +54,7 @@ jobs:
         run: |
           export KO_DOCKER_REPO="kind.local"
           bash hack/quick-install.sh
+          bash integrations/logging/splunk/install.sh
       - name: Test Go code
         run: |
           export KO_DOCKER_REPO="kind.local"

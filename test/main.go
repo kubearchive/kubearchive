@@ -5,8 +5,10 @@ package test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -26,6 +28,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
@@ -204,4 +207,52 @@ func GetDynamicKubernetesClient() (*dynamic.DynamicClient, error) {
 		return nil, fmt.Errorf("Error instantiating k8s from host %s: %s", config.Host, err)
 	}
 	return client, nil
+}
+
+func GetUrl(client *http.Client, token string, url string) (*unstructured.UnstructuredList, error) {
+	body, err := getUrl(client, token, url)
+	if err != nil {
+		return nil, err
+	}
+
+	var data unstructured.UnstructuredList
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		fmt.Printf("Couldn't unmarshal JSON, %s\n", err)
+		return nil, err
+	}
+	fmt.Printf("The HTTP status returned is OK, returned %d items\n", len(data.Items))
+	return &data, nil
+}
+
+func GetLogs(client *http.Client, token string, url string) ([]byte, error) {
+	return getUrl(client, token, url)
+}
+
+func getUrl(client *http.Client, token string, url string) ([]byte, error) {
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		fmt.Printf("could not create a request, %s", err)
+		return nil, err
+	}
+	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	response, err := client.Do(request)
+	if err != nil {
+		fmt.Printf("Couldn't get a response HTTP, %s\n", err)
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		fmt.Printf("Couldn't read Body, %s\n", err)
+		return nil, err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		fmt.Printf("The HTTP status returned is not OK, %s - %s \n", response.Status, string(body))
+		return nil, fmt.Errorf("%d", response.StatusCode)
+	}
+
+	return body, nil
 }

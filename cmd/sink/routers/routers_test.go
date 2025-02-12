@@ -5,6 +5,8 @@ package routers
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -40,7 +42,27 @@ func setupRouter(
 	ctrl, err := NewController(db, filter, k8sClient, builder)
 	assert.Nil(t, err)
 	router.POST("/", ctrl.CloudEventsHandler)
+	router.GET("/livez", ctrl.Livez)
+	router.GET("/readyz", ctrl.Readyz)
 	return router
+}
+
+func setupClient(t testing.TB, objects ...runtime.Object) *fake.FakeDynamicClient {
+	t.Helper()
+	testScheme := runtime.NewScheme()
+	err := metav1.AddMetaToScheme(testScheme)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	err = batchv1.AddToScheme(testScheme)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	err = corev1.AddToScheme(testScheme)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	return fake.NewSimpleDynamicClient(testScheme, objects...)
 }
 
 func TestReceiveCloudEvents(t *testing.T) {
@@ -266,23 +288,9 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		},
 	}
 
-	testScheme := runtime.NewScheme()
-	err := metav1.AddMetaToScheme(testScheme)
-	if err != nil {
-		assert.FailNow(t, err.Error())
-	}
-	err = batchv1.AddToScheme(testScheme)
-	if err != nil {
-		assert.FailNow(t, err.Error())
-	}
-	err = corev1.AddToScheme(testScheme)
-	if err != nil {
-		assert.FailNow(t, err.Error())
-	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client := fake.NewSimpleDynamicClient(testScheme, tt.clusterObjs...)
+			client := setupClient(t, tt.clusterObjs...)
 			db := fakeDb.NewFakeDatabase(make([]*unstructured.Unstructured, 0), make([]fakeDb.LogUrlRow, 0), "$.")
 			filter := fakeFilters.NewFilters(tt.archive, tt.delete, tt.archiveOnDelete)
 			builder, err := logs.NewUrlBuilder()
@@ -314,6 +322,76 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 					assert.Error(t, err)
 				}
 			}
+		})
+	}
+}
+
+func TestLivez(t *testing.T) {
+	db := fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{}, "$.")
+	filter := fakeFilters.NewFilters([]string{}, []string{}, []string{})
+	builder, _ := logs.NewUrlBuilder()
+	router := setupRouter(t, db, filter, nil, builder)
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/livez", nil)
+	router.ServeHTTP(res, req)
+
+	expected, _ := json.Marshal(gin.H{
+		"Code":          http.StatusOK,
+		"ginMode":       "debug",
+		"openTelemetry": "disabled",
+		"message":       "healthy",
+	})
+	assert.Equal(t, res.Body.Bytes(), expected)
+	assert.Equal(t, res.Code, http.StatusOK)
+}
+
+func TestReadyz(t *testing.T) {
+	testCases := []struct {
+		name         string
+		dbConnReady  bool
+		namespaceSet bool
+		k8sApiConn   bool
+		expected     int
+	}{
+		{
+			name:        "Sink is ready",
+			dbConnReady: true,
+			k8sApiConn:  true,
+			expected:    http.StatusOK,
+		},
+		{
+			name:        "Cannot check kubernetes api",
+			dbConnReady: true,
+			k8sApiConn:  false,
+			expected:    http.StatusServiceUnavailable,
+		},
+		{
+			name:        "Database is not ready",
+			dbConnReady: false,
+			k8sApiConn:  true,
+			expected:    http.StatusServiceUnavailable,
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			var db database.DBInterface
+			filter := fakeFilters.NewFilters(nil, nil, nil)
+			builder, _ := logs.NewUrlBuilder()
+			if tt.k8sApiConn {
+				t.Setenv(namespaceEnvVar, "kubearchive")
+			}
+			if tt.dbConnReady {
+				db = fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{}, "$.")
+			} else {
+				db = fakeDb.NewFakeDatabaseWithError(errors.New("test error"))
+			}
+			client := setupClient(t)
+			router := setupRouter(t, db, filter, client, builder)
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+			router.ServeHTTP(res, req)
+
+			assert.Equal(t, tt.expected, res.Code)
 		})
 	}
 }

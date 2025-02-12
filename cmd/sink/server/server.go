@@ -30,6 +30,10 @@ func NewServer(controller *routers.Controller) *Server {
 	router.Use(otelgin.Middleware(""))
 
 	router.POST("/", controller.CloudEventsHandler)
+
+	router.GET("/livez", controller.Livez)
+	router.GET("/readyz", controller.Readyz)
+
 	return &Server{
 		controller: controller,
 		router:     router,

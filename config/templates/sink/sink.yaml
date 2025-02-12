@@ -71,6 +71,14 @@ spec:
                   fieldPath: metadata.namespace
             - name: KUBEARCHIVE_LOGGING_DIR
               value: /data/logging
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 8080
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
 ---
 kind: Service
 apiVersion: v1

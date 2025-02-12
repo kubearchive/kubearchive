@@ -113,12 +113,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("Starting KubeArchive API", "version", version, "commit", commit, "built", date)
 	err := observability.Start(otelServiceName)
 	if err != nil {
 		slog.Info("Could not start opentelemetry", "error", err.Error())
 	}
 
+	slog.Info("Starting KubeArchive API", "version", version, "commit", commit, "built", date)
 	cacheExpirations, err := getCacheExpirations()
 	if err != nil {
 		slog.Error(err.Error())

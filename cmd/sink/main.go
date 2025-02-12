@@ -34,12 +34,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("Starting KubeArchive Sink", "version", version, "commit", commit, "built", date)
 	err := kaObservability.Start(otelServiceName)
 	if err != nil {
 		slog.Error("Could not start tracing", "err", err.Error())
 		os.Exit(1)
 	}
+
+	slog.Info("Starting KubeArchive Sink", "version", version, "commit", commit, "built", date)
 	db, err := database.NewDatabase()
 	if err != nil {
 		slog.Error("Could not connect to the database", "err", err)

@@ -42,3 +42,4 @@ release-notes.json
 
 # Performance
 perf-results/*
+merge/*

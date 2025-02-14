@@ -166,3 +166,11 @@ func Shutdown(ctx context.Context) error {
 
 	return fmt.Errorf("Cannot shutdown TracerProvider. None have been started")
 }
+
+func Status() string {
+	observabilityConfig := os.Getenv(OtelStartEnvVar)
+	if observabilityConfig == "" {
+		return "disabled"
+	}
+	return observabilityConfig
+}

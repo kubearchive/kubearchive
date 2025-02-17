@@ -250,6 +250,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 }
 
 func TestWriteUrls(t *testing.T) {
+	t.Parallel()
 	k8sObj := &unstructured.Unstructured{}
 	k8sObj.SetUID(types.UID("abc-123-xyz"))
 	newUrls := []models.LogTuple{
@@ -265,6 +266,7 @@ func TestWriteUrls(t *testing.T) {
 		newUrls        []models.LogTuple
 		expected       []LogUrlRow
 		error          error
+		urlErr         error
 	}{
 		{
 			name:           "Insert log urls into empty table",
@@ -315,14 +317,34 @@ func TestWriteUrls(t *testing.T) {
 			expected:       testLogUrls,
 			error:          errors.New("Cannot write log urls to the database when k8sObj is nil"),
 		},
+		{
+			name:           "WriteUrls fails when urlErr is not nil",
+			initialLogUrls: []LogUrlRow{},
+			obj:            k8sObj,
+			jsonPath:       jsonPath,
+			newUrls:        newUrls,
+			expected:       []LogUrlRow{},
+			error:          nil,
+			urlErr:         errors.New("test error"),
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := NewFakeDatabase(testResources, tt.initialLogUrls, testJsonPath)
+			t.Parallel()
+			var db *Database
+			if tt.urlErr != nil {
+				db = NewFakeDatabaseWithUrlError(tt.urlErr)
+			} else {
+				db = NewFakeDatabase(testResources, tt.initialLogUrls, testJsonPath)
+			}
 			err := db.WriteUrls(context.Background(), tt.obj, tt.jsonPath, tt.newUrls...)
-			assert.Equal(t, tt.expected, db.logUrl)
-			assert.Equal(t, tt.error, err)
+			if tt.urlErr != nil {
+				assert.Equal(t, tt.urlErr, err)
+			} else {
+				assert.Equal(t, tt.expected, db.logUrl)
+				assert.Equal(t, tt.error, err)
+			}
 		})
 	}
 }
@@ -351,6 +373,47 @@ func TestQueryLogURLs(t *testing.T) {
 			url, jsonPath, _ := db.QueryLogURL(context.Background(), tt.kind, "", "", "")
 			assert.Equal(t, tt.expected, url)
 			assert.Equal(t, testJsonPath, jsonPath)
+		})
+	}
+}
+
+func TestWriteResources(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		obj  *unstructured.Unstructured
+		data []byte
+		err  error
+	}{
+		{
+			name: "Write to Database with no errors",
+			obj:  &unstructured.Unstructured{},
+			data: []byte{},
+			err:  nil,
+		},
+		{
+			name: "Write to Database with no errors",
+			obj:  &unstructured.Unstructured{},
+			data: []byte{},
+			err:  errors.New("test error"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			var db *Database
+			if tt.err != nil {
+				db = NewFakeDatabaseWithError(tt.err)
+			} else {
+				db = NewFakeDatabase([]*unstructured.Unstructured{}, []LogUrlRow{}, "$.")
+			}
+			err := db.WriteResource(context.Background(), tt.obj, tt.data)
+			if tt.err != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tt.err, err)
+			} else {
+				assert.Nil(t, err)
+			}
 		})
 	}
 }

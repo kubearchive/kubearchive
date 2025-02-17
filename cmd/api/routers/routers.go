@@ -17,6 +17,7 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/api/pagination"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/observability"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 type CacheExpirations struct {
@@ -43,6 +44,15 @@ func (c *Controller) GetResources(context *gin.Context) {
 	version := context.Param("version")
 	namespace := context.Param("namespace")
 	name := context.Param("name")
+	selector, parserErr := labels.Parse(context.Query("labelSelector"))
+	if parserErr != nil {
+		abort.Abort(context, parserErr, http.StatusBadRequest)
+	}
+	reqs, _ := selector.Requirements()
+	labelFilters, labelFiltersErr := database.NewLabelFilters(reqs)
+	if labelFiltersErr != nil {
+		abort.Abort(context, labelFiltersErr, http.StatusBadRequest)
+	}
 
 	apiVersion := version
 	if group != "" {
@@ -52,7 +62,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 	// We send namespace even if it's an empty string (non-namespaced resources) the Database
 	// knows what to do
 	resources, lastId, lastDate, err := c.Database.QueryResources(
-		context.Request.Context(), kind, apiVersion, namespace, name, id, date, limit)
+		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters, limit)
 
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)

@@ -5,7 +5,10 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
@@ -74,6 +77,69 @@ func (PostgreSQLFilter) OwnerFilter(cond sqlbuilder.Cond, owners []string) strin
 		"jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| $?",
 		pq.Array(owners),
 	))
+}
+
+func (PostgreSQLFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+	return cond.Var(sqlbuilder.Build(
+		"data->'metadata'->'labels' ?& $?",
+		pq.Array(labels),
+	))
+}
+
+func (PostgreSQLFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+	return cond.Var(sqlbuilder.Build(
+		"NOT data->'metadata'->'labels' ?| $?",
+		pq.Array(labels),
+	))
+}
+
+func (PostgreSQLFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+	jsonLabels, _ := json.Marshal(labels)
+	return cond.Var(sqlbuilder.Build(
+		"data->'metadata'->'labels' @> $?",
+		string(jsonLabels),
+	))
+}
+
+func (PostgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+	jsons := make([]string, 0)
+	for key, value := range labels {
+		jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
+	}
+	return cond.Var(sqlbuilder.Build(
+		"NOT data->'metadata'->'labels' @> ANY($?::jsonb[])",
+		pq.Array(jsons),
+	))
+}
+
+func (PostgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+	clauses := make([]string, 0)
+	for key, values := range labels {
+		jsons := make([]string, 0)
+		for _, value := range values {
+			jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
+		}
+		clauses = append(clauses, cond.Var(sqlbuilder.Build(
+			"data->'metadata'->'labels' @> ANY($?::jsonb[])",
+			pq.Array(jsons),
+		)))
+	}
+	return cond.And(clauses...)
+}
+
+func (f PostgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+	keys := maps.Keys(labels)
+	jsons := make([]string, 0)
+	for key, values := range labels {
+		for _, value := range values {
+			jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
+		}
+	}
+	notContainsClause := cond.Var(sqlbuilder.Build(
+		"NOT data->'metadata'->'labels' @> ANY($?::jsonb[])",
+		pq.Array(jsons),
+	))
+	return cond.And(f.ExistsLabelFilter(cond, slices.Collect(keys)), notContainsClause)
 }
 
 type PostgreSQLSorter struct{}

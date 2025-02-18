@@ -65,7 +65,7 @@ type KubeArchiveConfigReconciler struct {
 func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	log.Info("KubeArchiveConfig reconciling.")
+	log.Info("Reconciling KubeArchiveConfig")
 
 	kaconfig := &kubearchivev1alpha1.KubeArchiveConfig{}
 	if err := r.Get(ctx, req.NamespacedName, kaconfig); err != nil {
@@ -88,8 +88,12 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		// The object is being deleted.
 		if controllerutil.ContainsFinalizer(kaconfig, finalizerName) {
 			// Finalizer is present, clean up filters from ConfigMap and remove Namespace label.
-			if err := r.removeFilters(ctx, kaconfig); err != nil {
-				// If filter deletion fails, return with error so that it can be retried.
+
+			log.Info("Deleting KubeArchiveConfig")
+
+			// Reconcile all a13e resources to clean filters and potentially delete the a13e instance.
+			err := r.cleanupK9eResources(ctx, kaconfig)
+			if err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -130,9 +134,13 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	_, err = r.reconcileA13e(ctx, resources)
-	if err != nil {
-		return ctrl.Result{}, err
+	if len(resources) > 0 {
+		_, err = r.reconcileA13e(ctx, resources)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		log.Info("No resources, not reconciling ApiServerSource")
 	}
 
 	role, err := r.reconcileSinkRole(ctx, kaconfig)
@@ -151,6 +159,43 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *KubeArchiveConfigReconciler) cleanupK9eResources(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) error {
+	log := log.FromContext(ctx)
+
+	log.Info("in cleanupK9eResources")
+
+	// Empty out resources on KubeArchiveConfig so they are removed from the filter ConfigMap.
+	kaconfig.Spec.Resources = []kubearchivev1alpha1.KubeArchiveConfigResource{}
+	cm, err := r.reconcileFilterConfigMap(ctx, kaconfig)
+	if err != nil {
+		return err
+	}
+	resources := r.parseConfigMap(ctx, cm)
+
+	r.deleteRoleBinding(ctx, kaconfig, k9eSinkName, "Role")
+	r.deleteRoleBinding(ctx, kaconfig, a13eName, "ClusterRole")
+	r.deleteSinkRole(ctx, kaconfig)
+
+	if len(resources) > 0 {
+		_, err := r.reconcileA13eRole(ctx, resources)
+		if err != nil {
+			return err
+		}
+
+		_, err = r.reconcileA13e(ctx, resources)
+		if err != nil {
+			return err
+		}
+	} else {
+		log.Info("No resources specified, deleting ApiServerSource.")
+		// Leave ApiServerSource ClusterRole and ServiceAccount around as RoleBindings could be
+		// referring to both.
+		r.deleteA13e(ctx)
+	}
+
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -241,6 +286,26 @@ func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfi
 	}
 
 	return role, nil
+}
+
+func (r *KubeArchiveConfigReconciler) deleteSinkRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) {
+	r.deleteRole(ctx, kaconfig, k9eSinkName)
+}
+
+func (r *KubeArchiveConfigReconciler) deleteRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string) {
+	log := log.FromContext(ctx)
+
+	log.Info("in deleteRole " + roleName)
+	role, err := r.desiredRole(kaconfig, roleName, []rbacv1.PolicyRule{})
+	if err != nil {
+		log.Error(err, "Unable to get desired Role "+roleName)
+		return
+	}
+
+	err = r.Delete(ctx, role)
+	if err != nil {
+		log.Error(err, "Failed to delete Role "+roleName)
+	}
 }
 
 func (r *KubeArchiveConfigReconciler) desiredRole(kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {
@@ -371,6 +436,21 @@ func (r *KubeArchiveConfigReconciler) reconcileRoleBinding(ctx context.Context, 
 	return binding, nil
 }
 
+func (r *KubeArchiveConfigReconciler) deleteRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, name string, kind string) {
+	log := log.FromContext(ctx)
+
+	log.Info("in deleteRoleBinding " + name)
+	binding, err := r.desiredRoleBinding(kaconfig, name, kind)
+	if err != nil {
+		log.Error(err, "Unable to get desired RoleBinding "+name)
+		return
+	}
+	err = r.Delete(ctx, binding)
+	if err != nil {
+		log.Error(err, "Failed to delete RoleBinding "+name)
+	}
+}
+
 func (r *KubeArchiveConfigReconciler) desiredRoleBinding(kaconfig *kubearchivev1alpha1.KubeArchiveConfig, name string, kind string) (*rbacv1.RoleBinding, error) {
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -422,6 +502,25 @@ func (r *KubeArchiveConfigReconciler) reconcileA13e(ctx context.Context, resourc
 	}
 
 	return source, nil
+}
+
+func (r *KubeArchiveConfigReconciler) deleteA13e(ctx context.Context) {
+	log := log.FromContext(ctx)
+
+	log.Info("in deleteApiServerSource")
+
+	existing := &sourcesv1.ApiServerSource{}
+	err := r.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: k9eNs}, existing)
+	if err == nil {
+		err = r.Delete(ctx, existing)
+		if err != nil {
+			log.Error(err, "Failed to delete ApiServerSource")
+		}
+	} else if errors.IsNotFound(err) {
+		log.Info("No ApiServerSource to delete")
+	} else {
+		log.Error(err, "Error retrieving ApiServerSource")
+	}
 }
 
 func (r *KubeArchiveConfigReconciler) parseConfigMap(ctx context.Context, cm *corev1.ConfigMap) []sourcesv1.APIVersionKindSelector {
@@ -492,6 +591,7 @@ func (r *KubeArchiveConfigReconciler) reconcileFilterConfigMap(ctx context.Conte
 
 	log.Info("in reconcileFilterConfigMap")
 
+	log.Info("in reconcileFilterConfigMap: ConfigMap => " + SinkFilterConfigMapName + ", Namespace => " + k9eNs)
 	cm := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: k9eNs}, cm)
 	if err == nil {
@@ -527,6 +627,8 @@ func (r *KubeArchiveConfigReconciler) reconcileFilterConfigMap(ctx context.Conte
 func (r *KubeArchiveConfigReconciler) desiredFilterConfigMap(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 	log := log.FromContext(ctx)
 
+	log.Info("in desiredFilterConfigMap")
+
 	if cm == nil {
 		cm = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
@@ -537,44 +639,25 @@ func (r *KubeArchiveConfigReconciler) desiredFilterConfigMap(ctx context.Context
 		}
 	}
 
-	yamlBytes, err := yaml.Marshal(kaconfig.Spec.Resources)
-	if err != nil {
-		log.Error(err, "Failed to convert KubeArchiveConfig resources to JSON")
-		return cm, err
-	}
-
 	if cm.Data == nil {
 		cm.Data = make(map[string]string)
 	}
 
-	cm.Data[kaconfig.Namespace] = string(yamlBytes)
+	if len(kaconfig.Spec.Resources) > 0 {
+		yamlBytes, err := yaml.Marshal(kaconfig.Spec.Resources)
+		if err != nil {
+			log.Error(err, "Failed to convert KubeArchiveConfig resources to JSON")
+			return cm, err
+		}
+
+		cm.Data[kaconfig.Namespace] = string(yamlBytes)
+	} else {
+		delete(cm.Data, kaconfig.Namespace)
+	}
 
 	// Note that the owner reference is NOT set on the ConfigMap.  It should not be deleted when
 	// the KubeArchiveConfig object is deleted.
 	return cm, nil
-}
-
-func (r *KubeArchiveConfigReconciler) removeFilters(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) error {
-	log := log.FromContext(ctx)
-
-	log.Info("in removeFilters")
-
-	cm := &corev1.ConfigMap{}
-	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: k9eNs}, cm)
-	if err != nil {
-		log.Error(err, "Unable to get desired ConfigMap "+SinkFilterConfigMapName)
-		return err
-	}
-
-	delete(cm.Data, kaconfig.Namespace)
-
-	err = r.Update(ctx, cm)
-	if err != nil {
-		log.Error(err, "Failed to update filter ConfigMap "+SinkFilterConfigMapName)
-		return err
-	}
-
-	return nil
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileNamespace(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.Namespace, error) {

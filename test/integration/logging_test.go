@@ -13,11 +13,13 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/avast/retry-go/v4"
 	"github.com/kubearchive/kubearchive/test"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
+	errs "k8s.io/apimachinery/pkg/api/errors"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -66,6 +68,18 @@ func TestLogging(t *testing.T) {
 		errNamespace = clientset.CoreV1().Namespaces().Delete(context.Background(), namespaceName, metav1.DeleteOptions{})
 		if errNamespace != nil {
 			t.Fatal(errNamespace)
+		}
+
+		retryErr := retry.Do(func() error {
+			_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespaceName, metav1.GetOptions{})
+			if !errs.IsNotFound(getErr) {
+				return errors.New("Waiting for namespace "+namespaceName+" to be deleted")
+			}
+			return nil
+		}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+
+		if retryErr != nil {
+			t.Log(retryErr)
 		}
 	})
 

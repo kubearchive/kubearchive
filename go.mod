@@ -14,7 +14,7 @@ require (
 	github.com/cloudevents/sdk-go/v2 v2.15.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-logr/logr v1.4.2
-	github.com/go-sql-driver/mysql v1.8.1
+	github.com/go-sql-driver/mysql v1.9.0
 	github.com/google/cel-go v0.23.2
 	github.com/huandu/go-sqlbuilder v1.34.0
 	github.com/jmoiron/sqlx v1.4.0

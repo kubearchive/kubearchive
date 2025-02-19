@@ -17,10 +17,14 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/klog/v2"
 
+	rbacv1 "k8s.io/api/rbac/v1"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	crcache "sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -42,6 +46,7 @@ var (
 	commit  = ""
 	date    = ""
 	scheme  = runtime.NewScheme()
+	k9eNs   = os.Getenv("KUBEARCHIVE_NAMESPACE")
 )
 
 func init() {
@@ -106,8 +111,31 @@ func main() {
 	config.Wrap(func(rt http.RoundTripper) http.RoundTripper {
 		return otelhttp.NewTransport(rt)
 	})
+
+	cacheOptions := crcache.Options{
+		ByObject: map[client.Object]crcache.ByObject{
+			&kubearchiveapi.KubeArchiveConfig{}: {
+				Namespaces: make(map[string]crcache.Config),
+				Label:      k8slabels.Everything(),
+			},
+			&rbacv1.Role{}: {
+				Namespaces: make(map[string]crcache.Config),
+				Label:      k8slabels.Everything(),
+			},
+			&rbacv1.RoleBinding{}: {
+				Namespaces: make(map[string]crcache.Config),
+				Label:      k8slabels.Everything(),
+			},
+		},
+		DefaultNamespaces: map[string]crcache.Config{
+			k9eNs: {LabelSelector: k8slabels.Everything()},
+		},
+		DefaultLabelSelector: k8slabels.Nothing(),
+	}
+
 	mgr, err := ctrl.NewManager(config, ctrl.Options{
 		Scheme:                 scheme,
+		Cache:                  cacheOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,

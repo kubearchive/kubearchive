@@ -36,6 +36,44 @@ Parameters allowed:
 * `limit`: defaults to 100. Not higher than 1000. Limits the number of entries returned.
 * `continue`: token to access the next page of the pagination. Retrieve it at `.metadata.continue`
 of the returned `List` resource. An empty string if there are no more pages remaining.
+* `labelSelector`: allows filtering resources based on label filtering.
+
+=== Label Selector
+
+It implements the
+link:https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/[same filters available in the Kubernetes API]:
+
+Existence::
+    `labelSelector=wantedLabelKey`
+Not existence::
+    `labelSelector=!unwantedLabelKey` or `labelSelector=%21unwantedLabelKey` with URL encoding
+ Equality::
+    `labelSelector=labelKey=labelValue` or `labelSelector=labelKey%3DlabelValue` with URL encoding
+Inequality::
+    `labelSelector=labelKey!=unwantedLabelValue` or `labelSelector=labelKey%21%3DlabelValue`
+    with URL encoding
+Set based::
+    `labelSelector=labelKey in (value1, value2)` or `labelSelector=labelKey+in+%28value1,+value2%29`
+    with URL encoding
+Set not based::
+    `labelSelector=labelKey notin (value1, value2)` or `labelSelector=labelKey+notin+%28value1,+value2%29`
+    with URL encoding
+
+
+[NOTE]
+====
+Label selectors can be combined based on a logical AND by separating them with a comma.
+
+For example to retrieve pods in the `default` namespace with the following label selector:
+`app=kubearchive, env in (stage, dev), release!=stable`
+
+The API call is:
+
+[source,text]
+----
+/api/v1/namespaces/default/pods?labelSelector=app%3Dkubearchive%2C+env+in+%28stage%2C+dev%29%2C+release%21%3Dstable
+----
+====
 
 == Individual Resources
 

@@ -28,7 +28,7 @@ var RegisteredDBCreators = make(map[string]newDBCreatorFunc)
 
 type DBInterface interface {
 	QueryResources(ctx context.Context, kind, apiVersion, namespace,
-		name, continueId, continueDate string, limit int) ([]string, int64, string, error)
+		name, continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error)
 	QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error)
 
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
@@ -80,7 +80,7 @@ func (db *Database) Ping(ctx context.Context) error {
 }
 
 func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
-	continueId, continueDate string, limit int) ([]string, int64, string, error) {
+	continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error) {
 	sb := db.Selector.ResourceSelector()
 	sb.Where(
 		db.Filter.KindFilter(sb.Cond, kind),
@@ -95,6 +95,24 @@ func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, namesp
 	} else {
 		if continueId != "" && continueDate != "" {
 			sb.Where(db.Filter.CreationTSAndIDFilter(sb.Cond, continueDate, continueId))
+		}
+		if labelFilters.Exists != nil {
+			sb.Where(db.Filter.ExistsLabelFilter(sb.Cond, labelFilters.Exists))
+		}
+		if labelFilters.NotExists != nil {
+			sb.Where(db.Filter.NotExistsLabelFilter(sb.Cond, labelFilters.NotExists))
+		}
+		if labelFilters.Equals != nil {
+			sb.Where(db.Filter.EqualsLabelFilter(sb.Cond, labelFilters.Equals))
+		}
+		if labelFilters.NotEquals != nil {
+			sb.Where(db.Filter.NotEqualsLabelFilter(sb.Cond, labelFilters.NotEquals))
+		}
+		if labelFilters.In != nil {
+			sb.Where(db.Filter.InLabelFilter(sb.Cond, labelFilters.In))
+		}
+		if labelFilters.NotIn != nil {
+			sb.Where(db.Filter.NotInLabelFilter(sb.Cond, labelFilters.NotIn))
 		}
 		sb = db.Sorter.CreationTSAndIDSorter(sb)
 		sb.Limit(limit)

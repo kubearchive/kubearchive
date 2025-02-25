@@ -9,6 +9,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -94,7 +95,7 @@ func (f *Database) QueryLogURL(_ context.Context, _, _, _, _ string) (string, st
 }
 
 func (f *Database) QueryResources(ctx context.Context, kind, version, namespace, name,
-	continueId, continueDate string, limit int) ([]string, int64, string, error) {
+	continueId, continueDate string, _ *database.LabelFilters, limit int) ([]string, int64, string, error) {
 	var resources []*unstructured.Unstructured
 
 	if name != "" {

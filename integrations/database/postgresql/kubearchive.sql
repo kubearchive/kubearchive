@@ -258,7 +258,7 @@ CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.resource FOR EACH ROW EXECU
 --
 
 ALTER TABLE ONLY public.log_url
-    ADD CONSTRAINT log_url_uuid_fkey FOREIGN KEY (uuid) REFERENCES public.resource(uuid);
+    ADD CONSTRAINT log_url_uuid_fkey FOREIGN KEY (uuid) REFERENCES public.resource(uuid) ON DELETE CASCADE;
 
 
 --

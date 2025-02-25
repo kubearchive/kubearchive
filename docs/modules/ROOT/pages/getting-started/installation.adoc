@@ -17,22 +17,25 @@ This document explains how to install and configure KubeArchive in your Kubernet
 
 == Prepare the Database
 
-. Create ada user and a password for KubeArchive to use.
-. Create a database for KubeArchive, with admin permissions granted to the user you just created.
-. As the user, execute the `kubearchive.sql` we provide for initializing the database, located at:
+. Create a database user `kubearchive`.
+. With a DB admin account, apply the schema provided in the [filename]`kubearchive.sql` file
+within the KubeArchive release:
 +
 [source,bash,subs="attributes"]
 ----
 wget {download-path}/kubearchive.sql
-psql -h database.example.com -U username ... -f kubearchive.sql
+psql -h database.example.com \
+-U admin \
+-f kubearchive.sql
 ----
-+
-This file creates a PostgreSQL schema, a table for KubeArchive and other stuff KubeArchive
-requires.
+
+More information about the schema and its customization in the
+xref:integrations/database.adoc#_configuration_and_customization[Database Integration]
+section.
 
 == Configure Knative Eventing
 
-KubeArchive uses a broker to avoid missing Kubernetes resource updates. By default it is an `MTChannelBasedBroker`, but
+KubeArchive uses a broker to avoid missing Kubernetes resource updates. By default, it is an `MTChannelBasedBroker`, but
 the broker type can be changed if desired.
 
 [IMPORTANT]
@@ -42,6 +45,7 @@ link:https://knative.dev/docs/eventing/brokers/broker-types/[other broker types]
 in production environments.
 ====
 
+[_install_and_configure_kubearchive]
 == Install and Configure KubeArchive
 
 . Apply the release YAML to install KubeArchive:
@@ -53,19 +57,21 @@ kubectl apply -n kubearchive -f {download-path}/kubearchive.yaml
 
 . Provide the credentials for the database in the `kubearchive-database-credentials` secret:
 +
-[source,bash]
+[source, bash]
 ----
-cat <<EOF > /tmp/patch.yaml
-stringData:
-  DATABASE_KIND: postgresql
-  DATABASE_PORT: <postgresql-port>
-  DATABASE_URL: <postgresql-url>
-  DATABASE_USER: <kubearchive-username>
-  DATABASE_DB: <kubearchive-database>
-  DATABASE_PASSWORD: <kubearchive-password>
-EOF
-kubectl patch -n kubearchive secret kubearchive-database-credentials --patch-file /tmp/patch.yaml
+kubectl patch secret -n kubearchive kubearchive-database-credentials \
+--patch='{"stringData": {
+"DATABASE_URL": "database.example.com", <1>
+"DATABASE_PASSWORD": "password" <2>
+}}'
 ----
+<1> The database URL
+<2> The database password
+
++
+More info about this Secret in the
+xref:integrations/database.adoc#_configuration_and_customization[Database Integration]
+section.
 
 . Restart the `kubearchive-api-server` and `kubearchive-sink` Deployments to update
 the database credentials secret:

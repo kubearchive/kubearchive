@@ -7,14 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/cmd/api/abort"
 	"github.com/kubearchive/kubearchive/cmd/api/discovery"
 	"github.com/kubearchive/kubearchive/cmd/api/pagination"
+	"github.com/kubearchive/kubearchive/pkg/abort"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 	"k8s.io/apimachinery/pkg/labels"
@@ -115,10 +114,7 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 
 // Livez returns current server configuration as we don't have a clear deadlock indicator
 func (c *Controller) Livez(context *gin.Context) {
-	observabilityConfig := os.Getenv(observability.OtelStartEnvVar)
-	if observabilityConfig == "" {
-		observabilityConfig = "disabled"
-	}
+	observabilityConfig := observability.Status()
 
 	context.JSON(http.StatusOK, gin.H{
 		"code":           http.StatusOK,

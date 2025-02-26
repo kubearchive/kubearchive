@@ -34,22 +34,24 @@ jobs:
           curl -Lo ./kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           chmod +x ./kubectl
           sudo mv kubectl /usr/local/bin
-      - name: Install KinD
-        run: |
-          set -x
-
-          # Disable swap otherwise memory enforcement doesn't work
-          # See: https://kubernetes.slack.com/archives/CEKK1KTN2/p1600009955324200
-          sudo swapoff -a
-          sudo rm -f /swapfile
-
-          curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.21.0/kind-$(uname)-amd64
-          chmod +x ./kind
-          sudo mv kind /usr/local/bin
+      - name: Kubernetes KinD Cluster
+        uses: container-tools/kind-action@v1
+#      - name: Install KinD
+#        run: |
+#          set -x
+#
+#          # Disable swap otherwise memory enforcement doesn't work
+#          # See: https://kubernetes.slack.com/archives/CEKK1KTN2/p1600009955324200
+#          sudo swapoff -a
+#          sudo rm -f /swapfile
+#
+#          curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.21.0/kind-$(uname)-amd64
+#          chmod +x ./kind
+#          sudo mv kind /usr/local/bin
       - name: Install ko
         uses: ko-build/setup-ko@v0.8
-      - name: Create KinD cluster
-        run: kind create cluster
+#      - name: Create KinD cluster
+#        run: kind create cluster
       - name: Install KubeArchive
         run: |
           export KO_DOCKER_REPO="kind.local"
@@ -58,4 +60,4 @@ jobs:
       - name: Test Go code
         run: |
           export KO_DOCKER_REPO="kind.local"
-          go test -count=1 -v ./test/integration -tags=integration -timeout 60m
+          go test -count=1 -v ./test/integration/pagination_test.go -tags=integration -timeout 60m

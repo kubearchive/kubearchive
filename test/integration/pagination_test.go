@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
-	errs "k8s.io/apimachinery/pkg/api/errors"
+	//errs "k8s.io/apimachinery/pkg/api/errors"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -32,6 +32,7 @@ func TestPagination(t *testing.T) {
 	}
 
 	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
+	namespaceName = "testns"
 	_, err = clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: namespaceName,
@@ -41,24 +42,24 @@ func TestPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	t.Cleanup(func() {
-		err = clientset.CoreV1().Namespaces().Delete(context.Background(), namespaceName, metav1.DeleteOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		retryErr := retry.Do(func() error {
-			_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespaceName, metav1.GetOptions{})
-			if !errs.IsNotFound(getErr) {
-				return errors.New("Waiting for namespace "+namespaceName+" to be deleted")
-			}
-			return nil
-		}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
-
-		if retryErr != nil {
-			t.Log(retryErr)
-		}
-	})
+//	t.Cleanup(func() {
+//		err = clientset.CoreV1().Namespaces().Delete(context.Background(), namespaceName, metav1.DeleteOptions{})
+//		if err != nil {
+//			t.Fatal(err)
+//		}
+//
+//		retryErr := retry.Do(func() error {
+//			_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespaceName, metav1.GetOptions{})
+//			if !errs.IsNotFound(getErr) {
+//				return errors.New("Waiting for namespace "+namespaceName+" to be deleted")
+//			}
+//			return nil
+//		}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+//
+//		if retryErr != nil {
+//			t.Log(retryErr)
+//		}
+//	})
 
 	kac := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -183,7 +184,7 @@ func TestPagination(t *testing.T) {
 			return nil
 		}
 		return errors.New("could not retrieve Pods from the API")
-	}, retry.Attempts(240), retry.MaxDelay(4*time.Second))
+	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
 
 	if err != nil {
 		t.Fatal(err)

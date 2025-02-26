@@ -88,9 +88,9 @@ CREATE TABLE public.log_url (
     uuid uuid NOT NULL,
     url text NOT NULL,
     container_name text NOT NULL,
-    json_path text,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL
+	json_path text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -129,9 +129,9 @@ CREATE TABLE public.resource (
     name character varying NOT NULL,
     namespace character varying NOT NULL,
     resource_version character varying,
-    created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL,
-    cluster_deleted_ts timestamp without time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    cluster_deleted_ts timestamp with time zone,
     data jsonb NOT NULL
 );
 
@@ -264,4 +264,3 @@ ALTER TABLE ONLY public.log_url
 --
 -- PostgreSQL database dump complete
 --
-

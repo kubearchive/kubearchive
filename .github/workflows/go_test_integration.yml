@@ -38,6 +38,7 @@ jobs:
         uses: container-tools/kind-action@v1
         with:
           version: v0.21.0
+          kubectl_version: v1.31.0
 #      - name: Install KinD
 #        run: |
 #          set -x

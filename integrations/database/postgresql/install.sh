@@ -17,7 +17,11 @@ kubectl apply --server-side -f \
   https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-${VERSION}.yaml
 kubectl get ns
 kubectl get pods -n cnpg-system
-kubectl rollout status deployment --namespace=cnpg-system --timeout=180s
+kubectl rollout status deployment --namespace=cnpg-system --timeout=180s || true
+kubectl get events -n cnpg-system
+kubectl get pods -n cnpg-system
+kubectl get deployment -n cnpg-system
+kubectl logs deployment/cnpg-controller-manager -n cnpg-controller
 
 # Create the postgres database server.
 kubectl create ns ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -

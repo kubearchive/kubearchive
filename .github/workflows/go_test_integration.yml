@@ -36,6 +36,7 @@ jobs:
           sudo mv kubectl /usr/local/bin
       - name: Kubernetes KinD Cluster
         uses: container-tools/kind-action@v1
+        version: v0.21.0
 #      - name: Install KinD
 #        run: |
 #          set -x

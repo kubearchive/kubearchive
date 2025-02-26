@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/bin/bash 
+
+set -x 
 # Copyright KubeArchive Authors
 # SPDX-License-Identifier: Apache-2.0
 
@@ -13,6 +15,8 @@ NAMESPACE="postgresql"
 # Install cloudnative-pg operator.
 kubectl apply --server-side -f \
   https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/main/releases/cnpg-${VERSION}.yaml
+kubectl get ns
+kubectl get pods -n cnpg-system
 kubectl rollout status deployment --namespace=cnpg-system --timeout=90s
 
 # Create the postgres database server.

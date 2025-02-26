@@ -10,21 +10,26 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/avast/retry-go/v4"
 	"github.com/kubearchive/kubearchive/test"
 	authenticationv1 "k8s.io/api/authentication/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	errs "k8s.io/apimachinery/pkg/api/errors"
+	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestLogging(t *testing.T) {
 	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
-	clientset, _, errClient := test.GetKubernetesClient()
+	t.Log("Running in namespace "+namespaceName)
+	clientset, dynamicClient, errClient := test.GetKubernetesClient()
 	if errClient != nil {
 		t.Fatal(errClient)
 	}
@@ -67,7 +72,54 @@ func TestLogging(t *testing.T) {
 		if errNamespace != nil {
 			t.Fatal(errNamespace)
 		}
+
+		retryErr := retry.Do(func() error {
+			_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespaceName, metav1.GetOptions{})
+			if !errs.IsNotFound(getErr) {
+				return errors.New("Waiting for namespace "+namespaceName+" to be deleted")
+			}
+			return nil
+		}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+
+		if retryErr != nil {
+			t.Log(retryErr)
+		}
 	})
+
+	kac := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "KubeArchiveConfig",
+			"apiVersion": fmt.Sprintf("%s/%s", kubearchivev1alpha1.SchemeBuilder.GroupVersion.Group, kubearchivev1alpha1.SchemeBuilder.GroupVersion.Version),
+			"metadata": map[string]string{
+				"name":      "kubearchive",
+				"namespace": namespaceName,
+			},
+			"spec": map[string]any{
+				"resources": []map[string]any{
+					{
+						"selector": map[string]string{
+							"apiVersion": "batch/v1",
+							"kind":       "Job",
+						},
+						"archiveWhen": "has(status.completionTime)",
+					},
+					{
+						"selector": map[string]string{
+							"apiVersion": "v1",
+							"kind":       "Pod",
+						},
+						"deleteWhen":  "status.phase == 'Succeeded'",
+					},
+				},
+			},
+		},
+	}
+
+	gvr := kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
+	_, err = dynamicClient.Resource(gvr).Namespace(namespaceName).Create(context.Background(), kac, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, roleBindingErr := clientset.RbacV1().RoleBindings(namespaceName).Create(context.Background(), &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -105,17 +157,33 @@ func TestLogging(t *testing.T) {
 		},
 	}
 
-	// Install the log-generator.
-	namespaceCmd := fmt.Sprintf("--namespace=%s", namespaceName)
-	cmd := exec.Command("bash", "../log-generators/cronjobs/install.sh", namespaceCmd, "--num-jobs=1")
-	output, errScript := cmd.CombinedOutput()
-	if errScript != nil {
-		fmt.Println("Could not run the log-generator: ", errScript)
-		t.Fatal(errScript)
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "generate-log-1",
+			Namespace:    namespaceName,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec {
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name:    "flog",
+							Command: []string{"flog", "-n", "10", "-d", "1ms"},
+							Image:   "quay.io/kubearchive/mingrammer/flog",
+						},
+					},
+				},
+			},
+		},
 	}
-	fmt.Println("Output: ", string(output))
 
-	url := fmt.Sprintf("https://localhost:8081/apis/batch/v1/namespaces/%s/cronjobs/generate-log-1/log", namespaceName)
+	_, err = clientset.BatchV1().Jobs(namespaceName).Create(context.Background(), job, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	url := fmt.Sprintf("https://localhost:8081/apis/batch/v1/namespaces/%s/jobs/generate-log-1/log", namespaceName)
 	retryErr = retry.Do(func() error {
 		body, err := test.GetLogs(&client, token.Status.Token, url)
 		if err != nil {
@@ -123,17 +191,17 @@ func TestLogging(t *testing.T) {
 		}
 
 		if len(body) == 0 {
-			return errors.New("could not retrieve the pod log")
+			return errors.New("could not retrieve the job log")
 		}
 		fmt.Println("Successfully retrieved logs")
 
 		bodyString := string(body)
-		if len(strings.Split(bodyString, "\n")) != 1025 {
-			return fmt.Errorf("expected 1025 lines, currently '%d'. Trying again...", len(strings.Split(bodyString, "\n")))
+		if len(strings.Split(bodyString, "\n")) != 11 {
+			return fmt.Errorf("expected 11 lines, currently '%d'. Trying again...", len(strings.Split(bodyString, "\n")))
 		}
 
 		return nil
-	}, retry.Attempts(20))
+	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

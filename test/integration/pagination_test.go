@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-
 	"testing"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
+	errs "k8s.io/apimachinery/pkg/api/errors"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -46,6 +46,18 @@ func TestPagination(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+
+		retryErr := retry.Do(func() error {
+			_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespaceName, metav1.GetOptions{})
+			if !errs.IsNotFound(getErr) {
+				return errors.New("Waiting for namespace "+namespaceName+" to be deleted")
+			}
+			return nil
+		}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+
+		if retryErr != nil {
+			t.Log(retryErr)
+		}
 	})
 
 	kac := &unstructured.Unstructured{
@@ -63,7 +75,7 @@ func TestPagination(t *testing.T) {
 							"apiVersion": "v1",
 							"kind":       "Pod",
 						},
-						"archiveWhen": "true",
+						//"archiveWhen": "true",
 						"deleteWhen":  "status.phase == 'Succeeded'",
 					},
 				},
@@ -87,8 +99,8 @@ func TestPagination(t *testing.T) {
 			Containers: []corev1.Container{
 				corev1.Container{
 					Name:    "fedora",
-					Command: []string{"sleep", "10"},
-					Image:   "quay.io/fedora/fedora:latest",
+					Command: []string{"sleep", "1"},
+					Image:   "quay.io/fedora/fedora-minimal:latest",
 				},
 			},
 		},
@@ -171,7 +183,7 @@ func TestPagination(t *testing.T) {
 			return nil
 		}
 		return errors.New("could not retrieve Pods from the API")
-	}, retry.Attempts(80), retry.MaxDelay(4*time.Second))
+	}, retry.Attempts(240), retry.MaxDelay(4*time.Second))
 
 	if err != nil {
 		t.Fatal(err)

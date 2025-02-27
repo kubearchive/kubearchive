@@ -8,6 +8,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"regexp"
@@ -20,6 +21,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/database/facade"
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -92,42 +94,12 @@ func NewMock() (*sql.DB, sqlmock.Sqlmock) {
 	return db, mock
 }
 
-func TestPodQueryLogURLs(t *testing.T) {
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sb := tt.database.Selector.UrlFromResourceSelector()
-			sb.Where(
-				tt.database.Filter.KindFilter(sb.Cond, "Pod"),
-				tt.database.Filter.ApiVersionFilter(sb.Cond, podApiVersion),
-				tt.database.Filter.NamespaceFilter(sb.Cond, namespace),
-				tt.database.Filter.NameFilter(sb.Cond, podName),
-			)
-			query, args := sb.BuildWithFlavor(tt.database.Flavor)
-			expectedQuery := regexp.QuoteMeta(query)
-			db, mock := NewMock()
-			tt.database.DB = sqlx.NewDb(db, "sqlmock")
-
-			rows := sqlmock.NewRows([]string{"url", "json_path"})
-			rows.AddRow("mock-url-container1", jsonPath)
-			rows.AddRow("mock-url-container2", jsonPath)
-			mock.ExpectQuery(expectedQuery).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
-
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			logUrl, jp, err := tt.database.QueryLogURL(ctx, "Pod", podApiVersion, namespace, podName)
-			assert.Equal(t, "mock-url-container1", logUrl)
-			assert.Equal(t, jsonPath, jp)
-			assert.NoError(t, err)
-		})
-	}
-}
-
 func TestLogURLsFromNonExistentResource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
 			tt.database.DB = sqlx.NewDb(db, "sqlmock")
+
 			rows := sqlmock.NewRows([]string{"uuid"})
 			sb := tt.database.Selector.UUIDResourceSelector()
 			sb.Where(
@@ -145,7 +117,7 @@ func TestLogURLsFromNonExistentResource(t *testing.T) {
 			logUrl, jp, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName)
 			assert.Equal(t, "", logUrl)
 			assert.Equal(t, "", jp)
-			assert.Error(t, err, "resource not found")
+			assert.ErrorContains(t, err, "resource not found")
 		})
 	}
 }
@@ -157,9 +129,8 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 			tt.database.DB = sqlx.NewDb(db, "sqlmock")
 
 			// Get UUID query
-			rows := sqlmock.NewRows([]string{"uuid"})
-			rows.AddRow("mock-uuid-cronjob")
 			sb := tt.database.Selector.UUIDResourceSelector()
+			sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
 			sb.Where(
 				tt.database.Filter.KindFilter(sb.Cond, kind),
 				tt.database.Filter.ApiVersionFilter(sb.Cond, cronJobApiVersion),
@@ -167,42 +138,59 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 				tt.database.Filter.NameFilter(sb.Cond, cronJobName),
 			)
 			query, args := sb.BuildWithFlavor(tt.database.Flavor)
+
+			rows := sqlmock.NewRows([]string{"uuid"})
+			rows.AddRow("mock-uuid-cronjob")
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
+			// Get owned Job by the CronJob
 			sb = tt.database.Selector.OwnedResourceSelector()
 			sb.Where(tt.database.Filter.OwnerFilter(sb.Cond, []string{"mock-uuid-cronjob"}))
 			query, args = sb.BuildWithFlavor(tt.database.Flavor)
 
-			// Get owned job
 			rows = sqlmock.NewRows([]string{"kind", "uuid"})
 			rows.AddRow("Job", "mock-uuid-job")
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
-			// Get owned pods
-			rows = sqlmock.NewRows([]string{"kind", "uuid"})
-			rows.AddRow("Pod", "mock-uuid-pod1")
-			rows.AddRow("Pod", "mock-uuid-pod2")
+			// Get owned Pods by the Job
 			sb = tt.database.Selector.OwnedResourceSelector()
 			sb.Where(tt.database.Filter.OwnerFilter(sb.Cond, []string{"mock-uuid-job"}))
 			query, args = sb.BuildWithFlavor(tt.database.Flavor)
+
+			rows = sqlmock.NewRows([]string{"kind", "uuid"})
+			rows.AddRow("Pod", "mock-uuid-pod1")
+			rows.AddRow("Pod", "mock-uuid-pod2")
+			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+			sb = tt.database.Selector.ResourceSelector()
+			sb.Where(tt.database.Filter.UuidFilter(sb.Cond, "mock-uuid-pod1"))
+			query, args = sb.BuildWithFlavor(tt.database.Flavor)
+
+			rows = sqlmock.NewRows([]string{"created_at", "id", "data"})
+			rows.AddRow("YYYY-MM-DDTHH:MM:SS+00", 0, testPodResource)
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 			// Get pods log urls
+			sb = tt.database.Selector.UrlSelector()
+			sb.Where(
+				tt.database.Filter.UuidFilter(sb.Cond, "42422d92-1a72-418d-97cf-97019c2d56e8"),
+				tt.database.Filter.ContainerNameFilter(sb.Cond, "test-pod"),
+			)
+			query, args = sb.BuildWithFlavor(tt.database.Flavor)
+
 			rows = sqlmock.NewRows([]string{"url", "json_path"})
 			rows.AddRow("mock-log-url-pod1-container1", jsonPath)
 			rows.AddRow("mock-log-url-pod1-container2", jsonPath)
-			sb = tt.database.Selector.UrlSelector()
-			sb.Where(tt.database.Filter.UuidsFilter(sb.Cond, []string{"mock-uuid-pod1"}))
-			query, args = sb.BuildWithFlavor(tt.database.Flavor)
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
 			logUrl, jp, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName)
+			assert.NoError(t, err)
 			assert.Equal(t, "mock-log-url-pod1-container1", logUrl)
 			assert.Equal(t, jsonPath, jp)
-			assert.NoError(t, err)
+
 		})
 	}
 }
@@ -226,6 +214,7 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 			sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
 			sb.Limit(limit)
 			query, _ := sb.BuildWithFlavor(tt.database.Flavor)
+
 			for _, ttt := range subtests {
 				t.Run(ttt.name, func(t *testing.T) {
 					db, mock := NewMock()
@@ -518,5 +507,92 @@ func TestPing(t *testing.T) {
 			defer cancel()
 			assert.Nil(t, tt.database.Ping(ctx))
 		})
+	}
+}
+
+func TestQueryLogUrlContainerDefault(t *testing.T) {
+	innerTests := []struct {
+		name                  string
+		expectedContainerName string
+		expectedLogUrl        string
+	}{
+		{
+			name:                  "default container",
+			expectedContainerName: "generate1",
+			expectedLogUrl:        "https://logging.example.com/generate2",
+		},
+		{
+			name:                  "uses annotation",
+			expectedContainerName: "generate2",
+			expectedLogUrl:        "https://logging.example.com/generate2",
+		},
+	}
+
+	for _, tt := range tests {
+		for _, innerTest := range innerTests {
+			t.Run(innerTest.name, func(t *testing.T) {
+				db, mock := NewMock()
+				tt.database.DB = sqlx.NewDb(db, "sqlmock")
+
+				file, err := os.Open("testdata/pod-3-containers.json")
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() {
+					file.Close()
+				})
+
+				podBytes, err := io.ReadAll(file)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				var pod corev1.Pod
+				err = json.Unmarshal(podBytes, &pod)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if innerTest.expectedContainerName == "generate2" {
+					pod.SetAnnotations(map[string]string{defaultContainerAnnotation: innerTest.expectedContainerName})
+				}
+
+				newPodBytes, err := json.Marshal(pod)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				// Get the pod
+				sb := tt.database.Selector.ResourceSelector()
+				sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
+				sb.Where(
+					tt.database.Filter.KindFilter(sb.Cond, pod.Kind),
+					tt.database.Filter.ApiVersionFilter(sb.Cond, pod.APIVersion),
+					tt.database.Filter.NamespaceFilter(sb.Cond, pod.Namespace),
+					tt.database.Filter.NameFilter(sb.Cond, pod.Name),
+				)
+				query, args := sb.BuildWithFlavor(tt.database.Flavor)
+
+				rows := sqlmock.NewRows([]string{"created_at", "id", "data"})
+				rows.AddRow("YYYY-MM-DDTHH:MM:SS+00", "0", string(newPodBytes))
+				mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+				// Get the Logs
+				sb = tt.database.Selector.UrlSelector()
+				sb.Where(
+					tt.database.Filter.UuidFilter(sb.Cond, string(pod.UID)),
+					tt.database.Filter.ContainerNameFilter(sb.Cond, innerTest.expectedContainerName),
+				)
+				query, args = sb.BuildWithFlavor(tt.database.Flavor)
+				rows = sqlmock.NewRows([]string{"url", "json_path"})
+				rows.AddRow(innerTest.expectedLogUrl, "")
+				mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+				logUrl, jp, err := tt.database.QueryLogURL(context.Background(), pod.Kind, pod.APIVersion, pod.Namespace, pod.Name)
+				assert.NoError(t, err)
+				assert.Equal(t, innerTest.expectedLogUrl, logUrl)
+				assert.Equal(t, "", jp)
+			})
+		}
 	}
 }

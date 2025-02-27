@@ -66,3 +66,4 @@ jobs:
           go test -count=1 -v ./test/integration/pagination_test.go -tags=integration -timeout 60m || true
           kubectl get pods -n testns
           kubectl get events -n testns
+          kubectl logs svc/kubearchive-sink -n kubearchive

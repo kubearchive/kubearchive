@@ -67,3 +67,5 @@ jobs:
           kubectl get pods -n testns
           kubectl get events -n testns
           kubectl logs svc/kubearchive-sink -n kubearchive
+          api=`kubectl get deployment -n kubearchive | grep apiserversource | awk '{print $1}'`
+          kubectl logs deployment/$api -n kubearchive

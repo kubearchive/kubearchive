@@ -34,6 +34,7 @@ import (
 const (
 	letterBytes   = "abcdefghijklmnopqrstuvwxyz"
 	randSuffixLen = 8
+	K9eNamespace  = "kubearchive"
 )
 
 func RandomString() string {

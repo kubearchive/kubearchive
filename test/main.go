@@ -5,6 +5,8 @@ package test
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,10 +14,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -34,7 +33,10 @@ import (
 	"k8s.io/client-go/util/homedir"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	errs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -45,6 +47,7 @@ const (
 	letterBytes   = "abcdefghijklmnopqrstuvwxyz"
 	randSuffixLen = 8
 	K9eNamespace  = "kubearchive"
+	KACName       = "kubearchive"
 )
 
 func RandomString() string {
@@ -53,56 +56,6 @@ func RandomString() string {
 		suffix[i] = letterBytes[rand.Intn(len(letterBytes))] // #nosec G404
 	}
 	return string(suffix)
-}
-
-func CreateResources(t testing.TB, resources ...string) error {
-	t.Helper()
-	for _, resource := range resources {
-		f, err := os.CreateTemp("/tmp", "resource-*.yml")
-		if err != nil {
-			return err
-		}
-
-		_, err = f.Write([]byte(resource))
-		if err != nil {
-			return err
-		}
-		f.Close()
-
-		t.Logf("running ko apply -f %s, file kept for inspection.\n", f.Name())
-		cmd := exec.Command("ko", "apply", "-f", f.Name()) // #nosec G204
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			return errors.New(string(output))
-		}
-	}
-
-	return nil
-}
-
-func DeleteResources(t testing.TB, resources ...string) error {
-	t.Helper()
-	for _, resource := range resources {
-		f, err := os.CreateTemp("/tmp", "resource-*.yml")
-		if err != nil {
-			return err
-		}
-
-		_, err = f.Write([]byte(resource))
-		if err != nil {
-			return err
-		}
-		f.Close()
-
-		t.Logf("running kubectl delete -f %s, file kept for inspection.\n", f.Name())
-		cmd := exec.Command("kubectl", "delete", "-f", f.Name()) // #nosec G204
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			return errors.New(string(output))
-		}
-	}
-
-	return nil
 }
 
 func GetKubernetesConfig() (*rest.Config, error) {
@@ -150,7 +103,7 @@ func portForward(t testing.TB, ports []string, pod, ns string) (chan struct{}, e
 		if len(errOut.String()) != 0 {
 			errReady = errors.New(errOut.String())
 		} else if len(out.String()) != 0 {
-			t.Log(out.String())
+			OutputLines(t, out.String())
 		}
 	}()
 	return stopChan, errReady
@@ -163,9 +116,8 @@ var forwardChan chan struct{}
 
 const apiServerPort = "8081"
 
-// Helper function to forward a port in a thread safe way. Returns the port used to access the Api Server and function
-// for cleaning up the forwarded port that should be called with defer
-func PortForwardApiServer(t testing.TB, clientset kubernetes.Interface) (string, func()) {
+// Helper function to forward a port in a thread safe way. Returns the port used to access the Api Server.
+func PortForwardApiServer(t testing.TB, clientset kubernetes.Interface) string {
 	t.Helper()
 	forwardRequestsMutex.Lock()
 	defer forwardRequestsMutex.Unlock()
@@ -176,7 +128,7 @@ func PortForwardApiServer(t testing.TB, clientset kubernetes.Interface) (string,
 			LabelSelector: "app=kubearchive-api-server",
 			FieldSelector: "status.phase=Running",
 		})
-		t.Logf("Pod to forward: %s\n", pods.Items[0].Name)
+		t.Logf("Pod to forward: %s", pods.Items[0].Name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,7 +148,7 @@ func PortForwardApiServer(t testing.TB, clientset kubernetes.Interface) (string,
 
 	forwardRequests++
 
-	return apiServerPort, func() {
+	t.Cleanup(func() {
 		forwardRequestsMutex.Lock()
 		defer forwardRequestsMutex.Unlock()
 		forwardRequests--
@@ -205,51 +157,51 @@ func PortForwardApiServer(t testing.TB, clientset kubernetes.Interface) (string,
 		if forwardRequests == 0 {
 			close(forwardChan)
 		}
-	}
+	})
+
+	return apiServerPort
 }
 
-func GetKubernetesClient() (*kubernetes.Clientset, *dynamic.DynamicClient, error) {
+func GetKubernetesClient(t testing.TB) (*kubernetes.Clientset, *dynamic.DynamicClient) {
+	t.Helper()
 
 	config, err := GetKubernetesConfig()
 	if err != nil {
-		return nil, nil, err
+		t.Fatal(err)
 	}
 
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, nil, err
+		t.Fatal(err)
 	}
 
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		return nil, nil, err
+		t.Fatal(err)
 	}
-	return client, dynamicClient, nil
+	return client, dynamicClient
 }
 
-func GetPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (logs string, err error) {
-	pods, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		return "", fmt.Errorf("Couldn't get pods for '%s' namespace: %w", namespace, err)
+func GetPodLogs(t testing.TB, namespace, podPrefix string) (logs string, err error) {
+	t.Helper()
+
+	clientset, _ := GetKubernetesClient(t)
+
+	podName := GetPodName(t, clientset, namespace, podPrefix)
+	if podName == "" {
+		return "", fmt.Errorf("Unable to find pod with prefix '%s'", podPrefix)
 	}
 
-	var realPodName string
-	for _, pod := range pods.Items {
-		if strings.Contains(pod.Name, podName) {
-			realPodName = pod.Name
-		}
-	}
-
-	req := clientset.CoreV1().Pods("kubearchive").GetLogs(realPodName, &corev1.PodLogOptions{})
+	req := clientset.CoreV1().Pods("kubearchive").GetLogs(podName, &corev1.PodLogOptions{})
 	logStream, err := req.Stream(context.TODO())
 	if err != nil {
-		return "", fmt.Errorf("Couldn't get logs for pod '%s' in the '%s' namespace: %w", realPodName, namespace, err)
+		return "", fmt.Errorf("Could not get logs for pod '%s' in the '%s' namespace: %w", podName, namespace, err)
 	}
 
 	buf := new(bytes.Buffer)
 	_, err = buf.ReadFrom(logStream)
 	if err != nil {
-		return "", fmt.Errorf("Couldn't process ReadFrom the stream: %w", err)
+		return "", fmt.Errorf("Could not process ReadFrom the stream: %w", err)
 	}
 	logBytes := buf.Bytes()
 	logs = string(logBytes)
@@ -257,27 +209,25 @@ func GetPodLogs(clientset *kubernetes.Clientset, namespace, podName string) (log
 	return logs, nil
 }
 
-func GetDynamicKubernetesClient() (*dynamic.DynamicClient, error) {
-	var kubeconfig string
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = filepath.Join(home, ".kube", "config")
+// Returns the first pod in the namespace that starts with the given pod prefix.
+func GetPodName(t testing.TB, clientset *kubernetes.Clientset, namespace, prefix string) string {
+	pods, err := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{})
+	if err != nil {
+		t.Fatal(errors.New("Unable to get pods in namespace '" + namespace + "'"))
 	}
 
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		return nil, err
+	var podName = ""
+	for _, pod := range pods.Items {
+		if strings.HasPrefix(pod.Name, prefix) {
+			podName = pod.Name
+		}
 	}
-
-	client, err := dynamic.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("Error instantiating k8s from host %s: %s", config.Host, err)
-	}
-	return client, nil
+	return podName
 }
 
-func GetUrl(t testing.TB, client *http.Client, token string, url string) (*unstructured.UnstructuredList, error) {
-	t.Helper()
-	body, err := getUrl(t, client, token, url)
+func GetUrl(t testing.TB, token string, url string) (*unstructured.UnstructuredList, error) {
+	client := getHTTPClient(t)
+	body, err := getUrl(t, &client, token, url)
 	if err != nil {
 		return nil, err
 	}
@@ -285,41 +235,68 @@ func GetUrl(t testing.TB, client *http.Client, token string, url string) (*unstr
 	var data unstructured.UnstructuredList
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		t.Logf("Couldn't unmarshal JSON, %s\n", err)
+		t.Logf("Could not unmarshal JSON, %s", err)
 		return nil, err
 	}
-	t.Logf("The HTTP status returned is OK, returned %d items\n", len(data.Items))
+	t.Logf("HTTP status: 200 OK, returned %d items", len(data.Items))
 	return &data, nil
 }
 
-func GetLogs(t testing.TB, client *http.Client, token string, url string) ([]byte, error) {
+func GetLogs(t testing.TB, token string, url string) ([]byte, error) {
+	client := getHTTPClient(t)
+	return getUrl(t, &client, token, url)
+}
+
+func getHTTPClient(t testing.TB) http.Client {
 	t.Helper()
-	return getUrl(t, client, token, url)
+
+	clientset, _ := GetKubernetesClient(t)
+	secret, errSecret := clientset.CoreV1().Secrets("kubearchive").Get(context.Background(),
+		"kubearchive-api-server-tls", metav1.GetOptions{})
+	if errSecret != nil {
+		t.Fatal(errSecret)
+	}
+
+	caCertPool := x509.NewCertPool()
+	appendCert := caCertPool.AppendCertsFromPEM(secret.Data["ca.crt"])
+	if !appendCert {
+		t.Log("could not append the CA cert")
+		t.Fatal(errors.New("could not append the CA cert"))
+	}
+
+	return http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs:    caCertPool,
+				MinVersion: tls.VersionTLS13,
+			},
+		},
+	}
 }
 
 func getUrl(t testing.TB, client *http.Client, token string, url string) ([]byte, error) {
 	t.Helper()
 	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		t.Logf("could not create a request, %s\n", err)
+		t.Logf("Could not create a request, %s", err)
 		return nil, err
 	}
 	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	response, err := client.Do(request)
 	if err != nil {
-		t.Logf("Couldn't get a response HTTP, %s\n", err)
+		t.Logf("Could not get an HTTP response, %s", err)
 		return nil, err
 	}
 	defer response.Body.Close()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		t.Logf("Couldn't read Body, %s\n", err)
+		t.Logf("Could not read body, %s", err)
 		return nil, err
 	}
 
 	if response.StatusCode != http.StatusOK {
-		t.Logf("The HTTP status returned is not OK, %s - %s \n", response.Status, string(body))
+		t.Logf("HTTP status: %s, response: %s", response.Status, string(body))
 		return nil, fmt.Errorf("%d", response.StatusCode)
 	}
 
@@ -328,94 +305,226 @@ func getUrl(t testing.TB, client *http.Client, token string, url string) ([]byte
 
 var logGenMutex sync.Mutex
 
-type logGenType int
-
-const (
-	CronJobGenerator logGenType = iota
-	PipelineGenerator
-)
-
-func (l logGenType) installScriptPath(t testing.TB) string {
-	t.Helper()
-	switch l {
-	case CronJobGenerator:
-		return "../log-generators/cronjobs/install.sh"
-	case PipelineGenerator:
-		return "../log-generators/pipelines/install.sh"
-	default:
-		t.Fatal("Invalid log generator. Use CronJobs or Pipelines")
+// Run a job to generate a log. Returns the job name.
+func RunLogGenerator(t testing.TB, namespace string) string {
+	clientset, _ := GetKubernetesClient(t)
+	name := fmt.Sprintf("generate-log-%s", RandomString())
+	t.Logf("Running job '%s/%s'", namespace, name)
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						corev1.Container{
+							Name:    "flog",
+							Command: []string{"flog", "-n", "10", "-d", "1ms"},
+							Image:   "quay.io/kubearchive/mingrammer/flog",
+						},
+					},
+				},
+			},
+		},
 	}
-	return ""
+
+	_, err := clientset.BatchV1().Jobs(namespace).Create(context.Background(), job, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return name
 }
 
-// RunLogGenerators runs the log generators in the thread safe way.
-func RunLogGenerators(t testing.TB, logGen logGenType, namespace string, numRuns int) {
+// Create a test namespace, returning the namespace name and the SA token.
+func CreateTestNamespace(t testing.TB, customCleanup bool) (string, *authenticationv1.TokenRequest) {
+	// Create a randomly name testing namespace and return the name.
 	t.Helper()
-	logGenMutex.Lock()
-	defer logGenMutex.Unlock()
 
-	namespaceFlag := "--namespace=" + namespace
-	numFlag := "--num-jobs=" + strconv.Itoa(numRuns)
+	clientset, _ := GetKubernetesClient(t)
 
-	t.Log("Command:", "bash", logGen.installScriptPath(t), namespaceFlag, numFlag)
+	namespace := fmt.Sprintf("test-%s", RandomString())
+	t.Log("Creating test namespace '" + namespace + "'")
 
-	cmd := exec.Command("bash", logGen.installScriptPath(t), namespaceFlag, numFlag) // #nosec G204
-	output, errScript := cmd.CombinedOutput()
-	if errScript != nil {
-		t.Log("Could not run the log-generator: ", string(output))
-		t.Fatal(errScript)
-	}
-	t.Log("Output: ", string(output))
-}
+	_, err := clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
+		},
+	}, metav1.CreateOptions{})
 
-func CreateKAC(t testing.TB, clientset kubernetes.Interface, dynamicClient dynamic.Interface, kac *unstructured.Unstructured, namespaceName string) {
-	gvr := kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
-	_, err := dynamicClient.Resource(gvr).Namespace(namespaceName).Create(context.Background(), kac, metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	a13eGvr := sourcesv1.SchemeGroupVersion.WithResource("apiserversources")
+	if !customCleanup {
+		t.Cleanup(func() {
+			DeleteTestNamespace(t, namespace)
+		})
+	}
+
 	err = retry.Do(func() error {
-		_, retryErr := dynamicClient.Resource(a13eGvr).Namespace("kubearchive").Get(context.Background(), "kubearchive-a13e", metav1.GetOptions{})
-		return retryErr
-	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+		_, e := clientset.CoreV1().ServiceAccounts(namespace).Get(context.Background(), "default", metav1.GetOptions{})
+		return e
+	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+	if err != nil {
+		t.Logf("Could not find Service Account 'default' in namespace '%s'", namespace)
+		t.Fatal(err)
+	}
+
+	token, err := clientset.CoreV1().ServiceAccounts(namespace).CreateToken(context.Background(), "default", &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
+	if err != nil {
+		t.Logf("Could not create a token for service account 'default' in namespace '%s'", namespace)
+		t.Fatal(err)
+	}
+
+	_, err = clientset.RbacV1().RoleBindings(namespace).Create(context.Background(), &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "view-default-test",
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      "default",
+				Namespace: namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "ClusterRole",
+			Name:     "view",
+		},
+	},
+		metav1.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	return namespace, token
+}
+
+func CreateKAC(t testing.TB, namespace string, resources map[string]any) {
+	clientset, dynamicClient := GetKubernetesClient(t)
+	kac := newKAC(namespace, resources)
+
+	gvr := kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
+	_, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.Background(), kac, metav1.CreateOptions{})
+	if err != nil {
+		t.Logf("Could not create KubeArchiveConfig in namespace '%s'", namespace)
+		t.Fatal(err)
+	}
+
+	if len(resources) > 0 {
+		// If we have resources, make sure ApiServerSource is created and there are sink filters before returning.
+		a13eGvr := sourcesv1.SchemeGroupVersion.WithResource("apiserversources")
+		err = retry.Do(func() error {
+			_, retryErr := dynamicClient.Resource(a13eGvr).Namespace("kubearchive").Get(context.Background(), "kubearchive-a13e", metav1.GetOptions{})
+			return retryErr
+		}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = retry.Do(func() error {
+			sinkFilters, retryErr := clientset.CoreV1().ConfigMaps("kubearchive").Get(context.Background(), "sink-filters", metav1.GetOptions{})
+			if retryErr != nil {
+				return retryErr
+			}
+			_, exists := sinkFilters.Data[namespace]
+			if !exists {
+				return fmt.Errorf("sink-filters ConfigMap does not yet have filters for the namespace %s", namespace)
+			}
+			return nil
+		}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func DeleteKAC(t testing.TB, namespace string) {
+	clientset, dynamicClient := GetKubernetesClient(t)
+
+	gvr := kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
+	err := dynamicClient.Resource(gvr).Namespace(namespace).Delete(context.Background(), KACName, metav1.DeleteOptions{})
+	if err != nil {
+		t.Logf("Could not delete KubeArchiveConfig in namespace '%s'", namespace)
+		t.Fatal(err)
+	}
+
+	// Make sure KubeArchiveConfig is deleted.
+	err = retry.Do(func() error {
+		_, retryErr := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), KACName, metav1.GetOptions{})
+		return retryErr
+	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Make sure the sink filters have been updated.
 	err = retry.Do(func() error {
 		sinkFilters, retryErr := clientset.CoreV1().ConfigMaps("kubearchive").Get(context.Background(), "sink-filters", metav1.GetOptions{})
 		if retryErr != nil {
 			return retryErr
 		}
-		_, exists := sinkFilters.Data[namespaceName]
-		if !exists {
-			return fmt.Errorf("sink-filters ConfigMap does not yet have filters for the namespace %s", namespaceName)
+		_, exists := sinkFilters.Data[namespace]
+		if exists {
+			return fmt.Errorf("Sink filters ConfigMap still has filters for namespace '%s'", namespace)
 		}
 		return nil
-	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
-// GetSAToken waits for Service Account 'default' to exist in the namespace before creating a TokenRequest
-func GetSAToken(t testing.TB, clientset kubernetes.Interface, namespaceName string) *authenticationv1.TokenRequest {
+func DeleteTestNamespace(t testing.TB, namespace string) {
+	// Delete the given namespace and wait until it is removed from the cluster.
 	t.Helper()
-	saErr := retry.Do(func() error {
-		_, err := clientset.CoreV1().ServiceAccounts(namespaceName).Get(context.Background(), "default", metav1.GetOptions{})
-		return err
-	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
-	if saErr != nil {
-		t.Logf("Could not find Service Account 'default' in namespace '%s'\n", namespaceName)
-		t.Fatal(saErr)
+
+	t.Log("Deleting test namespace '" + namespace + "'")
+
+	clientset, _ := GetKubernetesClient(t)
+
+	errNamespace := clientset.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+	if errNamespace != nil {
+		t.Fatal(errNamespace)
 	}
 
-	token, tokenErr := clientset.CoreV1().ServiceAccounts(namespaceName).CreateToken(context.Background(), "default", &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
-	if tokenErr != nil {
-		t.Logf("Could not create a token for service account 'default' in namespace '%s'\n", namespaceName)
-		t.Fatal(tokenErr)
+	retryErr := retry.Do(func() error {
+		_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+		if !errs.IsNotFound(getErr) {
+			return errors.New("Waiting for namespace " + namespace + " to be deleted")
+		}
+		return nil
+	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+
+	if retryErr != nil {
+		t.Log(retryErr)
 	}
-	return token
+}
+
+func newKAC(namespace string, resources map[string]any) *unstructured.Unstructured {
+	return &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind": "KubeArchiveConfig",
+			"apiVersion": fmt.Sprintf("%s/%s",
+				kubearchivev1alpha1.SchemeBuilder.GroupVersion.Group,
+				kubearchivev1alpha1.SchemeBuilder.GroupVersion.Version),
+			"metadata": map[string]string{
+				"name":      KACName,
+				"namespace": namespace,
+			},
+			"spec": resources,
+		},
+	}
+}
+
+func OutputLines(t testing.TB, output string) {
+	for _, line := range strings.Split(output, "\n") {
+		if len(line) > 0 {
+			t.Log(line)
+		}
+	}
 }

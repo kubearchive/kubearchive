@@ -74,7 +74,7 @@ func TestReceiveCloudEvents(t *testing.T) {
 		{
 			name:       "Valid CloudEvent with kubernetes resource",
 			file:       "testdata/CE-job.json",
-			httpStatus: http.StatusOK,
+			httpStatus: http.StatusAccepted,
 		},
 		{
 			name:       "Request body is not a CloudEvent",
@@ -151,7 +151,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "Archive Jobs from CloudEvents",
 			files:              []string{"testdata/CE-job.json"},
-			httpStatus:         http.StatusOK,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{"Job"},
 			delete:             []string{},
 			archiveOnDelete:    []string{},
@@ -164,7 +164,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "Ignore Pod from CloudEvents",
 			files:              []string{"testdata/CE-job.json", "testdata/CE-pod-1-container.json"},
-			httpStatus:         http.StatusOK,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{"Job"},
 			delete:             []string{},
 			archiveOnDelete:    []string{},
@@ -177,7 +177,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "Archive Pod from CloudEvents with log urls",
 			files:              []string{"testdata/CE-pod-1-container.json"},
-			httpStatus:         http.StatusOK,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{"Pod"},
 			delete:             []string{},
 			archiveOnDelete:    []string{},
@@ -190,7 +190,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "Archive Pod with 3 containers from CloudEvents with log urls",
 			files:              []string{"testdata/CE-pod-3-container.json"},
-			httpStatus:         http.StatusOK,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{"Pod"},
 			delete:             []string{},
 			archiveOnDelete:    []string{},
@@ -203,7 +203,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "ArchiveOnDelete Jobs from CloudEvents",
 			files:              []string{"testdata/CE-job-delete.json"},
-			httpStatus:         http.StatusOK,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{},
 			delete:             []string{},
 			archiveOnDelete:    []string{"Job"},
@@ -216,7 +216,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "Ignore Pod from CloudEvents",
 			files:              []string{"testdata/CE-job-delete.json", "testdata/CE-pod-1-container-delete.json"},
-			httpStatus:         http.StatusOK,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{},
 			delete:             []string{},
 			archiveOnDelete:    []string{"Job"},
@@ -229,7 +229,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "ArchiveOnDelete Pod from CloudEvents with log urls",
 			files:              []string{"testdata/CE-pod-1-container-delete.json"},
-			httpStatus:         http.StatusOK,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{},
 			delete:             []string{},
 			archiveOnDelete:    []string{"Pod"},
@@ -242,7 +242,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "ArchiveOnDelete Pod with 3 containers from CloudEvents with log urls",
 			files:              []string{"testdata/CE-pod-3-container-delete.json"},
-			httpStatus:         http.StatusOK,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{},
 			delete:             []string{},
 			archiveOnDelete:    []string{"Pod"},
@@ -255,7 +255,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "Delete Job from CloudEvent",
 			files:              []string{"testdata/CE-job.json"},
-			httpStatus:         http.StatusOK,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{},
 			delete:             []string{"Job"},
 			archiveOnDelete:    []string{},
@@ -268,7 +268,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "Delete Pod from CloudEvent with log urls",
 			files:              []string{"testdata/CE-pod-1-container.json"},
-			httpStatus:         http.StatusOK,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{},
 			delete:             []string{"Pod"},
 			archiveOnDelete:    []string{},
@@ -281,7 +281,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "Delete Pod with 3 containers from CloudEvent with log urls",
 			files:              []string{"testdata/CE-pod-3-container.json"},
-			httpStatus:         http.StatusOK,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{},
 			delete:             []string{"Pod"},
 			archiveOnDelete:    []string{},
@@ -548,7 +548,7 @@ func TestLogUrlWriteFails(t *testing.T) {
 		{
 			name:            "Archive Jobs from CloudEvents",
 			files:           []string{"testdata/CE-job.json"},
-			httpStatus:      http.StatusOK,
+			httpStatus:      http.StatusAccepted,
 			archive:         []string{"Job"},
 			delete:          []string{},
 			archiveOnDelete: []string{},
@@ -575,7 +575,7 @@ func TestLogUrlWriteFails(t *testing.T) {
 		{
 			name:            "ArchiveOnDelete Jobs from CloudEvents",
 			files:           []string{"testdata/CE-job-delete.json"},
-			httpStatus:      http.StatusOK,
+			httpStatus:      http.StatusAccepted,
 			archive:         []string{},
 			delete:          []string{},
 			archiveOnDelete: []string{"Job"},
@@ -602,7 +602,7 @@ func TestLogUrlWriteFails(t *testing.T) {
 		{
 			name:            "Delete Job from CloudEvent",
 			files:           []string{"testdata/CE-job.json"},
-			httpStatus:      http.StatusOK,
+			httpStatus:      http.StatusAccepted,
 			archive:         []string{},
 			delete:          []string{"Job"},
 			archiveOnDelete: []string{},

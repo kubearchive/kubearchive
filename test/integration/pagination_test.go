@@ -19,10 +19,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
-	errs "k8s.io/apimachinery/pkg/api/errors"
 	rbacv1 "k8s.io/api/rbac/v1"
+	errs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
 func TestPagination(t *testing.T) {
@@ -50,7 +51,7 @@ func TestPagination(t *testing.T) {
 		retryErr := retry.Do(func() error {
 			_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespaceName, metav1.GetOptions{})
 			if !errs.IsNotFound(getErr) {
-				return errors.New("Waiting for namespace "+namespaceName+" to be deleted")
+				return errors.New("Waiting for namespace " + namespaceName + " to be deleted")
 			}
 			return nil
 		}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
@@ -75,8 +76,7 @@ func TestPagination(t *testing.T) {
 							"apiVersion": "v1",
 							"kind":       "Pod",
 						},
-						"archiveWhen": "true",
-						"deleteWhen":  "status.phase == 'Succeeded'",
+						"deleteWhen": "status.phase == 'Succeeded'",
 					},
 				},
 			},
@@ -85,6 +85,24 @@ func TestPagination(t *testing.T) {
 
 	gvr := kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
 	_, err = dynamicClient.Resource(gvr).Namespace(namespaceName).Create(context.Background(), kac, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	a13eGvr := sourcesv1.SchemeGroupVersion.WithResource("apiserversources")
+	err = retry.Do(func() error {
+		_, err = dynamicClient.Resource(a13eGvr).Namespace("kubearchive").Get(context.Background(), "kubearchive-a13e", metav1.GetOptions{})
+		return err
+	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cmGvr := corev1.SchemeGroupVersion.WithResource("configmaps")
+	err = retry.Do(func() error {
+		_, err = dynamicClient.Resource(cmGvr).Namespace("kubearchive").Get(context.Background(), "sink-filters", metav1.GetOptions{})
+		return err
+	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}

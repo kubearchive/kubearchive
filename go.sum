@@ -905,8 +905,8 @@ k8s.io/kube-openapi v0.0.0-20241212222426-2c72e554b1e7 h1:hcha5B1kVACrLujCKLbr8X
 k8s.io/kube-openapi v0.0.0-20241212222426-2c72e554b1e7/go.mod h1:GewRfANuJ70iYzvn+i4lezLDAFzvjxZYK1gn1lWcfas=
 k8s.io/utils v0.0.0-20241210054802-24370beab758 h1:sdbE21q2nlQtFh65saZY+rRM6x6aJJI8IUa1AmH/qa0=
 k8s.io/utils v0.0.0-20241210054802-24370beab758/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
-knative.dev/eventing v0.44.2 h1:7oqRHty3AYzCWmQomTV/skA6NhZXFXCY8rXAx2/OUac=
-knative.dev/eventing v0.44.2/go.mod h1:4ndE/NDntPvunnUl/q7MFbkX0pS/vKaMUFOXFRf1GWA=
+knative.dev/eventing v0.44.3 h1:cwL1SCvgtlY/GxK2D3H4L25uF/zky0A5R81sblRryZc=
+knative.dev/eventing v0.44.3/go.mod h1:4ndE/NDntPvunnUl/q7MFbkX0pS/vKaMUFOXFRf1GWA=
 knative.dev/pkg v0.0.0-20250226145529-0372c089c78f h1:udznvloLcWaixDGrENQ9HRcj1fiMlE6cP8L0V3K4V74=
 knative.dev/pkg v0.0.0-20250226145529-0372c089c78f/go.mod h1:ijkSiVyNl0yTjfRsGx3infOo9ohlyE1lTCri9iUHR80=
 nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=

@@ -210,6 +210,37 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 	k8sCtx, k8sCancel := context.WithTimeout(ctx, time.Second*5)
 	defer k8sCancel()
 
+	list, err := c.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).List(
+		k8sCtx,
+		metav1.ListOptions{
+			FieldSelector: "metadata.name=" + k8sObj.GetName(),
+		},
+	)
+	if err != nil {
+		slog.Error(
+			"Could not list resource",
+			"event-id", event.ID(),
+			"event-type", event.Type(),
+			"id", k8sObj.GetUID(),
+			"kind", k8sObj.GetKind(),
+			"namespace", k8sObj.GetNamespace(),
+			"name", k8sObj.GetName(),
+			"err", err,
+		)
+		return NewCEResult(http.StatusInternalServerError)
+	}
+	if len(list.Items) == 0 {
+		slog.Info(
+			"Resource is already deleted",
+			"event-id", event.ID(),
+			"event-type", event.Type(),
+			"id", k8sObj.GetUID(),
+			"kind", k8sObj.GetKind(),
+			"namespace", k8sObj.GetNamespace(),
+			"name", k8sObj.GetName(),
+		)
+		return NewCEResult(http.StatusAccepted)
+	}
 	err = c.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).Delete(
 		k8sCtx,
 		k8sObj.GetName(),

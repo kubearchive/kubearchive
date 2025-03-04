@@ -15,21 +15,14 @@ import (
 
 	"github.com/avast/retry-go/v4"
 	"github.com/kubearchive/kubearchive/test"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // TestDatabaseConnection verifies the database connection retries using the Sink component.
 func TestDatabaseConnection(t *testing.T) {
-	clientset, _, err := test.GetKubernetesClient()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	dynclient, err := test.GetDynamicKubernetesClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	clientset, dynclient := test.GetKubernetesClient(t)
 
 	// Fence database to make it unavailable - https://cloudnative-pg.io/documentation/1.24/fencing/
 	clusterResource := schema.GroupVersionResource{Group: "postgresql.cnpg.io", Version: "v1", Resource: "clusters"}
@@ -47,6 +40,8 @@ func TestDatabaseConnection(t *testing.T) {
 	}
 	t.Logf("Fenced database")
 
+	podName := test.GetPodName(t, clientset, "kubearchive", "kubearchive-sink")
+
 	// restart sink pod - replicas = 0
 	deploymentScaleSink, err := clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
 	if err != nil {
@@ -62,8 +57,11 @@ func TestDatabaseConnection(t *testing.T) {
 	t.Logf("Changing sink to %d replicas", scaleSink.Spec.Replicas)
 	t.Log(*usSink)
 
-	t.Logf("Waiting 5 seconds for kubearchive-sink to scale down...")
-	time.Sleep(5 * time.Second)
+	t.Logf("Waiting for sink pod '%s' to disappear", podName)
+	err = retry.Do(func() error {
+		_, e := clientset.CoreV1().Pods("kubearchive").Get(context.Background(), podName, metav1.GetOptions{})
+		return e
+	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
 
 	// restart sink pod - replicas = 1
 	deploymentScaleSink, err = clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
@@ -82,18 +80,17 @@ func TestDatabaseConnection(t *testing.T) {
 	// wait to sink pod ready and generate connection retries with the database
 	t.Logf("Waiting for sink to be up, and to generate retries with the database")
 	retryErr := retry.Do(func() error {
-		logs, err := test.GetPodLogs(clientset, "kubearchive", "kubearchive-sink")
+		logs, err := test.GetPodLogs(t, "kubearchive", "kubearchive-sink")
 		if err != nil {
 			return err
 		}
 
-		t.Logf("Logs\n%s", logs)
 		if strings.Contains(logs, "connection refused") {
 			return nil
 		}
 
 		return fmt.Errorf("Sink pod didn't try to connect to the database yet")
-	})
+	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -115,20 +112,35 @@ func TestDatabaseConnection(t *testing.T) {
 	t.Logf("Unfenced database")
 
 	retryErr = retry.Do(func() error {
-		logs, err := test.GetPodLogs(clientset, "kubearchive", "kubearchive-sink")
+		logs, err := test.GetPodLogs(t, "kubearchive", "kubearchive-sink")
 		if err != nil {
 			return nil
 		}
 
-		t.Logf("Logs:\n%s", logs)
 		if strings.Contains(logs, "Successfully connected to the database") {
 			return nil
 		}
 
-		return errors.New("Sink pod didn't connect successfully to the database yet")
-	})
+		return errors.New("Sink pod did not connect successfully to the database yet")
+	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
 	}
+
+	// Wait for sink pod to be ready.
+	podName = test.GetPodName(t, clientset, "kubearchive", "kubearchive-sink")
+	err = retry.Do(func() error {
+		pod, e := clientset.CoreV1().Pods("kubearchive").Get(context.Background(), podName, metav1.GetOptions{})
+		if e != nil {
+			return e
+		}
+
+		for _, condition := range pod.Status.Conditions {
+			if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
+				return nil
+			}
+		}
+		return errors.New("Sink pod is not in 'Ready' status")
+	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
 }

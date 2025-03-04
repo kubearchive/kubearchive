@@ -6,88 +6,43 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
-	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/test"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	errs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestPagination(t *testing.T) {
 	t.Parallel()
-	clientset, dynamicClient, err := test.GetKubernetesClient()
-	if err != nil {
-		t.Fatal(err)
-	}
 
-	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
-	_, err = clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespaceName,
-		},
-	}, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	clientset, _ := test.GetKubernetesClient(t)
+	namespaceName, token := test.CreateTestNamespace(t, false)
 
-	t.Cleanup(func() {
-		err = clientset.CoreV1().Namespaces().Delete(context.Background(), namespaceName, metav1.DeleteOptions{})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		retryErr := retry.Do(func() error {
-			_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespaceName, metav1.GetOptions{})
-			if !errs.IsNotFound(getErr) {
-				return errors.New("Waiting for namespace " + namespaceName + " to be deleted")
-			}
-			return nil
-		}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
-
-		if retryErr != nil {
-			t.Log(retryErr)
-		}
-	})
-
-	kac := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"kind":       "KubeArchiveConfig",
-			"apiVersion": fmt.Sprintf("%s/%s", kubearchivev1alpha1.SchemeBuilder.GroupVersion.Group, kubearchivev1alpha1.SchemeBuilder.GroupVersion.Version),
-			"metadata": map[string]string{
-				"name":      "kubearchive",
-				"namespace": namespaceName,
-			},
-			"spec": map[string]any{
-				"resources": []map[string]any{
-					{
-						"selector": map[string]string{
-							"apiVersion": "v1",
-							"kind":       "Pod",
-						},
-						"deleteWhen": "status.phase == 'Succeeded'",
-					},
+	resources := map[string]any{
+		"resources": []map[string]any{
+			{
+				"selector": map[string]string{
+					"apiVersion": "v1",
+					"kind":       "Pod",
 				},
+				"deleteWhen": "status.phase == 'Succeeded'",
 			},
 		},
 	}
 
-	test.CreateKAC(t, clientset, dynamicClient, kac, namespaceName)
+	test.CreateKAC(t, namespaceName, resources)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pod-",
-			Namespace:    namespaceName,
+			Namespace: namespaceName,
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyNever,
@@ -101,54 +56,20 @@ func TestPagination(t *testing.T) {
 		},
 	}
 
-	for _ = range 30 {
-		_, err = clientset.CoreV1().Pods(namespaceName).Create(context.Background(), pod, metav1.CreateOptions{})
+	for i := range 30 {
+		pod.ObjectMeta.SetName("pod-" + strconv.Itoa(i))
+		_, err := clientset.CoreV1().Pods(namespaceName).Create(context.Background(), pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	_, err = clientset.RbacV1().RoleBindings(namespaceName).Create(context.Background(), &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "view-default-test",
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      "default",
-				Namespace: namespaceName,
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "view",
-		},
-	},
-		metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	token := test.GetSAToken(t, clientset, namespaceName)
-
-	clientHTTP := http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-
-	// Forward api service port
-	port, portClose := test.PortForwardApiServer(t, clientset)
-	t.Cleanup(portClose)
-
+	port := test.PortForwardApiServer(t, clientset)
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods", port, namespaceName)
 	var list *unstructured.UnstructuredList
 	var getUrlErr error
-	err = retry.Do(func() error {
-		list, getUrlErr = test.GetUrl(t, &clientHTTP, token.Status.Token, url)
+	err := retry.Do(func() error {
+		list, getUrlErr = test.GetUrl(t, token.Status.Token, url)
 		if getUrlErr != nil {
 			t.Fatal(getUrlErr)
 		}
@@ -164,7 +85,7 @@ func TestPagination(t *testing.T) {
 	}
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?limit=10", port, namespaceName)
-	initList, getUrlErrInitList := test.GetUrl(t, &clientHTTP, token.Status.Token, url)
+	initList, getUrlErrInitList := test.GetUrl(t, token.Status.Token, url)
 	if getUrlErrInitList != nil {
 		t.Fatal(getUrlErrInitList)
 	}
@@ -176,14 +97,14 @@ func TestPagination(t *testing.T) {
 		namespaceName,
 		initList.GetContinue(),
 	)
-	continueList, getUrlErrContinueList := test.GetUrl(t, &clientHTTP, token.Status.Token, url)
+	continueList, getUrlErrContinueList := test.GetUrl(t, token.Status.Token, url)
 	if getUrlErrContinueList != nil {
 		t.Fatal(getUrlErrContinueList)
 	}
 	assert.Equal(t, 10, len(continueList.Items))
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?limit=20", port, namespaceName)
-	allList, getUrlErrAllList := test.GetUrl(t, &clientHTTP, token.Status.Token, url)
+	allList, getUrlErrAllList := test.GetUrl(t, token.Status.Token, url)
 	if getUrlErrAllList != nil {
 		t.Fatal(getUrlErrAllList)
 	}

@@ -16,9 +16,9 @@ fi
 # Don't fail immediately so we can generate a summary of the action
 set +o errexit
 
-go test -json -count=1 -v ./test/integration -tags=integration -timeout 60m \
+go test -json -count=1 -v ./test/integration -tags=integration -timeout 15m \
     | tee ${RESULTS_DIR}/${FILE_PREFIX}_results.jsonl \
-    | jq -r 'select(.Action == "output") | .Output | rtrimstr("\n")'
+    | jq --unbuffered -r 'select(.Action == "output") | .Output | rtrimstr("\n")'
 
 # save return code from integration test to use as return code from this script later
 RET_CODE="$?"

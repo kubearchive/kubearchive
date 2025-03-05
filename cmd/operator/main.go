@@ -39,7 +39,10 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
-const otelServiceName = "kubearchive.operator"
+const (
+	otelServiceName   = "kubearchive.operator"
+	enablePprofEnvVar = "KUBEARCHIVE_ENABLE_PPROF"
+)
 
 var (
 	version = "main"
@@ -133,7 +136,7 @@ func main() {
 		DefaultLabelSelector: k8slabels.Nothing(),
 	}
 
-	mgr, err := ctrl.NewManager(config, ctrl.Options{
+	mgrOptions := ctrl.Options{
 		Scheme:                 scheme,
 		Cache:                  cacheOptions,
 		WebhookServer:          webhookServer,
@@ -152,7 +155,13 @@ func main() {
 		// if you are doing or is intended to do any operation such as perform cleanups
 		// after the operator stops then its usage might be unsafe.
 		// LeaderElectionReleaseOnCancel: true,
-	})
+	}
+
+	if os.Getenv(enablePprofEnvVar) == "true" {
+		mgrOptions.PprofBindAddress = ":8082"
+	}
+
+	mgr, err := ctrl.NewManager(config, mgrOptions)
 	if err != nil {
 		slog.Error("unable to start operator", "err", err)
 		os.Exit(1)

@@ -7,11 +7,14 @@ import (
 	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/avast/retry-go/v4"
 )
 
 type PromResult struct {
@@ -75,20 +78,33 @@ func main() {
 		q.Add("end", *end)
 		req.URL.RawQuery = q.Encode()
 
-		response, err := client.Do(req)
-		if err != nil {
-			panic(fmt.Sprintf("error doing the request: %s", err))
-		}
-		defer response.Body.Close()
+		var responseBytes []byte
+		retryErr := retry.Do(
+			func() error {
+				response, errDo := client.Do(req)
+				if errDo != nil {
+					return fmt.Errorf("error doing the request: %s", err)
+				}
+				defer response.Body.Close()
 
-		responseBytes, err := io.ReadAll(response.Body)
-		if err != nil {
-			panic(fmt.Sprintf("error reading all: %s", err))
-		}
+				var errRead error
+				responseBytes, errRead = io.ReadAll(response.Body)
+				if errRead != nil {
+					return fmt.Errorf("error reading all: %s", err)
+				}
 
-		if response.StatusCode != http.StatusOK {
-			fmt.Println(string(responseBytes))
-			panic("status code not OK")
+				if response.StatusCode != http.StatusOK {
+					fmt.Println(string(responseBytes))
+					return errors.New("status code not OK")
+				}
+
+				return nil
+			}, retry.OnRetry(func(n uint, err error) {
+				fmt.Printf("Retry #%d: %s\n", n, err)
+			}))
+
+		if retryErr != nil {
+			panic(fmt.Sprintf("error calling Prometheus: %s", err))
 		}
 
 		var responseData PrometheusResponse

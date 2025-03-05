@@ -8,7 +8,7 @@ import (
 	"github.com/cloudevents/sdk-go/v2/protocol"
 )
 
-// knative eventing expects that a response to a cloud event has an empty body, so NewHTTPResult should be called with
+// knative eventing expects that a response to a cloud event has an empty body, so NewHTTPResult must be called with
 // an empty string.
 func NewCEResult(statusCode int) protocol.Result {
 	return cloudevents.NewHTTPResult(statusCode, "")

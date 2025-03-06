@@ -24,6 +24,7 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 	corev1 "k8s.io/api/core/v1"
+	errs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -209,27 +210,12 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 	propagationPolicy := metav1.DeletePropagationBackground // can't get address of a const
 	k8sCtx, k8sCancel := context.WithTimeout(ctx, time.Second*5)
 	defer k8sCancel()
-
-	list, err := c.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).List(
+	err = c.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).Delete(
 		k8sCtx,
-		metav1.ListOptions{
-			FieldSelector: "metadata.name=" + k8sObj.GetName(),
-		},
+		k8sObj.GetName(),
+		metav1.DeleteOptions{PropagationPolicy: &propagationPolicy},
 	)
-	if err != nil {
-		slog.Error(
-			"Could not list resource",
-			"event-id", event.ID(),
-			"event-type", event.Type(),
-			"id", k8sObj.GetUID(),
-			"kind", k8sObj.GetKind(),
-			"namespace", k8sObj.GetNamespace(),
-			"name", k8sObj.GetName(),
-			"err", err,
-		)
-		return NewCEResult(http.StatusInternalServerError)
-	}
-	if len(list.Items) == 0 {
+	if errs.IsNotFound(err) {
 		slog.Info(
 			"Resource is already deleted",
 			"event-id", event.ID(),
@@ -241,11 +227,6 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 		)
 		return NewCEResult(http.StatusAccepted)
 	}
-	err = c.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).Delete(
-		k8sCtx,
-		k8sObj.GetName(),
-		metav1.DeleteOptions{PropagationPolicy: &propagationPolicy},
-	)
 	if err != nil {
 		slog.Error(
 			"Error deleting a resource",

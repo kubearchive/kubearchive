@@ -254,7 +254,7 @@ func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kac
 		resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
 		resources = append(resources, resource)
 	}
-	return r.reconcileRole(ctx, kaconfig, k9eSinkName, r.getRules(ctx, resources, []string{"list", "delete"}))
+	return r.reconcileRole(ctx, kaconfig, k9eSinkName, r.getRules(ctx, resources, []string{"delete"}))
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {

@@ -24,6 +24,7 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 	corev1 "k8s.io/api/core/v1"
+	errs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -145,17 +146,19 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 // receiveCloudEvent returns an HTTP 422 if event.Data is not a kubernetes object. All other failures should return HTTP
 // 500 instead.
 func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Event) protocol.Result {
+	ex := event.Extensions()
+	slog.Info("Received CloudEvent", "event-id", event.ID(), "event-type", event.Type(), "kind", ex["kind"], "name", ex["name"], "namespace", ex["namespace"])
 	k8sObj, err := models.UnstructuredFromByteSlice(event.Data())
 	if err != nil {
 		slog.Error("Received malformed CloudEvent", "event-id", event.ID(), "err", err)
-		return NewCEResult(http.StatusUnprocessableEntity, err)
+		return NewCEResult(http.StatusUnprocessableEntity)
 	}
 
 	if strings.HasSuffix(event.Type(), ".delete") {
 		if c.Filters.MustArchiveOnDelete(ctx, k8sObj) {
 			err = c.writeResource(ctx, k8sObj, event)
 			if err != nil {
-				return NewCEResult(http.StatusInternalServerError, err)
+				return NewCEResult(http.StatusInternalServerError)
 			}
 		}
 
@@ -168,7 +171,7 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
 		)
-		return NewCEResult(http.StatusOK, nil)
+		return NewCEResult(http.StatusAccepted)
 	}
 
 	if !c.Filters.MustArchive(ctx, k8sObj) {
@@ -181,12 +184,12 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
 		)
-		return NewCEResult(http.StatusOK, nil)
+		return NewCEResult(http.StatusAccepted)
 	}
 
 	err = c.writeResource(ctx, k8sObj, event)
 	if err != nil {
-		return NewCEResult(http.StatusInternalServerError, err)
+		return NewCEResult(http.StatusInternalServerError)
 	}
 
 	if !c.Filters.MustDelete(ctx, k8sObj) {
@@ -199,7 +202,7 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
 		)
-		return NewCEResult(http.StatusOK, err)
+		return NewCEResult(http.StatusAccepted)
 	}
 
 	kind := k8sObj.GetObjectKind().GroupVersionKind()
@@ -207,12 +210,23 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 	propagationPolicy := metav1.DeletePropagationBackground // can't get address of a const
 	k8sCtx, k8sCancel := context.WithTimeout(ctx, time.Second*5)
 	defer k8sCancel()
-
 	err = c.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).Delete(
 		k8sCtx,
 		k8sObj.GetName(),
 		metav1.DeleteOptions{PropagationPolicy: &propagationPolicy},
 	)
+	if errs.IsNotFound(err) {
+		slog.Info(
+			"Resource is already deleted",
+			"event-id", event.ID(),
+			"event-type", event.Type(),
+			"id", k8sObj.GetUID(),
+			"kind", k8sObj.GetKind(),
+			"namespace", k8sObj.GetNamespace(),
+			"name", k8sObj.GetName(),
+		)
+		return NewCEResult(http.StatusAccepted)
+	}
 	if err != nil {
 		slog.Error(
 			"Error deleting a resource",
@@ -224,14 +238,14 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			"name", k8sObj.GetName(),
 			"err", err,
 		)
-		return NewCEResult(http.StatusInternalServerError, err)
+		return NewCEResult(http.StatusInternalServerError)
 	}
 
 	deleteTs := metav1.Now()
 	k8sObj.SetDeletionTimestamp(&deleteTs)
 	err = c.writeResource(ctx, k8sObj, event)
 	if err != nil {
-		return NewCEResult(http.StatusInternalServerError, err)
+		return NewCEResult(http.StatusInternalServerError)
 	}
 
 	slog.Info(
@@ -243,7 +257,7 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 		"namespace", k8sObj.GetNamespace(),
 		"name", k8sObj.GetName(),
 	)
-	return NewCEResult(http.StatusOK, nil)
+	return NewCEResult(http.StatusAccepted)
 }
 
 func (c *Controller) CloudEventsHandler(ctx *gin.Context) {

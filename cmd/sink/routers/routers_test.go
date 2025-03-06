@@ -294,7 +294,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		{
 			name:               "Delete Pod that does not exist",
 			files:              []string{"testdata/CE-pod-does-not-exist.json"},
-			httpStatus:         http.StatusInternalServerError,
+			httpStatus:         http.StatusAccepted,
 			archive:            []string{},
 			delete:             []string{"Pod"},
 			archiveOnDelete:    []string{},

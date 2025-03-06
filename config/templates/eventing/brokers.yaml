@@ -15,7 +15,7 @@ metadata:
 spec:
   delivery:
     retry: 4
-    backoffPolicy: exponential
+    backoffPolicy: linear
     # ISO 8601 format
     backoffDelay: PT0.5S
     deadLetterSink:
@@ -37,6 +37,6 @@ metadata:
 spec:
   delivery:
     retry: 4
-    backoffPolicy: exponential
+    backoffPolicy: linear
     # ISO 8601 format
     backoffDelay: PT0.5S

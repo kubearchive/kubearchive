@@ -49,7 +49,7 @@ KubeArchive uses a trigger to subscribe to Cloud Events from this broker. The pr
 spec:
   delivery:
     retry: 4
-    backoffPolicy: exponential
+    backoffPolicy: linear
     # ISO 8601 format
     backoffDelay: PT0.5S
     deadLetterSink:
@@ -106,7 +106,7 @@ response to a `POST` request have different meanings:
 |===
 |HTTP Status Code |Meaning
 
-|200
+|202
 |successfully received and processed the cloud event
 
 |422
@@ -117,3 +117,10 @@ not send the cloud event again without modifying the `data` field first.
 |successfully received a valid cloud event with a kubernetes resource in it, but kubearchive encountered an error while
 trying to process the resource. This can happen if there was issue writing to the database or requesting the Kubernetes
 API to delete an object. The cloud event can be sent again without modification.
+
+[NOTE]
+====
+Knative Eventing expects that Cloud Event recipients will respond cloud event delivery in specific ways. You can learn
+more about these expectation in the
+link:https://github.com/knative/specs/blob/main/specs/eventing/data-plane.md#event-acknowledgement-and-delivery-retry[Knative specification here]
+====

@@ -1,0 +1,38 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: Performance Recap
+run-name: Performance Recap
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * 0"  # Each sunday at 0 UTC
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  setup:
+    uses: ./.github/workflows/log_run_details.yml
+  integration:
+    name: KubeArchive Performance Recap
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Cache Performance results
+        uses: actions/cache@v4
+        with:
+          key: performance-results
+          path: |
+            ./merge
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Display Go version
+        run: go version
+      - name: Run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          bash test/performance/merge.sh

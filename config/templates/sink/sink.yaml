@@ -45,6 +45,8 @@ spec:
             - secretRef:
                 name: kubearchive-database-credentials
           env:
+            - name: KUBEARCHIVE_ENABLE_PPROF
+              value: "true"
             - name: GIN_MODE
               value: release
             - name: LOG_LEVEL
@@ -71,6 +73,10 @@ spec:
                   fieldPath: metadata.namespace
             - name: KUBEARCHIVE_LOGGING_DIR
               value: /data/logging
+          ports:
+            - containerPort: 8080
+              name: sink
+              protocol: TCP
           livenessProbe:
             httpGet:
               path: /livez

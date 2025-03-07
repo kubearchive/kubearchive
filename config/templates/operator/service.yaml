@@ -17,5 +17,9 @@ spec:
       protocol: TCP
       targetPort: 9443
       name: webhook-server
+    - port: 8082
+      protocol: TCP
+      targetPort: 8082
+      name: pprof-server
   selector:
     control-plane: controller-manager

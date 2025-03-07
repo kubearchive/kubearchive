@@ -7,6 +7,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
@@ -17,6 +18,8 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/sink/routers"
 	"github.com/kubearchive/kubearchive/pkg/middleware"
 )
+
+const enablePprofEnvVar = "KUBEARCHIVE_ENABLE_PPROF"
 
 type Server struct {
 	controller *routers.Controller
@@ -33,6 +36,21 @@ func NewServer(controller *routers.Controller) *Server {
 
 	router.GET("/livez", controller.Livez)
 	router.GET("/readyz", controller.Readyz)
+
+	if os.Getenv(enablePprofEnvVar) == "true" {
+		router.GET("/debug/pprof/", gin.WrapF(pprof.Index))
+		router.GET("/debug/pprof/cmdline", gin.WrapF(pprof.Cmdline))
+		router.GET("/debug/pprof/profile", gin.WrapF(pprof.Profile))
+		router.POST("/debug/pprof/symbol", gin.WrapF(pprof.Symbol))
+		router.GET("/debug/pprof/symbol", gin.WrapF(pprof.Symbol))
+		router.GET("/debug/pprof/trace", gin.WrapF(pprof.Trace))
+		router.GET("/debug/pprof/allocs", gin.WrapH(pprof.Handler("allocs")))
+		router.GET("/debug/pprof/block", gin.WrapH(pprof.Handler("block")))
+		router.GET("/debug/pprof/goroutine", gin.WrapH(pprof.Handler("goroutine")))
+		router.GET("/debug/pprof/heap", gin.WrapH(pprof.Handler("heap")))
+		router.GET("/debug/pprof/mutex", gin.WrapH(pprof.Handler("mutex")))
+		router.GET("/debug/pprof/threadcreate", gin.WrapH(pprof.Handler("threadcreate")))
+	}
 
 	return &Server{
 		controller: controller,

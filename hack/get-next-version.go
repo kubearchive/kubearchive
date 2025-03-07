@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -39,11 +40,22 @@ func main() {
 	}
 
 	var collectedKinds string
+	var errs error
 	for _, pr := range releaseNotes {
-		kinds := pr.(map[string]any)["kinds"].([]any)
-		for _, kind := range kinds {
+		prMap := pr.(map[string]any)
+		kinds, ok := prMap["kinds"]
+		if !ok {
+			errs = errors.Join(fmt.Errorf("PR '%v' does not have 'kind/*' labels, please add one.", prMap["pr_number"]), errs)
+			continue
+		}
+
+		for _, kind := range kinds.([]any) {
 			collectedKinds += fmt.Sprintf("%s ", kind.(string))
 		}
+	}
+
+	if errs != nil {
+		panic(fmt.Sprintf("some PRs do not have 'kind/*' labels:\n%s", errs.Error()))
 	}
 
 	fmt.Fprintf(os.Stderr, "DEBUG: Collected Kinds: %s\n", collectedKinds)

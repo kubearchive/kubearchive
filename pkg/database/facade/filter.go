@@ -22,6 +22,7 @@ type DBFilter interface {
 	NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string
 	InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string
 	NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string
+	ContainerNameFilter(cond sqlbuilder.Cond, containerName string) string
 }
 
 // PartialDBFilterImpl implements partially the DBFilter interface
@@ -54,4 +55,8 @@ func (PartialDBFilterImpl) UuidsFilter(cond sqlbuilder.Cond, uuids []string) str
 
 func (PartialDBFilterImpl) UuidFilter(cond sqlbuilder.Cond, uuid string) string {
 	return cond.Equal("uuid", uuid)
+}
+
+func (PartialDBFilterImpl) ContainerNameFilter(cond sqlbuilder.Cond, containerName string) string {
+	return cond.Equal("container_name", containerName)
 }

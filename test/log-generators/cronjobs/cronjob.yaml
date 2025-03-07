@@ -14,12 +14,28 @@ spec:
       template:
         spec:
           containers:
-            - name: generate
+            - name: generate1
               image: quay.io/kubearchive/mingrammer/flog
               imagePullPolicy: IfNotPresent
               args:
                 - "-n"
                 - "1024"
+                - "-d"
+                - "20ms"
+            - name: generate2
+              image: quay.io/kubearchive/mingrammer/flog
+              imagePullPolicy: IfNotPresent
+              args:
+                - "-n"
+                - "512"
+                - "-d"
+                - "20ms"
+            - name: generate3
+              image: quay.io/kubearchive/mingrammer/flog
+              imagePullPolicy: IfNotPresent
+              args:
+                - "-n"
+                - "256"
                 - "-d"
                 - "20ms"
           restartPolicy: OnFailure

@@ -57,5 +57,4 @@ jobs:
           bash integrations/logging/splunk/install.sh
       - name: Test Go code
         run: |
-          export KO_DOCKER_REPO="kind.local"
           go test -count=1 -v ./test/integration -tags=integration -timeout 60m

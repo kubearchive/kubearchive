@@ -44,7 +44,7 @@ require (
 	k8s.io/klog/v2 v2.130.1
 	knative.dev/eventing v0.44.3
 	knative.dev/pkg v0.0.0-20250226145529-0372c089c78f
-	sigs.k8s.io/controller-runtime v0.20.1-0.20250226022829-9d8d219840a4
+	sigs.k8s.io/controller-runtime v0.20.3
 )
 
 require (

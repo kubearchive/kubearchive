@@ -29,6 +29,8 @@ spec:
             - --health-probe-bind-address=:8081
             - --leader-elect
           env:
+            - name: KUBEARCHIVE_ENABLE_PPROF
+              value: "true"
             - name: LOG_LEVEL
               value: INFO
             - name: KUBEARCHIVE_NAMESPACE
@@ -61,6 +63,9 @@ spec:
           ports:
             - containerPort: 9443
               name: webhook-server
+              protocol: TCP
+            - containerPort: 8082
+              name: pprof-server
               protocol: TCP
           volumeMounts:
             - mountPath: /tmp/k8s-webhook-server/serving-certs

@@ -87,6 +87,8 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	router.GET("/livez", controller.Livez)
 	router.GET("/readyz", controller.Readyz)
 
+	observability.SetupPprof(router)
+
 	creds, credsErr := logging.GetKubeArchiveLoggingCredentials()
 
 	apisGroup.GET("/:group/:version/:resourceType", controller.GetResources)

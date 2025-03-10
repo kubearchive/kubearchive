@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/sink/routers"
 	"github.com/kubearchive/kubearchive/pkg/middleware"
+	"github.com/kubearchive/kubearchive/pkg/observability"
 )
 
 type Server struct {
@@ -33,6 +34,8 @@ func NewServer(controller *routers.Controller) *Server {
 
 	router.GET("/livez", controller.Livez)
 	router.GET("/readyz", controller.Readyz)
+
+	observability.SetupPprof(router)
 
 	return &Server{
 		controller: controller,

@@ -6,8 +6,10 @@ package database
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 
@@ -15,8 +17,11 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/database/facade"
 	"github.com/kubearchive/kubearchive/pkg/models"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+const defaultContainerAnnotation = "kubectl.kubernetes.io/default-container"
 
 var ResourceNotFoundError = errors.New("resource not found")
 
@@ -126,42 +131,87 @@ type uuidKindDate struct {
 	Date string `db:"created_at"`
 }
 
-func (db *Database) QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error) {
-
+// Returns the log url, the json path and an error given a selector builder for a Pod
+func (db *Database) getLogsForPodSelector(ctx context.Context, sb *sqlbuilder.SelectBuilder, namespace, name string) (string, string, error) {
 	type logURLJsonPath struct {
 		LogURL   string `db:"url"`
 		JsonPath string `db:"json_path"`
 	}
-	strQueryPerformer := newQueryPerformer[string](db.DB, db.Flavor)
 	logQueryPerformer := newQueryPerformer[logURLJsonPath](db.DB, db.Flavor)
+
+	podString, _, _, err := db.performResourceQuery(ctx, sb)
+	if err != nil {
+		return "", "", fmt.Errorf("could not retrieve resource '%s/%s': %s", namespace, name, err.Error())
+	}
+
+	if len(podString) == 0 {
+		return "", "", ResourceNotFoundError
+	}
+
+	var pod corev1.Pod
+	err = json.Unmarshal([]byte(podString[0]), &pod)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to deserialize pod '%s/%s': %s", namespace, name, err.Error())
+	}
+
+	annotations := pod.GetAnnotations()
+	containerName, ok := annotations[defaultContainerAnnotation]
+	if !ok {
+		// This is to avoid index out of bounds error with no context
+		if len(pod.Spec.Containers) == 0 {
+			return "", "", fmt.Errorf("pod '%s/%s' does not have containers, something went wrong", namespace, name)
+		}
+		containerName = pod.Spec.Containers[0].Name
+	}
+
+	slog.Debug(
+		"found pod preferred container for logs",
+		"container", containerName,
+		"namespace", namespace,
+		"name", name,
+	)
+	sb = db.Selector.UrlSelector()
+	sb.Where(
+		db.Filter.UuidFilter(sb.Cond, string(pod.UID)),
+		db.Filter.ContainerNameFilter(sb.Cond, containerName),
+	)
+	logUrls, err := logQueryPerformer.performQuery(ctx, sb)
+	if err != nil {
+		return "", "", err
+	}
+	if len(logUrls) >= 1 {
+		return logUrls[0].LogURL, logUrls[0].JsonPath, nil
+	} else {
+		return "", "", ResourceNotFoundError
+	}
+}
+
+func (db *Database) QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error) {
 	if kind == "Pod" {
-		sb := db.Selector.UrlFromResourceSelector()
+		sb := db.Selector.ResourceSelector()
+		sb = db.Sorter.CreationTSAndIDSorter(sb) // If resources are named the same, select the newest
 		sb.Where(
 			db.Filter.KindFilter(sb.Cond, kind),
 			db.Filter.ApiVersionFilter(sb.Cond, apiVersion),
 			db.Filter.NamespaceFilter(sb.Cond, namespace),
 			db.Filter.NameFilter(sb.Cond, name),
 		)
-		logUrls, err := logQueryPerformer.performQuery(ctx, sb)
-		if err != nil {
-			return "", "", err
-		}
-		if len(logUrls) >= 1 {
-			return logUrls[0].LogURL, logUrls[0].JsonPath, nil
-		} else {
-			return "", "", ResourceNotFoundError
-		}
+
+		return db.getLogsForPodSelector(ctx, sb, namespace, name)
 	}
 
+	// Not a Pod
 	sb := db.Selector.UUIDResourceSelector()
+	sb = db.Sorter.CreationTSAndIDSorter(sb) // If resources are named the same, select the newest
 	sb.Where(
 		db.Filter.KindFilter(sb.Cond, kind),
 		db.Filter.ApiVersionFilter(sb.Cond, apiVersion),
 		db.Filter.NamespaceFilter(sb.Cond, namespace),
 		db.Filter.NameFilter(sb.Cond, name),
 	)
-	uuid, err := strQueryPerformer.performSingleRowQuery(ctx, sb)
 
+	strQueryPerformer := newQueryPerformer[string](db.DB, db.Flavor)
+	uuid, err := strQueryPerformer.performSingleRowQuery(ctx, sb)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", ResourceNotFoundError
 	}
@@ -170,6 +220,13 @@ func (db *Database) QueryLogURL(ctx context.Context, kind, apiVersion, namespace
 		return "", "", err
 	}
 
+	slog.Debug(
+		"getting owned pods for resource",
+		"kind", kind,
+		"namespace", namespace,
+		"name", name,
+		"uuid", uuid,
+	)
 	pods, err := db.getOwnedPodsUuids(ctx, []string{uuid}, []uuidKindDate{})
 	if err != nil {
 		return "", "", err
@@ -183,17 +240,10 @@ func (db *Database) QueryLogURL(ctx context.Context, kind, apiVersion, namespace
 		return strings.Compare(b.Date, a.Date)
 	})
 
-	sb = db.Selector.UrlSelector()
-	sb.Where(db.Filter.UuidsFilter(sb.Cond, []string{pods[0].Uuid}))
-	logUrls, err := logQueryPerformer.performQuery(ctx, sb)
-	if err != nil {
-		return "", "", err
-	}
-	if len(logUrls) >= 1 {
-		return logUrls[0].LogURL, logUrls[0].JsonPath, nil
-	} else {
-		return "", "", ResourceNotFoundError
-	}
+	sb = db.Selector.ResourceSelector()
+	sb.Where(db.Filter.UuidFilter(sb.Cond, pods[0].Uuid))
+
+	return db.getLogsForPodSelector(ctx, sb, namespace, name)
 }
 
 func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids []string, podUuids []uuidKindDate,

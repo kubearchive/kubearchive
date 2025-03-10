@@ -9,14 +9,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"sync"
+	"testing"
+
+	"github.com/avast/retry-go/v4"
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -45,7 +49,8 @@ func RandomString() string {
 	return string(suffix)
 }
 
-func CreateResources(resources ...string) error {
+func CreateResources(t testing.TB, resources ...string) error {
+	t.Helper()
 	for _, resource := range resources {
 		f, err := os.CreateTemp("/tmp", "resource-*.yml")
 		if err != nil {
@@ -58,7 +63,7 @@ func CreateResources(resources ...string) error {
 		}
 		f.Close()
 
-		slog.Info("running ko apply -f, file kept for inspection.", "file", f.Name())
+		t.Logf("running ko apply -f %s, file kept for inspection.\n", f.Name())
 		cmd := exec.Command("ko", "apply", "-f", f.Name()) // #nosec G204
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -69,7 +74,8 @@ func CreateResources(resources ...string) error {
 	return nil
 }
 
-func DeleteResources(resources ...string) error {
+func DeleteResources(t testing.TB, resources ...string) error {
+	t.Helper()
 	for _, resource := range resources {
 		f, err := os.CreateTemp("/tmp", "resource-*.yml")
 		if err != nil {
@@ -82,7 +88,7 @@ func DeleteResources(resources ...string) error {
 		}
 		f.Close()
 
-		slog.Info("running kubectl delete -f, file kept for inspection.", "file", f.Name())
+		t.Logf("running kubectl delete -f %s, file kept for inspection.\n", f.Name())
 		cmd := exec.Command("kubectl", "delete", "-f", f.Name()) // #nosec G204
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -102,8 +108,9 @@ func GetKubernetesConfig() (*rest.Config, error) {
 	return clientcmd.BuildConfigFromFlags("", kubeconfig)
 }
 
-// PortForward forwards the given ports until the retrieved channel is closed
-func PortForward(ports []string, pod, ns string) (chan struct{}, error) {
+// portForward forwards the given ports until the retrieved channel is closed
+func portForward(t testing.TB, ports []string, pod, ns string) (chan struct{}, error) {
+	t.Helper()
 	config, err := GetKubernetesConfig()
 	if err != nil {
 		return nil, err
@@ -137,10 +144,62 @@ func PortForward(ports []string, pod, ns string) (chan struct{}, error) {
 		if len(errOut.String()) != 0 {
 			errReady = errors.New(errOut.String())
 		} else if len(out.String()) != 0 {
-			fmt.Println(out.String())
+			t.Log(out.String())
 		}
 	}()
 	return stopChan, errReady
+}
+
+// state variables for PortForwardApiServer
+var forwardRequestsMutex sync.Mutex
+var forwardRequests int = 0
+var forwardChan chan struct{}
+
+const apiServerPort = "8081"
+
+// Helper function to forward a port in a thread safe way. Returns the port used to access the Api Server and function
+// for cleaning up the forwarded port that should be called with defer
+func PortForwardApiServer(t testing.TB, clientset kubernetes.Interface) (string, func()) {
+	t.Helper()
+	forwardRequestsMutex.Lock()
+	defer forwardRequestsMutex.Unlock()
+
+	// forward the port if not already forwarded
+	if forwardRequests == 0 {
+		pods, err := clientset.CoreV1().Pods("kubearchive").List(context.Background(), metav1.ListOptions{
+			LabelSelector: "app=kubearchive-api-server",
+			FieldSelector: "status.phase=Running",
+		})
+		t.Logf("Pod to forward: %s\n", pods.Items[0].Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var errPortForward error
+		retryErr := retry.Do(func() error {
+			forwardChan, errPortForward = portForward(t, []string{fmt.Sprintf("%s:%s", apiServerPort, apiServerPort)}, pods.Items[0].Name, "kubearchive")
+			if errPortForward != nil {
+				return errPortForward
+			}
+			return nil
+		}, retry.Attempts(3))
+
+		if retryErr != nil {
+			t.Fatal(retryErr)
+		}
+	}
+
+	forwardRequests++
+
+	return apiServerPort, func() {
+		forwardRequestsMutex.Lock()
+		defer forwardRequestsMutex.Unlock()
+		forwardRequests--
+
+		// close the port if no longer needed
+		if forwardRequests == 0 {
+			close(forwardChan)
+		}
+	}
 }
 
 func GetKubernetesClient() (*kubernetes.Clientset, *dynamic.DynamicClient, error) {
@@ -210,8 +269,9 @@ func GetDynamicKubernetesClient() (*dynamic.DynamicClient, error) {
 	return client, nil
 }
 
-func GetUrl(client *http.Client, token string, url string) (*unstructured.UnstructuredList, error) {
-	body, err := getUrl(client, token, url)
+func GetUrl(t testing.TB, client *http.Client, token string, url string) (*unstructured.UnstructuredList, error) {
+	t.Helper()
+	body, err := getUrl(t, client, token, url)
 	if err != nil {
 		return nil, err
 	}
@@ -219,41 +279,85 @@ func GetUrl(client *http.Client, token string, url string) (*unstructured.Unstru
 	var data unstructured.UnstructuredList
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		fmt.Printf("Couldn't unmarshal JSON, %s\n", err)
+		t.Logf("Couldn't unmarshal JSON, %s\n", err)
 		return nil, err
 	}
-	fmt.Printf("The HTTP status returned is OK, returned %d items\n", len(data.Items))
+	t.Logf("The HTTP status returned is OK, returned %d items\n", len(data.Items))
 	return &data, nil
 }
 
-func GetLogs(client *http.Client, token string, url string) ([]byte, error) {
-	return getUrl(client, token, url)
+func GetLogs(t testing.TB, client *http.Client, token string, url string) ([]byte, error) {
+	t.Helper()
+	return getUrl(t, client, token, url)
 }
 
-func getUrl(client *http.Client, token string, url string) ([]byte, error) {
+func getUrl(t testing.TB, client *http.Client, token string, url string) ([]byte, error) {
+	t.Helper()
 	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		fmt.Printf("could not create a request, %s", err)
+		t.Logf("could not create a request, %s\n", err)
 		return nil, err
 	}
 	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	response, err := client.Do(request)
 	if err != nil {
-		fmt.Printf("Couldn't get a response HTTP, %s\n", err)
+		t.Logf("Couldn't get a response HTTP, %s\n", err)
 		return nil, err
 	}
 	defer response.Body.Close()
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
-		fmt.Printf("Couldn't read Body, %s\n", err)
+		t.Logf("Couldn't read Body, %s\n", err)
 		return nil, err
 	}
 
 	if response.StatusCode != http.StatusOK {
-		fmt.Printf("The HTTP status returned is not OK, %s - %s \n", response.Status, string(body))
+		t.Logf("The HTTP status returned is not OK, %s - %s \n", response.Status, string(body))
 		return nil, fmt.Errorf("%d", response.StatusCode)
 	}
 
 	return body, nil
+}
+
+var logGenMutex sync.Mutex
+
+type logGenType int
+
+const (
+	CronJobGenerator logGenType = iota
+	PipelineGenerator
+)
+
+func (l logGenType) installScriptPath(t testing.TB) string {
+	t.Helper()
+	switch l {
+	case CronJobGenerator:
+		return "../log-generators/cronjobs/install.sh"
+	case PipelineGenerator:
+		return "../log-generators/pipelines/install.sh"
+	default:
+		t.Fatal("Invalid log generator. Use CronJobs or Pipelines")
+	}
+	return ""
+}
+
+// RunLogGenerators runs the log generators in the thread safe way.
+func RunLogGenerators(t testing.TB, logGen logGenType, namespace string, numRuns int) {
+	t.Helper()
+	logGenMutex.Lock()
+	defer logGenMutex.Unlock()
+
+	namespaceFlag := "--namespace=" + namespace
+	numFlag := "--num-jobs=" + strconv.Itoa(numRuns)
+
+	t.Log("Command:", "bash", logGen.installScriptPath(t), namespaceFlag, numFlag)
+
+	cmd := exec.Command("bash", logGen.installScriptPath(t), namespaceFlag, numFlag) // #nosec G204
+	output, errScript := cmd.CombinedOutput()
+	if errScript != nil {
+		t.Log("Could not run the log-generator: ", string(output))
+		t.Fatal(errScript)
+	}
+	t.Log("Output: ", string(output))
 }

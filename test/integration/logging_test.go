@@ -20,8 +20,8 @@ import (
 	"github.com/kubearchive/kubearchive/test"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
-	errs "k8s.io/apimachinery/pkg/api/errors"
 	rbacv1 "k8s.io/api/rbac/v1"
+	errs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -75,7 +75,7 @@ func TestLogging(t *testing.T) {
 		retryErr := retry.Do(func() error {
 			_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespaceName, metav1.GetOptions{})
 			if !errs.IsNotFound(getErr) {
-				return errors.New("Waiting for namespace "+namespaceName+" to be deleted")
+				return errors.New("Waiting for namespace " + namespaceName + " to be deleted")
 			}
 			return nil
 		}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
@@ -255,7 +255,6 @@ func TestDefaultContainer(t *testing.T) {
 							"kind":       "Pod",
 						},
 						"archiveWhen": "true",
-						"deleteWhen":  "status.phase == 'Succeeded'",
 					},
 				},
 			},

@@ -17,16 +17,15 @@ import (
 	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/test"
 	"github.com/stretchr/testify/assert"
-	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	errs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
 func TestPagination(t *testing.T) {
+	t.Parallel()
 	clientset, dynamicClient, err := test.GetKubernetesClient()
 	if err != nil {
 		t.Fatal(err)
@@ -83,29 +82,7 @@ func TestPagination(t *testing.T) {
 		},
 	}
 
-	gvr := kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
-	_, err = dynamicClient.Resource(gvr).Namespace(namespaceName).Create(context.Background(), kac, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	a13eGvr := sourcesv1.SchemeGroupVersion.WithResource("apiserversources")
-	err = retry.Do(func() error {
-		_, err = dynamicClient.Resource(a13eGvr).Namespace("kubearchive").Get(context.Background(), "kubearchive-a13e", metav1.GetOptions{})
-		return err
-	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	cmGvr := corev1.SchemeGroupVersion.WithResource("configmaps")
-	err = retry.Do(func() error {
-		_, err = dynamicClient.Resource(cmGvr).Namespace("kubearchive").Get(context.Background(), "sink-filters", metav1.GetOptions{})
-		return err
-	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
-	if err != nil {
-		t.Fatal(err)
-	}
+	test.CreateKAC(t, clientset, dynamicClient, kac, namespaceName)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -153,11 +130,7 @@ func TestPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	token, err := clientset.CoreV1().ServiceAccounts(namespaceName).CreateToken(context.Background(), "default", &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
-	if err != nil {
-		fmt.Printf("could not create a token, %s", err)
-		t.Fatal(err)
-	}
+	token := test.GetSAToken(t, clientset, namespaceName)
 
 	clientHTTP := http.Client{
 		Transport: &http.Transport{
@@ -168,31 +141,14 @@ func TestPagination(t *testing.T) {
 	}
 
 	// Forward api service port
-	pods, err := clientset.CoreV1().Pods("kubearchive").List(context.Background(), metav1.ListOptions{LabelSelector: "app=kubearchive-api-server"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	port, portClose := test.PortForwardApiServer(t, clientset)
+	t.Cleanup(portClose)
 
-	var portForward chan struct{}
-	var errPortForward error
-	retryErr := retry.Do(func() error {
-		portForward, errPortForward = test.PortForward([]string{"8081:8081"}, pods.Items[0].Name, "kubearchive")
-		if errPortForward != nil {
-			return errPortForward
-		}
-		return nil
-	}, retry.Attempts(3))
-
-	if retryErr != nil {
-		t.Fatal(errPortForward)
-	}
-	defer close(portForward)
-
-	url := fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods", namespaceName)
+	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods", port, namespaceName)
 	var list *unstructured.UnstructuredList
 	var getUrlErr error
 	err = retry.Do(func() error {
-		list, getUrlErr = test.GetUrl(&clientHTTP, token.Status.Token, url)
+		list, getUrlErr = test.GetUrl(t, &clientHTTP, token.Status.Token, url)
 		if getUrlErr != nil {
 			t.Fatal(getUrlErr)
 		}
@@ -207,22 +163,27 @@ func TestPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	url = fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods?limit=10", namespaceName)
-	initList, getUrlErrInitList := test.GetUrl(&clientHTTP, token.Status.Token, url)
+	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?limit=10", port, namespaceName)
+	initList, getUrlErrInitList := test.GetUrl(t, &clientHTTP, token.Status.Token, url)
 	if getUrlErrInitList != nil {
 		t.Fatal(getUrlErrInitList)
 	}
 	assert.Equal(t, 10, len(initList.Items))
 
-	url = fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods?limit=10&continue=%s", namespaceName, initList.GetContinue())
-	continueList, getUrlErrContinueList := test.GetUrl(&clientHTTP, token.Status.Token, url)
+	url = fmt.Sprintf(
+		"https://localhost:%s/api/v1/namespaces/%s/pods?limit=10&continue=%s",
+		port,
+		namespaceName,
+		initList.GetContinue(),
+	)
+	continueList, getUrlErrContinueList := test.GetUrl(t, &clientHTTP, token.Status.Token, url)
 	if getUrlErrContinueList != nil {
 		t.Fatal(getUrlErrContinueList)
 	}
 	assert.Equal(t, 10, len(continueList.Items))
 
-	url = fmt.Sprintf("https://localhost:8081/api/v1/namespaces/%s/pods?limit=20", namespaceName)
-	allList, getUrlErrAllList := test.GetUrl(&clientHTTP, token.Status.Token, url)
+	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?limit=20", port, namespaceName)
+	allList, getUrlErrAllList := test.GetUrl(t, &clientHTTP, token.Status.Token, url)
 	if getUrlErrAllList != nil {
 		t.Fatal(getUrlErrAllList)
 	}

@@ -57,4 +57,9 @@ jobs:
           bash integrations/logging/splunk/install.sh
       - name: Test Go code
         run: |
-          go test -count=1 -v ./test/integration -tags=integration -timeout 60m
+          bash test/integration/run.sh
+      - name: Archive integration test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: results
+          path: integration-results

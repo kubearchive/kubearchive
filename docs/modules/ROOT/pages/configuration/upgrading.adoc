@@ -1,0 +1,47 @@
+= Upgrading KubeArchive
+
+This document details the process to upgrade your KubeArchive installation.
+
+. Stop KubeArchive:
++
+[source,bash]
+----
+kubectl scale -n kubearchive deployment kubearchive-sink kubearchive-api-server kubearchive-operator --replicas 0
+----
+
+. Download the KubeArchive repository and switch to the version you would like to upgrade
+to.
++
+[source,bash]
+----
+git clone https://github.com/kubearchive/kubearchive.git --branch=v1.1.0 kubearchive-v1.1.0
+----
+
+. Run the database migrations:
++
+[source,bash]
+----
+cd kubearchive-v1.1.0
+migrate -verbose \
+    -path integrations/database/postgresql/migrations/ \
+    -database postgresql://<kubearchive-user>:<kubearchive-password>@<postgresql-host>:<postgresql-port>/<kubearchive-database> \
+    up
+----
+
+. Apply the new KubeArchive manifests and scale back KubeArchive:
++
+[source,bash]
+----
+kubectl apply -n kubearchive -f https://github.com/kubearchive/kubearchive/releases/download/v1.1.0/kubearchive.yaml
+kubectl scale -n kubearchive deployment kubearchive-sink kubearchive-api-server kubearchive-operator --replicas 1
+----
+
+. Check pods/deployments are running correctly:
++
+[source,bash]
+----
+kubectl get -n kubearchive all
+kubectl logs -n kubearchive deployment/kubearchive-sink
+kubectl logs -n kubearchive deployment/kubearchive-api-server
+kubectl logs -n kubearchive deployment/kubearchive-operator
+----

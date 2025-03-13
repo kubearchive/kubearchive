@@ -11,22 +11,21 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os/exec"
 	"testing"
 	"time"
 
 	"github.com/avast/retry-go/v4"
 	"github.com/kubearchive/kubearchive/test"
-	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
-	errs "k8s.io/apimachinery/pkg/api/errors"
 	rbacv1 "k8s.io/api/rbac/v1"
+	errs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // TestKubeArchiveDeployments is redundant with the kubectl rollout status from the hack/quick-install.sh
 // ,but it serves as a valid integration test, not a dummy that is not testing anything real.
 func TestAllDeploymentsReady(t *testing.T) {
+	t.Parallel()
 	client, _, err := test.GetKubernetesClient()
 	if err != nil {
 		t.Fatal(err)
@@ -62,35 +61,15 @@ func TestAllDeploymentsReady(t *testing.T) {
 }
 
 func TestNormalOperation(t *testing.T) {
+	t.Parallel()
 	clientset, _, errClient := test.GetKubernetesClient()
 	if errClient != nil {
 		t.Fatal(errClient)
 	}
 
 	// Forward api service port
-	pods, err := clientset.CoreV1().Pods("kubearchive").List(context.Background(), metav1.ListOptions{
-		LabelSelector: "app=kubearchive-api-server",
-		FieldSelector: "status.phase=Running",
-	})
-	fmt.Println(fmt.Sprintf("Pod to forward: %s", pods.Items[0].Name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var portForward chan struct{}
-	var errPortForward error
-	retryErr := retry.Do(func() error {
-		portForward, errPortForward = test.PortForward([]string{"8081:8081"}, pods.Items[0].Name, "kubearchive")
-		if errPortForward != nil {
-			return errPortForward
-		}
-		return nil
-	}, retry.Attempts(3))
-
-	if retryErr != nil {
-		t.Fatal(retryErr)
-	}
-
-	defer close(portForward)
+	port, closePort := test.PortForwardApiServer(t, clientset)
+	t.Cleanup(closePort)
 
 	// Create test namespace
 	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
@@ -113,7 +92,7 @@ func TestNormalOperation(t *testing.T) {
 		retryErr := retry.Do(func() error {
 			_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespaceName, metav1.GetOptions{})
 			if !errs.IsNotFound(getErr) {
-				return errors.New("Waiting for namespace "+namespaceName+" to be deleted")
+				return errors.New("Waiting for namespace " + namespaceName + " to be deleted")
 			}
 			return nil
 		}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
@@ -124,14 +103,8 @@ func TestNormalOperation(t *testing.T) {
 	})
 
 	// Call the log-generator.
-	namespaceCmd := fmt.Sprintf("--namespace=%s", namespaceName)
-	cmd := exec.Command("bash", "../log-generators/cronjobs/install.sh", namespaceCmd, "--num-jobs=1")
-	output, errScript := cmd.CombinedOutput()
-	if errScript != nil {
-		fmt.Println("Could not run the log-generator: ", errScript)
-		t.Fatal(errScript)
-	}
-	fmt.Println("Output: ", string(output))
+	numJobs := 1
+	test.RunLogGenerators(t, test.CronJobGenerator, namespaceName, numJobs)
 
 	_, errRoleBinding := clientset.RbacV1().RoleBindings(namespaceName).Create(context.Background(), &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -164,16 +137,12 @@ func TestNormalOperation(t *testing.T) {
 		t.Fatal(errSecret)
 	}
 
-	token, errToken := clientset.CoreV1().ServiceAccounts(namespaceName).CreateToken(context.Background(), "default", &authenticationv1.TokenRequest{}, metav1.CreateOptions{})
-	if errToken != nil {
-		fmt.Printf("could not create a token, %s", errToken)
-		t.Fatal(errToken)
-	}
+	token := test.GetSAToken(t, clientset, namespaceName)
 
 	caCertPool := x509.NewCertPool()
 	appendCert := caCertPool.AppendCertsFromPEM(secret.Data["ca.crt"])
 	if !appendCert {
-		fmt.Printf("could not append the CA cert")
+		t.Log("could not append the CA cert")
 		t.Fatal(errors.New("could not append the CA cert"))
 	}
 	clientHTTP := http.Client{
@@ -184,9 +153,9 @@ func TestNormalOperation(t *testing.T) {
 		},
 	}
 
-	url := fmt.Sprintf("https://localhost:8081/apis/batch/v1/namespaces/%s/cronjobs", namespaceName)
-	retryErr = retry.Do(func() error {
-		list, getUrlErr := test.GetUrl(&clientHTTP, token.Status.Token, url)
+	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/cronjobs", port, namespaceName)
+	retryErr := retry.Do(func() error {
+		list, getUrlErr := test.GetUrl(t, &clientHTTP, token.Status.Token, url)
 		if getUrlErr != nil {
 			return getUrlErr
 		}

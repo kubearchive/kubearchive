@@ -19,7 +19,7 @@ kubectl rollout status deployment --namespace=cnpg-system --timeout=90s
 kubectl create ns ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n ${NAMESPACE} apply -f .
 kubectl -n ${NAMESPACE} wait pod/kubearchive-1 --for=create --timeout=60s
-kubectl -n ${NAMESPACE} wait pod/kubearchive-1 --for=condition=ready --timeout=90s
+kubectl -n ${NAMESPACE} wait pod/kubearchive-1 --for=condition=ready --timeout=120s
 
 # Create the kubearchive database
 LOCAL_PORT=5433

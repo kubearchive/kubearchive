@@ -15,6 +15,8 @@ NAMESPACE="splunk-operator"
 set -o errexit
 set -o xtrace
 
+echo "Starting splunk installation at $(date)"
+
 kubectl apply -f https://github.com/splunk/splunk-operator/releases/download/2.6.0/splunk-operator-cluster.yaml \
 	--server-side --force-conflicts
 
@@ -42,3 +44,5 @@ if kubectl get ns ${KUBEARCHIVE_NS} >& /dev/null; then
     kubectl -n ${KUBEARCHIVE_NS} rollout status deployment kubearchive-sink --timeout=60s
     kubectl -n ${KUBEARCHIVE_NS} rollout status deployment kubearchive-api-server --timeout=60s
 fi
+
+echo "Finished splunk installation at $(date)"

@@ -4,4 +4,4 @@
 defaultLdflags:
   - -X main.version={{ .Git.Tag }}
   - -X main.commit={{ .Git.FullCommit }}
-  - -X main.date={{ .Date }}
+  - -X main.date={{ .Git.CommitDate }}

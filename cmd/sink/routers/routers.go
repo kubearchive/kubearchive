@@ -134,7 +134,6 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 		"kind", obj.GetKind(),
 		"namespace", obj.GetNamespace(),
 		"name", obj.GetName(),
-		"id", event.ID(),
 	)
 	// only write logs for k8s resources likes pods that have them and UrlBuilder is configured
 	if c.LogUrlBuilder != nil && strings.ToLower(obj.GetKind()) == "pod" {

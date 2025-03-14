@@ -23,18 +23,21 @@ import (
 
 const defaultContainerAnnotation = "kubectl.kubernetes.io/default-container"
 
-var ResourceNotFoundError = errors.New("resource not found")
-
 type newDatabaseFunc func(*sqlx.DB) DBInterface
 type newDBCreatorFunc func(map[string]string) facade.DBCreator
 
-var RegisteredDatabases = make(map[string]newDatabaseFunc)
-var RegisteredDBCreators = make(map[string]newDBCreatorFunc)
+var (
+	ResourceNotFoundError        = errors.New("resource not found")
+	CurrentDatabaseSchemaVersion = "1"
+	RegisteredDatabases          = make(map[string]newDatabaseFunc)
+	RegisteredDBCreators         = make(map[string]newDBCreatorFunc)
+)
 
 type DBInterface interface {
 	QueryResources(ctx context.Context, kind, apiVersion, namespace,
 		name, continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error)
 	QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error)
+	QueryDatabaseSchemaVersion(ctx context.Context) (string, error)
 
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
 	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error
@@ -77,11 +80,38 @@ func NewDatabase() (DBInterface, error) {
 		return nil, fmt.Errorf("no database registered with name '%s'", env[DbKindEnvVar])
 	}
 
+	version, err := database.QueryDatabaseSchemaVersion(context.Background())
+	if err != nil {
+		// We close because the parent caller don't close if there is any error
+		if err := database.CloseDB(); err != nil {
+			return nil, errors.New("error closing the database while retrieving the schema version")
+		}
+		return nil, errors.New("cant retrieve schema version, make sure you run the migrations")
+	}
+
+	slog.Debug("retrieved database version information", "version", version)
+
+	if version != CurrentDatabaseSchemaVersion {
+		// We close because the parent caller don't close if there is any error
+		if err := database.CloseDB(); err != nil {
+			return nil, errors.New("error closing the database after retrieving the schema version")
+		}
+		return nil, fmt.Errorf("the schema is on version '%s' but the expected is '%s'. Please run the database migrations", version, CurrentDatabaseSchemaVersion)
+	}
+
 	return database, nil
 }
 
 func (db *Database) Ping(ctx context.Context) error {
 	return db.DB.PingContext(ctx)
+}
+
+func (db *Database) QueryDatabaseSchemaVersion(ctx context.Context) (string, error) {
+	strQueryPerformer := newQueryPerformer[string](db.DB, db.Flavor)
+
+	sb := sqlbuilder.NewSelectBuilder()
+	sb.Select("version").From("schema_migrations")
+	return strQueryPerformer.performSingleRowQuery(ctx, sb)
 }
 
 func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,

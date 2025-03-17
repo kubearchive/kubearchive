@@ -12,9 +12,9 @@ if [ ! -d "${RESULTS_DIR}" ]; then
     mkdir -p ${RESULTS_DIR}
 fi
 
-go test -json -count=1 -v ./test/integration -tags=integration -timeout 60m \
+go test -json -count=1 -v ./test/integration -tags=integration -timeout 15m \
     | tee ${RESULTS_DIR}/${FILE_PREFIX}_results.jsonl \
-    | jq -r 'select(.Action == "output") | .Output | rtrimstr("\n")'
+    | jq --unbuffered -r 'select(.Action == "output") | .Output | rtrimstr("\n")'
 
 jq --slurp -r 'group_by(.Test) | .[] | .[] | select(.Action == "output") | .Output | rtrimstr("\n")' ${RESULTS_DIR}/${FILE_PREFIX}_results.jsonl > ${RESULTS_DIR}/${FILE_PREFIX}_formatted.txt
 

@@ -42,6 +42,10 @@ This document lists and details the database schema used by KubeArchive.
 |timestamp not null
 |Last time this record was updated.
 
+|cluster_updated_ts
+|timestamp not null
+|Timestamp when the resource was last updated on the cluster.
+
 |cluster_deleted_ts
 |timestamp not null
 |Timestamp when KubeArchive deleted the resource from the cluster.

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -393,7 +394,7 @@ func TestWriteResources(t *testing.T) {
 			err:  nil,
 		},
 		{
-			name: "Write to Database with no errors",
+			name: "Write to Database with error",
 			obj:  &unstructured.Unstructured{},
 			data: []byte{},
 			err:  errors.New("test error"),
@@ -408,7 +409,7 @@ func TestWriteResources(t *testing.T) {
 			} else {
 				db = NewFakeDatabase([]*unstructured.Unstructured{}, []LogUrlRow{}, "$.")
 			}
-			err := db.WriteResource(context.Background(), tt.obj, tt.data)
+			err := db.WriteResource(context.Background(), tt.obj, tt.data, time.Now())
 			if tt.err != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tt.err, err)

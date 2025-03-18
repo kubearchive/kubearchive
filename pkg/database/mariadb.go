@@ -6,6 +6,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/huandu/go-sqlbuilder"
@@ -117,16 +118,24 @@ type MariaDBInserter struct {
 
 func (MariaDBInserter) ResourceInserter(
 	uuid, apiVersion, kind, name, namespace, version string,
+	clusterUpdatedTs time.Time,
 	clusterDeletedTs sql.NullString,
 	data []byte,
 ) *sqlbuilder.InsertBuilder {
 	ib := sqlbuilder.NewInsertBuilder()
 	ib.InsertInto("resource")
-	ib.Cols("uuid", "api_version", "kind", "name", "namespace", "resource_version", "cluster_deleted_ts", "data")
-	ib.Values(uuid, apiVersion, kind, name, namespace, version, clusterDeletedTs, data)
+	ib.Cols(
+		"uuid", "api_version", "kind", "name", "namespace", "resource_version", "cluster_updated_ts",
+		"cluster_deleted_ts", "data",
+	)
+	ib.Values(uuid, apiVersion, kind, name, namespace, version, clusterUpdatedTs, clusterDeletedTs, data)
 	ib.SQL(ib.Var(sqlbuilder.Build(
-		"ON DUPLICATE KEY UPDATE name=$?, namespace=$?, resource_version=$?, cluster_deleted_ts=$?, data=$?",
-		name, namespace, version, clusterDeletedTs, data,
+		"ON DUPLICATE KEY UPDATE name=$?, namespace=$?, resource_version=$?, cluster_updated_ts=$?, cluster_deleted_ts=$?, data=$?",
+		name, namespace, version, clusterUpdatedTs, clusterDeletedTs, data,
+	)))
+	ib.SQL(ib.Var(sqlbuilder.Build(
+		"WHERE resource.cluster_deleted_ts < $?",
+		clusterUpdatedTs,
 	)))
 	return ib
 }

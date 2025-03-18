@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,6 +21,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/database/facade"
+	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -592,6 +594,127 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, innerTest.expectedLogUrl, logUrl)
 				assert.Equal(t, "", jp)
+			})
+		}
+	}
+}
+
+func TestWriteResource(t *testing.T) {
+	innerTests := []struct {
+		name    string
+		inserts []struct {
+			string
+			time.Time
+		}
+		err error
+	}{
+		{
+			name: "insert objects successfully",
+			inserts: []struct {
+				string
+				time.Time
+			}{
+				{
+					"testdata/pod-3-containers.json",
+					time.Now(),
+				},
+				{
+					"testdata/job.json",
+					time.Now(),
+				},
+			},
+			err: nil,
+		},
+		{
+			name: "insert and update object",
+			inserts: []struct {
+				string
+				time.Time
+			}{
+				{
+					"testdata/pod-3-containers.json",
+					time.Now(),
+				},
+				{
+					"testdata/pod-3-containers.json",
+					time.Now(),
+				},
+			},
+			err: nil,
+		},
+		{
+			name: "insert twice with no update due to older resource",
+			inserts: []struct {
+				string
+				time.Time
+			}{
+				{
+					"testdata/pod-3-containers.json",
+					time.Now(),
+				},
+				{
+					"testdata/pod-3-containers.json",
+					time.Time{},
+				},
+			},
+			err: nil,
+		},
+		{
+			name: "handle write failure",
+			inserts: []struct {
+				string
+				time.Time
+			}{
+				{
+					"testdata/pod-3-containers.json",
+					time.Now(),
+				},
+			},
+			err: errors.New("error writing to the database"),
+		},
+	}
+	for _, tt := range tests {
+		for _, innerTest := range innerTests {
+			t.Run(fmt.Sprintf("%s (db: %s)", innerTest.name, tt.name), func(t *testing.T) {
+				for _, insert := range innerTest.inserts {
+					db, mock := NewMock()
+					tt.database.DB = sqlx.NewDb(db, "sqlmock")
+					data, err := os.ReadFile(insert.string)
+					if err != nil {
+						t.Fatal(err)
+					}
+					obj, err := models.UnstructuredFromByteSlice(data)
+					if err != nil {
+						t.Fatal(err)
+					}
+					query, args := tt.database.Inserter.ResourceInserter(
+						string(obj.GetUID()),
+						obj.GetAPIVersion(),
+						obj.GetKind(),
+						obj.GetName(),
+						obj.GetNamespace(),
+						obj.GetResourceVersion(),
+						insert.Time,
+						sql.NullString{
+							Valid: false,
+						},
+						data,
+					).BuildWithFlavor(tt.database.Flavor)
+					mock.ExpectBegin()
+					if innerTest.err == nil {
+						mock.ExpectExec(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnResult(sqlmock.NewResult(0, 1))
+						mock.ExpectCommit()
+					} else {
+						mock.ExpectExec(regexp.QuoteMeta(query)).WithArgs(args).WillReturnError(innerTest.err)
+						mock.ExpectRollback()
+					}
+					dbErr := tt.database.WriteResource(t.Context(), obj, data, insert.Time)
+					if innerTest.err == nil {
+						assert.Nil(t, dbErr)
+					} else {
+						assert.NotNil(t, dbErr)
+					}
+				}
 			})
 		}
 	}

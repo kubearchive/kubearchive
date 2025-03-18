@@ -133,15 +133,15 @@ link:https://go.dev/doc/effective_go#init[init function]
 that:
 
 * Inserts in the
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L27[`RegisteredDBCreators`]
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L23[`RegisteredDBCreators`]
 map an entry keyed with the name of the DB type with a
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L24[`newDBCreatorFunc`]
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L20[`newDBCreatorFunc`]
 implementation as value.
 
 * Inserts in the
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L26[`RegisteredDatabases`]
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L22[`RegisteredDatabases`]
 map an entry keyed with the name of the DB type with a
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L23[`newDatabaseFunc`]
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L55[Database implementation]
 as value.
 
 === The `newDBCreatorFunc`
@@ -152,15 +152,15 @@ implementation.
 
 The `DBCreator` should include `env` as a parameter so the `GetConnectionString` can access them.
 
-=== The `DBInterface` implementation returned by the `newDatabaseFunc`
+=== The `Database` implementation
 
 [NOTE]
 ====
 This section includes the development guidelines expected by the KubeArchive maintainers.
 ====
 
-The `DBInterface` should be a struct with
-link:https://github.com/kubearchive/kubearchive/blob/main/pkg/database/database.go#L40[`Database`]
+The `Database` implementation should be a struct with
+link:https://github.com/kubearchive/kubearchive/blob/main/pkg/database/database.go#L32[`DatabaseImpl`]
 embedded.
 
 Make sure to implement the interfaces that are part of it:

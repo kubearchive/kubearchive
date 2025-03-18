@@ -25,7 +25,7 @@ type CacheExpirations struct {
 }
 
 type Controller struct {
-	Database           database.DBInterface
+	Database           database.DBReader
 	CacheConfiguration CacheExpirations
 }
 

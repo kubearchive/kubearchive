@@ -115,14 +115,8 @@ func (db *DatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, names
 func (db *DatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error) {
 	sb := db.getSelector().ResourceSelector()
-	sb.Where(
-		db.filter.KindFilter(sb.Cond, kind),
-		db.filter.ApiVersionFilter(sb.Cond, apiVersion),
-	)
-
-	if namespace != "" {
-		sb.Where(db.filter.NamespaceFilter(sb.Cond, namespace))
-	}
+	mainWhereClause := db.mainWhereClause(kind, apiVersion, namespace)
+	sb.AddWhereClause(mainWhereClause)
 	if name != "" {
 		sb.Where(db.filter.NameFilter(sb.Cond, name))
 	} else {
@@ -139,7 +133,7 @@ func (db *DatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, na
 			sb.Where(db.filter.EqualsLabelFilter(sb.Cond, labelFilters.Equals))
 		}
 		if labelFilters.NotEquals != nil {
-			sb.Where(db.filter.NotEqualsLabelFilter(sb.Cond, labelFilters.NotEquals))
+			sb.Where(db.filter.NotEqualsLabelFilter(sb.Cond, labelFilters.NotEquals, mainWhereClause))
 		}
 		if labelFilters.In != nil {
 			sb.Where(db.filter.InLabelFilter(sb.Cond, labelFilters.In))
@@ -151,6 +145,20 @@ func (db *DatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, na
 		sb.Limit(limit)
 	}
 	return db.performResourceQuery(ctx, sb)
+}
+
+func (db *DatabaseImpl) mainWhereClause(kind, apiVersion, namespace string) *sqlbuilder.WhereClause {
+	whereClause := sqlbuilder.NewWhereClause()
+	cond := sqlbuilder.NewCond()
+	whereClause.AddWhereExpr(
+		cond.Args,
+		db.filter.KindFilter(*cond, kind),
+		db.filter.ApiVersionFilter(*cond, apiVersion),
+	)
+	if namespace != "" {
+		whereClause.AddWhereExpr(cond.Args, db.filter.NamespaceFilter(*cond, namespace))
+	}
+	return whereClause
 }
 
 // Returns the log url, the json path and an error given a Selector builder for a Pod

@@ -117,15 +117,20 @@ func (PostgreSQLFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[strin
 	))
 }
 
-func (PostgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (PostgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string {
 	jsons := make([]string, 0)
 	for key, value := range labels {
 		jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
 	}
-	return cond.Var(sqlbuilder.Build(
-		"NOT data->'metadata'->'labels' @> ANY($?::jsonb[])",
+
+	uuidWithAnyLabelQuery := sqlbuilder.Select("uuid").From("resources")
+	uuidWithAnyLabelQuery.AddWhereClause(clause)
+	uuidWithAnyLabelQuery.Where(uuidWithAnyLabelQuery.Var(sqlbuilder.Build(
+		"data->'metadata'->'labels' @> ANY($?::jsonb[])",
 		pq.Array(jsons),
-	))
+	)))
+
+	return cond.NotIn("uuid", uuidWithAnyLabelQuery)
 }
 
 func (PostgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {

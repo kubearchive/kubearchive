@@ -105,7 +105,7 @@ func (MariaDBFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]s
 	return ""
 }
 
-func (MariaDBFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (MariaDBFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string {
 	// TODO
 	return ""
 }

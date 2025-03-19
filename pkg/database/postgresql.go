@@ -80,21 +80,21 @@ func (postgreSQLFilter) OwnerFilter(cond sqlbuilder.Cond, owners []string) strin
 	)
 }
 
-func (postgreSQLFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+func (postgreSQLFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string, _ *sqlbuilder.WhereClause) string {
 	return fmt.Sprintf(
 		"data->'metadata'->'labels' ?& %s",
 		cond.Var(pq.Array(labels)),
 	)
 }
 
-func (postgreSQLFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+func (postgreSQLFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string, _ *sqlbuilder.WhereClause) string {
 	return fmt.Sprintf(
 		"NOT data->'metadata'->'labels' ?| %s",
 		cond.Var(pq.Array(labels)),
 	)
 }
 
-func (postgreSQLFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (postgreSQLFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, _ *sqlbuilder.WhereClause) string {
 	jsonLabels, _ := json.Marshal(labels)
 	return fmt.Sprintf(
 		"data->'metadata'->'labels' @> %s",
@@ -102,18 +102,23 @@ func (postgreSQLFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[strin
 	)
 }
 
-func (postgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (postgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string {
 	jsons := make([]string, 0)
 	for key, value := range labels {
 		jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
 	}
-	return fmt.Sprintf(
-		"NOT data->'metadata'->'labels' @> ANY(%s::jsonb[])",
-		cond.Var(pq.Array(jsons)),
-	)
+
+	uuidWithAnyLabelQuery := sqlbuilder.Select("uuid").From("resources")
+	uuidWithAnyLabelQuery.AddWhereClause(clause)
+	uuidWithAnyLabelQuery.Where(fmt.Sprintf(
+		"data->'metadata'->'labels' @> ANY(%s::jsonb[])",
+		uuidWithAnyLabelQuery.Var(pq.Array(jsons)),
+	))
+
+	return cond.NotIn("uuid", uuidWithAnyLabelQuery)
 }
 
-func (postgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+func (postgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, _ *sqlbuilder.WhereClause) string {
 	clauses := make([]string, 0)
 	for key, values := range labels {
 		jsons := make([]string, 0)
@@ -127,7 +132,7 @@ func (postgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]
 	return cond.And(clauses...)
 }
 
-func (f postgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+func (f postgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, _ *sqlbuilder.WhereClause) string {
 	keys := maps.Keys(labels)
 	jsons := make([]string, 0)
 	for key, values := range labels {
@@ -138,7 +143,7 @@ func (f postgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[stri
 	notContainsClause := fmt.Sprintf(
 		"NOT data->'metadata'->'labels' @> ANY(%s::jsonb[])",
 		cond.Var(pq.Array(jsons)))
-	return cond.And(f.ExistsLabelFilter(cond, slices.Collect(keys)), notContainsClause)
+	return cond.And(f.ExistsLabelFilter(cond, slices.Collect(keys), nil), notContainsClause)
 }
 
 type postgreSQLSorter struct{}

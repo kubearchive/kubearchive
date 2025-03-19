@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -351,26 +352,27 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 			t.Run(fmt.Sprintf("%s %s", tt.name, ttt.name), func(t *testing.T) {
 				filter := tt.database.getFilter()
 				sb := tt.database.getSelector().ResourceSelector()
-				sb.Where(
-					filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion),
-				)
+				mainWhereClause := sqlbuilder.NewWhereClause()
+				cond := sqlbuilder.NewCond()
+				mainWhereClause.AddWhereExpr(cond.Args, filter.KindApiVersionFilter(*cond, podKind, podApiVersion))
+				sb.AddWhereClause(mainWhereClause)
 				if ttt.labelFilters.Exists != nil {
-					sb.Where(filter.ExistsLabelFilter(sb.Cond, ttt.labelFilters.Exists))
+					sb.Where(filter.ExistsLabelFilter(sb.Cond, ttt.labelFilters.Exists, nil))
 				}
 				if ttt.labelFilters.NotExists != nil {
-					sb.Where(filter.NotExistsLabelFilter(sb.Cond, ttt.labelFilters.NotExists))
+					sb.Where(filter.NotExistsLabelFilter(sb.Cond, ttt.labelFilters.NotExists, nil))
 				}
 				if ttt.labelFilters.Equals != nil {
-					sb.Where(filter.EqualsLabelFilter(sb.Cond, ttt.labelFilters.Equals))
+					sb.Where(filter.EqualsLabelFilter(sb.Cond, ttt.labelFilters.Equals, nil))
 				}
 				if ttt.labelFilters.NotEquals != nil {
-					sb.Where(filter.NotEqualsLabelFilter(sb.Cond, ttt.labelFilters.NotEquals))
+					sb.Where(filter.NotEqualsLabelFilter(sb.Cond, ttt.labelFilters.NotEquals, mainWhereClause))
 				}
 				if ttt.labelFilters.In != nil {
-					sb.Where(filter.InLabelFilter(sb.Cond, ttt.labelFilters.In))
+					sb.Where(filter.InLabelFilter(sb.Cond, ttt.labelFilters.In, nil))
 				}
 				if ttt.labelFilters.NotIn != nil {
-					sb.Where(filter.NotInLabelFilter(sb.Cond, ttt.labelFilters.NotIn))
+					sb.Where(filter.NotInLabelFilter(sb.Cond, ttt.labelFilters.NotIn, nil))
 				}
 				sb = tt.database.getSorter().CreationTSAndIDSorter(sb)
 				sb.Limit(100)
@@ -382,11 +384,15 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 				// In inequality, set-based and set not based, the order of the arguments is not ensured
 				// That's why there is a custom validator function for this arguments
 				if ttt.args != nil {
-					expectedArgs := []driver.Value{podKind, podApiVersion}
-					for i := 2; i < len(args)-1; i++ {
-						expectedArgs = append(expectedArgs, ttt.args)
+					expectedArgs := make([]driver.Value, 0)
+					for _, expectedArg := range args {
+						switch expectedArg.(type) {
+						case string, int:
+							expectedArgs = append(expectedArgs, expectedArg)
+						default:
+							expectedArgs = append(expectedArgs, ttt.args)
+						}
 					}
-					expectedArgs = append(expectedArgs, limit)
 					mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(expectedArgs...).WillReturnRows(rows)
 				} else {
 					mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)

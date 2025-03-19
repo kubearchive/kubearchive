@@ -75,32 +75,32 @@ func (mariaDBFilter) OwnerFilter(cond sqlbuilder.Cond, uuids []string) string {
 		cond.Var(sqlbuilder.List(uuids)))
 }
 
-func (mariaDBFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+func (mariaDBFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string, clause *sqlbuilder.WhereClause) string {
 	// TODO
 	return ""
 }
 
-func (mariaDBFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+func (mariaDBFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string, clause *sqlbuilder.WhereClause) string {
 	// TODO
 	return ""
 }
 
-func (mariaDBFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (mariaDBFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string {
 	// TODO
 	return ""
 }
 
-func (mariaDBFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (mariaDBFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string {
 	// TODO
 	return ""
 }
 
-func (mariaDBFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+func (mariaDBFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string {
 	// TODO
 	return ""
 }
 
-func (mariaDBFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+func (mariaDBFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string {
 	// TODO
 	return ""
 }

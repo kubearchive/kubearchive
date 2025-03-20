@@ -26,7 +26,13 @@ func ConfigureLogging() error {
 		return fmt.Errorf("Log level '%s' does not exist", levelText)
 	}
 
-	slogHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	slogHandler := slog.NewTextHandler(
+		os.Stdout,
+		&slog.HandlerOptions{
+			Level:     level,
+			AddSource: true,
+		},
+	)
 	slogLogger := slog.New(slogHandler)
 	slog.SetDefault(slogLogger)
 

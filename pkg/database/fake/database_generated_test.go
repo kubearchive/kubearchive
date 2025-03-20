@@ -333,7 +333,7 @@ func TestWriteUrls(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var db *Database
+			var db *FakeDatabase
 			if tt.urlErr != nil {
 				db = NewFakeDatabaseWithUrlError(tt.urlErr)
 			} else {
@@ -402,7 +402,7 @@ func TestWriteResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var db *Database
+			var db *FakeDatabase
 			if tt.err != nil {
 				db = NewFakeDatabaseWithError(tt.err)
 			} else {

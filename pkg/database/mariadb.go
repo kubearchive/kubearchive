@@ -9,13 +9,28 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/database/facade"
 )
 
 func init() {
-	RegisteredDatabases["mariadb"] = NewMariaDBDatabase
+	RegisteredDatabases["mariadb"] = NewMariaDBDatabase()
 	RegisteredDBCreators["mariadb"] = NewMariaDBCreator
+}
+
+type MariaDBDatabase struct {
+	*DatabaseImpl
+}
+
+func NewMariaDBDatabase() *MariaDBDatabase {
+	return &MariaDBDatabase{
+		&DatabaseImpl{
+			flavor:   sqlbuilder.MySQL,
+			filter:   MariaDBFilter{},
+			selector: MariaDBSelector{},
+			sorter:   MariaDBSorter{},
+			inserter: MariaDBInserter{},
+			deleter:  facade.DBDeleterImpl{},
+		}}
 }
 
 type MariaDBDatabaseCreator struct {
@@ -90,7 +105,7 @@ func (MariaDBFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]s
 	return ""
 }
 
-func (MariaDBFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (MariaDBFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string {
 	// TODO
 	return ""
 }
@@ -129,20 +144,4 @@ func (MariaDBInserter) ResourceInserter(
 		name, namespace, version, clusterDeletedTs, data,
 	)))
 	return ib
-}
-
-type MariaDBDatabase struct {
-	*Database
-}
-
-func NewMariaDBDatabase(conn *sqlx.DB) DBInterface {
-	return MariaDBDatabase{&Database{
-		DB:       conn,
-		Flavor:   sqlbuilder.MySQL,
-		Selector: MariaDBSelector{},
-		Filter:   MariaDBFilter{},
-		Sorter:   MariaDBSorter{},
-		Inserter: MariaDBInserter{},
-		Deleter:  facade.DBDeleterImpl{},
-	}}
 }

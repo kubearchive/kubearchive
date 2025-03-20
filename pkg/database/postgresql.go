@@ -11,15 +11,31 @@ import (
 	"slices"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/database/facade"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
 func init() {
-	RegisteredDatabases["postgresql"] = NewPostgreSQLDatabase
+
+	RegisteredDatabases["postgresql"] = NewPostgreSQLDatabase()
 	RegisteredDBCreators["postgresql"] = NewPostgreSQLCreator
+}
+
+type PostgreSQLDatabase struct {
+	*DatabaseImpl
+}
+
+func NewPostgreSQLDatabase() *PostgreSQLDatabase {
+	return &PostgreSQLDatabase{
+		&DatabaseImpl{
+			flavor:   sqlbuilder.PostgreSQL,
+			filter:   PostgreSQLFilter{},
+			selector: PostgreSQLSelector{},
+			sorter:   PostgreSQLSorter{},
+			inserter: PostgreSQLInserter{},
+			deleter:  facade.DBDeleterImpl{},
+		}}
 }
 
 type PostgreSQLCreator struct {
@@ -101,15 +117,20 @@ func (PostgreSQLFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[strin
 	))
 }
 
-func (PostgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (PostgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string {
 	jsons := make([]string, 0)
 	for key, value := range labels {
 		jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
 	}
-	return cond.Var(sqlbuilder.Build(
-		"NOT data->'metadata'->'labels' @> ANY($?::jsonb[])",
+
+	uuidWithAnyLabelQuery := sqlbuilder.Select("uuid").From("resources")
+	uuidWithAnyLabelQuery.AddWhereClause(clause)
+	uuidWithAnyLabelQuery.Where(uuidWithAnyLabelQuery.Var(sqlbuilder.Build(
+		"data->'metadata'->'labels' @> ANY($?::jsonb[])",
 		pq.Array(jsons),
-	))
+	)))
+
+	return cond.NotIn("uuid", uuidWithAnyLabelQuery)
 }
 
 func (PostgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
@@ -166,20 +187,4 @@ func (PostgreSQLInserter) ResourceInserter(
 		name, namespace, version, clusterDeletedTs, data,
 	)))
 	return ib
-}
-
-type PostgreSQLDatabase struct {
-	*Database
-}
-
-func NewPostgreSQLDatabase(conn *sqlx.DB) DBInterface {
-	return PostgreSQLDatabase{&Database{
-		DB:       conn,
-		Flavor:   sqlbuilder.PostgreSQL,
-		Selector: PostgreSQLSelector{},
-		Filter:   PostgreSQLFilter{},
-		Sorter:   PostgreSQLSorter{},
-		Inserter: PostgreSQLInserter{},
-		Deleter:  facade.DBDeleterImpl{},
-	}}
 }

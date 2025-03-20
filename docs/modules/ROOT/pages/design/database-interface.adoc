@@ -6,7 +6,7 @@ This page documents the proposal for the structure and content of `pkg/database`
 
 * Reduce the friction when adding support to a new DBMS(Database Management System).
 * Enable overriding the default read/write operations for a specific DBMS.
-* Expose the filters (`WHERE` clauses) and sorters (`ORDER BY` clauses) separately from the rest of the `SQL` statements
+* Expose the filters (`WHERE` clauses) and sorters (`ORDER BY` clauses) separately from the rest of the `SQL` statements,
 so they can be plugged in and out of the different queries.
 * Reduce the maintenance of the codebase.
 * Increase the readability of the codebase.
@@ -15,17 +15,29 @@ so they can be plugged in and out of the different queries.
 
 The two pillars of this proposal are:
 
-* Definition of interfaces that need to be implementing when adding support to a new DBMS.
+* Definition of interfaces that need to be implementing when adding support to a new database engine.
 * Usage of a SQL Builder.
 
 === Database Interfaces
 
-To add a new DBMS the following interfaces must be implemented:
+To add a new database engine the following interfaces must be implemented:
 
-`DBInterface`::
-Include the methods that should be used by the rest of the KubeArchive application.
-Encapsulates the business logic related to the different read/write database operations:
-`QueryResources`, `WriteResources`, `WriteUrls`, `QueryLogUrls`, etc.
+`Database`::
+Composed by `DBWriter` and `DBReader` described below.
+
+`DBReader`::
+Include the methods that should be used by the KubeArchive API.
+Encapsulates the business logic related to the different read database operations:
+`QueryResources` and `QueryLogURL` as well as the unexported getters of the implementations interfaces involved in
+creating write SQL statements pieces: `DBSelector`, `DBSorter` and `DBFilter`.
+It also includes some general database management methods like `Ping` and `CloseDB`.
+
+`DBWriter`::
+Include the methods that should be used by the KubeArchive sink.
+Encapsulates the business logic related to the different write database operations:
+`WriteResources` and `WriteUrls` as well as the unexported getters of the implementations interfaces involved in
+creating write SQL statements pieces: `DBInserter`, `DBDeleter` and `DBFilter`.
+It also includes some general database management methods like `Ping` and `CloseDB`.
 
 `DBCreator`::
 Include the methods `GetDriverName()` and `GetConnectionString()`.
@@ -48,7 +60,7 @@ Encapsulate the different `DELETE` SQL statement without the `WHERE` clauses.
 
 ==== Additional requirements for new DBMS
 
-* Add a `DBInterface` constructor function to the `RegisteredDatabases` map assigned to a key with the driver name.
+* Add a `Database` implementation to the `RegisteredDatabases` map assigned to a key with the driver name.
 The function receive no parameters.
 * Add a `DBCreator` constructor function.
 The function receives a map parameter with all the environment variables.

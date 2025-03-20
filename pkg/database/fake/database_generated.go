@@ -79,6 +79,10 @@ func (f *Database) Ping(_ context.Context) error {
 	return f.err
 }
 
+func (f *Database) QueryDatabaseSchemaVersion(ctx context.Context) (string, error) {
+	return database.CurrentDatabaseSchemaVersion, nil
+}
+
 func (f *Database) TestConnection(_ map[string]string) error {
 	return f.err
 }

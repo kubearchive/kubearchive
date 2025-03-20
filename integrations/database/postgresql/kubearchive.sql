@@ -44,6 +44,7 @@ SET row_security = off;
 --
 
 ALTER DATABASE kubearchive SET "TimeZone" TO 'UTC';
+ALTER DATABASE kubearchive SET work_mem TO '64MB';
 
 
 \connect kubearchive
@@ -88,7 +89,7 @@ CREATE TABLE public.log_url (
     uuid uuid NOT NULL,
     url text NOT NULL,
     container_name text NOT NULL,
-	json_path text,
+    json_path text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -264,3 +265,4 @@ ALTER TABLE ONLY public.log_url
 --
 -- PostgreSQL database dump complete
 --
+

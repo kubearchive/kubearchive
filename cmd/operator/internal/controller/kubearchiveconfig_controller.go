@@ -135,7 +135,7 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	}
 
 	if len(resources) > 0 {
-		_, err = r.reconcileA13e(ctx, resources)
+		err = r.reconcileA13e(ctx, resources)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -184,7 +184,7 @@ func (r *KubeArchiveConfigReconciler) cleanupK9eResources(ctx context.Context, k
 			return err
 		}
 
-		_, err = r.reconcileA13e(ctx, resources)
+		err = r.reconcileA13e(ctx, resources)
 		if err != nil {
 			return err
 		}
@@ -475,7 +475,7 @@ func (r *KubeArchiveConfigReconciler) desiredRoleBinding(kaconfig *kubearchivev1
 	return binding, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileA13e(ctx context.Context, resources []sourcesv1.APIVersionKindSelector) (*sourcesv1.ApiServerSource, error) {
+func (r *KubeArchiveConfigReconciler) reconcileA13e(ctx context.Context, resources []sourcesv1.APIVersionKindSelector) error {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileApiServerSource")
@@ -488,20 +488,20 @@ func (r *KubeArchiveConfigReconciler) reconcileA13e(ctx context.Context, resourc
 		err = r.Update(ctx, source)
 		if err != nil {
 			log.Error(err, "Failed to update ApiServerSource")
-			return source, err
+			return err
 		}
 	} else if errors.IsNotFound(err) {
 		err = r.Create(ctx, source)
 		if err != nil {
 			log.Error(err, "Failed to create ApiServerSource")
-			return source, err
+			return err
 		}
 	} else {
 		log.Error(err, "Failed to reconcile ApiServerSource")
-		return source, err
+		return err
 	}
 
-	return source, nil
+	return nil
 }
 
 func (r *KubeArchiveConfigReconciler) deleteA13e(ctx context.Context) {

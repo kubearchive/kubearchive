@@ -9,7 +9,8 @@ import (
 	"strings"
 
 	"github.com/google/cel-go/cel"
-	"github.com/google/cel-go/checker/decls"
+	"github.com/google/cel-go/common/decls"
+	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	celext "github.com/google/cel-go/ext"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -24,17 +25,17 @@ func CompileOrCELExpression(exprs ...string) (*cel.Program, error) {
 }
 
 func CompileCELExpr(expr string) (*cel.Program, error) {
-	mapStrDyn := decls.NewMapType(decls.String, decls.Dyn)
+	mapStrDyn := types.NewMapType(types.StringType, types.DynType)
 	env, err := cel.NewEnv(
 		celext.Strings(),
 		celext.Encoders(),
 		celext.Sets(),
 		celext.Lists(),
 		celext.Math(),
-		cel.Declarations(
-			decls.NewVar("metadata", mapStrDyn),
-			decls.NewVar("spec", mapStrDyn),
-			decls.NewVar("status", mapStrDyn),
+		cel.VariableDecls(
+			decls.NewVariable("metadata", mapStrDyn),
+			decls.NewVariable("spec", mapStrDyn),
+			decls.NewVariable("status", mapStrDyn),
 		),
 	)
 	if err != nil {

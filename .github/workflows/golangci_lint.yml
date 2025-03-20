@@ -4,6 +4,9 @@
 name: golangci-lint
 run-name: Linting Tests (golangci-lint)
 on:
+  schedule:
+    # 9:25 UTC every 1st of month
+    - cron: '25 09 1 * *'
   push:
     branches:
       - 'main'
@@ -36,4 +39,5 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          only-new-issues: true
+          # When is scheduled, show all issues
+          only-new-issues: ${{ github.event_name != 'schedule' }}

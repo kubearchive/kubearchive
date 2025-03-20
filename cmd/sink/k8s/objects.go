@@ -13,7 +13,7 @@ import (
 // GetLastUpdateTs returns the last time obj was updated on the cluster
 func GetLastUpdateTs(obj *unstructured.Unstructured) time.Time {
 	fields := obj.GetManagedFields()
-	var latest *metav1.Time
+	latest := &metav1.Time{} // zero value is Jan 1, year 1, 00:00:00.000000000 UTC
 	for _, elem := range fields {
 		if latest == nil || latest.Before(elem.Time) {
 			latest = elem.Time

@@ -33,21 +33,32 @@ type newDBCreatorFunc func(map[string]string) facade.DBCreator
 var RegisteredDatabases = make(map[string]newDatabaseFunc)
 var RegisteredDBCreators = make(map[string]newDBCreatorFunc)
 
-type Database interface {
+type DBReader interface {
 	QueryResources(ctx context.Context, kind, apiVersion, namespace,
 		name, continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error)
 	QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error)
+	Ping(ctx context.Context) error
+	CloseDB() error
 
+	getSelector() facade.DBSelector
+	getSorter() facade.DBSorter
+}
+
+type DBWriter interface {
 	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, lastUpdated time.Time) error
 	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error
 	Ping(ctx context.Context) error
 	CloseDB() error
 
-	getSelector() facade.DBSelector
-	getFilter() facade.DBFilter
-	getSorter() facade.DBSorter
 	getInserter() facade.DBInserter
 	getDeleter() facade.DBDeleter
+}
+
+type Database interface {
+	DBReader
+	DBWriter
+
+	getFilter() facade.DBFilter
 	getFlavor() sqlbuilder.Flavor
 	setConn(*sqlx.DB)
 }
@@ -65,7 +76,15 @@ type DatabaseImpl struct {
 var db Database
 var once sync.Once
 
-func NewDatabase() (Database, error) {
+func NewReader() (DBReader, error) {
+	return newDatabase()
+}
+
+func NewWriter() (DBWriter, error) {
+	return newDatabase()
+}
+
+func newDatabase() (Database, error) {
 	var err error
 
 	once.Do(func() {

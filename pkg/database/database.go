@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
@@ -52,7 +53,18 @@ type Database struct {
 	Deleter  facade.DBDeleter
 }
 
+var db DBInterface
+var once sync.Once
+
 func NewDatabase() (DBInterface, error) {
+	var err error
+	once.Do(func() {
+		db, err = newDB()
+	})
+	return db, err
+}
+
+func newDB() (DBInterface, error) {
 	env, err := newDatabaseEnvironment()
 	if err != nil {
 		return nil, err

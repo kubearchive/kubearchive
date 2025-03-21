@@ -21,7 +21,7 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	"github.com/kubearchive/kubearchive/cmd/sink/logs"
 	"github.com/kubearchive/kubearchive/pkg/abort"
-	"github.com/kubearchive/kubearchive/pkg/database"
+	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 	corev1 "k8s.io/api/core/v1"
@@ -37,14 +37,14 @@ const namespaceEnvVar = "KUBEARCHIVE_NAMESPACE"
 type Controller struct {
 	ceHandler     *ceClient.EventReceiver
 	ceProtocol    *cloudevents.HTTPProtocol
-	Db            database.DBWriter
+	Db            interfaces.DBWriter
 	Filters       filters.Interface
 	K8sClient     dynamic.Interface
 	LogUrlBuilder *logs.UrlBuilder
 }
 
 func NewController(
-	db database.DBWriter, filter filters.Interface, k8sClient dynamic.Interface, urlBuilder *logs.UrlBuilder,
+	db interfaces.DBWriter, filter filters.Interface, k8sClient dynamic.Interface, urlBuilder *logs.UrlBuilder,
 ) (*Controller, error) {
 	controller := &Controller{
 		Db: db, Filters: filter, K8sClient: k8sClient, LogUrlBuilder: urlBuilder,

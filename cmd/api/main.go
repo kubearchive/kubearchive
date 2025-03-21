@@ -22,6 +22,7 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/api/routers"
 	"github.com/kubearchive/kubearchive/pkg/cache"
 	"github.com/kubearchive/kubearchive/pkg/database"
+	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	kaLogging "github.com/kubearchive/kubearchive/pkg/logging"
 	"github.com/kubearchive/kubearchive/pkg/middleware"
 	"github.com/kubearchive/kubearchive/pkg/observability"
@@ -132,7 +133,7 @@ func main() {
 		slog.Error("Could not connect to database", "error", err.Error())
 		os.Exit(1)
 	}
-	defer func(db database.DBReader) {
+	defer func(db interfaces.DBReader) {
 		deferErr := db.CloseDB()
 		if deferErr != nil {
 			slog.Error("Could not close the database connection", "error", deferErr.Error())

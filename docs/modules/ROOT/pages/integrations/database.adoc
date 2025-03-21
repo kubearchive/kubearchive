@@ -123,44 +123,25 @@ kubectl rollout -n kubearchive restart deployment kubearchive-sink kubearchive-a
 ====
 
 
-== Adding a New Database
+== Adding a New Database engine
 
 To add a new database integration follow the instructions:
 
 1. Create a new file under `pkg/database` named after the new database engine.
-2. Include an
-link:https://go.dev/doc/effective_go#init[init function]
-that:
+   If it's a sql engine, it should be under `pkg/database/sql`.
+2. Include a new entry on the
+link:https://github.com/kubearchive/kubearchive/blob/main/pkg/database/database.go#L15[`RegisteredDatabases`]
+map with the instance of the new `Database` implementation.
 
-* Inserts in the
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L25[`RegisteredDBCreators`]
-map an entry keyed with the name of the DB type with a
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L22[`newDBCreatorFunc`]
-implementation as value.
-
-* Inserts in the
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L24[`RegisteredDatabases`]
-map an entry keyed with the name of the DB type with a
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L22[`newDatabaseFunc`]
-as value.
-
-=== The `newDBCreatorFunc`
-
-This function receives the set of environment variables with the database configuration and returns a
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/creator.go[`DBCreator`]
-implementation.
-
-The `DBCreator` should include `env` as a parameter so the `GetConnectionString` can access them.
-
-=== The `DBInterface` implementation returned by the `newDatabaseFunc`
+=== The `Database` implementation
 
 [NOTE]
 ====
 This section includes the development guidelines expected by the KubeArchive maintainers.
 ====
 
-The `Database` implementation should be a struct with
-link:https://github.com/kubearchive/kubearchive/blob/main/pkg/database/database.go#L40[`DatabaseImpl`]
+If the engine is a sql one, `Database` implementation should be a struct with
+link:https://github.com/kubearchive/kubearchive/blob/main/pkg/database/database.go#L40[`sqlDatabaseImpl`]
 embedded.
 
 Make sure to implement the interfaces that are part of it:

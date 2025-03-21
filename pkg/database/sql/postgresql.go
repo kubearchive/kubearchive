@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package database
+package sql
 
 import (
 	"database/sql"
@@ -12,32 +12,21 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
-	"github.com/kubearchive/kubearchive/pkg/database/facade"
+	"github.com/kubearchive/kubearchive/pkg/database/env"
+	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
-func init() {
-	RegisteredDatabases["postgresql"] = newPostgreSQLDatabase
-	RegisteredDBCreators["postgresql"] = newPostgreSQLCreator
-}
+type postgreSQLCreator struct{}
 
-type postgreSQLCreator struct {
-	env map[string]string
-}
-
-func newPostgreSQLCreator(env map[string]string) facade.DBCreator {
-	return postgreSQLCreator{env: env}
-}
-
-func (creator postgreSQLCreator) GetDriverName() string {
+func (postgreSQLCreator) GetDriverName() string {
 	return "postgres"
 }
 
-func (creator postgreSQLCreator) GetConnectionString() string {
-	return fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=require", creator.env[DbUserEnvVar],
-		creator.env[DbPasswordEnvVar], creator.env[DbNameEnvVar], creator.env[DbHostEnvVar], creator.env[DbPortEnvVar])
+func (creator postgreSQLCreator) GetConnectionString(e map[string]string) string {
+	return fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=require", e[env.DbUserEnvVar],
+		e[env.DbPasswordEnvVar], e[env.DbNameEnvVar], e[env.DbHostEnvVar], e[env.DbPortEnvVar])
 }
 
 type postgreSQLSelector struct {
@@ -181,17 +170,17 @@ func (postgreSQLInserter) ResourceInserter(
 }
 
 type postgreSQLDatabase struct {
-	*DatabaseImpl
+	*sqlDatabaseImpl
 }
 
-func newPostgreSQLDatabase(conn *sqlx.DB) Database {
-	return postgreSQLDatabase{&DatabaseImpl{
-		db:       conn,
+func NewPostgreSQLDatabase() *postgreSQLDatabase {
+	return &postgreSQLDatabase{&sqlDatabaseImpl{
 		flavor:   sqlbuilder.PostgreSQL,
 		selector: postgreSQLSelector{},
 		filter:   postgreSQLFilter{},
 		sorter:   postgreSQLSorter{},
 		inserter: postgreSQLInserter{},
 		deleter:  facade.DBDeleterImpl{},
+		creator:  postgreSQLCreator{},
 	}}
 }

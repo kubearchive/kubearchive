@@ -66,39 +66,39 @@ type PostgreSQLFilter struct {
 }
 
 func (PostgreSQLFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string {
-	return cond.Var(sqlbuilder.Build(
-		"(data->'metadata'->>'creationTimestamp', id) < ($?, $?)",
-		continueDate, continueId,
-	))
+	return fmt.Sprintf(
+		"(data->'metadata'->>'creationTimestamp', id) < (%s, %s)",
+		cond.Var(continueDate), cond.Var(continueId),
+	)
 }
 
 func (PostgreSQLFilter) OwnerFilter(cond sqlbuilder.Cond, owners []string) string {
-	return cond.Var(sqlbuilder.Build(
-		"jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| $?",
-		pq.Array(owners),
-	))
+	return fmt.Sprintf(
+		"jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| %s",
+		cond.Var(pq.Array(owners)),
+	)
 }
 
 func (PostgreSQLFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
-	return cond.Var(sqlbuilder.Build(
-		"data->'metadata'->'labels' ?& $?",
-		pq.Array(labels),
-	))
+	return fmt.Sprintf(
+		"data->'metadata'->'labels' ?& %s",
+		cond.Var(pq.Array(labels)),
+	)
 }
 
 func (PostgreSQLFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
-	return cond.Var(sqlbuilder.Build(
-		"NOT data->'metadata'->'labels' ?| $?",
-		pq.Array(labels),
-	))
+	return fmt.Sprintf(
+		"NOT data->'metadata'->'labels' ?| %s",
+		cond.Var(pq.Array(labels)),
+	)
 }
 
-func (PostgreSQLFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (PostgreSQLFilter) EqualsLabelFilter(_ sqlbuilder.Cond, labels map[string]string) string {
 	jsonLabels, _ := json.Marshal(labels)
-	return cond.Var(sqlbuilder.Build(
-		"data->'metadata'->'labels' @> $?",
+	return fmt.Sprintf(
+		"data->'metadata'->'labels' @> %s",
 		string(jsonLabels),
-	))
+	)
 }
 
 func (PostgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
@@ -106,10 +106,10 @@ func (PostgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[st
 	for key, value := range labels {
 		jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
 	}
-	return cond.Var(sqlbuilder.Build(
-		"NOT data->'metadata'->'labels' @> ANY($?::jsonb[])",
-		pq.Array(jsons),
-	))
+	return fmt.Sprintf(
+		"NOT data->'metadata'->'labels' @> ANY(%s::jsonb[])",
+		cond.Var(pq.Array(jsons)),
+	)
 }
 
 func (PostgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
@@ -119,10 +119,9 @@ func (PostgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]
 		for _, value := range values {
 			jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
 		}
-		clauses = append(clauses, cond.Var(sqlbuilder.Build(
-			"data->'metadata'->'labels' @> ANY($?::jsonb[])",
-			pq.Array(jsons),
-		)))
+		clauses = append(clauses, fmt.Sprintf(
+			"data->'metadata'->'labels' @> ANY(%s::jsonb[])",
+			cond.Var(pq.Array(jsons))))
 	}
 	return cond.And(clauses...)
 }
@@ -135,10 +134,9 @@ func (f PostgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[stri
 			jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
 		}
 	}
-	notContainsClause := cond.Var(sqlbuilder.Build(
-		"NOT data->'metadata'->'labels' @> ANY($?::jsonb[])",
-		pq.Array(jsons),
-	))
+	notContainsClause := fmt.Sprintf(
+		"NOT data->'metadata'->'labels' @> ANY(%s::jsonb[])",
+		cond.Var(pq.Array(jsons)))
 	return cond.And(f.ExistsLabelFilter(cond, slices.Collect(keys)), notContainsClause)
 }
 

@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package database
+package sql
 
 import (
 	"database/sql"
@@ -11,32 +11,25 @@ import (
 	"slices"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
-	"github.com/kubearchive/kubearchive/pkg/database/facade"
+	"github.com/kubearchive/kubearchive/pkg/database"
+	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
 func init() {
-	RegisteredDatabases["postgresql"] = NewPostgreSQLDatabase
-	RegisteredDBCreators["postgresql"] = NewPostgreSQLCreator
+	database.RegisteredDatabases["postgresql"] = NewPostgreSQLDatabase()
 }
 
-type PostgreSQLCreator struct {
-	env map[string]string
-}
-
-func NewPostgreSQLCreator(env map[string]string) facade.DBCreator {
-	return PostgreSQLCreator{env: env}
-}
+type PostgreSQLCreator struct{}
 
 func (creator PostgreSQLCreator) GetDriverName() string {
 	return "postgres"
 }
 
-func (creator PostgreSQLCreator) GetConnectionString() string {
-	return fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=require", creator.env[DbUserEnvVar],
-		creator.env[DbPasswordEnvVar], creator.env[DbNameEnvVar], creator.env[DbHostEnvVar], creator.env[DbPortEnvVar])
+func (creator PostgreSQLCreator) GetConnectionString(env map[string]string) string {
+	return fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=require", env[database.DbUserEnvVar],
+		env[database.DbPasswordEnvVar], env[database.DbNameEnvVar], env[database.DbHostEnvVar], env[database.DbPortEnvVar])
 }
 
 type PostgreSQLSelector struct {
@@ -172,9 +165,8 @@ type PostgreSQLDatabase struct {
 	*Database
 }
 
-func NewPostgreSQLDatabase(conn *sqlx.DB) DBInterface {
+func NewPostgreSQLDatabase() PostgreSQLDatabase {
 	return PostgreSQLDatabase{&Database{
-		DB:       conn,
 		Flavor:   sqlbuilder.PostgreSQL,
 		Selector: PostgreSQLSelector{},
 		Filter:   PostgreSQLFilter{},

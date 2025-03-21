@@ -103,8 +103,7 @@ func TestLogURLsFromNonExistentResource(t *testing.T) {
 			rows := sqlmock.NewRows([]string{"uuid"})
 			sb := tt.database.Selector.UUIDResourceSelector()
 			sb.Where(
-				tt.database.Filter.KindFilter(sb.Cond, kind),
-				tt.database.Filter.ApiVersionFilter(sb.Cond, cronJobApiVersion),
+				tt.database.Filter.KindApiVersionFilter(sb.Cond, kind, cronJobApiVersion),
 				tt.database.Filter.NamespaceFilter(sb.Cond, namespace),
 				tt.database.Filter.NameFilter(sb.Cond, cronJobName),
 			)
@@ -132,8 +131,7 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 			sb := tt.database.Selector.UUIDResourceSelector()
 			sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
 			sb.Where(
-				tt.database.Filter.KindFilter(sb.Cond, kind),
-				tt.database.Filter.ApiVersionFilter(sb.Cond, cronJobApiVersion),
+				tt.database.Filter.KindApiVersionFilter(sb.Cond, kind, cronJobApiVersion),
 				tt.database.Filter.NamespaceFilter(sb.Cond, namespace),
 				tt.database.Filter.NameFilter(sb.Cond, cronJobName),
 			)
@@ -208,8 +206,7 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sb := tt.database.Selector.ResourceSelector()
 			sb.Where(
-				tt.database.Filter.KindFilter(sb.Cond, podKind),
-				tt.database.Filter.ApiVersionFilter(sb.Cond, podApiVersion),
+				tt.database.Filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion),
 			)
 			sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
 			sb.Limit(limit)
@@ -251,8 +248,7 @@ func TestQueryResources(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sb := tt.database.Selector.ResourceSelector()
 			sb.Where(
-				tt.database.Filter.KindFilter(sb.Cond, podKind),
-				tt.database.Filter.ApiVersionFilter(sb.Cond, podApiVersion),
+				tt.database.Filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion),
 				tt.database.Filter.NamespaceFilter(sb.Cond, namespace),
 			)
 			sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
@@ -403,8 +399,7 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 			t.Run(fmt.Sprintf("%s %s", tt.name, ttt.name), func(t *testing.T) {
 				sb := tt.database.Selector.ResourceSelector()
 				sb.Where(
-					tt.database.Filter.KindFilter(sb.Cond, podKind),
-					tt.database.Filter.ApiVersionFilter(sb.Cond, podApiVersion),
+					tt.database.Filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion),
 				)
 				if ttt.labelFilters.Exists != nil {
 					sb.Where(tt.database.Filter.ExistsLabelFilter(sb.Cond, ttt.labelFilters.Exists))
@@ -463,8 +458,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			sb := tt.database.Selector.ResourceSelector()
 			sb.Where(
-				tt.database.Filter.KindFilter(sb.Cond, kind),
-				tt.database.Filter.ApiVersionFilter(sb.Cond, podApiVersion),
+				tt.database.Filter.KindApiVersionFilter(sb.Cond, kind, podApiVersion),
 				tt.database.Filter.NamespaceFilter(sb.Cond, namespace),
 				tt.database.Filter.NameFilter(sb.Cond, podName),
 			)
@@ -566,8 +560,7 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 				sb := tt.database.Selector.ResourceSelector()
 				sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
 				sb.Where(
-					tt.database.Filter.KindFilter(sb.Cond, pod.Kind),
-					tt.database.Filter.ApiVersionFilter(sb.Cond, pod.APIVersion),
+					tt.database.Filter.KindApiVersionFilter(sb.Cond, pod.Kind, pod.APIVersion),
 					tt.database.Filter.NamespaceFilter(sb.Cond, pod.Namespace),
 					tt.database.Filter.NameFilter(sb.Cond, pod.Name),
 				)

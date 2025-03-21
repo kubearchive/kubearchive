@@ -127,12 +127,12 @@ func main() {
 	}
 	memCache := cache.New()
 
-	db, err := database.NewDatabase()
+	db, err := database.NewReader()
 	if err != nil {
 		slog.Error("Could not connect to database", "error", err.Error())
 		os.Exit(1)
 	}
-	defer func(db database.DBInterface) {
+	defer func(db database.DBReader) {
 		deferErr := db.CloseDB()
 		if deferErr != nil {
 			slog.Error("Could not close the database connection", "error", deferErr.Error())

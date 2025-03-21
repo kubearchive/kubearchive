@@ -169,11 +169,11 @@ func (PostgreSQLInserter) ResourceInserter(
 }
 
 type PostgreSQLDatabase struct {
-	*Database
+	*DatabaseImpl
 }
 
-func NewPostgreSQLDatabase(conn *sqlx.DB) DBInterface {
-	return PostgreSQLDatabase{&Database{
+func NewPostgreSQLDatabase(conn *sqlx.DB) Database {
+	return PostgreSQLDatabase{&DatabaseImpl{
 		DB:       conn,
 		Flavor:   sqlbuilder.PostgreSQL,
 		Selector: PostgreSQLSelector{},

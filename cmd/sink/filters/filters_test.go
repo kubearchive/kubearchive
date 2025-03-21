@@ -145,7 +145,7 @@ func TestHandleUpdates(t *testing.T) {
 			ch := make(chan watch.Event)
 			t.Cleanup(func() { close(ch) })
 			watcher := newMockWatcher(t, ch)
-			retryWatcher, err := toolsWatch.NewRetryWatcher("1", &cache.ListWatch{WatchFunc: watcher})
+			retryWatcher, err := toolsWatch.NewRetryWatcherWithContext(t.Context(), "1", &cache.ListWatch{WatchFunc: watcher})
 			if err != nil {
 				assert.FailNow(t, "Could not create a watcher")
 			}

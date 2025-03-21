@@ -47,27 +47,27 @@ var tests = []struct {
 }{
 	{
 		name: "mariadb",
-		database: &MariaDBDatabase{
-			&Database{
-				Flavor:   sqlbuilder.MySQL,
-				Selector: MariaDBSelector{},
-				Filter:   MariaDBFilter{},
-				Sorter:   MariaDBSorter{},
-				Inserter: MariaDBInserter{},
-				Deleter:  facade.DBDeleterImpl{},
+		database: &mariaDBDatabase{
+			&DatabaseImpl{
+				flavor:   sqlbuilder.MySQL,
+				selector: mariaDBSelector{},
+				filter:   mariaDBFilter{},
+				sorter:   mariaDBSorter{},
+				inserter: mariaDBInserter{},
+				deleter:  facade.DBDeleterImpl{},
 			},
 		},
 	},
 	{
 		name: "postgresql",
-		database: &PostgreSQLDatabase{
-			&Database{
-				Flavor:   sqlbuilder.PostgreSQL,
-				Selector: PostgreSQLSelector{},
-				Filter:   PostgreSQLFilter{},
-				Sorter:   PostgreSQLSorter{},
-				Inserter: PostgreSQLInserter{},
-				Deleter:  facade.DBDeleterImpl{},
+		database: &postgreSQLDatabase{
+			&DatabaseImpl{
+				flavor:   sqlbuilder.PostgreSQL,
+				selector: postgreSQLSelector{},
+				filter:   postgreSQLFilter{},
+				sorter:   postgreSQLSorter{},
+				inserter: postgreSQLInserter{},
+				deleter:  facade.DBDeleterImpl{},
 			},
 		},
 	},

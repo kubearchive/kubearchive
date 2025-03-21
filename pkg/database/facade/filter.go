@@ -8,8 +8,7 @@ import "github.com/huandu/go-sqlbuilder"
 // DBFilter encapsulates all the Filter functions that must be implemented by the drivers
 // All its functions share the same signature
 type DBFilter interface {
-	KindFilter(cond sqlbuilder.Cond, kind string) string
-	ApiVersionFilter(cond sqlbuilder.Cond, apiVersion string) string
+	KindApiVersionFilter(cond sqlbuilder.Cond, kind, apiVersion string) string
 	NamespaceFilter(cond sqlbuilder.Cond, ns string) string
 	NameFilter(cond sqlbuilder.Cond, name string) string
 	CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string
@@ -29,12 +28,8 @@ type DBFilter interface {
 // with the default selectors with non-specific DBMS functions
 type PartialDBFilterImpl struct{}
 
-func (PartialDBFilterImpl) KindFilter(cond sqlbuilder.Cond, kind string) string {
-	return cond.Equal("kind", kind)
-}
-
-func (PartialDBFilterImpl) ApiVersionFilter(cond sqlbuilder.Cond, apiVersion string) string {
-	return cond.Equal("api_version", apiVersion)
+func (PartialDBFilterImpl) KindApiVersionFilter(cond sqlbuilder.Cond, kind, apiVersion string) string {
+	return cond.And(cond.Equal("kind", kind), cond.Equal("api_version", apiVersion))
 }
 
 func (PartialDBFilterImpl) NamespaceFilter(cond sqlbuilder.Cond, ns string) string {

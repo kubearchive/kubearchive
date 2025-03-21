@@ -41,11 +41,11 @@ const (
 var resourceQueryColumns = []string{"created_at", "id", "data"}
 var tests = []struct {
 	name     string
-	database *Database
+	database *DatabaseImpl
 }{
 	{
 		name: "mariadb",
-		database: &Database{
+		database: &DatabaseImpl{
 			Flavor:   sqlbuilder.MySQL,
 			Selector: MariaDBSelector{},
 			Filter:   MariaDBFilter{},
@@ -56,7 +56,7 @@ var tests = []struct {
 	},
 	{
 		name: "postgresql",
-		database: &Database{
+		database: &DatabaseImpl{
 			Flavor:   sqlbuilder.PostgreSQL,
 			Selector: PostgreSQLSelector{},
 			Filter:   PostgreSQLFilter{},

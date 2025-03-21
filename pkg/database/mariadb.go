@@ -132,11 +132,11 @@ func (MariaDBInserter) ResourceInserter(
 }
 
 type MariaDBDatabase struct {
-	*Database
+	*DatabaseImpl
 }
 
-func NewMariaDBDatabase(conn *sqlx.DB) DBInterface {
-	return MariaDBDatabase{&Database{
+func NewMariaDBDatabase(conn *sqlx.DB) Database {
+	return MariaDBDatabase{&DatabaseImpl{
 		DB:       conn,
 		Flavor:   sqlbuilder.MySQL,
 		Selector: MariaDBSelector{},

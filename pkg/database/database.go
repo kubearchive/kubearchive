@@ -25,13 +25,13 @@ const defaultContainerAnnotation = "kubectl.kubernetes.io/default-container"
 
 var ResourceNotFoundError = errors.New("resource not found")
 
-type newDatabaseFunc func(*sqlx.DB) DBInterface
+type newDatabaseFunc func(*sqlx.DB) Database
 type newDBCreatorFunc func(map[string]string) facade.DBCreator
 
 var RegisteredDatabases = make(map[string]newDatabaseFunc)
 var RegisteredDBCreators = make(map[string]newDBCreatorFunc)
 
-type DBInterface interface {
+type Database interface {
 	QueryResources(ctx context.Context, kind, apiVersion, namespace,
 		name, continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error)
 	QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error)
@@ -42,7 +42,7 @@ type DBInterface interface {
 	CloseDB() error
 }
 
-type Database struct {
+type DatabaseImpl struct {
 	DB       *sqlx.DB
 	Flavor   sqlbuilder.Flavor
 	Selector facade.DBSelector
@@ -52,7 +52,7 @@ type Database struct {
 	Deleter  facade.DBDeleter
 }
 
-func NewDatabase() (DBInterface, error) {
+func NewDatabase() (Database, error) {
 	env, err := newDatabaseEnvironment()
 	if err != nil {
 		return nil, err
@@ -70,7 +70,7 @@ func NewDatabase() (DBInterface, error) {
 		return nil, err
 	}
 
-	var database DBInterface
+	var database Database
 	if init, ok := RegisteredDatabases[env[DbKindEnvVar]]; ok {
 		database = init(conn)
 	} else {
@@ -80,11 +80,11 @@ func NewDatabase() (DBInterface, error) {
 	return database, nil
 }
 
-func (db *Database) Ping(ctx context.Context) error {
+func (db *DatabaseImpl) Ping(ctx context.Context) error {
 	return db.DB.PingContext(ctx)
 }
 
-func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
+func (db *DatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error) {
 	sb := db.Selector.ResourceSelector()
 	sb.Where(
@@ -132,7 +132,7 @@ type uuidKindDate struct {
 }
 
 // Returns the log url, the json path and an error given a selector builder for a Pod
-func (db *Database) getLogsForPodSelector(ctx context.Context, sb *sqlbuilder.SelectBuilder, namespace, name string) (string, string, error) {
+func (db *DatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbuilder.SelectBuilder, namespace, name string) (string, string, error) {
 	type logURLJsonPath struct {
 		LogURL   string `db:"url"`
 		JsonPath string `db:"json_path"`
@@ -186,7 +186,7 @@ func (db *Database) getLogsForPodSelector(ctx context.Context, sb *sqlbuilder.Se
 	}
 }
 
-func (db *Database) QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error) {
+func (db *DatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error) {
 	if kind == "Pod" {
 		sb := db.Selector.ResourceSelector()
 		sb = db.Sorter.CreationTSAndIDSorter(sb) // If resources are named the same, select the newest
@@ -246,7 +246,7 @@ func (db *Database) QueryLogURL(ctx context.Context, kind, apiVersion, namespace
 	return db.getLogsForPodSelector(ctx, sb, namespace, name)
 }
 
-func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids []string, podUuids []uuidKindDate,
+func (db *DatabaseImpl) getOwnedPodsUuids(ctx context.Context, ownersUuids []string, podUuids []uuidKindDate,
 ) ([]uuidKindDate, error) {
 
 	if len(ownersUuids) == 0 {
@@ -270,7 +270,7 @@ func (db *Database) getOwnedPodsUuids(ctx context.Context, ownersUuids []string,
 	}
 }
 
-func (db *Database) performResourceQuery(ctx context.Context, sb *sqlbuilder.SelectBuilder) ([]string, int64, string, error) {
+func (db *DatabaseImpl) performResourceQuery(ctx context.Context, sb *sqlbuilder.SelectBuilder) ([]string, int64, string, error) {
 	type resourceFields struct {
 		Date     string `db:"created_at"`
 		Id       int64  `db:"id"`
@@ -296,7 +296,7 @@ func (db *Database) performResourceQuery(ctx context.Context, sb *sqlbuilder.Sel
 	return resources, lastRow.Id, lastRow.Date, nil
 }
 
-func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
+func (db *DatabaseImpl) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
 	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)
@@ -336,7 +336,7 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 
 // WriteUrls deletes urls for k8sObj before writing urls to prevent duplicates. If logs is empty or nil all urls for
 // k8sObj will be deleted from the database and will not be replaced
-func (db *Database) WriteUrls(
+func (db *DatabaseImpl) WriteUrls(
 	ctx context.Context,
 	k8sObj *unstructured.Unstructured,
 	jsonPath string,
@@ -407,6 +407,6 @@ func (db *Database) WriteUrls(
 	return nil
 }
 
-func (db *Database) CloseDB() error {
+func (db *DatabaseImpl) CloseDB() error {
 	return db.DB.Close()
 }

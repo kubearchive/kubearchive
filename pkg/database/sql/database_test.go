@@ -1,6 +1,6 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
-package database
+package sql
 
 import (
 	"database/sql"
@@ -8,8 +8,6 @@ import (
 	"os"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/huandu/go-sqlbuilder"
-	"github.com/kubearchive/kubearchive/pkg/database/facade"
 )
 
 const (
@@ -28,33 +26,15 @@ const (
 
 var tests = []struct {
 	name     string
-	database Database
+	database sqlDatabase
 }{
 	{
-		name: "mariadb",
-		database: &mariaDBDatabase{
-			&DatabaseImpl{
-				flavor:   sqlbuilder.MySQL,
-				selector: mariaDBSelector{},
-				filter:   mariaDBFilter{},
-				sorter:   mariaDBSorter{},
-				inserter: mariaDBInserter{},
-				deleter:  facade.DBDeleterImpl{},
-			},
-		},
+		name:     "mariadb",
+		database: NewMariaDBDatabase(),
 	},
 	{
-		name: "postgresql",
-		database: &postgreSQLDatabase{
-			&DatabaseImpl{
-				flavor:   sqlbuilder.PostgreSQL,
-				selector: postgreSQLSelector{},
-				filter:   postgreSQLFilter{},
-				sorter:   postgreSQLSorter{},
-				inserter: postgreSQLInserter{},
-				deleter:  facade.DBDeleterImpl{},
-			},
-		},
+		name:     "postgresql",
+		database: NewPostgreSQLDatabase(),
 	},
 }
 

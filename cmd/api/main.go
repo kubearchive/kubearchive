@@ -137,7 +137,7 @@ func main() {
 		if deferErr != nil {
 			slog.Error("Could not close the database connection", "error", deferErr.Error())
 		} else {
-			slog.Info("Database connection closed successfully")
+			slog.Info("database connection closed successfully")
 		}
 	}(db)
 

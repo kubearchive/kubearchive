@@ -27,12 +27,12 @@ func TestNewFakeDatabase(t *testing.T) {
 		logUrls   []LogUrlRow
 	}{
 		{
-			name:      "the database is created with no resources",
+			name:      "the fakeDatabase is created with no resources",
 			resources: nil,
 			logUrls:   nil,
 		},
 		{
-			name:      "the database is created with test resources",
+			name:      "the fakeDatabase is created with test resources",
 			resources: testResources,
 			logUrls:   testLogUrls,
 		},
@@ -310,13 +310,13 @@ func TestWriteUrls(t *testing.T) {
 			error: nil,
 		},
 		{
-			name:           "Nil k8sObj returns error with no change to database",
+			name:           "Nil k8sObj returns error with no change to fakeDatabase",
 			initialLogUrls: testLogUrls,
 			obj:            nil,
 			jsonPath:       jsonPath,
 			newUrls:        newUrls,
 			expected:       testLogUrls,
-			error:          errors.New("Cannot write log urls to the database when k8sObj is nil"),
+			error:          errors.New("Cannot write log urls to the fakeDatabase when k8sObj is nil"),
 		},
 		{
 			name:           "WriteUrls fails when urlErr is not nil",
@@ -333,7 +333,7 @@ func TestWriteUrls(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var db *Database
+			var db *fakeDatabase
 			if tt.urlErr != nil {
 				db = NewFakeDatabaseWithUrlError(tt.urlErr)
 			} else {
@@ -387,13 +387,13 @@ func TestWriteResources(t *testing.T) {
 		err  error
 	}{
 		{
-			name: "Write to Database with no errors",
+			name: "Write to fakeDatabase with no errors",
 			obj:  &unstructured.Unstructured{},
 			data: []byte{},
 			err:  nil,
 		},
 		{
-			name: "Write to Database with no errors",
+			name: "Write to fakeDatabase with no errors",
 			obj:  &unstructured.Unstructured{},
 			data: []byte{},
 			err:  errors.New("test error"),
@@ -402,7 +402,7 @@ func TestWriteResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			var db *Database
+			var db *fakeDatabase
 			if tt.err != nil {
 				db = NewFakeDatabaseWithError(tt.err)
 			} else {

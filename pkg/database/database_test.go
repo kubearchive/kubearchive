@@ -41,28 +41,28 @@ const (
 var resourceQueryColumns = []string{"created_at", "id", "data"}
 var tests = []struct {
 	name     string
-	database *Database
+	database *databaseImpl
 }{
 	{
 		name: "mariadb",
-		database: &Database{
-			Flavor:   sqlbuilder.MySQL,
-			Selector: MariaDBSelector{},
-			Filter:   MariaDBFilter{},
-			Sorter:   MariaDBSorter{},
-			Inserter: MariaDBInserter{},
-			Deleter:  facade.DBDeleterImpl{},
+		database: &databaseImpl{
+			flavor:   sqlbuilder.MySQL,
+			selector: mariaDBSelector{},
+			filter:   mariaDBFilter{},
+			sorter:   mariaDBSorter{},
+			inserter: mariaDBInserter{},
+			deleter:  facade.DBDeleterImpl{},
 		},
 	},
 	{
 		name: "postgresql",
-		database: &Database{
-			Flavor:   sqlbuilder.PostgreSQL,
-			Selector: PostgreSQLSelector{},
-			Filter:   PostgreSQLFilter{},
-			Sorter:   PostgreSQLSorter{},
-			Inserter: PostgreSQLInserter{},
-			Deleter:  facade.DBDeleterImpl{},
+		database: &databaseImpl{
+			flavor:   sqlbuilder.PostgreSQL,
+			selector: postgreSQLSelector{},
+			filter:   postgreSQLFilter{},
+			sorter:   postgreSQLSorter{},
+			inserter: postgreSQLInserter{},
+			deleter:  facade.DBDeleterImpl{},
 		},
 	},
 }
@@ -87,7 +87,7 @@ var subtests = []struct {
 func NewMock() (*sql.DB, sqlmock.Sqlmock) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
-		slog.Error("an error '%s' was not expected when opening a stub database connection", "err", err)
+		slog.Error("an error '%s' was not expected when opening a stub databaseImpl connection", "err", err)
 		os.Exit(1)
 	}
 
@@ -98,17 +98,17 @@ func TestLogURLsFromNonExistentResource(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
-			tt.database.DB = sqlx.NewDb(db, "sqlmock")
+			tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 			rows := sqlmock.NewRows([]string{"uuid"})
-			sb := tt.database.Selector.UUIDResourceSelector()
+			sb := tt.database.selector.UUIDResourceSelector()
 			sb.Where(
-				tt.database.Filter.KindFilter(sb.Cond, kind),
-				tt.database.Filter.ApiVersionFilter(sb.Cond, cronJobApiVersion),
-				tt.database.Filter.NamespaceFilter(sb.Cond, namespace),
-				tt.database.Filter.NameFilter(sb.Cond, cronJobName),
+				tt.database.filter.KindFilter(sb.Cond, kind),
+				tt.database.filter.ApiVersionFilter(sb.Cond, cronJobApiVersion),
+				tt.database.filter.NamespaceFilter(sb.Cond, namespace),
+				tt.database.filter.NameFilter(sb.Cond, cronJobName),
 			)
-			query, _ := sb.BuildWithFlavor(tt.database.Flavor)
+			query, _ := sb.BuildWithFlavor(tt.database.flavor)
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(kind, cronJobApiVersion, namespace, cronJobName).WillReturnRows(rows)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -126,57 +126,57 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
-			tt.database.DB = sqlx.NewDb(db, "sqlmock")
+			tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 			// Get UUID query
-			sb := tt.database.Selector.UUIDResourceSelector()
-			sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
+			sb := tt.database.selector.UUIDResourceSelector()
+			sb = tt.database.sorter.CreationTSAndIDSorter(sb)
 			sb.Where(
-				tt.database.Filter.KindFilter(sb.Cond, kind),
-				tt.database.Filter.ApiVersionFilter(sb.Cond, cronJobApiVersion),
-				tt.database.Filter.NamespaceFilter(sb.Cond, namespace),
-				tt.database.Filter.NameFilter(sb.Cond, cronJobName),
+				tt.database.filter.KindFilter(sb.Cond, kind),
+				tt.database.filter.ApiVersionFilter(sb.Cond, cronJobApiVersion),
+				tt.database.filter.NamespaceFilter(sb.Cond, namespace),
+				tt.database.filter.NameFilter(sb.Cond, cronJobName),
 			)
-			query, args := sb.BuildWithFlavor(tt.database.Flavor)
+			query, args := sb.BuildWithFlavor(tt.database.flavor)
 
 			rows := sqlmock.NewRows([]string{"uuid"})
 			rows.AddRow("mock-uuid-cronjob")
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 			// Get owned Job by the CronJob
-			sb = tt.database.Selector.OwnedResourceSelector()
-			sb.Where(tt.database.Filter.OwnerFilter(sb.Cond, []string{"mock-uuid-cronjob"}))
-			query, args = sb.BuildWithFlavor(tt.database.Flavor)
+			sb = tt.database.selector.OwnedResourceSelector()
+			sb.Where(tt.database.filter.OwnerFilter(sb.Cond, []string{"mock-uuid-cronjob"}))
+			query, args = sb.BuildWithFlavor(tt.database.flavor)
 
 			rows = sqlmock.NewRows([]string{"kind", "uuid"})
 			rows.AddRow("Job", "mock-uuid-job")
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 			// Get owned Pods by the Job
-			sb = tt.database.Selector.OwnedResourceSelector()
-			sb.Where(tt.database.Filter.OwnerFilter(sb.Cond, []string{"mock-uuid-job"}))
-			query, args = sb.BuildWithFlavor(tt.database.Flavor)
+			sb = tt.database.selector.OwnedResourceSelector()
+			sb.Where(tt.database.filter.OwnerFilter(sb.Cond, []string{"mock-uuid-job"}))
+			query, args = sb.BuildWithFlavor(tt.database.flavor)
 
 			rows = sqlmock.NewRows([]string{"kind", "uuid"})
 			rows.AddRow("Pod", "mock-uuid-pod1")
 			rows.AddRow("Pod", "mock-uuid-pod2")
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
-			sb = tt.database.Selector.ResourceSelector()
-			sb.Where(tt.database.Filter.UuidFilter(sb.Cond, "mock-uuid-pod1"))
-			query, args = sb.BuildWithFlavor(tt.database.Flavor)
+			sb = tt.database.selector.ResourceSelector()
+			sb.Where(tt.database.filter.UuidFilter(sb.Cond, "mock-uuid-pod1"))
+			query, args = sb.BuildWithFlavor(tt.database.flavor)
 
 			rows = sqlmock.NewRows([]string{"created_at", "id", "data"})
 			rows.AddRow("YYYY-MM-DDTHH:MM:SS+00", 0, testPodResource)
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 			// Get pods log urls
-			sb = tt.database.Selector.UrlSelector()
+			sb = tt.database.selector.UrlSelector()
 			sb.Where(
-				tt.database.Filter.UuidFilter(sb.Cond, "42422d92-1a72-418d-97cf-97019c2d56e8"),
-				tt.database.Filter.ContainerNameFilter(sb.Cond, "test-pod"),
+				tt.database.filter.UuidFilter(sb.Cond, "42422d92-1a72-418d-97cf-97019c2d56e8"),
+				tt.database.filter.ContainerNameFilter(sb.Cond, "test-pod"),
 			)
-			query, args = sb.BuildWithFlavor(tt.database.Flavor)
+			query, args = sb.BuildWithFlavor(tt.database.flavor)
 
 			rows = sqlmock.NewRows([]string{"url", "json_path"})
 			rows.AddRow("mock-log-url-pod1-container1", jsonPath)
@@ -206,19 +206,19 @@ func sliceOfAny2sliceOfValue(values []any) []driver.Value {
 func TestQueryResourcesWithoutNamespace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sb := tt.database.Selector.ResourceSelector()
+			sb := tt.database.selector.ResourceSelector()
 			sb.Where(
-				tt.database.Filter.KindFilter(sb.Cond, podKind),
-				tt.database.Filter.ApiVersionFilter(sb.Cond, podApiVersion),
+				tt.database.filter.KindFilter(sb.Cond, podKind),
+				tt.database.filter.ApiVersionFilter(sb.Cond, podApiVersion),
 			)
-			sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
+			sb = tt.database.sorter.CreationTSAndIDSorter(sb)
 			sb.Limit(limit)
-			query, _ := sb.BuildWithFlavor(tt.database.Flavor)
+			query, _ := sb.BuildWithFlavor(tt.database.flavor)
 
 			for _, ttt := range subtests {
 				t.Run(ttt.name, func(t *testing.T) {
 					db, mock := NewMock()
-					tt.database.DB = sqlx.NewDb(db, "sqlmock")
+					tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 					rows := sqlmock.NewRows(resourceQueryColumns)
 					if ttt.data {
@@ -249,19 +249,19 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 func TestQueryResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sb := tt.database.Selector.ResourceSelector()
+			sb := tt.database.selector.ResourceSelector()
 			sb.Where(
-				tt.database.Filter.KindFilter(sb.Cond, podKind),
-				tt.database.Filter.ApiVersionFilter(sb.Cond, podApiVersion),
-				tt.database.Filter.NamespaceFilter(sb.Cond, namespace),
+				tt.database.filter.KindFilter(sb.Cond, podKind),
+				tt.database.filter.ApiVersionFilter(sb.Cond, podApiVersion),
+				tt.database.filter.NamespaceFilter(sb.Cond, namespace),
 			)
-			sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
+			sb = tt.database.sorter.CreationTSAndIDSorter(sb)
 			sb.Limit(limit)
-			query, _ := sb.BuildWithFlavor(tt.database.Flavor)
+			query, _ := sb.BuildWithFlavor(tt.database.flavor)
 			for _, ttt := range subtests {
 				t.Run(ttt.name, func(t *testing.T) {
 					db, mock := NewMock()
-					tt.database.DB = sqlx.NewDb(db, "sqlmock")
+					tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 					rows := sqlmock.NewRows(resourceQueryColumns)
 					if ttt.data {
@@ -401,34 +401,34 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 	for _, tt := range tests {
 		for _, ttt := range filterTests {
 			t.Run(fmt.Sprintf("%s %s", tt.name, ttt.name), func(t *testing.T) {
-				sb := tt.database.Selector.ResourceSelector()
+				sb := tt.database.selector.ResourceSelector()
 				sb.Where(
-					tt.database.Filter.KindFilter(sb.Cond, podKind),
-					tt.database.Filter.ApiVersionFilter(sb.Cond, podApiVersion),
+					tt.database.filter.KindFilter(sb.Cond, podKind),
+					tt.database.filter.ApiVersionFilter(sb.Cond, podApiVersion),
 				)
 				if ttt.labelFilters.Exists != nil {
-					sb.Where(tt.database.Filter.ExistsLabelFilter(sb.Cond, ttt.labelFilters.Exists))
+					sb.Where(tt.database.filter.ExistsLabelFilter(sb.Cond, ttt.labelFilters.Exists))
 				}
 				if ttt.labelFilters.NotExists != nil {
-					sb.Where(tt.database.Filter.NotExistsLabelFilter(sb.Cond, ttt.labelFilters.NotExists))
+					sb.Where(tt.database.filter.NotExistsLabelFilter(sb.Cond, ttt.labelFilters.NotExists))
 				}
 				if ttt.labelFilters.Equals != nil {
-					sb.Where(tt.database.Filter.EqualsLabelFilter(sb.Cond, ttt.labelFilters.Equals))
+					sb.Where(tt.database.filter.EqualsLabelFilter(sb.Cond, ttt.labelFilters.Equals))
 				}
 				if ttt.labelFilters.NotEquals != nil {
-					sb.Where(tt.database.Filter.NotEqualsLabelFilter(sb.Cond, ttt.labelFilters.NotEquals))
+					sb.Where(tt.database.filter.NotEqualsLabelFilter(sb.Cond, ttt.labelFilters.NotEquals))
 				}
 				if ttt.labelFilters.In != nil {
-					sb.Where(tt.database.Filter.InLabelFilter(sb.Cond, ttt.labelFilters.In))
+					sb.Where(tt.database.filter.InLabelFilter(sb.Cond, ttt.labelFilters.In))
 				}
 				if ttt.labelFilters.NotIn != nil {
-					sb.Where(tt.database.Filter.NotInLabelFilter(sb.Cond, ttt.labelFilters.NotIn))
+					sb.Where(tt.database.filter.NotInLabelFilter(sb.Cond, ttt.labelFilters.NotIn))
 				}
-				sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
+				sb = tt.database.sorter.CreationTSAndIDSorter(sb)
 				sb.Limit(100)
-				query, args := sb.BuildWithFlavor(tt.database.Flavor)
+				query, args := sb.BuildWithFlavor(tt.database.flavor)
 				db, mock := NewMock()
-				tt.database.DB = sqlx.NewDb(db, "sqlmock")
+				tt.database.db = sqlx.NewDb(db, "sqlmock")
 				rows := sqlmock.NewRows(resourceQueryColumns)
 				rows.AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource))
 				// In inequality, set-based and set not based, the order of the arguments is not ensured
@@ -461,18 +461,18 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 func TestQueryNamespacedResourceByName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sb := tt.database.Selector.ResourceSelector()
+			sb := tt.database.selector.ResourceSelector()
 			sb.Where(
-				tt.database.Filter.KindFilter(sb.Cond, kind),
-				tt.database.Filter.ApiVersionFilter(sb.Cond, podApiVersion),
-				tt.database.Filter.NamespaceFilter(sb.Cond, namespace),
-				tt.database.Filter.NameFilter(sb.Cond, podName),
+				tt.database.filter.KindFilter(sb.Cond, kind),
+				tt.database.filter.ApiVersionFilter(sb.Cond, podApiVersion),
+				tt.database.filter.NamespaceFilter(sb.Cond, namespace),
+				tt.database.filter.NameFilter(sb.Cond, podName),
 			)
-			query, _ := sb.BuildWithFlavor(tt.database.Flavor)
+			query, _ := sb.BuildWithFlavor(tt.database.flavor)
 			for _, ttt := range subtests {
 				t.Run(ttt.name, func(t *testing.T) {
 					db, mock := NewMock()
-					tt.database.DB = sqlx.NewDb(db, "sqlmock")
+					tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 					rows := sqlmock.NewRows(resourceQueryColumns)
 					if ttt.data {
@@ -501,7 +501,7 @@ func TestPing(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db, mock := NewMock()
-			tt.database.DB = sqlx.NewDb(db, "sqlmock")
+			tt.database.db = sqlx.NewDb(db, "sqlmock")
 			mock.ExpectPing()
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 			defer cancel()
@@ -532,7 +532,7 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 		for _, innerTest := range innerTests {
 			t.Run(innerTest.name, func(t *testing.T) {
 				db, mock := NewMock()
-				tt.database.DB = sqlx.NewDb(db, "sqlmock")
+				tt.database.db = sqlx.NewDb(db, "sqlmock")
 
 				file, err := os.Open("testdata/pod-3-containers.json")
 				if err != nil {
@@ -563,27 +563,27 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 				}
 
 				// Get the pod
-				sb := tt.database.Selector.ResourceSelector()
-				sb = tt.database.Sorter.CreationTSAndIDSorter(sb)
+				sb := tt.database.selector.ResourceSelector()
+				sb = tt.database.sorter.CreationTSAndIDSorter(sb)
 				sb.Where(
-					tt.database.Filter.KindFilter(sb.Cond, pod.Kind),
-					tt.database.Filter.ApiVersionFilter(sb.Cond, pod.APIVersion),
-					tt.database.Filter.NamespaceFilter(sb.Cond, pod.Namespace),
-					tt.database.Filter.NameFilter(sb.Cond, pod.Name),
+					tt.database.filter.KindFilter(sb.Cond, pod.Kind),
+					tt.database.filter.ApiVersionFilter(sb.Cond, pod.APIVersion),
+					tt.database.filter.NamespaceFilter(sb.Cond, pod.Namespace),
+					tt.database.filter.NameFilter(sb.Cond, pod.Name),
 				)
-				query, args := sb.BuildWithFlavor(tt.database.Flavor)
+				query, args := sb.BuildWithFlavor(tt.database.flavor)
 
 				rows := sqlmock.NewRows([]string{"created_at", "id", "data"})
 				rows.AddRow("YYYY-MM-DDTHH:MM:SS+00", "0", string(newPodBytes))
 				mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 				// Get the Logs
-				sb = tt.database.Selector.UrlSelector()
+				sb = tt.database.selector.UrlSelector()
 				sb.Where(
-					tt.database.Filter.UuidFilter(sb.Cond, string(pod.UID)),
-					tt.database.Filter.ContainerNameFilter(sb.Cond, innerTest.expectedContainerName),
+					tt.database.filter.UuidFilter(sb.Cond, string(pod.UID)),
+					tt.database.filter.ContainerNameFilter(sb.Cond, innerTest.expectedContainerName),
 				)
-				query, args = sb.BuildWithFlavor(tt.database.Flavor)
+				query, args = sb.BuildWithFlavor(tt.database.flavor)
 				rows = sqlmock.NewRows([]string{"url", "json_path"})
 				rows.AddRow(innerTest.expectedLogUrl, "")
 				mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)

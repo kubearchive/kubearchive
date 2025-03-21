@@ -5,7 +5,7 @@ package facade
 
 import "github.com/huandu/go-sqlbuilder"
 
-// DBSorter encapsulates all the Sorter functions that must be implemented by the drivers
+// DBSorter encapsulates all the sorter functions that must be implemented by the drivers
 type DBSorter interface {
 	CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder
 }

@@ -11,7 +11,7 @@ import (
 )
 
 func TestGetDatabaseEnvironmentVars(t *testing.T) {
-	value := "Database"
+	value := "databaseImpl"
 	errDBHost := fmt.Errorf(dbConnectionErrStr, DbHostEnvVar)
 	errDBKind := fmt.Errorf(dbConnectionErrStr, DbKindEnvVar)
 	errDBName := fmt.Errorf(dbConnectionErrStr, DbNameEnvVar)

@@ -129,7 +129,7 @@ func TestNormalOperation(t *testing.T) {
 		t.Fatal(errRoleBinding)
 	}
 
-	// Retrieve the objects from the DB using the API.
+	// Retrieve the objects from the db using the API.
 
 	// Set up the http client with cert
 	secret, errSecret := clientset.CoreV1().Secrets("kubearchive").Get(context.Background(), "kubearchive-api-server-tls", metav1.GetOptions{})

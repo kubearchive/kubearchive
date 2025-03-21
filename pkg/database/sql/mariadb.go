@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package database
+package sql
 
 import (
 	"database/sql"
@@ -9,30 +9,23 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
-	"github.com/kubearchive/kubearchive/pkg/database/facade"
+	"github.com/kubearchive/kubearchive/pkg/database"
+	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
 )
 
 func init() {
-	RegisteredDatabases["mariadb"] = NewMariaDBDatabase
-	RegisteredDBCreators["mariadb"] = NewMariaDBCreator
+	database.RegisteredDatabases["mariadb"] = NewMariaDBDatabase()
 }
 
-type MariaDBDatabaseCreator struct {
-	env map[string]string
-}
+type MariaDBDatabaseCreator struct{}
 
-func NewMariaDBCreator(env map[string]string) facade.DBCreator {
-	return &MariaDBDatabaseCreator{env: env}
-}
-
-func (creator MariaDBDatabaseCreator) GetDriverName() string {
+func (MariaDBDatabaseCreator) GetDriverName() string {
 	return "mysql"
 }
 
-func (creator MariaDBDatabaseCreator) GetConnectionString() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", creator.env[DbUserEnvVar],
-		creator.env[DbPasswordEnvVar], creator.env[DbHostEnvVar], creator.env[DbPortEnvVar], creator.env[DbNameEnvVar])
+func (MariaDBDatabaseCreator) GetConnectionString(env map[string]string) string {
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", env[database.DbUserEnvVar],
+		env[database.DbPasswordEnvVar], env[database.DbHostEnvVar], env[database.DbPortEnvVar], env[database.DbNameEnvVar])
 }
 
 type MariaDBSelector struct {
@@ -135,9 +128,8 @@ type MariaDBDatabase struct {
 	*Database
 }
 
-func NewMariaDBDatabase(conn *sqlx.DB) DBInterface {
+func NewMariaDBDatabase() MariaDBDatabase {
 	return MariaDBDatabase{&Database{
-		DB:       conn,
 		Flavor:   sqlbuilder.MySQL,
 		Selector: MariaDBSelector{},
 		Filter:   MariaDBFilter{},

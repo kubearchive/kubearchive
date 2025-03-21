@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package database
+package sql
 
 import (
 	"context"

@@ -75,6 +75,10 @@ func NewFakeDatabaseWithUrlError(err error) *Database {
 	return &Database{resources, logUrls, "", nil, err}
 }
 
+func (f *Database) Init(_ map[string]string) error {
+	return nil
+}
+
 func (f *Database) Ping(_ context.Context) error {
 	return f.err
 }

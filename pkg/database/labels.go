@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 )
 
-// LabelFilters encapsulates the database filters for labels in the archived resources
+// LabelFilters encapsulates the databaseImpl filters for labels in the archived resources
 type LabelFilters struct {
 	Exists    []string
 	NotExists []string

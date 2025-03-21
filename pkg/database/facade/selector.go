@@ -5,7 +5,7 @@ package facade
 
 import "github.com/huandu/go-sqlbuilder"
 
-// DBSelector encapsulates all the Selector functions that must be implemented by the drivers
+// DBSelector encapsulates all the selector functions that must be implemented by the drivers
 type DBSelector interface {
 	ResourceSelector() *sqlbuilder.SelectBuilder
 	UUIDResourceSelector() *sqlbuilder.SelectBuilder

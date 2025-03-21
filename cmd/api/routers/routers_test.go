@@ -337,12 +337,12 @@ func TestReadyz(t *testing.T) {
 		expected    int
 	}{
 		{
-			name:        "Database Ready",
+			name:        "database Ready",
 			dbConnReady: true,
 			expected:    http.StatusOK,
 		},
 		{
-			name:        "Database Not Ready",
+			name:        "database Not Ready",
 			dbConnReady: false,
 			expected:    http.StatusServiceUnavailable,
 		},

@@ -152,7 +152,7 @@ func TestPagination(t *testing.T) {
 		if getUrlErr != nil {
 			t.Fatal(getUrlErr)
 		}
-		// We want to wait until everything is stored in the DB to avoid out of order inserts
+		// We want to wait until everything is stored in the db to avoid out of order inserts
 		if len(list.Items) >= 30 {
 			return nil
 		}

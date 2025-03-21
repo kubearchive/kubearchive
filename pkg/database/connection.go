@@ -34,16 +34,16 @@ func establishConnection(driver, connectionString string) (*sqlx.DB, error) {
 		},
 		configs...)
 	if errRetry != nil {
-		log.Printf("Unable to connect to the database, error: %v", errRetry)
+		log.Printf("Unable to connect to the databaseImpl, error: %v", errRetry)
 		return nil, errRetry
 	}
 
 	err = otelsql.RegisterDBStatsMetrics(conn, otelsql.WithAttributes(semconv.DBSystemKey.String(driver)))
 	if err != nil {
-		log.Printf("Unable to instrument the DB properly, error: %v", err)
+		log.Printf("Unable to instrument the db properly, error: %v", err)
 		return nil, err
 	}
 
-	log.Println("Successfully connected to the database")
+	log.Println("Successfully connected to the databaseImpl")
 	return sqlx.NewDb(conn, driver), nil
 }

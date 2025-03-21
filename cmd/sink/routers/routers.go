@@ -273,7 +273,7 @@ func (c *Controller) Livez(ctx *gin.Context) {
 	})
 }
 
-// Readyz checks connections to the Database and to the Kubernetes API
+// Readyz checks connections to the database and to the Kubernetes API
 func (c *Controller) Readyz(ctx *gin.Context) {
 	err := c.Db.Ping(ctx.Request.Context())
 	if err != nil {

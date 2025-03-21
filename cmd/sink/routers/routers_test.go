@@ -718,7 +718,7 @@ func TestReadyz(t *testing.T) {
 			expected:    http.StatusServiceUnavailable,
 		},
 		{
-			name:        "Database is not ready",
+			name:        "database is not ready",
 			dbConnReady: false,
 			k8sApiConn:  true,
 			expected:    http.StatusServiceUnavailable,

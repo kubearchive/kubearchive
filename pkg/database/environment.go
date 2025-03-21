@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	dbConnectionErrStr string = "Could not create database connection string: %s must be set"
+	dbConnectionErrStr string = "Could not create databaseImpl connection string: %s must be set"
 
 	DbKindEnvVar     string = "DATABASE_KIND"
 	DbNameEnvVar     string = "DATABASE_DB"
@@ -22,7 +22,7 @@ const (
 
 var DbEnvVars = [...]string{DbKindEnvVar, DbNameEnvVar, DbUserEnvVar, DbPasswordEnvVar, DbHostEnvVar, DbPortEnvVar}
 
-// Reads database connection info from the environment variables and returns a map of variable name to value.
+// Reads databaseImpl connection info from the environment variables and returns a map of variable name to value.
 func newDatabaseEnvironment() (map[string]string, error) {
 	var err error
 	env := make(map[string]string)

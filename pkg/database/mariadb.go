@@ -62,17 +62,16 @@ type MariaDBFilter struct {
 }
 
 func (MariaDBFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string {
-	return cond.Var(sqlbuilder.Build(
-		"(CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime), uuid) < ($?, $?)",
-		continueDate, continueId,
-	))
+	return fmt.Sprintf(
+		"(CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime), uuid) < (%s, %s)",
+		cond.Var(continueDate), cond.Var(continueId),
+	)
 }
 
 func (MariaDBFilter) OwnerFilter(cond sqlbuilder.Cond, uuids []string) string {
-	return cond.Var(sqlbuilder.Build(
-		"JSON_OVERLAPS(JSON_EXTRACT(data, '$.metadata.ownerReferences.**.uid'), JSON_ARRAY($?))",
-		sqlbuilder.List(uuids),
-	))
+	return fmt.Sprintf(
+		"JSON_OVERLAPS(JSON_EXTRACT(data, '$.metadata.ownerReferences.**.uid'), JSON_ARRAY(%s))",
+		cond.Var(sqlbuilder.List(uuids)))
 }
 
 func (MariaDBFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {

@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
@@ -36,7 +37,7 @@ type DBInterface interface {
 		name, continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error)
 	QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error)
 
-	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error
+	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, lastUpdated time.Time) error
 	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error
 	Ping(ctx context.Context) error
 	CloseDB() error
@@ -296,7 +297,7 @@ func (db *Database) performResourceQuery(ctx context.Context, sb *sqlbuilder.Sel
 	return resources, lastRow.Id, lastRow.Date, nil
 }
 
-func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte) error {
+func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, lastUpdated time.Time) error {
 	tx, err := db.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)
@@ -308,6 +309,7 @@ func (db *Database) WriteResource(ctx context.Context, k8sObj *unstructured.Unst
 		k8sObj.GetName(),
 		k8sObj.GetNamespace(),
 		k8sObj.GetResourceVersion(),
+		lastUpdated,
 		models.OptionalTimestamp(k8sObj.GetDeletionTimestamp()),
 		data,
 	).BuildWithFlavor(db.Flavor)

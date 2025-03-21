@@ -132,6 +132,7 @@ CREATE TABLE public.resource (
     resource_version character varying,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    cluster_updated_ts timestamp with time zone NOT NULL,
     cluster_deleted_ts timestamp with time zone,
     data jsonb NOT NULL
 );

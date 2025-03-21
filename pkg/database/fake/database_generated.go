@@ -48,6 +48,7 @@ type LogUrlRow struct {
 }
 
 type Database struct {
+	database.Database
 	resources []*unstructured.Unstructured
 	logUrl    []LogUrlRow
 	jsonPath  string
@@ -56,7 +57,7 @@ type Database struct {
 }
 
 func NewFakeDatabase(testResources []*unstructured.Unstructured, testLogs []LogUrlRow, jsonPath string) *Database {
-	return &Database{testResources, testLogs, jsonPath, nil, nil}
+	return &Database{resources: testResources, logUrl: testLogs, jsonPath: jsonPath}
 }
 
 func NewFakeDatabaseWithError(err error) *Database {
@@ -64,7 +65,7 @@ func NewFakeDatabaseWithError(err error) *Database {
 		resources []*unstructured.Unstructured
 		logUrls   []LogUrlRow
 	)
-	return &Database{resources, logUrls, "", err, nil}
+	return &Database{resources: resources, logUrl: logUrls, err: err}
 }
 
 func NewFakeDatabaseWithUrlError(err error) *Database {
@@ -72,7 +73,7 @@ func NewFakeDatabaseWithUrlError(err error) *Database {
 		resources []*unstructured.Unstructured
 		logUrls   []LogUrlRow
 	)
-	return &Database{resources, logUrls, "", nil, err}
+	return &Database{resources: resources, logUrl: logUrls, urlErr: err}
 }
 
 func (f *Database) Ping(_ context.Context) error {

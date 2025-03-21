@@ -143,7 +143,7 @@ type mariaDBDatabase struct {
 	*DatabaseImpl
 }
 
-func newMariaDBDatabase(conn *sqlx.DB) DBInterface {
+func newMariaDBDatabase(conn *sqlx.DB) Database {
 	return mariaDBDatabase{&DatabaseImpl{
 		db:       conn,
 		flavor:   sqlbuilder.MySQL,

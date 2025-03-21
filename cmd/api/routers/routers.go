@@ -25,7 +25,7 @@ type CacheExpirations struct {
 }
 
 type Controller struct {
-	Database           database.DBInterface
+	Database           database.Database
 	CacheConfiguration CacheExpirations
 }
 
@@ -58,7 +58,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
-	// We send namespace even if it's an empty string (non-namespaced resources) the Database
+	// We send namespace even if it's an empty string (non-namespaced resources) the DatabaseImpl
 	// knows what to do
 	resources, lastId, lastDate, err := c.Database.QueryResources(
 		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters, limit)

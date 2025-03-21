@@ -27,13 +27,13 @@ const defaultContainerAnnotation = "kubectl.kubernetes.io/default-container"
 
 var ResourceNotFoundError = errors.New("resource not found")
 
-type newDatabaseFunc func(*sqlx.DB) DBInterface
+type newDatabaseFunc func(*sqlx.DB) Database
 type newDBCreatorFunc func(map[string]string) facade.DBCreator
 
 var RegisteredDatabases = make(map[string]newDatabaseFunc)
 var RegisteredDBCreators = make(map[string]newDBCreatorFunc)
 
-type DBInterface interface {
+type Database interface {
 	QueryResources(ctx context.Context, kind, apiVersion, namespace,
 		name, continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error)
 	QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error)
@@ -62,10 +62,10 @@ type DatabaseImpl struct {
 	deleter  facade.DBDeleter
 }
 
-var db DBInterface
+var db Database
 var once sync.Once
 
-func NewDatabase() (DBInterface, error) {
+func NewDatabase() (Database, error) {
 	var err error
 
 	once.Do(func() {

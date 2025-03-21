@@ -43,7 +43,7 @@ const (
 var resourceQueryColumns = []string{"created_at", "id", "data"}
 var tests = []struct {
 	name     string
-	database DBInterface
+	database Database
 }{
 	{
 		name: "mariadb",

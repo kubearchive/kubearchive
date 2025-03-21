@@ -37,14 +37,14 @@ const namespaceEnvVar = "KUBEARCHIVE_NAMESPACE"
 type Controller struct {
 	ceHandler     *ceClient.EventReceiver
 	ceProtocol    *cloudevents.HTTPProtocol
-	Db            database.DBInterface
+	Db            database.Database
 	Filters       filters.Interface
 	K8sClient     dynamic.Interface
 	LogUrlBuilder *logs.UrlBuilder
 }
 
 func NewController(
-	db database.DBInterface, filter filters.Interface, k8sClient dynamic.Interface, urlBuilder *logs.UrlBuilder,
+	db database.Database, filter filters.Interface, k8sClient dynamic.Interface, urlBuilder *logs.UrlBuilder,
 ) (*Controller, error) {
 	controller := &Controller{
 		Db: db, Filters: filter, K8sClient: k8sClient, LogUrlBuilder: urlBuilder,

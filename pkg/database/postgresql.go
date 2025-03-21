@@ -179,7 +179,7 @@ type postgreSQLDatabase struct {
 	*DatabaseImpl
 }
 
-func newPostgreSQLDatabase(conn *sqlx.DB) DBInterface {
+func newPostgreSQLDatabase(conn *sqlx.DB) Database {
 	return postgreSQLDatabase{&DatabaseImpl{
 		db:       conn,
 		flavor:   sqlbuilder.PostgreSQL,

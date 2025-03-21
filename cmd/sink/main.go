@@ -41,12 +41,12 @@ func main() {
 	}
 
 	slog.Info("Starting KubeArchive Sink", "version", version, "commit", commit, "built", date)
-	db, err := database.NewDatabase()
+	db, err := database.NewWriter()
 	if err != nil {
 		slog.Error("Could not connect to the database", "err", err)
 		os.Exit(1)
 	}
-	defer func(db database.Database) {
+	defer func(db database.DBWriter) {
 		err = db.CloseDB()
 		if err != nil {
 			slog.Error("Could not close the database connection", "error", err.Error())

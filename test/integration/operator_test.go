@@ -28,8 +28,10 @@ const (
 func TestKACs(t *testing.T) {
 	tests := map[string]struct {
 		resources map[string]any
+		applyNS   int // Number of namespaces in ConfigMap after apply.
+		deleteNS  int // Number of namespaces in ConfigMap after delete.
 	}{
-		"emptyKAC": {resources: map[string]any{}},
+		"emptyKAC": {resources: map[string]any{}, applyNS: 1, deleteNS: 0},
 		"nonEmptyKAC": {resources: map[string]any{
 			"resources": []map[string]any{
 				{
@@ -40,23 +42,21 @@ func TestKACs(t *testing.T) {
 					"archiveWhen": "true",
 					"deleteWhen":  "status.phase == 'Succeeded'",
 				},
-			},
-		},
-		},
+			}}, applyNS: 1, deleteNS: 0},
 	}
 	for name, values := range tests {
 		t.Run(name, func(t *testing.T) {
 			namespace, _ := test.CreateTestNamespace(t, false)
 
 			test.CreateKAC(t, namespace, values.resources)
-			checkResourcesAfterApply(t, namespace, name)
+			checkResourcesAfterApply(t, namespace, name, values.applyNS)
 			test.DeleteKAC(t, namespace)
-			checkResourcesAfterDelete(t, namespace, name)
+			checkResourcesAfterDelete(t, namespace, name, values.deleteNS)
 		})
 	}
 }
 
-func checkResourcesAfterApply(t testing.TB, namespace string, testName string) {
+func checkResourcesAfterApply(t testing.TB, namespace string, testName string, applyNS int) {
 	t.Helper()
 
 	clientset, dynaclient := test.GetKubernetesClient(t)
@@ -73,9 +73,11 @@ func checkResourcesAfterApply(t testing.TB, namespace string, testName string) {
 				return getErr
 			}
 		}
-		_, getErr = clientset.CoreV1().ConfigMaps(test.K9eNamespace).Get(context.Background(), filtersName, metav1.GetOptions{})
+		cm, getErr := clientset.CoreV1().ConfigMaps(test.K9eNamespace).Get(context.Background(), filtersName, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
+		} else if len(cm.Data) != applyNS {
+			return fmt.Errorf("Found %d namespaces in ConfigMap, expected %d", len(cm.Data), applyNS)
 		}
 		_, getErr = clientset.CoreV1().ServiceAccounts(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
 		if getErr != nil {
@@ -105,7 +107,7 @@ func checkResourcesAfterApply(t testing.TB, namespace string, testName string) {
 	}
 }
 
-func checkResourcesAfterDelete(t testing.TB, namespace string, testName string) {
+func checkResourcesAfterDelete(t testing.TB, namespace string, testName string, deleteNS int) {
 	t.Helper()
 
 	clientset, dynaclient := test.GetKubernetesClient(t)
@@ -122,9 +124,11 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, testName string) 
 				return getErr
 			}
 		}
-		_, getErr = clientset.CoreV1().ConfigMaps(test.K9eNamespace).Get(context.Background(), filtersName, metav1.GetOptions{})
+		cm, getErr := clientset.CoreV1().ConfigMaps(test.K9eNamespace).Get(context.Background(), filtersName, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
+		} else if len(cm.Data) != deleteNS {
+			return fmt.Errorf("Found %d namespaces in ConfigMap, expected %d", len(cm.Data), deleteNS)
 		}
 		_, getErr = clientset.CoreV1().ServiceAccounts(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
 		if getErr != nil {

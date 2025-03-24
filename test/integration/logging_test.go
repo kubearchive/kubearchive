@@ -6,118 +6,65 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/test"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
-	errs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func TestLogging(t *testing.T) {
 	t.Parallel()
-	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
-	clientset, _, errClient := test.GetKubernetesClient()
-	if errClient != nil {
-		t.Fatal(errClient)
-	}
 
-	port, closePort := test.PortForwardApiServer(t, clientset)
-	t.Cleanup(closePort)
+	clientset, _ := test.GetKubernetesClient(t)
+	port := test.PortForwardApiServer(t, clientset)
+	namespaceName, token := test.CreateTestNamespace(t, false)
 
-	_, errNamespace := clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespaceName,
-		},
-	}, metav1.CreateOptions{})
-	if errNamespace != nil {
-		t.Fatal(errNamespace)
-	}
-
-	t.Cleanup(func() {
-		errNamespace = clientset.CoreV1().Namespaces().Delete(context.Background(), namespaceName, metav1.DeleteOptions{})
-		if errNamespace != nil {
-			t.Fatal(errNamespace)
-		}
-
-		retryErr := retry.Do(func() error {
-			_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespaceName, metav1.GetOptions{})
-			if !errs.IsNotFound(getErr) {
-				return errors.New("Waiting for namespace " + namespaceName + " to be deleted")
-			}
-			return nil
-		}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
-
-		if retryErr != nil {
-			t.Log(retryErr)
-		}
-	})
-
-	_, roleBindingErr := clientset.RbacV1().RoleBindings(namespaceName).Create(context.Background(), &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "view-default-test",
-		},
-		Subjects: []rbacv1.Subject{
+	resources := map[string]any{
+		"resources": []map[string]any{
 			{
-				Kind:      "ServiceAccount",
-				Name:      "default",
-				Namespace: namespaceName,
+				"selector": map[string]string{
+					"apiVersion": "batch/v1",
+					"kind":       "Job",
+				},
+				"archiveWhen": "has(status.completionTime)",
 			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "view",
-		},
-	},
-		metav1.CreateOptions{})
-	if roleBindingErr != nil {
-		t.Fatal(roleBindingErr)
-	}
-
-	token := test.GetSAToken(t, clientset, namespaceName)
-
-	client := http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+			{
+				"selector": map[string]string{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+				},
+				"archiveWhen": "true",
 			},
 		},
 	}
 
-	// Install the log-generator.
-	numRuns := 1
-	test.RunLogGenerators(t, test.CronJobGenerator, namespaceName, numRuns)
-
-	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/cronjobs/generate-log-1/log", port, namespaceName)
+	test.CreateKAC(t, namespaceName, resources)
+	job := test.RunLogGenerator(t, namespaceName)
+	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespaceName, job)
 	retryErr := retry.Do(func() error {
-		body, err := test.GetLogs(t, &client, token.Status.Token, url)
+		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
 		}
 
 		if len(body) == 0 {
-			return errors.New("could not retrieve the pod log")
+			return errors.New("could not retrieve the job log")
 		}
 		t.Log("Successfully retrieved logs")
 
 		bodyString := string(body)
-		if len(strings.Split(bodyString, "\n")) != 1025 {
-			return fmt.Errorf("expected 1025 lines, currently '%d'. Trying again...", len(strings.Split(bodyString, "\n")))
+		if len(strings.Split(bodyString, "\n")) != 11 {
+			return fmt.Errorf("expected 11 lines, currently '%d'. Trying again...", len(strings.Split(bodyString, "\n")))
 		}
 
 		return nil
-	}, retry.Attempts(20))
+	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -126,86 +73,24 @@ func TestLogging(t *testing.T) {
 
 func TestDefaultContainer(t *testing.T) {
 	t.Parallel()
-	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
-	clientset, dynamicClient, errClient := test.GetKubernetesClient()
-	if errClient != nil {
-		t.Fatal(errClient)
-	}
 
-	port, closePort := test.PortForwardApiServer(t, clientset)
-	t.Cleanup(closePort)
+	clientset, _ := test.GetKubernetesClient(t)
+	port := test.PortForwardApiServer(t, clientset)
+	namespaceName, token := test.CreateTestNamespace(t, false)
 
-	_, errNamespace := clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespaceName,
-		},
-	}, metav1.CreateOptions{})
-	if errNamespace != nil {
-		t.Fatal(errNamespace)
-	}
-
-	t.Cleanup(func() {
-		errNamespace = clientset.CoreV1().Namespaces().Delete(context.Background(), namespaceName, metav1.DeleteOptions{})
-		if errNamespace != nil {
-			t.Fatal(errNamespace)
-		}
-	})
-
-	_, roleBindingErr := clientset.RbacV1().RoleBindings(namespaceName).Create(context.Background(), &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "view-default-test",
-		},
-		Subjects: []rbacv1.Subject{
+	resources := map[string]any{
+		"resources": []map[string]any{
 			{
-				Kind:      "ServiceAccount",
-				Name:      "default",
-				Namespace: namespaceName,
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "view",
-		},
-	},
-		metav1.CreateOptions{})
-	if roleBindingErr != nil {
-		t.Fatal(roleBindingErr)
-	}
-
-	token := test.GetSAToken(t, clientset, namespaceName)
-
-	client := http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
-
-	kac := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"kind":       "KubeArchiveConfig",
-			"apiVersion": fmt.Sprintf("%s/%s", kubearchivev1alpha1.SchemeBuilder.GroupVersion.Group, kubearchivev1alpha1.SchemeBuilder.GroupVersion.Version),
-			"metadata": map[string]string{
-				"name":      "kubearchive",
-				"namespace": namespaceName,
-			},
-			"spec": map[string]any{
-				"resources": []map[string]any{
-					{
-						"selector": map[string]string{
-							"apiVersion": "v1",
-							"kind":       "Pod",
-						},
-						"archiveWhen": "true",
-					},
+				"selector": map[string]string{
+					"apiVersion": "v1",
+					"kind":       "Pod",
 				},
+				"archiveWhen": "true",
 			},
 		},
 	}
 
-	test.CreateKAC(t, clientset, dynamicClient, kac, namespaceName)
+	test.CreateKAC(t, namespaceName, resources)
 
 	// Create a pod
 	pod := &corev1.Pod{
@@ -262,7 +147,7 @@ func TestDefaultContainer(t *testing.T) {
 
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log", port, namespaceName)
 	retryErr := retry.Do(func() error {
-		body, err := test.GetLogs(t, &client, token.Status.Token, url)
+		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
 		}
@@ -279,7 +164,7 @@ func TestDefaultContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(200), retry.MaxDelay(3*time.Second))
+	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -287,7 +172,7 @@ func TestDefaultContainer(t *testing.T) {
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/wants-second/log", port, namespaceName)
 	retryErr = retry.Do(func() error {
-		body, err := test.GetLogs(t, &client, token.Status.Token, url)
+		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
 		}
@@ -304,7 +189,7 @@ func TestDefaultContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(200), retry.MaxDelay(3*time.Second))
+	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

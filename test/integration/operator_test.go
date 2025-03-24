@@ -8,119 +8,63 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/test"
-	corev1 "k8s.io/api/core/v1"
 	errs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-type Test int
-
 const (
-	emptyKAC Test = iota
-	nonEmptyKAC
-)
-
-const (
-	kacName     = "kubearchive"
-	a13eName    = kacName + "-a13e"
-	sinkName    = kacName + "-sink"
+	a13eName    = test.KACName + "-a13e"
+	sinkName    = test.KACName + "-sink"
 	filtersName = "sink-filters"
 )
 
-func TestEmptyKAC(t *testing.T) {
-	runTest(t, emptyKAC, map[string]any{})
-}
-
-func TestNonEmptyKAC(t *testing.T) {
-	resources := map[string]any{
-		"resources": []map[string]any{
-			{
-				"selector": map[string]string{
-					"apiVersion": "v1",
-					"kind":       "Pod",
+func TestKACs(t *testing.T) {
+	tests := map[string]struct {
+		resources map[string]any
+	}{
+		"emptyKAC": {resources: map[string]any{}},
+		"nonEmptyKAC": {resources: map[string]any{
+			"resources": []map[string]any{
+				{
+					"selector": map[string]string{
+						"apiVersion": "v1",
+						"kind":       "Pod",
+					},
+					"archiveWhen": "true",
+					"deleteWhen":  "status.phase == 'Succeeded'",
 				},
-				"archiveWhen": "true",
-				"deleteWhen":  "status.phase == 'Succeeded'",
 			},
 		},
-	}
-	runTest(t, nonEmptyKAC, resources)
-}
-
-func runTest(t testing.TB, testName Test, resources map[string]any) {
-	t.Helper()
-
-	clientset, dynaclient, errClient := test.GetKubernetesClient()
-	if errClient != nil {
-		t.Fatal(errClient)
-	}
-
-	// Create test namespace
-	namespaceName := fmt.Sprintf("test-%s", test.RandomString())
-	t.Log("Running test in namespace "+namespaceName)
-	_, errNamespace := clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: namespaceName,
 		},
-	}, metav1.CreateOptions{})
-	if errNamespace != nil {
-		t.Fatal(errNamespace)
 	}
-	// This register the function.
-	t.Cleanup(func() {
-		// delete the test namespace
-		errNamespace = clientset.CoreV1().Namespaces().Delete(context.Background(), namespaceName, metav1.DeleteOptions{})
-		if errNamespace != nil {
-			t.Fatal(errNamespace)
-		}
+	for name, values := range tests {
+		t.Run(name, func(t *testing.T) {
+			namespace, _ := test.CreateTestNamespace(t, false)
 
-		retryErr := retry.Do(func() error {
-			_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespaceName, metav1.GetOptions{})
-			if !errs.IsNotFound(getErr) {
-				return errors.New("Waiting for namespace "+namespaceName+" to be deleted")
-			}
-			return nil
-		}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
-
-		if retryErr != nil {
-			t.Log(retryErr)
-		}
-	})
-
-	kac := newKAC(namespaceName, resources)
-	gvr := kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
-	_, err := dynaclient.Resource(gvr).Namespace(namespaceName).Create(context.Background(), kac, metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
+			test.CreateKAC(t, namespace, values.resources)
+			checkResourcesAfterApply(t, namespace, name)
+			test.DeleteKAC(t, namespace)
+			checkResourcesAfterDelete(t, namespace, name)
+		})
 	}
-
-	checkResourcesAfterApply(t, namespaceName, testName)
-
-	err = dynaclient.Resource(gvr).Namespace(namespaceName).Delete(context.Background(), kacName, metav1.DeleteOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	checkResourcesAfterDelete(t, namespaceName, testName)
 }
 
-func checkResourcesAfterApply(t testing.TB, namespace string, testName Test) {
+func checkResourcesAfterApply(t testing.TB, namespace string, testName string) {
 	t.Helper()
 
-	clientset, dynaclient, _ := test.GetKubernetesClient()
+	clientset, dynaclient := test.GetKubernetesClient(t)
 
 	err := retry.Do(func() error {
 		gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
 		_, getErr := dynaclient.Resource(gvr).Namespace(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
-		if testName == emptyKAC {
+		if testName == "emptyKAC" {
 			if !errs.IsNotFound(getErr) {
 				return errors.New("Unexpectedly found an ApiServerSource.")
 			}
@@ -161,15 +105,15 @@ func checkResourcesAfterApply(t testing.TB, namespace string, testName Test) {
 	}
 }
 
-func checkResourcesAfterDelete(t testing.TB, namespace string, testName Test) {
+func checkResourcesAfterDelete(t testing.TB, namespace string, testName string) {
 	t.Helper()
 
-	clientset, dynaclient, _ := test.GetKubernetesClient()
+	clientset, dynaclient := test.GetKubernetesClient(t)
 
 	err := retry.Do(func() error {
 		gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
 		_, getErr := dynaclient.Resource(gvr).Namespace(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
-		if testName == emptyKAC || testName == nonEmptyKAC {
+		if testName == "emptyKAC" || testName == "nonEmptyKAC" {
 			if !errs.IsNotFound(getErr) {
 				return errors.New("Unexpectedly found an ApiServerSource.")
 			}
@@ -210,18 +154,66 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, testName Test) {
 	}
 }
 
-func newKAC(namespace string, resources map[string]any) *unstructured.Unstructured {
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"kind": "KubeArchiveConfig",
-			"apiVersion": fmt.Sprintf("%s/%s",
-				kubearchivev1alpha1.SchemeBuilder.GroupVersion.Group,
-				kubearchivev1alpha1.SchemeBuilder.GroupVersion.Version),
-			"metadata": map[string]string{
-				"name":      kacName,
-				"namespace": namespace,
+// Test that having both a global and local KubeArchiveConfig works. This is done by archiving Pods
+// in the global KubeArchiveConfig and Jobs in the local KubeArchiveConfig. Then run a job and verify
+// that the job logs can be retrieved.
+func TestGlobalAndLocalKAC(t *testing.T) {
+	t.Helper()
+
+	globalres := map[string]any{
+		"resources": []map[string]any{
+			{
+				"selector": map[string]string{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+				},
+				"archiveWhen": "status.phase == 'Succeeded'",
 			},
-			"spec": resources,
 		},
 	}
+	localres := map[string]any{
+		"resources": []map[string]any{
+			{
+				"selector": map[string]string{
+					"apiVersion": "batch/v1",
+					"kind":       "Job",
+				},
+				"archiveWhen": "has(status.completionTime)",
+			},
+		},
+	}
+
+	clientset, _ := test.GetKubernetesClient(t)
+	port := test.PortForwardApiServer(t, clientset)
+	namespace, token := test.CreateTestNamespace(t, false)
+
+	test.CreateKAC(t, test.K9eNamespace, globalres)
+	test.CreateKAC(t, namespace, localres)
+
+	job := test.RunLogGenerator(t, namespace)
+	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespace, job)
+	retryErr := retry.Do(func() error {
+		body, err := test.GetLogs(t, token.Status.Token, url)
+		if err != nil {
+			return err
+		}
+
+		if len(body) == 0 {
+			return errors.New("could not retrieve the job log")
+		}
+		t.Log("Successfully retrieved logs")
+
+		bodyString := string(body)
+		if len(strings.Split(bodyString, "\n")) != 11 {
+			return fmt.Errorf("expected 11 lines, currently '%d'. Trying again...", len(strings.Split(bodyString, "\n")))
+		}
+
+		return nil
+	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+
+	test.DeleteKAC(t, test.K9eNamespace)
 }

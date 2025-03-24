@@ -5,6 +5,7 @@ package facade
 
 import (
 	"database/sql"
+	"time"
 
 	"github.com/huandu/go-sqlbuilder"
 )
@@ -13,6 +14,7 @@ import (
 type DBInserter interface {
 	ResourceInserter(
 		uuid, apiVersion, kind, name, namespace, version string,
+		clusterUpdatedTs time.Time,
 		clusterDeletedTs sql.NullString,
 		data []byte,
 	) *sqlbuilder.InsertBuilder

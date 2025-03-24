@@ -161,7 +161,7 @@ func (f *Database) filterResourceByKindApiVersionNamespaceAndName(kind, apiVersi
 	return filteredResources
 }
 
-func (f *Database) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte) error {
+func (f *Database) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte, _ time.Time) error {
 	if f.err != nil {
 		return f.err
 	}

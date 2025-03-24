@@ -18,6 +18,7 @@ import (
 	"github.com/cloudevents/sdk-go/v2/protocol"
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/sink/filters"
+	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	"github.com/kubearchive/kubearchive/cmd/sink/logs"
 	"github.com/kubearchive/kubearchive/pkg/abort"
 	"github.com/kubearchive/kubearchive/pkg/database"
@@ -110,9 +111,10 @@ func (c *Controller) writeLogs(ctx context.Context, obj *unstructured.Unstructur
 }
 
 func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstructured, event cloudevents.Event) error {
+	lastUpdateTs := k8s.GetLastUpdateTs(obj)
 	dbCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
-	err := c.Db.WriteResource(dbCtx, obj, event.Data())
+	err := c.Db.WriteResource(dbCtx, obj, event.Data(), lastUpdateTs)
 	if err != nil {
 		slog.Error(
 			"Failed to write object from cloudevent to the database",

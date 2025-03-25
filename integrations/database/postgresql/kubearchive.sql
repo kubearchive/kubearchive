@@ -210,14 +210,14 @@ CREATE INDEX idx_creation_timestamp_id ON public.resource USING btree ((((data -
 -- Name: idx_json_annotations; Type: INDEX; Schema: public; Owner: kubearchive
 --
 
-CREATE INDEX idx_json_annotations ON public.resource USING gin ((((data -> 'metadata'::text) -> 'annotations'::text)) jsonb_path_ops);
+CREATE INDEX idx_json_annotations ON public.resource USING gin ((((data -> 'metadata'::text) -> 'annotations'::text)));
 
 
 --
 -- Name: idx_json_labels; Type: INDEX; Schema: public; Owner: kubearchive
 --
 
-CREATE INDEX idx_json_labels ON public.resource USING gin ((((data -> 'metadata'::text) -> 'labels'::text)) jsonb_path_ops);
+CREATE INDEX idx_json_labels ON public.resource USING gin ((((data -> 'metadata'::text) -> 'labels'::text)));
 
 
 --

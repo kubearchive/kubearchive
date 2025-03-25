@@ -41,6 +41,14 @@ type DBInterface interface {
 	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error
 	Ping(ctx context.Context) error
 	CloseDB() error
+
+	getSelector() facade.DBSelector
+	getFilter() facade.DBFilter
+	getSorter() facade.DBSorter
+	getInserter() facade.DBInserter
+	getDeleter() facade.DBDeleter
+	getFlavor() sqlbuilder.Flavor
+	setConn(*sqlx.DB)
 }
 
 type Database struct {
@@ -411,4 +419,32 @@ func (db *Database) WriteUrls(
 
 func (db *Database) CloseDB() error {
 	return db.DB.Close()
+}
+
+func (db *Database) getSelector() facade.DBSelector {
+	return db.Selector
+}
+
+func (db *Database) getFilter() facade.DBFilter {
+	return db.Filter
+}
+
+func (db *Database) getInserter() facade.DBInserter {
+	return db.Inserter
+}
+
+func (db *Database) getSorter() facade.DBSorter {
+	return db.Sorter
+}
+
+func (db *Database) getDeleter() facade.DBDeleter {
+	return db.Deleter
+}
+
+func (db *Database) getFlavor() sqlbuilder.Flavor {
+	return db.Flavor
+}
+
+func (db *Database) setConn(conn *sqlx.DB) {
+	db.DB = conn
 }

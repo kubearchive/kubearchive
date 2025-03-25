@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
@@ -61,32 +62,41 @@ type Database struct {
 	Deleter  facade.DBDeleter
 }
 
+var db DBInterface
+var once sync.Once
+
 func NewDatabase() (DBInterface, error) {
-	env, err := newDatabaseEnvironment()
-	if err != nil {
-		return nil, err
-	}
+	var err error
 
-	var creator facade.DBCreator
-	if c, ok := RegisteredDBCreators[env[DbKindEnvVar]]; ok {
-		creator = c(env)
-	} else {
-		return nil, fmt.Errorf("no database registered with name '%s'", env[DbKindEnvVar])
-	}
+	once.Do(func() {
+		env, newDBErr := newDatabaseEnvironment()
+		if newDBErr != nil {
+			err = newDBErr
+			return
+		}
 
-	conn, err := establishConnection(creator.GetDriverName(), creator.GetConnectionString())
-	if err != nil {
-		return nil, err
-	}
+		var creator facade.DBCreator
+		if c, ok := RegisteredDBCreators[env[DbKindEnvVar]]; ok {
+			creator = c(env)
+		} else {
+			err = fmt.Errorf("no database registered with name '%s'", env[DbKindEnvVar])
+			return
+		}
 
-	var database DBInterface
-	if init, ok := RegisteredDatabases[env[DbKindEnvVar]]; ok {
-		database = init(conn)
-	} else {
-		return nil, fmt.Errorf("no database registered with name '%s'", env[DbKindEnvVar])
-	}
+		conn, errConn := establishConnection(creator.GetDriverName(), creator.GetConnectionString())
+		if errConn != nil {
+			err = errConn
+			return
+		}
 
-	return database, nil
+		if init, ok := RegisteredDatabases[env[DbKindEnvVar]]; ok {
+			db = init(conn)
+		} else {
+			err = fmt.Errorf("no database registered with name '%s'", env[DbKindEnvVar])
+		}
+	})
+
+	return db, err
 }
 
 func (db *Database) Ping(ctx context.Context) error {

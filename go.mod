@@ -11,7 +11,7 @@ require (
 	github.com/XSAM/otelsql v0.37.0
 	github.com/avast/retry-go/v4 v4.6.1
 	github.com/cloudevents/sdk-go/observability/opentelemetry/v2 v2.15.2
-	github.com/cloudevents/sdk-go/v2 v2.15.2
+	github.com/cloudevents/sdk-go/v2 v2.16.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-logr/logr v1.4.2
 	github.com/go-sql-driver/mysql v1.9.1

@@ -106,11 +106,7 @@ func (db *Database) Ping(ctx context.Context) error {
 func (db *Database) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error) {
 	sb := db.Selector.ResourceSelector()
-	sb.Where(
-		db.Filter.KindFilter(sb.Cond, kind),
-		db.Filter.ApiVersionFilter(sb.Cond, apiVersion),
-	)
-
+	sb.Where(db.Filter.KindApiVersionFilter(sb.Cond, kind, apiVersion))
 	if namespace != "" {
 		sb.Where(db.Filter.NamespaceFilter(sb.Cond, namespace))
 	}
@@ -210,8 +206,7 @@ func (db *Database) QueryLogURL(ctx context.Context, kind, apiVersion, namespace
 		sb := db.Selector.ResourceSelector()
 		sb = db.Sorter.CreationTSAndIDSorter(sb) // If resources are named the same, select the newest
 		sb.Where(
-			db.Filter.KindFilter(sb.Cond, kind),
-			db.Filter.ApiVersionFilter(sb.Cond, apiVersion),
+			db.Filter.KindApiVersionFilter(sb.Cond, kind, apiVersion),
 			db.Filter.NamespaceFilter(sb.Cond, namespace),
 			db.Filter.NameFilter(sb.Cond, name),
 		)
@@ -223,8 +218,7 @@ func (db *Database) QueryLogURL(ctx context.Context, kind, apiVersion, namespace
 	sb := db.Selector.UUIDResourceSelector()
 	sb = db.Sorter.CreationTSAndIDSorter(sb) // If resources are named the same, select the newest
 	sb.Where(
-		db.Filter.KindFilter(sb.Cond, kind),
-		db.Filter.ApiVersionFilter(sb.Cond, apiVersion),
+		db.Filter.KindApiVersionFilter(sb.Cond, kind, apiVersion),
 		db.Filter.NamespaceFilter(sb.Cond, namespace),
 		db.Filter.NameFilter(sb.Cond, name),
 	)

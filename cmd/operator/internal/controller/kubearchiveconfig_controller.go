@@ -166,9 +166,7 @@ func (r *KubeArchiveConfigReconciler) cleanupK9eResources(ctx context.Context, k
 
 	log.Info("in cleanupK9eResources")
 
-	// Empty out resources on KubeArchiveConfig so they are removed from the filter ConfigMap.
-	kaconfig.Spec.Resources = []kubearchivev1alpha1.KubeArchiveConfigResource{}
-	cm, err := r.reconcileFilterConfigMap(ctx, kaconfig)
+	cm, err := r.deleteNamespaceFromFilterConfigMap(ctx, kaconfig)
 	if err != nil {
 		return err
 	}
@@ -591,7 +589,6 @@ func (r *KubeArchiveConfigReconciler) reconcileFilterConfigMap(ctx context.Conte
 
 	log.Info("in reconcileFilterConfigMap")
 
-	log.Info("in reconcileFilterConfigMap: ConfigMap => " + SinkFilterConfigMapName + ", Namespace => " + k9eNs)
 	cm := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: k9eNs}, cm)
 	if err == nil {
@@ -643,20 +640,38 @@ func (r *KubeArchiveConfigReconciler) desiredFilterConfigMap(ctx context.Context
 		cm.Data = make(map[string]string)
 	}
 
-	if len(kaconfig.Spec.Resources) > 0 {
-		yamlBytes, err := yaml.Marshal(kaconfig.Spec.Resources)
-		if err != nil {
-			log.Error(err, "Failed to convert KubeArchiveConfig resources to JSON")
-			return cm, err
-		}
-
-		cm.Data[kaconfig.Namespace] = string(yamlBytes)
-	} else {
-		delete(cm.Data, kaconfig.Namespace)
+	yamlBytes, err := yaml.Marshal(kaconfig.Spec.Resources)
+	if err != nil {
+		log.Error(err, "Failed to convert KubeArchiveConfig resources to JSON")
+		return cm, err
 	}
+
+	cm.Data[kaconfig.Namespace] = string(yamlBytes)
 
 	// Note that the owner reference is NOT set on the ConfigMap.  It should not be deleted when
 	// the KubeArchiveConfig object is deleted.
+	return cm, nil
+}
+
+func (r *KubeArchiveConfigReconciler) deleteNamespaceFromFilterConfigMap(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.ConfigMap, error) {
+	log := log.FromContext(ctx)
+
+	log.Info("in deleteNamespaceFromFilterConfigMap")
+
+	cm := &corev1.ConfigMap{}
+	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: k9eNs}, cm)
+	if err == nil {
+		delete(cm.Data, kaconfig.Namespace)
+		err = r.Update(ctx, cm)
+		if err != nil {
+			log.Error(err, "Failed to remove namespace '"+kaconfig.Namespace+"' from filter ConfigMap "+SinkFilterConfigMapName)
+			return nil, err
+		}
+	} else {
+		log.Error(err, "Failed to get filter ConfigMap "+SinkFilterConfigMapName)
+		return nil, err
+	}
+
 	return cm, nil
 }
 

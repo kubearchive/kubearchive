@@ -4,6 +4,9 @@
 name: golangci-lint
 run-name: Linting Tests (golangci-lint)
 on:
+  schedule:
+    # 9:25 UTC every 1st of month
+    - cron: '25 09 1 * *'
   push:
     branches:
       - 'main'
@@ -19,7 +22,7 @@ jobs:
     uses: ./.github/workflows/log_run_details.yml
   golangci:
     # See https://github.com/golangci/golangci-lint-action
-    name: "golangci-lint security testing"
+    name: GolangCI Lint
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
@@ -36,4 +39,22 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          only-new-issues: true
+          # When is scheduled, show all issues
+          only-new-issues: ${{ github.event_name != 'schedule' }}
+      - name: Notify golangci-lint failed
+        uses: jayqi/failed-build-issue-action@v1
+        if: failure() && github.event_name == 'schedule' && github.repository == 'kubearchive/kubearchive'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          title-template: GolangCI Linting found errors
+          body-template: |
+            The scheduled workflow of GolangCI Lint found some problems. We run this scheduled
+            against the whole codebase, so when a PR is submitted authors do not need to deal with
+            problems they did not introduce. However we need to solve those problems from time to time.
+            The URL of the failed job is:
+
+            https://github.com/kubearchive/kubearchive/actions/runs/{{ runId }}
+
+            Run `golanci-lint` to see the errors locally, visit the worfklow run, make sure the problems
+            you found locally match. Investigate if they do not match. Solve the problems and open a
+            pull request to solve them.

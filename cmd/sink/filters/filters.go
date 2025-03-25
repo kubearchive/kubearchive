@@ -211,7 +211,7 @@ func (f *Filters) Update() (UpdateStopper, error) {
 			metav1.SingleObject(metav1.ObjectMeta{Name: filtersCmName, Namespace: globalKey}),
 		)
 	}
-	retryWatcher, err := toolsWatch.NewRetryWatcher("1", &cache.ListWatch{WatchFunc: watcher})
+	retryWatcher, err := toolsWatch.NewRetryWatcherWithContext(context.Background(), "1", &cache.ListWatch{WatchFunc: watcher})
 	if err != nil {
 		return noopUpdateStopper, fmt.Errorf("Could not create a watcher for the %s ConfigMap: %s", filtersCmName, err)
 	}

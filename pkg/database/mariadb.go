@@ -15,32 +15,32 @@ import (
 )
 
 func init() {
-	RegisteredDatabases["mariadb"] = NewMariaDBDatabase
-	RegisteredDBCreators["mariadb"] = NewMariaDBCreator
+	RegisteredDatabases["mariadb"] = newMariaDBDatabase
+	RegisteredDBCreators["mariadb"] = newMariaDBCreator
 }
 
-type MariaDBDatabaseCreator struct {
+type mariaDBDatabaseCreator struct {
 	env map[string]string
 }
 
-func NewMariaDBCreator(env map[string]string) facade.DBCreator {
-	return &MariaDBDatabaseCreator{env: env}
+func newMariaDBCreator(env map[string]string) facade.DBCreator {
+	return &mariaDBDatabaseCreator{env: env}
 }
 
-func (creator MariaDBDatabaseCreator) GetDriverName() string {
+func (creator mariaDBDatabaseCreator) GetDriverName() string {
 	return "mysql"
 }
 
-func (creator MariaDBDatabaseCreator) GetConnectionString() string {
+func (creator mariaDBDatabaseCreator) GetConnectionString() string {
 	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", creator.env[DbUserEnvVar],
 		creator.env[DbPasswordEnvVar], creator.env[DbHostEnvVar], creator.env[DbPortEnvVar], creator.env[DbNameEnvVar])
 }
 
-type MariaDBSelector struct {
+type mariaDBSelector struct {
 	facade.PartialDBSelectorImpl
 }
 
-func (MariaDBSelector) ResourceSelector() *sqlbuilder.SelectBuilder {
+func (mariaDBSelector) ResourceSelector() *sqlbuilder.SelectBuilder {
 	sb := sqlbuilder.NewSelectBuilder()
 	return sb.Select(
 		sb.As("JSON_VALUE(data, '$.metadata.creationTimestamp')", "created_at"),
@@ -49,7 +49,7 @@ func (MariaDBSelector) ResourceSelector() *sqlbuilder.SelectBuilder {
 	).From("resource")
 }
 
-func (MariaDBSelector) OwnedResourceSelector() *sqlbuilder.SelectBuilder {
+func (mariaDBSelector) OwnedResourceSelector() *sqlbuilder.SelectBuilder {
 	sb := sqlbuilder.NewSelectBuilder()
 	return sb.Select(
 		"uuid",
@@ -58,65 +58,65 @@ func (MariaDBSelector) OwnedResourceSelector() *sqlbuilder.SelectBuilder {
 	).From("resource")
 }
 
-type MariaDBFilter struct {
+type mariaDBFilter struct {
 	facade.PartialDBFilterImpl
 }
 
-func (MariaDBFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string {
+func (mariaDBFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string {
 	return cond.Var(sqlbuilder.Build(
 		"(CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime), uuid) < ($?, $?)",
 		continueDate, continueId,
 	))
 }
 
-func (MariaDBFilter) OwnerFilter(cond sqlbuilder.Cond, uuids []string) string {
+func (mariaDBFilter) OwnerFilter(cond sqlbuilder.Cond, uuids []string) string {
 	return cond.Var(sqlbuilder.Build(
 		"JSON_OVERLAPS(JSON_EXTRACT(data, '$.metadata.ownerReferences.**.uid'), JSON_ARRAY($?))",
 		sqlbuilder.List(uuids),
 	))
 }
 
-func (MariaDBFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+func (mariaDBFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
 	// TODO
 	return ""
 }
 
-func (MariaDBFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+func (mariaDBFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
 	// TODO
 	return ""
 }
 
-func (MariaDBFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (mariaDBFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
 	// TODO
 	return ""
 }
 
-func (MariaDBFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (mariaDBFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
 	// TODO
 	return ""
 }
 
-func (MariaDBFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+func (mariaDBFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
 	// TODO
 	return ""
 }
 
-func (MariaDBFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+func (mariaDBFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
 	// TODO
 	return ""
 }
 
-type MariaDBSorter struct{}
+type mariaDBSorter struct{}
 
-func (MariaDBSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {
+func (mariaDBSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {
 	return sb.OrderBy("CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime) DESC", "id DESC")
 }
 
-type MariaDBInserter struct {
+type mariaDBInserter struct {
 	facade.PartialDBInserterImpl
 }
 
-func (MariaDBInserter) ResourceInserter(
+func (mariaDBInserter) ResourceInserter(
 	uuid, apiVersion, kind, name, namespace, version string,
 	clusterUpdatedTs time.Time,
 	clusterDeletedTs sql.NullString,
@@ -140,18 +140,18 @@ func (MariaDBInserter) ResourceInserter(
 	return ib
 }
 
-type MariaDBDatabase struct {
-	*Database
+type mariaDBDatabase struct {
+	*DatabaseImpl
 }
 
-func NewMariaDBDatabase(conn *sqlx.DB) DBInterface {
-	return MariaDBDatabase{&Database{
-		DB:       conn,
-		Flavor:   sqlbuilder.MySQL,
-		Selector: MariaDBSelector{},
-		Filter:   MariaDBFilter{},
-		Sorter:   MariaDBSorter{},
-		Inserter: MariaDBInserter{},
-		Deleter:  facade.DBDeleterImpl{},
+func newMariaDBDatabase(conn *sqlx.DB) DBInterface {
+	return mariaDBDatabase{&DatabaseImpl{
+		db:       conn,
+		flavor:   sqlbuilder.MySQL,
+		selector: mariaDBSelector{},
+		filter:   mariaDBFilter{},
+		sorter:   mariaDBSorter{},
+		inserter: mariaDBInserter{},
+		deleter:  facade.DBDeleterImpl{},
 	}}
 }

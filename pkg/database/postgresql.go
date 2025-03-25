@@ -19,32 +19,32 @@ import (
 )
 
 func init() {
-	RegisteredDatabases["postgresql"] = NewPostgreSQLDatabase
-	RegisteredDBCreators["postgresql"] = NewPostgreSQLCreator
+	RegisteredDatabases["postgresql"] = newPostgreSQLDatabase
+	RegisteredDBCreators["postgresql"] = newPostgreSQLCreator
 }
 
-type PostgreSQLCreator struct {
+type postgreSQLCreator struct {
 	env map[string]string
 }
 
-func NewPostgreSQLCreator(env map[string]string) facade.DBCreator {
-	return PostgreSQLCreator{env: env}
+func newPostgreSQLCreator(env map[string]string) facade.DBCreator {
+	return postgreSQLCreator{env: env}
 }
 
-func (creator PostgreSQLCreator) GetDriverName() string {
+func (creator postgreSQLCreator) GetDriverName() string {
 	return "postgres"
 }
 
-func (creator PostgreSQLCreator) GetConnectionString() string {
+func (creator postgreSQLCreator) GetConnectionString() string {
 	return fmt.Sprintf("user=%s password=%s dbname=%s host=%s port=%s sslmode=require", creator.env[DbUserEnvVar],
 		creator.env[DbPasswordEnvVar], creator.env[DbNameEnvVar], creator.env[DbHostEnvVar], creator.env[DbPortEnvVar])
 }
 
-type PostgreSQLSelector struct {
+type postgreSQLSelector struct {
 	facade.PartialDBSelectorImpl
 }
 
-func (PostgreSQLSelector) ResourceSelector() *sqlbuilder.SelectBuilder {
+func (postgreSQLSelector) ResourceSelector() *sqlbuilder.SelectBuilder {
 	sb := sqlbuilder.NewSelectBuilder()
 	return sb.Select(
 		sb.As("data->'metadata'->>'creationTimestamp'", "created_at"),
@@ -53,7 +53,7 @@ func (PostgreSQLSelector) ResourceSelector() *sqlbuilder.SelectBuilder {
 	).From("resource")
 }
 
-func (PostgreSQLSelector) OwnedResourceSelector() *sqlbuilder.SelectBuilder {
+func (postgreSQLSelector) OwnedResourceSelector() *sqlbuilder.SelectBuilder {
 	sb := sqlbuilder.NewSelectBuilder()
 	return sb.Select(
 		"uuid",
@@ -62,39 +62,39 @@ func (PostgreSQLSelector) OwnedResourceSelector() *sqlbuilder.SelectBuilder {
 	).From("resource")
 }
 
-type PostgreSQLFilter struct {
+type postgreSQLFilter struct {
 	facade.PartialDBFilterImpl
 }
 
-func (PostgreSQLFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string {
+func (postgreSQLFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string {
 	return cond.Var(sqlbuilder.Build(
 		"(data->'metadata'->>'creationTimestamp', id) < ($?, $?)",
 		continueDate, continueId,
 	))
 }
 
-func (PostgreSQLFilter) OwnerFilter(cond sqlbuilder.Cond, owners []string) string {
+func (postgreSQLFilter) OwnerFilter(cond sqlbuilder.Cond, owners []string) string {
 	return cond.Var(sqlbuilder.Build(
 		"jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| $?",
 		pq.Array(owners),
 	))
 }
 
-func (PostgreSQLFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+func (postgreSQLFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
 	return cond.Var(sqlbuilder.Build(
 		"data->'metadata'->'labels' ?& $?",
 		pq.Array(labels),
 	))
 }
 
-func (PostgreSQLFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
+func (postgreSQLFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
 	return cond.Var(sqlbuilder.Build(
 		"NOT data->'metadata'->'labels' ?| $?",
 		pq.Array(labels),
 	))
 }
 
-func (PostgreSQLFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (postgreSQLFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
 	jsonLabels, _ := json.Marshal(labels)
 	return cond.Var(sqlbuilder.Build(
 		"data->'metadata'->'labels' @> $?",
@@ -102,7 +102,7 @@ func (PostgreSQLFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[strin
 	))
 }
 
-func (PostgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
+func (postgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
 	jsons := make([]string, 0)
 	for key, value := range labels {
 		jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
@@ -113,7 +113,7 @@ func (PostgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[st
 	))
 }
 
-func (PostgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+func (postgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
 	clauses := make([]string, 0)
 	for key, values := range labels {
 		jsons := make([]string, 0)
@@ -128,7 +128,7 @@ func (PostgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]
 	return cond.And(clauses...)
 }
 
-func (f PostgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
+func (f postgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
 	keys := maps.Keys(labels)
 	jsons := make([]string, 0)
 	for key, values := range labels {
@@ -143,17 +143,17 @@ func (f PostgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[stri
 	return cond.And(f.ExistsLabelFilter(cond, slices.Collect(keys)), notContainsClause)
 }
 
-type PostgreSQLSorter struct{}
+type postgreSQLSorter struct{}
 
-func (PostgreSQLSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {
+func (postgreSQLSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {
 	return sb.OrderBy("data->'metadata'->>'creationTimestamp' DESC", "id DESC")
 }
 
-type PostgreSQLInserter struct {
+type postgreSQLInserter struct {
 	facade.PartialDBInserterImpl
 }
 
-func (PostgreSQLInserter) ResourceInserter(
+func (postgreSQLInserter) ResourceInserter(
 	uuid, apiVersion, kind, name, namespace, version string,
 	clusterUpdatedTs time.Time,
 	clusterDeletedTs sql.NullString,
@@ -177,18 +177,18 @@ func (PostgreSQLInserter) ResourceInserter(
 	return ib
 }
 
-type PostgreSQLDatabase struct {
-	*Database
+type postgreSQLDatabase struct {
+	*DatabaseImpl
 }
 
-func NewPostgreSQLDatabase(conn *sqlx.DB) DBInterface {
-	return PostgreSQLDatabase{&Database{
-		DB:       conn,
-		Flavor:   sqlbuilder.PostgreSQL,
-		Selector: PostgreSQLSelector{},
-		Filter:   PostgreSQLFilter{},
-		Sorter:   PostgreSQLSorter{},
-		Inserter: PostgreSQLInserter{},
-		Deleter:  facade.DBDeleterImpl{},
+func newPostgreSQLDatabase(conn *sqlx.DB) DBInterface {
+	return postgreSQLDatabase{&DatabaseImpl{
+		db:       conn,
+		flavor:   sqlbuilder.PostgreSQL,
+		selector: postgreSQLSelector{},
+		filter:   postgreSQLFilter{},
+		sorter:   postgreSQLSorter{},
+		inserter: postgreSQLInserter{},
+		deleter:  facade.DBDeleterImpl{},
 	}}
 }

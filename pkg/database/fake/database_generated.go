@@ -47,8 +47,8 @@ type LogUrlRow struct {
 	JsonPath      string
 }
 
-type Database struct {
-	database.Database
+type fakeDatabase struct {
+	database.DatabaseImpl
 	resources []*unstructured.Unstructured
 	logUrl    []LogUrlRow
 	jsonPath  string
@@ -56,46 +56,46 @@ type Database struct {
 	urlErr    error
 }
 
-func NewFakeDatabase(testResources []*unstructured.Unstructured, testLogs []LogUrlRow, jsonPath string) *Database {
-	return &Database{resources: testResources, logUrl: testLogs, jsonPath: jsonPath}
+func NewFakeDatabase(testResources []*unstructured.Unstructured, testLogs []LogUrlRow, jsonPath string) *fakeDatabase {
+	return &fakeDatabase{resources: testResources, logUrl: testLogs, jsonPath: jsonPath}
 }
 
-func NewFakeDatabaseWithError(err error) *Database {
+func NewFakeDatabaseWithError(err error) *fakeDatabase {
 	var (
 		resources []*unstructured.Unstructured
 		logUrls   []LogUrlRow
 	)
-	return &Database{resources: resources, logUrl: logUrls, err: err}
+	return &fakeDatabase{resources: resources, logUrl: logUrls, err: err}
 }
 
-func NewFakeDatabaseWithUrlError(err error) *Database {
+func NewFakeDatabaseWithUrlError(err error) *fakeDatabase {
 	var (
 		resources []*unstructured.Unstructured
 		logUrls   []LogUrlRow
 	)
-	return &Database{resources: resources, logUrl: logUrls, urlErr: err}
+	return &fakeDatabase{resources: resources, logUrl: logUrls, urlErr: err}
 }
 
-func (f *Database) Ping(_ context.Context) error {
+func (f *fakeDatabase) Ping(_ context.Context) error {
 	return f.err
 }
 
-func (f *Database) TestConnection(_ map[string]string) error {
+func (f *fakeDatabase) TestConnection(_ map[string]string) error {
 	return f.err
 }
 
-func (f *Database) queryResources(_ context.Context, kind, version, _, _ string, _ int) []*unstructured.Unstructured {
+func (f *fakeDatabase) queryResources(_ context.Context, kind, version, _, _ string, _ int) []*unstructured.Unstructured {
 	return f.filterResourcesByKindAndApiVersion(kind, version)
 }
 
-func (f *Database) QueryLogURL(_ context.Context, _, _, _, _ string) (string, string, error) {
+func (f *fakeDatabase) QueryLogURL(_ context.Context, _, _, _, _ string) (string, string, error) {
 	if len(f.logUrl) == 0 {
 		return "", "", f.err
 	}
 	return f.logUrl[0].Url, f.jsonPath, f.err
 }
 
-func (f *Database) QueryResources(ctx context.Context, kind, version, namespace, name,
+func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namespace, name,
 	continueId, continueDate string, _ *database.LabelFilters, limit int) ([]string, int64, string, error) {
 	var resources []*unstructured.Unstructured
 
@@ -127,12 +127,12 @@ func (f *Database) QueryResources(ctx context.Context, kind, version, namespace,
 	return stringResources, id, date, f.err
 }
 
-func (f *Database) queryNamespacedResourceByName(_ context.Context, kind, version, namespace, name string,
+func (f *fakeDatabase) queryNamespacedResourceByName(_ context.Context, kind, version, namespace, name string,
 ) []*unstructured.Unstructured {
 	return f.filterResourceByKindApiVersionNamespaceAndName(kind, version, namespace, name)
 }
 
-func (f *Database) filterResourcesByKindAndApiVersion(kind, apiVersion string) []*unstructured.Unstructured {
+func (f *fakeDatabase) filterResourcesByKindAndApiVersion(kind, apiVersion string) []*unstructured.Unstructured {
 	var filteredResources []*unstructured.Unstructured
 	for _, resource := range f.resources {
 		if resource.GetKind() == kind && resource.GetAPIVersion() == apiVersion {
@@ -142,7 +142,7 @@ func (f *Database) filterResourcesByKindAndApiVersion(kind, apiVersion string) [
 	return filteredResources
 }
 
-func (f *Database) filterResourcesByKindApiVersionAndNamespace(kind, apiVersion, namespace string) []*unstructured.Unstructured {
+func (f *fakeDatabase) filterResourcesByKindApiVersionAndNamespace(kind, apiVersion, namespace string) []*unstructured.Unstructured {
 	var filteredResources []*unstructured.Unstructured
 	for _, resource := range f.resources {
 		if resource.GetKind() == kind && resource.GetAPIVersion() == apiVersion && resource.GetNamespace() == namespace {
@@ -152,7 +152,7 @@ func (f *Database) filterResourcesByKindApiVersionAndNamespace(kind, apiVersion,
 	return filteredResources
 }
 
-func (f *Database) filterResourceByKindApiVersionNamespaceAndName(kind, apiVersion, namespace, name string) []*unstructured.Unstructured {
+func (f *fakeDatabase) filterResourceByKindApiVersionNamespaceAndName(kind, apiVersion, namespace, name string) []*unstructured.Unstructured {
 	var filteredResources []*unstructured.Unstructured
 	for _, resource := range f.resources {
 		if resource.GetKind() == kind && resource.GetAPIVersion() == apiVersion && resource.GetNamespace() == namespace && resource.GetName() == name {
@@ -162,7 +162,7 @@ func (f *Database) filterResourceByKindApiVersionNamespaceAndName(kind, apiVersi
 	return filteredResources
 }
 
-func (f *Database) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte, _ time.Time) error {
+func (f *fakeDatabase) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte, _ time.Time) error {
 	if f.err != nil {
 		return f.err
 	}
@@ -170,7 +170,7 @@ func (f *Database) WriteResource(_ context.Context, k8sObj *unstructured.Unstruc
 	return nil
 }
 
-func (f *Database) WriteUrls(_ context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error {
+func (f *fakeDatabase) WriteUrls(_ context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error {
 	if f.urlErr != nil {
 		return f.urlErr
 	}
@@ -193,14 +193,14 @@ func (f *Database) WriteUrls(_ context.Context, k8sObj *unstructured.Unstructure
 	return nil
 }
 
-func (f *Database) NumResources() int {
+func (f *fakeDatabase) NumResources() int {
 	return len(f.resources)
 }
 
-func (f *Database) NumLogUrls() int {
+func (f *fakeDatabase) NumLogUrls() int {
 	return len(f.logUrl)
 }
 
-func (f *Database) CloseDB() error {
+func (f *fakeDatabase) CloseDB() error {
 	return f.err
 }

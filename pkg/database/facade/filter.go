@@ -5,7 +5,7 @@ package facade
 
 import "github.com/huandu/go-sqlbuilder"
 
-// DBFilter encapsulates all the Filter functions that must be implemented by the drivers
+// DBFilter encapsulates all the filter functions that must be implemented by the drivers
 // All its functions share the same signature
 type DBFilter interface {
 	KindApiVersionFilter(cond sqlbuilder.Cond, kind, apiVersion string) string

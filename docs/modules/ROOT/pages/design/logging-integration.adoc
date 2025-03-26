@@ -97,17 +97,22 @@ In this case the following happens:
 - `TaskRuns` are archived when they are deleted.
 - `Pods` are archived when they are deleted and are also part of a Tekton `Pipeline`.
 
-== Generating Log URLs [[generating_log_urls]]
+== Configuration
 
-The logging system is an integration in KubeArchive. All that is required for
-the integration is the successful generation of a URL to access the log for a
-specific `Pod` in the logging system. URLs will ONLY be generated for `Pods`.
+The logging system is an integration in KubeArchive.
+The integration requires the successful generation of a URL to access the log for a
+specific `Pod` in the logging system and the credentials
+to access that logging system. URLs will ONLY be generated for `Pods`.
+
+=== ConfigMap
 
 To support multiple logging systems, the URLs must be able to be parameterized
 based on the logging system. This is done via a `ConfigMap` named
-`kubearchive-logging`. This `ConfigMap` requires a single entry,
-LOG_URL, whose string value will be interpolated using the other variables
-defined in the `ConfigMap`.  For example, take this `ConfigMap` for Splunk:
+`kubearchive-logging`.
+The ConfigMap contains entries that are used to generate logging URLs.
+The only required key in this ConfigMap is `LOG_URL`.
+
+.Example of kubearchive-logging ConfigMap for Splunk
 [source,yaml]
 ----
 ---
@@ -117,34 +122,43 @@ metadata:
   name: kubearchive-logging
   namespace: kubearchive
 data:
-  # NOTE: CONTAINER_NAME is provided at URL generation time by KubeArchive.
-  POD_ID: "cel:metadata.uid"
-  LOG_URL: "https://localhost:8089/services/search/jobs/export?search=search%20%2A%20%7C%20spath%20%22kubernetes.pod_id%22%20%7C%20search%20%22kubernetes.pod_id%22%3D%22{POD_ID}%22%20%7C%20spath%20%22kubernetes.container_name%22%20%7C%20search%20%22kubernetes.container_name%22%3D%22{CONTAINER_NAME}%22%20%7C%20sort%20time%20%7C%20table%20%22message%22&output_mode=json"
-  LOG_URL_JSONPATH: "$.hits.hits[*]._source.message"
+  # CONTAINER_NAME: "cel:spec.containers.map(m, m.name)" <1>
+  POD_ID: "cel:metadata.uid" <2>
+  LOG_URL: "https://splunk-single-standalone-service.splunk-operator.svc.cluster.local:8089/services/search/jobs/export?search=search%20%2A%20%7C%20spath%20%22kubernetes.pod_id%22%20%7C%20search%20%22kubernetes.pod_id%22%3D%22{POD_ID}%22%20%7C%20spath%20%22kubernetes.container_name%22%20%7C%20search%20%22kubernetes.container_name%22%3D%22{CONTAINER_NAME}%22%20%7C%20sort%20time%20%7C%20table%20%22message%22&output_mode=json" <3>
+  LOG_URL_JSONPATH: "$.hits.hits[*]._source.message" <4>
 ----
-The value of each variable is either a string or a CEL expression. A value that
-begins with the prefix "cel:" will be evaluated as a CEL expression against the
-body of the cloud event (that is the resource) to determine the real value of that
-variable used in the substitution. For example:
 
-So when generating the logging URL to be stored when a `Pod` is archived,
-the following steps are done:
+<1> The `CONTAINER_NAME` parameter is provided at URL generation time by KubeArchive.
+<2> The string to replace `POD_ID` inside the `LOG_URL` template.
+If it's prefixed with `cel:`, it is considered as a CEL expression to locate its value
+within the body of the Cloud Event where the resource is stored.
+<3> The template for the log URL. The `CONTAINER_NAME` variable is allowed
+even if it's not defined in the `ConfigMap` as it's provided at URL generation time.
+<4> Optional
+link:https://goessner.net/articles/JsonPath/[JSONPath Expression]
+applied by the API Server to the output of the response body.
 
-1. A map is created and populated all non-CEL expression key-value pairs from the `ConfigMap`.
-1. The key `CONTAINER_NAME` with the value `cel:spec.containers.map(m, m.name)` is added to the
-   map. If the `ConfigMap` contained the key `CONTAINER_NAME`, its value is overwritten
-1. All variables containing CEL expression variables are added to the map, and the
-   value for each of these variables is the value returned by evaluating the CEL expression.
-1. The value for LOG_URL is then interpolated recursively using this map until no more
-   substitutions are done, resulting in the final URL to the log in the logging system.
+=== Secret
 
-[IMPORTANT]
-====
-If the `ConfigMap` contains a key `LOG_URL_JSONPATH`, this JSONPath expression is applied
-by the API server or CLI to the output of the response body in order to extract the
-raw log body, which is then returned
-====
+The credentials to authorize the access to the logging backend API are stored in a `Secret`
+named `kubearhive-logging` with the mandatory keys `USER` and `PASSWORD`:
 
+.Example of kubearchive-logging Secret
+[source, yaml]
+----
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubearchive-logging
+  namespace: kubearchive
+type: Opaque
+stringData: <1>
+  USER: user
+  PASSWORD: password # notsecret
+----
+
+<1> The user and password used for HTTP Basic Access Authentication
 
 == Implementation
 
@@ -169,35 +183,53 @@ The sink should first delete any existing entries in the `log_url` table for the
 in the `log_url` table, and they should be removed to avoid duplicates.
 
 The sink will mount and use the `kubearchive-logging` `ConfigMap`
-for logging. Additionally, the sink will overwrite the `ConfigMap`
-value for `CONTAINER_NAME` as described in the <<generating_log_urls>> section.
+for logging.
+
+When generating the logging URL to be stored when a `Pod` is archived,
+the sink does the following steps:
+
+1. A map is created and populated all non-CEL expression key-value pairs from the `ConfigMap`.
+1. The key `CONTAINER_NAME` with the value `cel:spec.containers.map(m, m.name)` is added to the
+map. If the `ConfigMap` contained the key `CONTAINER_NAME`, its value is overwritten
+1. All variables containing CEL expression variables are added to the map, and the
+value for each of these variables is the value returned by evaluating the CEL expression.
+1. The value for LOG_URL is then interpolated recursively using this map until no more
+substitutions are done, resulting in the final URL to the log in the logging system.
+
+=== API
+
+The API mounts and use the `kubearchive-logging` `Secret` to authenticate
+against the backend logging API and the `ConfigMap` to retrieve the optional `JSON_PATH`
+key.
+
+The API exposes the logs under the endpoints:
+
+* `/:version/namespaces/:namespace/:resourceType/:name/log` for core resources
+* `/:group/:version/namespaces/:namespace/:resourceType/:name/log` for non core resources
+
+The API traverses the owner references to gather all the logs associated
+with the given resource. Note that logs could be queried for any resource. Most
+resource will not have any logs associated with them or their descendents, but queries on
+logs for `TaskRuns` and `Pods` are possible.
+
+The API perform post-processing on the output from the response to
+log URL in order to get the actual log output if a JSONPath expression
+is configured to be applied to the response body.
 
 === CLI
 
-The CLI will implement a `logs` command similar to `kubectl logs`.
+The CLI implements a `logs` command similar to `kubectl logs`.
 [source,bash]
 ----
 ka logs resource name
 ----
-This command will return the log contents for the the default container in the `Pod`.
-example:
+This command will return the log contents for the default container in the `Pod` unless
+specified with the `-c` option.
+
+.Example
 [source,bash]
 ----
 ka logs PipelineRun generate-logs-9fkp8 -n generate-logs-pipelines -c generate
 ----
 This will return the log URLs associated with the `PipelineRun` named "generate-logs-9fkp8"
 for the container "generate".
-
-The CLI will have to traverse the owner references to gather all of the logs associated
-with the given resource. Note that logs could be queried for any resource. Most
-resource will not have any logs associated with them or their descendents, but queries on
-logs for `TaskRuns` and `Pods` are possible.
-
-The CLI will perform post-processing on the output from the response to
-log URL in order to get the actual log output. This post-processing is a JSONPath expression
-to be applied to the response body.  This post-processing only needs to be done if the
-pre-defined entry `LOG_URL_JSONPATH` is contained in the logging `ConfigMap`.
-
-=== API
-
-The API will provide a mechanism similar to the CLI for retrieving log file contents.

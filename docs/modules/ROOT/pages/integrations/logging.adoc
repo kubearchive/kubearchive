@@ -24,7 +24,7 @@ A `KubeArchiveConfig` needs to be configured correctly to support this, meaning 
 be configured so that the initial resource and any dependent resources, all the way
 down to and including the `Pods`, are archived.
 
-Here's a sample `KubeArchiveConfig` as an example:
+.Example of KubeArchiveConfig that allows the retrieval of Job logs
 [source,yaml]
 ----
 ---
@@ -37,14 +37,14 @@ spec:
   resources:
     - deleteWhen: has(status.completionTime)
       selector:
-        apiVersion: ""
-        kind: CronJob
+        apiVersion: "batch/v1"
+        kind: Job
     - archiveOnDelete: true
       selector:
-        apiVersion: ""
+        apiVersion: "v1"
         kind: Pod
 ----
-In this example, the `CronJob` is configured to be archived and deleted when
+In this example, the `Job` is configured to be archived and deleted when
 the status contains a "completionTime" key. When that deletion happens,
 kubernetes will in turn delete the associated `Pod`. Since we have
 configured `archiveOnDelete` for `Pods` to be true, KubeArchive will archive
@@ -61,7 +61,7 @@ the existence of the log.
 
 ====
 
-Here's another sample `KubeArchiveConfig` for `PipelineRuns`:
+.Example of KubeArchiveConfig allowing the retrieval of PipelineRuns and TaskRuns
 [source,yaml]
 ----
 ---
@@ -91,15 +91,30 @@ In this example the following happens:
 - `TaskRuns` are archived when they are deleted.
 - `Pods` are archived when they are deleted and are also part of a Tekton `Pipeline`.
 
-== Configuring Log URL Generation
+== Configuration
 
-Logging URL generation in KubeArchive is controlled using the `ConfigMap`
-named `kubearchive-logging` in the KubeArchive installation namespace.
-URLs are generated using parameters that allow the URL to point to the
-specific log file associated with the given `Pod`. This `ConfigMap`
-requires a single entry, LOG_URL, whose string value will be interpolated
-using the other variables defined in the `ConfigMap`.  For example, take
-this `ConfigMap` for Splunk:
+[IMPORTANT]
+====
+The KubeArchive Sink and API are not aware of changes to the `kubearchive-logging` `ConfigMap` or `Secret`.
+After making changes to them, both elements should be restarted. The following
+command can be used to perform the restart:
+
+[source, bash]
+----
+kubectl rollout restart deployment --selector=app=kubearchive-sink
+kubectl rollout restart deployment --selector=app=kubearchive-api-server
+----
+====
+
+=== ConfigMap
+
+To support multiple logging systems, the URLs must be able to be parameterized
+based on the logging system. This is done via a `ConfigMap` named
+`kubearchive-logging`.
+The ConfigMap contains entries that are used to generate logging URLs.
+The only required key in this ConfigMap is `LOG_URL`.
+
+.Example of kubearchive-logging ConfigMap for Splunk
 [source,yaml]
 ----
 ---
@@ -109,40 +124,43 @@ metadata:
   name: kubearchive-logging
   namespace: kubearchive
 data:
-  POD_ID: cel:metadata.uid
-  POD: 'spath "kubernetes.pod_id" | search "kubernetes.pod_id"="{POD_ID}"'
-  CONTAINER: 'spath "kubernetes.container_name" | search "kubernetes.container_name"="{CONTAINER_NAME}"'
-  LOG_URL: http://127.0.0.1:8111/app/search/search?q=search * | {POD} | {CONTAINER}
+  # CONTAINER_NAME: "cel:spec.containers.map(m, m.name)" <1>
+  POD_ID: "cel:metadata.uid" <2>
+  LOG_URL: "https://splunk-single-standalone-service.splunk-operator.svc.cluster.local:8089/services/search/jobs/export?search=search%20%2A%20%7C%20spath%20%22kubernetes.pod_id%22%20%7C%20search%20%22kubernetes.pod_id%22%3D%22{POD_ID}%22%20%7C%20spath%20%22kubernetes.container_name%22%20%7C%20search%20%22kubernetes.container_name%22%3D%22{CONTAINER_NAME}%22%20%7C%20sort%20time%20%7C%20table%20%22message%22&output_mode=json" <3>
+  LOG_URL_JSONPATH: "$.hits.hits[*]._source.message" <4>
 ----
-The value of each variable is either a string or a CEL expression. A value that
-begins with the prefix "cel:" will be evaluated as a CEL expression against the
-body of the cloud event (that is the resource) to determine the real value of that
-variable used in the substitution. For example:
 
-When generating a log URL to be stored when a `Pod` is archived, the following steps are done:
+<1> The `CONTAINER_NAME` parameter is provided at URL generation time by KubeArchive.
+<2> The string to replace `POD_ID` inside the `LOG_URL` template.
+If it's prefixed with `cel:`, it is considered as a CEL expression to locate its value
+within the body of the Cloud Event where the resource is stored.
+<3> The template for the log URL. The `CONTAINER_NAME` variable is allowed
+even if it's not defined in the `ConfigMap` as it's provided at URL generation time.
+<4> Optional
+link:https://goessner.net/articles/JsonPath/[JSONPath Expression]
+applied by the API Server to the output of the response body.
 
-1. All variables containing CEL expression variables are evaluated against the `Pod`
-   resource being archived.
-1. The value for LOG_URL is then interpolated recursively using the values in the `ConfigMap`
-   until no more substitutions are done, resulting in the final URL to the log in the
-   logging system.
+=== Secret
 
-[TIP]
-====
-The variable `CONTAINER_NAME` is provided automatically by KubeArchive and can be used if your `LOG_URL`
-requires the name of the container.
-====
+The credentials to authorize the access to the logging backend API are stored in a `Secret`
+named `kubearhive-logging` with the mandatory keys `USER` and `PASSWORD`:
 
-[IMPORTANT]
-====
-The KubeArchive Sink is not aware of changes to the `kubearchive-logging` `ConfigMap`. After
-making changes to `kubearchive-logging`, the KubeArchive Sink must be restarted. The following
-command can be used to perform the restart:
+.Example of kubearchive-logging Secret
+[source, yaml]
+----
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubearchive-logging
+  namespace: kubearchive
+type: Opaque
+stringData: <1>
+  USER: user
+  PASSWORD: password # notsecret
+----
 
-```
-kubectl rollout restart deployment --selector=app=kubearchive-sink
-```
-====
+<1> The user and password used for HTTP Basic Access Authentication
 
 == Supported Logging Systems
 
@@ -150,7 +168,7 @@ KubeArchive currently integrates with both Splunk and Elasticsearch
 
 === Elasticsearch
 
-Following is a sample `ConfigMap` that generates log URLs for Elasticsearch.
+.Example of kubearchive-logging ConfigMap fot ElasticSearch integration
 [source,yaml]
 ----
 ---
@@ -160,7 +178,6 @@ metadata:
   name: kubearchive-logging
   namespace: kubearchive
 data:
-  # NOTE: CONTAINER_NAME is provided at URL generation time by KubeArchive.
   POD_ID: "cel:metadata.uid"
   LOG_URL: "https://localhost:9200/fluentd/_search?_source_includes=message&size=10000&sort=_doc&q=kubernetes.pod_id:{POD_ID}%20AND%20kubernetes.container_name:{CONTAINER_NAME}"
   LOG_URL_JSONPATH: "$.hits.hits[*]._source.message"
@@ -168,8 +185,7 @@ data:
 
 === Splunk
 
-Following is a sample `ConfigMap` for generating URLs for Splunk.
-
+.Example of kubearchive-logging ConfigMap for Splunk integration
 [source,yaml]
 ----
 ---
@@ -179,8 +195,7 @@ metadata:
   name: kubearchive-logging
   namespace: kubearchive
 data:
-  # NOTE: CONTAINER_NAME is provided at URL generation time by KubeArchive.
   POD_ID: "cel:metadata.uid"
-  LOG_URL: "https://localhost:8089/services/search/jobs/export?search=search%20%2A%20%7C%20spath%20%22kubernetes.pod_id%22%20%7C%20search%20%22kubernetes.pod_id%22%3D%22{POD_ID}%22%20%7C%20spath%20%22kubernetes.container_name%22%20%7C%20search%20%22kubernetes.container_name%22%3D%22{CONTAINER_NAME}%22%20%7C%20sort%20time%20%7C%20table%20%22message%22&output_mode=json"
+  LOG_URL: "https://splunk-single-standalone-service.splunk-operator.svc.cluster.local:8089/services/search/jobs/export?search=search%20%2A%20%7C%20spath%20%22kubernetes.pod_id%22%20%7C%20search%20%22kubernetes.pod_id%22%3D%22{POD_ID}%22%20%7C%20spath%20%22kubernetes.container_name%22%20%7C%20search%20%22kubernetes.container_name%22%3D%22{CONTAINER_NAME}%22%20%7C%20sort%20time%20%7C%20table%20%22message%22&output_mode=json"
   LOG_URL_JSONPATH: "$[*].result.message"
 ----

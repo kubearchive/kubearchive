@@ -34,7 +34,7 @@ func retrieveLogURL(c *gin.Context) {
 	c.JSON(http.StatusOK, fmt.Sprintf("%s-%s", c.GetString("logURL"), c.GetString("jsonPath")))
 }
 
-func setupRouter(db database.DBInterface, core bool) *gin.Engine {
+func setupRouter(db database.Database, core bool) *gin.Engine {
 	router := gin.Default()
 	ctrl := Controller{Database: db}
 	router.Use(func(c *gin.Context) {

@@ -318,7 +318,7 @@ func RunLogGenerator(t testing.TB, namespace string) string {
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
-						corev1.Container{
+						{
 							Name:    "flog",
 							Command: []string{"flog", "-n", "10", "-d", "1ms"},
 							Image:   "quay.io/kubearchive/mingrammer/flog",

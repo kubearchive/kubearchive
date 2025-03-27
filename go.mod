@@ -1,4 +1,4 @@
-module github.com/kubearchive/kubearchive
+module github.com/kronicler/kronicler
 
 go 1.24.0
 

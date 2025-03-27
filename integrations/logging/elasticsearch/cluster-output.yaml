@@ -1,4 +1,4 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: logging.banzaicloud.io/v1beta1
@@ -7,7 +7,7 @@ metadata:
   name: es-output
 spec:
   elasticsearch:
-    host: kubearchive-es-http.elastic-system.svc.cluster.local
+    host: kronicler-es-http.elastic-system.svc.cluster.local
     port: 9200
     scheme: https
     ssl_verify: false
@@ -16,7 +16,7 @@ spec:
     password:
       valueFrom:
         secretKeyRef:
-          name: kubearchive-es-elastic-user
+          name: kronicler-es-elastic-user
           key: elastic
     buffer:
       timekey: 1m

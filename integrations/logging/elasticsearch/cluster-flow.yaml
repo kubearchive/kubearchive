@@ -1,4 +1,4 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: logging.banzaicloud.io/v1beta1
@@ -18,7 +18,7 @@ spec:
           - kube-node-lease
           - kube-public
           - kube-system
-          - kubearchive
+          - kronicler
           - mariadb-operator
           - postgresql
     - select: {}

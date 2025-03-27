@@ -1,14 +1,14 @@
-= Configuring KubeArchive to Monitor a Namespace
+= Configuring Kronicler to Monitor a Namespace
 
-A user can configure KubeArchive to monitor a specific namespace using `ApiServerSource` by creating
-a `KubeArchiveConfig` custom resource similar to the following:
+A user can configure Kronicler to monitor a specific namespace using `ApiServerSource` by creating
+a `KroniclerConfig` custom resource similar to the following:
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: ns
 spec:
   resources:
@@ -18,7 +18,7 @@ spec:
       archiveWhen: status.state != 'Completed'
       deleteWhen: status.state == 'Completed'
 ----
-The configuration of `ApiServerSource` is done using the `selector` keys of the KubeArchiveConfig custom
+The configuration of `ApiServerSource` is done using the `selector` keys of the KroniclerConfig custom
 resource. The format of the `selectors` key can be found in the `ApiServerSource`
 link:https://knative.dev/docs/eventing/sources/apiserversource/reference/#resources-parameter[reference documentation].
 
@@ -26,5 +26,5 @@ The `archiveWhen` and `deleteWhen` keys contain expressions that determine when 
 
 [NOTE]
 ====
-The 'KubeArchiveConfig` resource must be named "kubearchive".
+The 'KroniclerConfig` resource must be named "kronicler".
 ====

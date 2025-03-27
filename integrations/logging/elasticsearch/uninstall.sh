@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 
 # From https://www.elastic.co/guide/en/cloud-on-k8s/current/k8s-deploy-eck.html

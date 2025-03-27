@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 //go:build integration
 
@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/kubearchive/kubearchive/test"
+	"github.com/kronicler/kronicler/test"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +38,7 @@ func TestPagination(t *testing.T) {
 		},
 	}
 
-	test.CreateKAC(t, namespaceName, resources)
+	test.CreateKroniclerConfig(t, namespaceName, resources)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

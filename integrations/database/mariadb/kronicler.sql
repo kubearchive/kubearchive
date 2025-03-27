@@ -1,7 +1,7 @@
 /*!999999\- enable the sandbox mode */
 -- MariaDB dump 10.19  Distrib 10.11.8-MariaDB, for Linux (x86_64)
 --
--- Host: 127.0.0.1    Database: kubearchive
+-- Host: 127.0.0.1    Database: kronicler
 -- ------------------------------------------------------
 -- Server version	11.4.3-MariaDB-ubu2404
 
@@ -17,14 +17,14 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
--- Current Database: `kubearchive`
+-- Current Database: `kronicler`
 --
 
-/*!40000 DROP DATABASE IF EXISTS `kubearchive`*/;
+/*!40000 DROP DATABASE IF EXISTS `kronicler`*/;
 
-CREATE DATABASE /*!32312 IF NOT EXISTS*/ `kubearchive` /*!40100 DEFAULT CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci */;
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ `kronicler` /*!40100 DEFAULT CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci */;
 
-USE `kubearchive`;
+USE `kronicler`;
 
 --
 -- Table structure for table `resource`

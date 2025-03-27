@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 //go:build integration
 
@@ -13,26 +13,26 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/kubearchive/kubearchive/test"
+	"github.com/kronicler/kronicler/test"
 	errs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 const (
-	a13eName    = test.KACName + "-a13e"
-	sinkName    = test.KACName + "-sink"
+	a13eName    = test.KroniclerConfigName + "-a13e"
+	sinkName    = test.KroniclerConfigName + "-sink"
 	filtersName = "sink-filters"
 )
 
-func TestKACs(t *testing.T) {
+func TestKroniclerConfigs(t *testing.T) {
 	tests := map[string]struct {
 		resources map[string]any
 		applyNS   int // Number of namespaces in ConfigMap after apply.
 		deleteNS  int // Number of namespaces in ConfigMap after delete.
 	}{
-		"emptyKAC": {resources: map[string]any{}, applyNS: 1, deleteNS: 0},
-		"nonEmptyKAC": {resources: map[string]any{
+		"emptyKroniclerConfig": {resources: map[string]any{}, applyNS: 1, deleteNS: 0},
+		"nonEmptyKroniclerConfig": {resources: map[string]any{
 			"resources": []map[string]any{
 				{
 					"selector": map[string]string{
@@ -48,9 +48,9 @@ func TestKACs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			namespace, _ := test.CreateTestNamespace(t, false)
 
-			test.CreateKAC(t, namespace, values.resources)
+			test.CreateKroniclerConfig(t, namespace, values.resources)
 			checkResourcesAfterApply(t, namespace, name, values.applyNS)
-			test.DeleteKAC(t, namespace)
+			test.DeleteKroniclerConfig(t, namespace)
 			checkResourcesAfterDelete(t, namespace, name, values.deleteNS)
 		})
 	}
@@ -63,8 +63,8 @@ func checkResourcesAfterApply(t testing.TB, namespace string, testName string, a
 
 	err := retry.Do(func() error {
 		gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
-		_, getErr := dynaclient.Resource(gvr).Namespace(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
-		if testName == "emptyKAC" {
+		_, getErr := dynaclient.Resource(gvr).Namespace(test.KroniclerNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
+		if testName == "emptyKroniclerConfig" {
 			if !errs.IsNotFound(getErr) {
 				return errors.New("Unexpectedly found an ApiServerSource.")
 			}
@@ -73,13 +73,13 @@ func checkResourcesAfterApply(t testing.TB, namespace string, testName string, a
 				return getErr
 			}
 		}
-		cm, getErr := clientset.CoreV1().ConfigMaps(test.K9eNamespace).Get(context.Background(), filtersName, metav1.GetOptions{})
+		cm, getErr := clientset.CoreV1().ConfigMaps(test.KroniclerNamespace).Get(context.Background(), filtersName, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
 		} else if len(cm.Data) != applyNS {
 			return fmt.Errorf("Found %d namespaces in ConfigMap, expected %d", len(cm.Data), applyNS)
 		}
-		_, getErr = clientset.CoreV1().ServiceAccounts(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
+		_, getErr = clientset.CoreV1().ServiceAccounts(test.KroniclerNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
 		}
@@ -114,8 +114,8 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, testName string, 
 
 	err := retry.Do(func() error {
 		gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
-		_, getErr := dynaclient.Resource(gvr).Namespace(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
-		if testName == "emptyKAC" || testName == "nonEmptyKAC" {
+		_, getErr := dynaclient.Resource(gvr).Namespace(test.KroniclerNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
+		if testName == "emptyKroniclerConfig" || testName == "nonEmptyKroniclerConfig" {
 			if !errs.IsNotFound(getErr) {
 				return errors.New("Unexpectedly found an ApiServerSource.")
 			}
@@ -124,13 +124,13 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, testName string, 
 				return getErr
 			}
 		}
-		cm, getErr := clientset.CoreV1().ConfigMaps(test.K9eNamespace).Get(context.Background(), filtersName, metav1.GetOptions{})
+		cm, getErr := clientset.CoreV1().ConfigMaps(test.KroniclerNamespace).Get(context.Background(), filtersName, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
 		} else if len(cm.Data) != deleteNS {
 			return fmt.Errorf("Found %d namespaces in ConfigMap, expected %d", len(cm.Data), deleteNS)
 		}
-		_, getErr = clientset.CoreV1().ServiceAccounts(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
+		_, getErr = clientset.CoreV1().ServiceAccounts(test.KroniclerNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
 		}
@@ -158,10 +158,10 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, testName string, 
 	}
 }
 
-// Test that having both a global and local KubeArchiveConfig works. This is done by archiving Pods
-// in the global KubeArchiveConfig and Jobs in the local KubeArchiveConfig. Then run a job and verify
+// Test that having both a global and local KroniclerConfig works. This is done by archiving Pods
+// in the global KroniclerConfig and Jobs in the local KroniclerConfig. Then run a job and verify
 // that the job logs can be retrieved.
-func TestGlobalAndLocalKAC(t *testing.T) {
+func TestGlobalAndLocalKroniclerConfig(t *testing.T) {
 	t.Helper()
 
 	globalres := map[string]any{
@@ -191,8 +191,8 @@ func TestGlobalAndLocalKAC(t *testing.T) {
 	port := test.PortForwardApiServer(t, clientset)
 	namespace, token := test.CreateTestNamespace(t, false)
 
-	test.CreateKAC(t, test.K9eNamespace, globalres)
-	test.CreateKAC(t, namespace, localres)
+	test.CreateKroniclerConfig(t, test.KroniclerNamespace, globalres)
+	test.CreateKroniclerConfig(t, namespace, localres)
 
 	job := test.RunLogGenerator(t, namespace)
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespace, job)
@@ -219,5 +219,5 @@ func TestGlobalAndLocalKAC(t *testing.T) {
 		t.Fatal(retryErr)
 	}
 
-	test.DeleteKAC(t, test.K9eNamespace)
+	test.DeleteKroniclerConfig(t, test.KroniclerNamespace)
 }

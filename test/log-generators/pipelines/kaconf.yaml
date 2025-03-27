@@ -1,10 +1,10 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
 spec:
   resources:
     - selector:

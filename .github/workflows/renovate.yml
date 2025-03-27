@@ -1,4 +1,4 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 #
 # Renovate: https://github.com/renovatebot/github-action
@@ -14,17 +14,17 @@ jobs:
   setup:
     uses: ./.github/workflows/log_run_details.yml
   renovate:
-    if: github.repository == 'kubearchive/kubearchive'  # Don't run renovate on forks
+    if: github.repository == 'kronicler/kronicler'  # Don't run renovate on forks
     runs-on: ubuntu-latest
     steps:
-      - name: Get kubearchive-renovate Github App Api Token
+      - name: Get kronicler-renovate Github App Api Token
         id: get_token
         uses: actions/create-github-app-token@v1
         with:
-          private-key: ${{ secrets.KUBEARCHIVE_RENOVATE_PRIVATE_KEY }}
-          app-id: ${{ secrets.KUBEARCHIVE_RENOVATE_APP_ID }}
+          private-key: ${{ secrets.KRONICLER_RENOVATE_PRIVATE_KEY }}
+          app-id: ${{ secrets.KRONICLER_RENOVATE_APP_ID }}
 
-      - name: Checkout KubeArchive repository
+      - name: Checkout Kronicler repository
         uses: actions/checkout@v4
 
       - name: Run Renovate
@@ -37,9 +37,9 @@ jobs:
           # renovate will generate an onboarding PR after the first run
           RENOVATE_ONBOARDING: "true"
           # username needed for Github auth (Github app name + "[bot]")
-          RENOVATE_USERNAME: "kubearchive-renovate[bot]"
+          RENOVATE_USERNAME: "kronicler-renovate[bot]"
           # git commit author. Format is: Github app name <id+RENOVATE_USERNAME@users.noreply.github.com>
-          # id can be retrieved from https://api.github.com/users/kubearchive-renovate[bot]
-          RENOVATE_GIT_AUTHOR: "kubearchive-renovate <171263778+kubearchive-renovate[bot]@users.noreply.github.com>"
+          # id can be retrieved from https://api.github.com/users/kronicler-renovate[bot]
+          RENOVATE_GIT_AUTHOR: "kronicler-renovate <171263778+kronicler-renovate[bot]@users.noreply.github.com>"
           # renovate will create signed commits
           RENOVATE_PLATFORM_COMMIT: "true"

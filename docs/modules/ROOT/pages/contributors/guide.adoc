@@ -1,6 +1,6 @@
 = Contribution Guide
 
-Welcome to the KubeArchive project! We are happy that you find this project
+Welcome to the Kronicler project! We are happy that you find this project
 interesting and want to improve it. There are many ways to contribute:
 
 * Reporting a bug
@@ -14,9 +14,9 @@ interesting and want to improve it. There are many ways to contribute:
 == Bugs, Features and Security Issues
 
 To submit a bug report or a feature request, use our
-link:https://github.com/kubearchive/kubearchive/issues[Bug Tracker].
+link:https://github.com/kronicler/kronicler/issues[Bug Tracker].
 For security reports, send an e-mail to the
-link:mailto:kubearchive-security@googlegroups.com[Security e-mail address].
+link:mailto:kronicler-security@googlegroups.com[Security e-mail address].
 
 When you submit any of these follow the templates provided by the Bug Tracker or
 otherwise provide:
@@ -32,7 +32,7 @@ otherwise provide:
 Before submitting any code or documentation create a GitHub issue in our Bug Tracker,
 so we can discuss and accept or reject the idea.
 
-By contributing to KubeArchive you accept the Developer Certificate of
+By contributing to Kronicler you accept the Developer Certificate of
 Origin (DCO). Agreeing to the DCO means you wrote or otherwise have the right to
 submit the code you submitted. You can read the v1.1 DCO
 link:https://developercertificate.org/[here].
@@ -52,10 +52,10 @@ We expect you to:
 
 == Important Links
 
-* link:https://github.com/kubearchive/kubearchive/issues[Bug Tracker]
-* link:https://github.com/kubearchive/community/blob/main/CODE_OF_CONDUCT.md[Code of Conduct]
-* link:https://github.com/orgs/kubearchive/discussions[Discussions]
-* link:https://groups.google.com/g/kubearchive[Mailing list]
-* link:https://groups.google.com/g/kubearchive-developers[Developers mailing list]
-* link:https://groups.google.com/g/kubearchive-coc[Code Of Conduct mailing list]
-* link:https://groups.google.com/g/kubearchive-security[Security mailing list]
+* link:https://github.com/kronicler/kronicler/issues[Bug Tracker]
+* link:https://github.com/kronicler/community/blob/main/CODE_OF_CONDUCT.md[Code of Conduct]
+* link:https://github.com/orgs/kronicler/discussions[Discussions]
+* link:https://groups.google.com/g/kronicler[Mailing list]
+* link:https://groups.google.com/g/kronicler-developers[Developers mailing list]
+* link:https://groups.google.com/g/kronicler-coc[Code Of Conduct mailing list]
+* link:https://groups.google.com/g/kronicler-security[Security mailing list]

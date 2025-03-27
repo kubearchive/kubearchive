@@ -1,20 +1,20 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: k8s.mariadb.com/v1alpha1
 kind: MariaDB
 metadata:
-  name: kubearchive
+  name: kronicler
 spec:
   rootPasswordSecretKeyRef:
-    name: kubearchive
+    name: kronicler
     key: root-password
 
-  username: kubearchive
+  username: kronicler
   passwordSecretKeyRef:
-    name: kubearchive
+    name: kronicler
     key: password
-  database: kubearchive
+  database: kronicler
 
   port: 3306
 

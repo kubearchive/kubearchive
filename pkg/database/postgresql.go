@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package database
@@ -13,7 +13,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
-	"github.com/kubearchive/kubearchive/pkg/database/facade"
+	"github.com/kronicler/kronicler/pkg/database/facade"
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )

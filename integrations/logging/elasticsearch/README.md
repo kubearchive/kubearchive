@@ -10,11 +10,11 @@ It will also configure logging so that all `Pod` logs are automatically sent to 
 To access the Elasticsearch Kibana Dashboard from outside of the cluster, the following steps need to be taken:
 1. Use `kubectl` to port forward, this will keep the terminal occupied:
     ```bash
-    kubectl -n elastic-system port-forward svc/kubearchive-kb-http 5601
+    kubectl -n elastic-system port-forward svc/kronicler-kb-http 5601
     ```
 1. Determine the `elastic` user password for Kibana:
     ```bash
-    kubectl -n elastic-system get secret kubearchive-es-elastic-user -o=jsonpath='{.data.elastic}' | base64 --decode
+    kubectl -n elastic-system get secret kronicler-es-elastic-user -o=jsonpath='{.data.elastic}' | base64 --decode
     ```
 1. In your browser, navigate to `https://localhost:5601`, using the user name `elastic` and the password
    retrieved in the previous step to login.

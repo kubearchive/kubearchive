@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 package test
 
@@ -22,7 +22,7 @@ import (
 
 	"github.com/avast/retry-go/v4"
 
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kroniclerv1alpha1 "github.com/kronicler/kronicler/cmd/operator/api/v1alpha1"
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -44,10 +44,10 @@ import (
 )
 
 const (
-	letterBytes   = "abcdefghijklmnopqrstuvwxyz"
-	randSuffixLen = 8
-	K9eNamespace  = "kubearchive"
-	KACName       = "kubearchive"
+	letterBytes         = "abcdefghijklmnopqrstuvwxyz"
+	randSuffixLen       = 8
+	KroniclerNamespace  = "kronicler"
+	KroniclerConfigName = "kronicler"
 )
 
 func RandomString() string {
@@ -124,8 +124,8 @@ func PortForwardApiServer(t testing.TB, clientset kubernetes.Interface) string {
 
 	// forward the port if not already forwarded
 	if forwardRequests == 0 {
-		pods, err := clientset.CoreV1().Pods("kubearchive").List(context.Background(), metav1.ListOptions{
-			LabelSelector: "app=kubearchive-api-server",
+		pods, err := clientset.CoreV1().Pods("kronicler").List(context.Background(), metav1.ListOptions{
+			LabelSelector: "app=kronicler-api-server",
 			FieldSelector: "status.phase=Running",
 		})
 		t.Logf("Pod to forward: %s", pods.Items[0].Name)
@@ -134,7 +134,7 @@ func PortForwardApiServer(t testing.TB, clientset kubernetes.Interface) string {
 		}
 		var errPortForward error
 		retryErr := retry.Do(func() error {
-			forwardChan, errPortForward = portForward(t, []string{fmt.Sprintf("%s:%s", apiServerPort, apiServerPort)}, pods.Items[0].Name, "kubearchive")
+			forwardChan, errPortForward = portForward(t, []string{fmt.Sprintf("%s:%s", apiServerPort, apiServerPort)}, pods.Items[0].Name, "kronicler")
 			if errPortForward != nil {
 				return errPortForward
 			}
@@ -192,7 +192,7 @@ func GetPodLogs(t testing.TB, namespace, podPrefix string) (logs string, err err
 		return "", fmt.Errorf("Unable to find pod with prefix '%s'", podPrefix)
 	}
 
-	req := clientset.CoreV1().Pods("kubearchive").GetLogs(podName, &corev1.PodLogOptions{})
+	req := clientset.CoreV1().Pods("kronicler").GetLogs(podName, &corev1.PodLogOptions{})
 	logStream, err := req.Stream(context.TODO())
 	if err != nil {
 		return "", fmt.Errorf("Could not get logs for pod '%s' in the '%s' namespace: %w", podName, namespace, err)
@@ -251,8 +251,8 @@ func getHTTPClient(t testing.TB) http.Client {
 	t.Helper()
 
 	clientset, _ := GetKubernetesClient(t)
-	secret, errSecret := clientset.CoreV1().Secrets("kubearchive").Get(context.Background(),
-		"kubearchive-api-server-tls", metav1.GetOptions{})
+	secret, errSecret := clientset.CoreV1().Secrets("kronicler").Get(context.Background(),
+		"kronicler-api-server-tls", metav1.GetOptions{})
 	if errSecret != nil {
 		t.Fatal(errSecret)
 	}
@@ -323,7 +323,7 @@ func RunLogGenerator(t testing.TB, namespace string) string {
 						corev1.Container{
 							Name:    "flog",
 							Command: []string{"flog", "-n", "10", "-d", "1ms"},
-							Image:   "quay.io/kubearchive/mingrammer/flog",
+							Image:   "quay.io/kronicler/mingrammer/flog",
 						},
 					},
 				},
@@ -404,14 +404,14 @@ func CreateTestNamespace(t testing.TB, customCleanup bool) (string, *authenticat
 	return namespace, token
 }
 
-func CreateKAC(t testing.TB, namespace string, resources map[string]any) {
+func CreateKroniclerConfig(t testing.TB, namespace string, resources map[string]any) {
 	clientset, dynamicClient := GetKubernetesClient(t)
-	kac := newKAC(namespace, resources)
+	kron := newKroniclerConfig(namespace, resources)
 
-	gvr := kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
-	_, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.Background(), kac, metav1.CreateOptions{})
+	gvr := kroniclerv1alpha1.GroupVersion.WithResource("kroniclerconfigs")
+	_, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.Background(), kron, metav1.CreateOptions{})
 	if err != nil {
-		t.Logf("Could not create KubeArchiveConfig in namespace '%s'", namespace)
+		t.Logf("Could not create KroniclerConfig in namespace '%s'", namespace)
 		t.Fatal(err)
 	}
 
@@ -419,7 +419,7 @@ func CreateKAC(t testing.TB, namespace string, resources map[string]any) {
 		// If we have resources, make sure ApiServerSource is created and there are sink filters before returning.
 		a13eGvr := sourcesv1.SchemeGroupVersion.WithResource("apiserversources")
 		err = retry.Do(func() error {
-			_, retryErr := dynamicClient.Resource(a13eGvr).Namespace("kubearchive").Get(context.Background(), "kubearchive-a13e", metav1.GetOptions{})
+			_, retryErr := dynamicClient.Resource(a13eGvr).Namespace("kronicler").Get(context.Background(), "kronicler-a13e", metav1.GetOptions{})
 			return retryErr
 		}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
 		if err != nil {
@@ -427,7 +427,7 @@ func CreateKAC(t testing.TB, namespace string, resources map[string]any) {
 		}
 
 		err = retry.Do(func() error {
-			sinkFilters, retryErr := clientset.CoreV1().ConfigMaps("kubearchive").Get(context.Background(), "sink-filters", metav1.GetOptions{})
+			sinkFilters, retryErr := clientset.CoreV1().ConfigMaps("kronicler").Get(context.Background(), "sink-filters", metav1.GetOptions{})
 			if retryErr != nil {
 				return retryErr
 			}
@@ -443,19 +443,19 @@ func CreateKAC(t testing.TB, namespace string, resources map[string]any) {
 	}
 }
 
-func DeleteKAC(t testing.TB, namespace string) {
+func DeleteKroniclerConfig(t testing.TB, namespace string) {
 	clientset, dynamicClient := GetKubernetesClient(t)
 
-	gvr := kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
-	err := dynamicClient.Resource(gvr).Namespace(namespace).Delete(context.Background(), KACName, metav1.DeleteOptions{})
+	gvr := kroniclerv1alpha1.GroupVersion.WithResource("kroniclerconfigs")
+	err := dynamicClient.Resource(gvr).Namespace(namespace).Delete(context.Background(), KroniclerConfigName, metav1.DeleteOptions{})
 	if err != nil {
-		t.Logf("Could not delete KubeArchiveConfig in namespace '%s'", namespace)
+		t.Logf("Could not delete KroniclerConfig in namespace '%s'", namespace)
 		t.Fatal(err)
 	}
 
-	// Make sure KubeArchiveConfig is deleted.
+	// Make sure KroniclerConfig is deleted.
 	err = retry.Do(func() error {
-		_, retryErr := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), KACName, metav1.GetOptions{})
+		_, retryErr := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), KroniclerConfigName, metav1.GetOptions{})
 		return retryErr
 	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
 	if err != nil {
@@ -464,7 +464,7 @@ func DeleteKAC(t testing.TB, namespace string) {
 
 	// Make sure the sink filters have been updated.
 	err = retry.Do(func() error {
-		sinkFilters, retryErr := clientset.CoreV1().ConfigMaps("kubearchive").Get(context.Background(), "sink-filters", metav1.GetOptions{})
+		sinkFilters, retryErr := clientset.CoreV1().ConfigMaps("kronicler").Get(context.Background(), "sink-filters", metav1.GetOptions{})
 		if retryErr != nil {
 			return retryErr
 		}
@@ -505,15 +505,15 @@ func DeleteTestNamespace(t testing.TB, namespace string) {
 	}
 }
 
-func newKAC(namespace string, resources map[string]any) *unstructured.Unstructured {
+func newKroniclerConfig(namespace string, resources map[string]any) *unstructured.Unstructured {
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"kind": "KubeArchiveConfig",
+			"kind": "KroniclerConfig",
 			"apiVersion": fmt.Sprintf("%s/%s",
-				kubearchivev1alpha1.SchemeBuilder.GroupVersion.Group,
-				kubearchivev1alpha1.SchemeBuilder.GroupVersion.Version),
+				kroniclerv1alpha1.SchemeBuilder.GroupVersion.Group,
+				kroniclerv1alpha1.SchemeBuilder.GroupVersion.Version),
 			"metadata": map[string]string{
-				"name":      KACName,
+				"name":      KroniclerConfigName,
 				"namespace": namespace,
 			},
 			"spec": resources,

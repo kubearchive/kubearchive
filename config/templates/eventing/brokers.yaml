@@ -1,16 +1,16 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 
 apiVersion: eventing.knative.dev/v1
 kind: Broker
 metadata:
-  name: kubearchive-broker
-  namespace: kubearchive
+  name: kronicler-broker
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: kubearchive-broker
+    app.kubernetes.io/name: kronicler-broker
     app.kubernetes.io/component: sink
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 spec:
   delivery:
@@ -22,17 +22,17 @@ spec:
       ref:
         apiVersion: eventing.knative.dev/v1
         kind: Broker
-        name: kubearchive-dls
+        name: kronicler-dls
 ---
 apiVersion: eventing.knative.dev/v1
 kind: Broker
 metadata:
-  name: kubearchive-dls
-  namespace: kubearchive
+  name: kronicler-dls
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: kubearchive-dls
+    app.kubernetes.io/name: kronicler-dls
     app.kubernetes.io/component: sink
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 spec:
   delivery:

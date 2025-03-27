@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 package cmd
 
@@ -23,7 +23,7 @@ type GetOptions struct {
 	GroupVersion   string
 	Token          string
 
-	KubeArchiveHost string
+	KroniclerHost string
 
 	RESTConfig *rest.Config
 	kubeFlags  *genericclioptions.ConfigFlags
@@ -31,8 +31,8 @@ type GetOptions struct {
 
 func NewGetOptions() *GetOptions {
 	return &GetOptions{
-		kubeFlags:       genericclioptions.NewConfigFlags(true),
-		KubeArchiveHost: "https://localhost:8081",
+		kubeFlags:     genericclioptions.NewConfigFlags(true),
+		KroniclerHost: "https://localhost:8081",
 	}
 }
 
@@ -41,7 +41,7 @@ func NewGetCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "get [GROUPVERSION] [RESOURCE]",
-		Short: "Command to get resources from KubeArchive",
+		Short: "Command to get resources from Kronicler",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
@@ -61,7 +61,7 @@ func NewGetCmd() *cobra.Command {
 
 	o.kubeFlags.AddFlags(cmd.Flags())
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	cmd.Flags().StringVar(&o.KubeArchiveHost, "kubearchive-host", o.KubeArchiveHost, fmt.Sprintf("Host where the KubeArchive API Server is listening. Defaults to '%s'", o.KubeArchiveHost))
+	cmd.Flags().StringVar(&o.KroniclerHost, "kronicler-host", o.KroniclerHost, fmt.Sprintf("Host where the Kronicler API Server is listening. Defaults to '%s'", o.KroniclerHost))
 
 	return cmd
 }
@@ -124,12 +124,12 @@ func (o *GetOptions) getResources(host string) ([]unstructured.Unstructured, err
 	return list.Items, nil
 }
 
-func (o *GetOptions) getKubeArchiveResources() ([]unstructured.Unstructured, error) {
+func (o *GetOptions) getKroniclerResources() ([]unstructured.Unstructured, error) {
 	o.RESTConfig.CAData = nil      // Remove CA data from the Kubeconfig
 	o.RESTConfig.CAFile = "ca.crt" // This expects you to have extracted the CA, see DEVELOPMENT.md
 	o.RESTConfig.BearerToken = *o.kubeFlags.BearerToken
 
-	return o.getResources(o.KubeArchiveHost)
+	return o.getResources(o.KroniclerHost)
 }
 
 func (o *GetOptions) Run() error {
@@ -138,13 +138,13 @@ func (o *GetOptions) Run() error {
 		return fmt.Errorf("error retrieving resources from the cluster: %w", err)
 	}
 
-	kubearchiveResources, err := o.getKubeArchiveResources()
+	kroniclerResources, err := o.getKroniclerResources()
 	if err != nil {
-		return fmt.Errorf("error retrieving resources from the KubeArchive API: %w", err)
+		return fmt.Errorf("error retrieving resources from the Kronicler API: %w", err)
 	}
 	var objs []unstructured.Unstructured
 	objs = append(objs, clusterResources...)
-	objs = append(objs, kubearchiveResources...)
+	objs = append(objs, kroniclerResources...)
 
 	for ix := range objs {
 		fmt.Println(objs[ix].GetName())

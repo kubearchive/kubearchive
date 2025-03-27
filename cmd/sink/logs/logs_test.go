@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package logs
@@ -9,8 +9,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kubearchive/kubearchive/pkg/files"
-	"github.com/kubearchive/kubearchive/pkg/models"
+	"github.com/kronicler/kronicler/pkg/files"
+	"github.com/kronicler/kronicler/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )

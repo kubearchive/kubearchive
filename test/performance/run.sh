@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 
 set -o xtrace
@@ -11,10 +11,10 @@ bash integrations/observability/grafana/install.sh
 
 kubectl apply -f - <<EOF
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: default
 spec:
   resources:
@@ -35,7 +35,7 @@ mkdir -p perf-results
 
 START=$(date +%s)
 sleep 30
-kubectl port-forward -n kubearchive svc/kubearchive-sink 8082:80 &
+kubectl port-forward -n kronicler svc/kronicler-sink 8082:80 &
 SINK_FORWARD_PID=$!
 ./venv/bin/locust -f ${SCRIPT_DIR}/locustfile.py --headless --users 2 -r 2 -t 600s -H https://localhost:8081 --only-summary --processes -1 CreatePods &> perf-results/create.txt
 kill $SINK_FORWARD_PID
@@ -49,7 +49,7 @@ kill $PROMETHEUS_FORWARD_PID
 
 START=$(date +%s)
 sleep 30
-kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081 &
+kubectl port-forward -n kronicler svc/kronicler-api-server 8081:8081 &
 SINK_FORWARD_PID=$!
 ./venv/bin/locust -f ${SCRIPT_DIR}/locustfile.py --headless --users 2 -r 2 -t 600s -H https://localhost:8081 --only-summary --processes -1 GetPods &> perf-results/get.txt
 kill $SINK_FORWARD_PID
@@ -67,7 +67,7 @@ set +o errexit
 cat <<EOF > ${GITHUB_STEP_SUMMARY:-/dev/stdout}
 ## Deployment Limits
 \`\`\`
-$(kubectl get -n kubearchive deployments.apps -l app.kubernetes.io/part-of=kubearchive -o go-template-file=${SCRIPT_DIR}/limits.gotemplate)
+$(kubectl get -n kronicler deployments.apps -l app.kubernetes.io/part-of=kronicler -o go-template-file=${SCRIPT_DIR}/limits.gotemplate)
 \`\`\`
 
 ## Create | Requests
@@ -76,7 +76,7 @@ $(tail -n13 perf-results/create.txt)
 \`\`\`
 
 \`\`\`
-$(kubectl exec -i -n postgresql pod/kubearchive-1 -- psql kubearchive -c "SELECT COUNT(*) FROM resource;")
+$(kubectl exec -i -n postgresql pod/kronicler-1 -- psql kronicler -c "SELECT COUNT(*) FROM resource;")
 \`\`\`
 
 ## Create | CPU (milliCPUs)

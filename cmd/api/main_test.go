@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 package main
 
@@ -14,9 +14,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	fakeK8s "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/kubearchive/kubearchive/cmd/api/routers"
-	"github.com/kubearchive/kubearchive/pkg/cache"
-	fakeDB "github.com/kubearchive/kubearchive/pkg/database/fake"
+	"github.com/kronicler/kronicler/cmd/api/routers"
+	"github.com/kronicler/kronicler/pkg/cache"
+	fakeDB "github.com/kronicler/kronicler/pkg/database/fake"
 )
 
 func fakeServer(k8sClient kubernetes.Interface, cache *cache.Cache) *Server {

@@ -1,4 +1,4 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 name: Performance
@@ -14,7 +14,7 @@ jobs:
   setup:
     uses: ./.github/workflows/log_run_details.yml
   integration:
-    name: KubeArchive Performance Tests
+    name: Kronicler Performance Tests
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
@@ -47,7 +47,7 @@ jobs:
         uses: ko-build/setup-ko@v0.8
       - name: Create KinD cluster
         run: kind create cluster
-      - name: Install KubeArchive
+      - name: Install Kronicler
         run: |
           export KO_DOCKER_REPO="kind.local"
           bash hack/quick-install.sh

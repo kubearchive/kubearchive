@@ -1,33 +1,33 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: "kubearchive-sink"
-  namespace: kubearchive
+  name: "kronicler-sink"
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: "kubearchive-sink"
+    app.kubernetes.io/name: "kronicler-sink"
     app.kubernetes.io/component: sink
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 spec:
   replicas: 1
   selector:
     matchLabels: &labels
-      app: kubearchive-sink
+      app: kronicler-sink
   template:
     metadata:
       labels: *labels
     spec:
-      serviceAccountName: kubearchive-sink
+      serviceAccountName: kronicler-sink
       volumes:
         - name: logging-config
           configMap:
-            name: kubearchive-logging
+            name: kronicler-logging
       containers:
-        - name: kubearchive-sink
-          image: ko://github.com/kubearchive/kubearchive/cmd/sink
+        - name: kronicler-sink
+          image: ko://github.com/kronicler/kronicler/cmd/sink
           resources:
             requests:
               cpu: 200m
@@ -43,19 +43,19 @@ spec:
           envFrom:
             # Provide DB URL, user, password, database and port as env vars
             - secretRef:
-                name: kubearchive-database-credentials
+                name: kronicler-database-credentials
           env:
-            - name: KUBEARCHIVE_ENABLE_PPROF
+            - name: KRONICLER_ENABLE_PPROF
               value: "true"
             - name: GIN_MODE
               value: release
             - name: LOG_LEVEL
               value: INFO
-            - name: KUBEARCHIVE_OTEL_MODE
+            - name: KRONICLER_OTEL_MODE
               value: "disabled"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: ""
-            - name: KUBEARCHIVE_OTLP_SEND_LOGS
+            - name: KRONICLER_OTLP_SEND_LOGS
               value: "false"
             - name: OTEL_GO_X_DEPRECATED_RUNTIME_METRICS
               value: "false"
@@ -67,11 +67,11 @@ spec:
               valueFrom:
                 resourceFieldRef:
                   resource: limits.cpu
-            - name: KUBEARCHIVE_NAMESPACE
+            - name: KRONICLER_NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-            - name: KUBEARCHIVE_LOGGING_DIR
+            - name: KRONICLER_LOGGING_DIR
               value: /data/logging
           ports:
             - containerPort: 8080
@@ -89,16 +89,16 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: "kubearchive-sink"
-  namespace: kubearchive
+  name: "kronicler-sink"
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: "kubearchive-sink"
+    app.kubernetes.io/name: "kronicler-sink"
     app.kubernetes.io/component: sink
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 spec:
   selector:
-    app: kubearchive-sink
+    app: kronicler-sink
   ports:
     - protocol: TCP
       port: 80

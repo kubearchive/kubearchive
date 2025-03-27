@@ -1,4 +1,4 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: v1
@@ -115,5 +115,5 @@ metadata:
   namespace: knative-eventing
 data:
   backend: "zipkin"
-  zipkin-endpoint: "http://grafana-lgtm.kubearchive.svc.cluster.local:9411"
+  zipkin-endpoint: "http://grafana-lgtm.kronicler.svc.cluster.local:9411"
   sample-rate: "1"

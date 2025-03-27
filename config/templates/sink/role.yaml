@@ -1,15 +1,15 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: "kubearchive-sink-watch"
-  namespace: kubearchive
+  name: "kronicler-sink-watch"
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: "kubearchive-sink-watch"
+    app.kubernetes.io/name: "kronicler-sink-watch"
     app.kubernetes.io/component: sink
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 rules:
   - apiGroups:

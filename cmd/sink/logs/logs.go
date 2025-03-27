@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package logs
@@ -10,10 +10,10 @@ import (
 	"os"
 	"strings"
 
-	ocel "github.com/kubearchive/kubearchive/pkg/cel"
-	"github.com/kubearchive/kubearchive/pkg/files"
-	"github.com/kubearchive/kubearchive/pkg/logurls"
-	"github.com/kubearchive/kubearchive/pkg/models"
+	ocel "github.com/kronicler/kronicler/pkg/cel"
+	"github.com/kronicler/kronicler/pkg/files"
+	"github.com/kronicler/kronicler/pkg/logurls"
+	"github.com/kronicler/kronicler/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -23,7 +23,7 @@ const (
 	jsonPathKey      = "LOG_URL_JSONPATH"
 )
 
-func getKubeArchiveLoggingConfig() (map[string]string, error) {
+func getKroniclerLoggingConfig() (map[string]string, error) {
 	loggingDir, exists := os.LookupEnv(files.LoggingDirEnvVar)
 	if !exists {
 		return nil, errors.New("Environment variable not set: " + files.LoggingDirEnvVar)
@@ -33,7 +33,7 @@ func getKubeArchiveLoggingConfig() (map[string]string, error) {
 		return nil, fmt.Errorf("Could not read logging config: %w", err)
 	}
 	if len(configFiles) == 0 {
-		return nil, errors.New("Logging Config is empty. To configure logging update the kubearchive-logging ConfigMap")
+		return nil, errors.New("Logging Config is empty. To configure logging update the kronicler-logging ConfigMap")
 	}
 
 	loggingConf, err := files.LoggingConfigFromFiles(configFiles)
@@ -49,13 +49,13 @@ type UrlBuilder struct {
 }
 
 func NewUrlBuilder() (*UrlBuilder, error) {
-	loggingConf, err := getKubeArchiveLoggingConfig()
+	loggingConf, err := getKroniclerLoggingConfig()
 	if err != nil {
 		return nil, err
 	}
 	_, exists := loggingConf[logurls.LogURL]
 	if !exists {
-		return nil, errors.New("Invalid logging config. The kubearchive-logging ConfigMap must have a key 'LOG_URL'")
+		return nil, errors.New("Invalid logging config. The kronicler-logging ConfigMap must have a key 'LOG_URL'")
 	}
 	// Set CONTAINER_NAME and overwrite it if already defined
 	loggingConf[logurls.ContainerName] = containerNameCel

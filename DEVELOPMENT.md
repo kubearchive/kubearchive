@@ -1,7 +1,7 @@
 # Development
 
 This document helps you to setup a development environment so you can contribute
-to KubeArchive. It also contain instructions to run integration tests, remote IDE
+to Kronicler. It also contain instructions to run integration tests, remote IDE
 debugging and other processes.
 
 ## Requisites
@@ -19,13 +19,13 @@ Install these tools:
 
 ## Creating a fork repository
 
-1. Create your fork of [KubeArchive](https://github.com/kubearchive/kubearchive)
+1. Create your fork of [Kronicler](https://github.com/kronicler/kronicler)
    following [this guide](https://help.github.com/articles/fork-a-repo/).
 1. Clone it to your computer:
     ```bash
-    git clone git@github.com:${YOUR_GITHUB_USERNAME}/kubearchive.git
-    cd kubearchive
-    git remote add upstream https://github.com/kubearchive/kubearchive.git
+    git clone git@github.com:${YOUR_GITHUB_USERNAME}/kronicler.git
+    cd kronicler
+    git remote add upstream https://github.com/kronicler/kronicler.git
     git remote set-url --push upstream no_push
     ```
 
@@ -42,47 +42,47 @@ Install these tools:
     export KO_DOCKER_REPO="kind.local"
     ```
 
-## Install KubeArchive, its dependencies, and initialize the database
+## Install Kronicler, its dependencies, and initialize the database
    ```bash
    hack/quick-install.sh
    ```
 
-## Update KubeArchive
+## Update Kronicler
 
-After you make changes to the code use the script to redeploy KubeArchive:
-
-```bash
-   hack/kubearchive-install.sh
-```
-
-## Uninstall KubeArchive
+After you make changes to the code use the script to redeploy Kronicler:
 
 ```bash
-   hack/kubearchive-delete.sh
+   hack/kronicler-install.sh
 ```
 
-**[NOTE]**: If KubeArchive is uninstalled and re-installed, all `KubeArchiveConfig` resources must be re-applied.
+## Uninstall Kronicler
 
-## Generate activity on the KubeArchive sink
+```bash
+   hack/kronicler-delete.sh
+```
+
+**[NOTE]**: If Kronicler is uninstalled and re-installed, all `KroniclerConfig` resources must be re-applied.
+
+## Generate activity on the Kronicler sink
 
 1. Install the CronJob log generator
     ```bash
     test/log-generators/cronjobs/install.sh
     ```
-1. Follow the logs on the KubeArchive sink:
+1. Follow the logs on the Kronicler sink:
     ```bash
-    kubectl logs -n kubearchive -l app=kubearchive-sink -f
+    kubectl logs -n kronicler -l app=kronicler-sink -f
     ```
 
-## Forward the KubeArchive API to localhost
+## Forward the Kronicler API to localhost
 
 1. Use `kubectl` to port forward, this will keep the terminal occupied:
     ```bash
-    kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081
+    kubectl port-forward -n kronicler svc/kronicler-api-server 8081:8081
     ```
-1. Get the Certificate Authority (CA) from the `kubearchive-api-server-tls` secret:
+1. Get the Certificate Authority (CA) from the `kronicler-api-server-tls` secret:
     ```bash
-    kubectl get -n kubearchive secrets kubearchive-api-server-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
+    kubectl get -n kronicler secrets kronicler-api-server-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
     ```
 
 1. Create a service account with a specific role to test the REST API.
@@ -97,21 +97,21 @@ After you make changes to the code use the script to redeploy KubeArchive:
     https://localhost:8081/apis/batch/v1/jobs | jq
     ```
 
-1. Check the new logs on the KubeArchive API:
+1. Check the new logs on the Kronicler API:
     ```bash
-    kubectl logs -n kubearchive -l app=kubearchive-api-server
+    kubectl logs -n kronicler -l app=kronicler-api-server
     ```
 
-## Use the KubeArchive CLI
+## Use the Kronicler CLI
 
 1. Use `kubectl` to port forward, this will keep the terminal occupied:
     ```bash
-    kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081
+    kubectl port-forward -n kronicler svc/kronicler-api-server 8081:8081
     ```
 
-1. Get the Certificate Authority (CA) from the `kubearchive-api-server-tls` secret:
+1. Get the Certificate Authority (CA) from the `kronicler-api-server-tls` secret:
     ```bash
-    kubectl get -n kubearchive secrets kubearchive-api-server-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
+    kubectl get -n kronicler secrets kronicler-api-server-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
     ```
 
 1. Run the CLI:
@@ -168,11 +168,11 @@ to start a debugger to which attach from your IDE.
 
    * To debug the API we also need the 8081 port for exposing the API Server:
    ```bash
-   kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081 40000:40000
+   kubectl port-forward -n kronicler svc/kronicler-api-server 8081:8081 40000:40000
    ```
    * Debug the operator webhooks:
    ```bash
-   kubectl port-forward -n kubearchive svc/kubearchive-operator-webhooks 40000:40000
+   kubectl port-forward -n kronicler svc/kronicler-operator-webhooks 40000:40000
    ```
 
 1. Enable breakpoints in your IDE.
@@ -187,10 +187,10 @@ to start a debugger to which attach from your IDE.
    curl -s --cacert ca.crt -H "Authorization: Bearer $(kubectl create -n test token default)" \
    https://localhost:8081/apis/batch/v1/jobs | jq
    ```
-   * Operator: Deploy the test resources that already include a KubeArchiveConfig Custom Resource
+   * Operator: Deploy the test resources that already include a KroniclerConfig Custom Resource
 
-**NOTE**: Debug just one component at once. After debugging a component, redeploy KubeArchive
-with `hack/kubearchive-delete.sh` and `hack/kubearchive-install.sh`
+**NOTE**: Debug just one component at once. After debugging a component, redeploy Kronicler
+with `hack/kronicler-delete.sh` and `hack/kronicler-install.sh`
 
 ## Enabling Telemetry
 
@@ -201,15 +201,15 @@ which also includes an OpenTelemetry Collector.
 As some dependencies use the Zipkin format to send traces, we are using the
 Collector's zipkin receiver.
 
-**Note**: KubeArchive sends traces and metrics to an intermediate OpenTelemetry
+**Note**: Kronicler sends traces and metrics to an intermediate OpenTelemetry
 Collector, which sends the data to the LGTM's Collector.
 
-1. After installing KubeArchive, run:
+1. After installing Kronicler, run:
     ```bash
     bash integrations/observability/grafana/install.sh
     ```
     **Note**: Knative's APIServerSource created before applying this change do not emit traces. Recreate
-    the KubeArchiveConfig to trigger the recreation of the APIServerSource.
+    the KroniclerConfig to trigger the recreation of the APIServerSource.
 1. Forward the Grafana UI port to localhost:
     ```bash
     kubectl port-forward -n observability svc/grafana-lgtm 3000:3000 &
@@ -220,13 +220,13 @@ start exploring metrics.
 
 ## Logging
 
-KubeArchive currenty has integrations for both Elasticsearch and Splunk. The sections
+Kronicler currenty has integrations for both Elasticsearch and Splunk. The sections
 below detail how to install each of those logging systems in a development environment.
 When the installation is complete, `Pod` logs will be sent to the logging system automatically.
 
-Once a logging system is installed, KubeArchive needs to be configured to generate log
+Once a logging system is installed, Kronicler needs to be configured to generate log
 URLs for it.  This is all detailed in the
-[KubeArchive documentation for logging integrations](https://kubearchive.github.io/kubearchive/main/integrations/logging.html). See this documentation for instructions and examples for configuring KubeArchive to generate
+[Kronicler documentation for logging integrations](https://kronicler.github.io/kronicler/main/integrations/logging.html). See this documentation for instructions and examples for configuring Kronicler to generate
 log URLs.
 
 * [ElasticSearch](./integrations/logging/elasticsearch/README.md)
@@ -247,7 +247,7 @@ log URLs.
 1. Using KinD and Podman Desktop. If you get this error:
    ```
    Error: failed to publish images: error publishing
-   ko://github.com/kubearchive/kubearchive/cmd/api: no nodes found for cluster "kind"
+   ko://github.com/kronicler/kronicler/cmd/api: no nodes found for cluster "kind"
    ```
    expose the `KIND_CLUSTER_NAME` env variable with the appropriate name of the kind cluster:
    ```bash
@@ -257,18 +257,18 @@ log URLs.
 
 1. Deploying the operator (for example using the `hack/quick-install.sh` script), the `Deployment` doesn't reach `Ready` state:
     ```
-    Waiting for deployment "kubearchive-operator" rollout to finish: 0 of 1 updated replicas are available...
+    Waiting for deployment "kronicler-operator" rollout to finish: 0 of 1 updated replicas are available...
     error: timed out waiting for the condition
     ```
-    And in the logs of the `kubearchive-operator` you see the following ERROR:
+    And in the logs of the `kronicler-operator` you see the following ERROR:
     ```
-     ❯ kubectl logs -n kubearchive deploy/kubearchive-operator --tail=5
+     ❯ kubectl logs -n kronicler deploy/kronicler-operator --tail=5
      2024-09-20T08:45:35Z    ERROR   error received after stop sequence was engaged  {"error": "leader election lost"}
      sigs.k8s.io/controller-runtime/pkg/manager.(*controllerManager).engageStopProcedure.func1
      sigs.k8s.io/controller-runtime@v0.19.0/pkg/manager/internal.go:512
      2024-09-20T08:45:35Z    ERROR   setup   problem running operator        {"error": "too many open files"}
      main.main
-     github.com/kubearchive/kubearchive/cmd/operator/main.go:154
+     github.com/kronicler/kronicler/cmd/operator/main.go:154
      runtime.main
      runtime/proc.go:271
     ```

@@ -1,6 +1,6 @@
 -- MySQL dump 10.13  Distrib 8.0.39, for Linux (x86_64)
 --
--- Host: 127.0.0.1    Database: kubearchive
+-- Host: 127.0.0.1    Database: kronicler
 -- ------------------------------------------------------
 -- Server version	9.0.1-router
 
@@ -16,14 +16,14 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
--- Current Database: `kubearchive`
+-- Current Database: `kronicler`
 --
 
-/*!40000 DROP DATABASE IF EXISTS `kubearchive`*/;
+/*!40000 DROP DATABASE IF EXISTS `kronicler`*/;
 
-CREATE DATABASE /*!32312 IF NOT EXISTS*/ `kubearchive` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
+CREATE DATABASE /*!32312 IF NOT EXISTS*/ `kronicler` /*!40100 DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci */ /*!80016 DEFAULT ENCRYPTION='N' */;
 
-USE `kubearchive`;
+USE `kronicler`;
 
 --
 -- Table structure for table `resource`

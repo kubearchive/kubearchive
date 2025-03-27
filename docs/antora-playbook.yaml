@@ -1,9 +1,9 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 site:
-  title: KubeArchive
-  url: https://kubearchive.github.io/kubearchive
+  title: Kronicler
+  url: https://kronicler.github.io/kronicler
   start_page: ROOT::index.adoc
 
 content:

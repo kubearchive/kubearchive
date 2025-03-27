@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 package main
 
@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kubearchive/kubearchive/pkg/cmd"
+	"github.com/kronicler/kronicler/pkg/cmd"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ func main() {
 func NewRootCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "kubectl-archive",
-		Short: "kubectl plugin to interact with KubeArchive",
+		Short: "kubectl plugin to interact with Kronicler",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("Hello from the root cmd")
 			return nil

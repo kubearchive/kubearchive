@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 package main
 
@@ -16,7 +16,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/kubearchive/kubearchive/test/performance/pkg"
+	"github.com/kronicler/kronicler/test/performance/pkg"
 )
 
 type Artifact struct {
@@ -45,9 +45,9 @@ type Stats struct {
 	CreatedAt string
 	HeadSha   string
 	Id        int64
-	Api       Stat `json:"kubearchive.api"`
-	Sink      Stat `json:"kubearchive.sink"`
-	Operator  Stat `json:"kubearchive.operator"`
+	Api       Stat `json:"kronicler.api"`
+	Sink      Stat `json:"kronicler.sink"`
+	Operator  Stat `json:"kronicler.operator"`
 }
 
 type Stat struct {
@@ -57,7 +57,7 @@ type Stat struct {
 	Mean   float64
 }
 
-const GITHUB_WORKFLOW_RUNS_ENDPOINT = "https://api.github.com/repos/kubearchive/kubearchive/actions/workflows/performance.yml/runs"
+const GITHUB_WORKFLOW_RUNS_ENDPOINT = "https://api.github.com/repos/kronicler/kronicler/actions/workflows/performance.yml/runs"
 const DATA_DIR = "./merge"
 
 func readOrPullWorkflowRuns() WorkflowRuns {

@@ -16,17 +16,17 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
-DROP DATABASE IF EXISTS kubearchive;
+DROP DATABASE IF EXISTS kronicler;
 --
--- Name: kubearchive; Type: DATABASE; Schema: -; Owner: kubearchive
+-- Name: kronicler; Type: DATABASE; Schema: -; Owner: kronicler
 --
 
-CREATE DATABASE kubearchive WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PROVIDER = libc LOCALE = 'en_US.UTF-8';
+CREATE DATABASE kronicler WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PROVIDER = libc LOCALE = 'en_US.UTF-8';
 
 
-ALTER DATABASE kubearchive OWNER TO kubearchive;
+ALTER DATABASE kronicler OWNER TO kronicler;
 
-\connect kubearchive
+\connect kronicler
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -40,14 +40,14 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: kubearchive; Type: DATABASE PROPERTIES; Schema: -; Owner: kubearchive
+-- Name: kronicler; Type: DATABASE PROPERTIES; Schema: -; Owner: kronicler
 --
 
-ALTER DATABASE kubearchive SET "TimeZone" TO 'UTC';
-ALTER DATABASE kubearchive SET work_mem TO '64MB';
+ALTER DATABASE kronicler SET "TimeZone" TO 'UTC';
+ALTER DATABASE kronicler SET work_mem TO '64MB';
 
 
-\connect kubearchive
+\connect kronicler
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -61,7 +61,7 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: trigger_set_timestamp(); Type: FUNCTION; Schema: public; Owner: kubearchive
+-- Name: trigger_set_timestamp(); Type: FUNCTION; Schema: public; Owner: kronicler
 --
 
 CREATE FUNCTION public.trigger_set_timestamp() RETURNS trigger
@@ -74,14 +74,14 @@ END;
 	$$;
 
 
-ALTER FUNCTION public.trigger_set_timestamp() OWNER TO kubearchive;
+ALTER FUNCTION public.trigger_set_timestamp() OWNER TO kronicler;
 
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 --
--- Name: log_url; Type: TABLE; Schema: public; Owner: kubearchive
+-- Name: log_url; Type: TABLE; Schema: public; Owner: kronicler
 --
 
 CREATE TABLE public.log_url (
@@ -95,10 +95,10 @@ CREATE TABLE public.log_url (
 );
 
 
-ALTER TABLE public.log_url OWNER TO kubearchive;
+ALTER TABLE public.log_url OWNER TO kronicler;
 
 --
--- Name: log_url_id_seq; Type: SEQUENCE; Schema: public; Owner: kubearchive
+-- Name: log_url_id_seq; Type: SEQUENCE; Schema: public; Owner: kronicler
 --
 
 CREATE SEQUENCE public.log_url_id_seq
@@ -109,17 +109,17 @@ CREATE SEQUENCE public.log_url_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.log_url_id_seq OWNER TO kubearchive;
+ALTER SEQUENCE public.log_url_id_seq OWNER TO kronicler;
 
 --
--- Name: log_url_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: kubearchive
+-- Name: log_url_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: kronicler
 --
 
 ALTER SEQUENCE public.log_url_id_seq OWNED BY public.log_url.id;
 
 
 --
--- Name: resource; Type: TABLE; Schema: public; Owner: kubearchive
+-- Name: resource; Type: TABLE; Schema: public; Owner: kronicler
 --
 
 CREATE TABLE public.resource (
@@ -138,10 +138,10 @@ CREATE TABLE public.resource (
 );
 
 
-ALTER TABLE public.resource OWNER TO kubearchive;
+ALTER TABLE public.resource OWNER TO kronicler;
 
 --
--- Name: resource_id_seq; Type: SEQUENCE; Schema: public; Owner: kubearchive
+-- Name: resource_id_seq; Type: SEQUENCE; Schema: public; Owner: kronicler
 --
 
 CREATE SEQUENCE public.resource_id_seq
@@ -152,31 +152,31 @@ CREATE SEQUENCE public.resource_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.resource_id_seq OWNER TO kubearchive;
+ALTER SEQUENCE public.resource_id_seq OWNER TO kronicler;
 
 --
--- Name: resource_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: kubearchive
+-- Name: resource_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: kronicler
 --
 
 ALTER SEQUENCE public.resource_id_seq OWNED BY public.resource.id;
 
 
 --
--- Name: log_url id; Type: DEFAULT; Schema: public; Owner: kubearchive
+-- Name: log_url id; Type: DEFAULT; Schema: public; Owner: kronicler
 --
 
 ALTER TABLE ONLY public.log_url ALTER COLUMN id SET DEFAULT nextval('public.log_url_id_seq'::regclass);
 
 
 --
--- Name: resource id; Type: DEFAULT; Schema: public; Owner: kubearchive
+-- Name: resource id; Type: DEFAULT; Schema: public; Owner: kronicler
 --
 
 ALTER TABLE ONLY public.resource ALTER COLUMN id SET DEFAULT nextval('public.resource_id_seq'::regclass);
 
 
 --
--- Name: log_url log_url_pkey; Type: CONSTRAINT; Schema: public; Owner: kubearchive
+-- Name: log_url log_url_pkey; Type: CONSTRAINT; Schema: public; Owner: kronicler
 --
 
 ALTER TABLE ONLY public.log_url
@@ -184,7 +184,7 @@ ALTER TABLE ONLY public.log_url
 
 
 --
--- Name: resource resource_pkey; Type: CONSTRAINT; Schema: public; Owner: kubearchive
+-- Name: resource resource_pkey; Type: CONSTRAINT; Schema: public; Owner: kronicler
 --
 
 ALTER TABLE ONLY public.resource
@@ -192,7 +192,7 @@ ALTER TABLE ONLY public.resource
 
 
 --
--- Name: resource resource_uuid_key; Type: CONSTRAINT; Schema: public; Owner: kubearchive
+-- Name: resource resource_uuid_key; Type: CONSTRAINT; Schema: public; Owner: kronicler
 --
 
 ALTER TABLE ONLY public.resource
@@ -200,63 +200,63 @@ ALTER TABLE ONLY public.resource
 
 
 --
--- Name: idx_creation_timestamp_id; Type: INDEX; Schema: public; Owner: kubearchive
+-- Name: idx_creation_timestamp_id; Type: INDEX; Schema: public; Owner: kronicler
 --
 
 CREATE INDEX idx_creation_timestamp_id ON public.resource USING btree ((((data -> 'metadata'::text) ->> 'creationTimestamp'::text)) DESC, id DESC);
 
 
 --
--- Name: idx_json_annotations; Type: INDEX; Schema: public; Owner: kubearchive
+-- Name: idx_json_annotations; Type: INDEX; Schema: public; Owner: kronicler
 --
 
 CREATE INDEX idx_json_annotations ON public.resource USING gin ((((data -> 'metadata'::text) -> 'annotations'::text)));
 
 
 --
--- Name: idx_json_labels; Type: INDEX; Schema: public; Owner: kubearchive
+-- Name: idx_json_labels; Type: INDEX; Schema: public; Owner: kronicler
 --
 
 CREATE INDEX idx_json_labels ON public.resource USING gin ((((data -> 'metadata'::text) -> 'labels'::text)));
 
 
 --
--- Name: idx_json_owners; Type: INDEX; Schema: public; Owner: kubearchive
+-- Name: idx_json_owners; Type: INDEX; Schema: public; Owner: kronicler
 --
 
 CREATE INDEX idx_json_owners ON public.resource USING gin ((((data -> 'metadata'::text) -> 'ownerReferences'::text)) jsonb_path_ops);
 
 
 --
--- Name: log_url_uuid_idx; Type: INDEX; Schema: public; Owner: kubearchive
+-- Name: log_url_uuid_idx; Type: INDEX; Schema: public; Owner: kronicler
 --
 
 CREATE INDEX log_url_uuid_idx ON public.resource USING btree (uuid);
 
 
 --
--- Name: resource_kind_namespace_idx; Type: INDEX; Schema: public; Owner: kubearchive
+-- Name: resource_kind_namespace_idx; Type: INDEX; Schema: public; Owner: kronicler
 --
 
 CREATE INDEX resource_kind_namespace_idx ON public.resource USING btree (kind, api_version, namespace);
 
 
 --
--- Name: log_url set_timestamp; Type: TRIGGER; Schema: public; Owner: kubearchive
+-- Name: log_url set_timestamp; Type: TRIGGER; Schema: public; Owner: kronicler
 --
 
 CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.log_url FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
 
 
 --
--- Name: resource set_timestamp; Type: TRIGGER; Schema: public; Owner: kubearchive
+-- Name: resource set_timestamp; Type: TRIGGER; Schema: public; Owner: kronicler
 --
 
 CREATE TRIGGER set_timestamp BEFORE UPDATE ON public.resource FOR EACH ROW EXECUTE FUNCTION public.trigger_set_timestamp();
 
 
 --
--- Name: log_url log_url_uuid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: kubearchive
+-- Name: log_url log_url_uuid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: kronicler
 --
 
 ALTER TABLE ONLY public.log_url

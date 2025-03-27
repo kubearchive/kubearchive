@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package routers
@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/cmd/api/discovery"
-	"github.com/kubearchive/kubearchive/cmd/api/pagination"
-	"github.com/kubearchive/kubearchive/pkg/abort"
-	"github.com/kubearchive/kubearchive/pkg/database"
-	"github.com/kubearchive/kubearchive/pkg/observability"
+	"github.com/kronicler/kronicler/cmd/api/discovery"
+	"github.com/kronicler/kronicler/cmd/api/pagination"
+	"github.com/kronicler/kronicler/pkg/abort"
+	"github.com/kronicler/kronicler/pkg/database"
+	"github.com/kronicler/kronicler/pkg/observability"
 	"k8s.io/apimachinery/pkg/labels"
 )
 

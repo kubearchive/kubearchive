@@ -1,18 +1,18 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: k8s.mariadb.com/v1alpha1
 kind: Grant
 metadata:
-  name: kubearchive
+  name: kronicler
 spec:
   mariaDbRef:
     name: kubarchive
   privileges:
     - "ALL PRIVILEGES"
-  database: kubearchive
+  database: kronicler
   table: "*"
-  username: kubearchive
+  username: kronicler
   grantOption: true
   host: "%"
   # Delete the resource in the database whenever the CR gets deleted.

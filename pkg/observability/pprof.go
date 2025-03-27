@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package observability
@@ -12,7 +12,7 @@ import (
 
 // EnablePprofEnvVar controls if the Pprof support is added or not.
 // It is exported so the Operator can use it.
-const EnablePprofEnvVar = "KUBEARCHIVE_ENABLE_PPROF"
+const EnablePprofEnvVar = "KRONICLER_ENABLE_PPROF"
 
 // SetupPprof adds the different  pprof profiles to a gin.Engine
 // under the well-known endpoint `/debug/pprof/`

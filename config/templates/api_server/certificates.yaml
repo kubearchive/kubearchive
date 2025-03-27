@@ -1,25 +1,25 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: "kubearchive-api-server-certificate"
-  namespace: kubearchive
+  name: "kronicler-api-server-certificate"
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: "kubearchive-api-server-certificate"
+    app.kubernetes.io/name: "kronicler-api-server-certificate"
     app.kubernetes.io/component: api-server
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 spec:
   isCA: false
-  commonName: kubearchive-api-server
-  secretName: "kubearchive-api-server-tls"
+  commonName: kronicler-api-server
+  secretName: "kronicler-api-server-tls"
   duration: 720h  # 30 days
   renewBefore: 360h  # 15 days
   subject:
     organizations:
-      - kubearchive
+      - kronicler
   privateKey:
     algorithm: ECDSA
     size: 256
@@ -28,9 +28,9 @@ spec:
     - key encipherment
   dnsNames:
     - localhost
-    - kubearchive-api-server
-    - "kubearchive-api-server.kubearchive.svc"
+    - kronicler-api-server
+    - "kronicler-api-server.kronicler.svc"
   issuerRef:
-    name: "kubearchive"
+    name: "kronicler"
     kind: Issuer
     group: cert-manager.io

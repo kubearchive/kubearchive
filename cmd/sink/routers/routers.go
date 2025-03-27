@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package routers
@@ -17,13 +17,13 @@ import (
 	ceClient "github.com/cloudevents/sdk-go/v2/client"
 	"github.com/cloudevents/sdk-go/v2/protocol"
 	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/cmd/sink/filters"
-	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
-	"github.com/kubearchive/kubearchive/cmd/sink/logs"
-	"github.com/kubearchive/kubearchive/pkg/abort"
-	"github.com/kubearchive/kubearchive/pkg/database"
-	"github.com/kubearchive/kubearchive/pkg/models"
-	"github.com/kubearchive/kubearchive/pkg/observability"
+	"github.com/kronicler/kronicler/cmd/sink/filters"
+	"github.com/kronicler/kronicler/cmd/sink/k8s"
+	"github.com/kronicler/kronicler/cmd/sink/logs"
+	"github.com/kronicler/kronicler/pkg/abort"
+	"github.com/kronicler/kronicler/pkg/database"
+	"github.com/kronicler/kronicler/pkg/models"
+	"github.com/kronicler/kronicler/pkg/observability"
 	corev1 "k8s.io/api/core/v1"
 	errs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-const namespaceEnvVar = "KUBEARCHIVE_NAMESPACE"
+const namespaceEnvVar = "KRONICLER_NAMESPACE"
 
 type Controller struct {
 	ceHandler     *ceClient.EventReceiver
@@ -285,7 +285,7 @@ func (c *Controller) Readyz(ctx *gin.Context) {
 	ns := os.Getenv(namespaceEnvVar)
 	if ns == "" {
 		err = fmt.Errorf(
-			"Could not determine the KubeArchive namespace. Environment variable %s is not set", namespaceEnvVar,
+			"Could not determine the Kronicler namespace. Environment variable %s is not set", namespaceEnvVar,
 		)
 		abort.Abort(ctx, err, http.StatusServiceUnavailable)
 	}

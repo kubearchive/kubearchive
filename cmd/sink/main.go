@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package main
@@ -7,14 +7,14 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/kubearchive/kubearchive/cmd/sink/filters"
-	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
-	"github.com/kubearchive/kubearchive/cmd/sink/logs"
-	"github.com/kubearchive/kubearchive/cmd/sink/routers"
-	"github.com/kubearchive/kubearchive/cmd/sink/server"
-	"github.com/kubearchive/kubearchive/pkg/database"
-	"github.com/kubearchive/kubearchive/pkg/logging"
-	kaObservability "github.com/kubearchive/kubearchive/pkg/observability"
+	"github.com/kronicler/kronicler/cmd/sink/filters"
+	"github.com/kronicler/kronicler/cmd/sink/k8s"
+	"github.com/kronicler/kronicler/cmd/sink/logs"
+	"github.com/kronicler/kronicler/cmd/sink/routers"
+	"github.com/kronicler/kronicler/cmd/sink/server"
+	"github.com/kronicler/kronicler/pkg/database"
+	"github.com/kronicler/kronicler/pkg/logging"
+	kaObservability "github.com/kronicler/kronicler/pkg/observability"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 )
 
 const (
-	otelServiceName = "kubearchive.sink"
+	otelServiceName = "kronicler.sink"
 	mountPathEnvVar = "MOUNT_PATH"
 )
 
@@ -40,7 +40,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	slog.Info("Starting KubeArchive Sink", "version", version, "commit", commit, "built", date)
+	slog.Info("Starting Kronicler Sink", "version", version, "commit", commit, "built", date)
 	db, err := database.NewWriter()
 	if err != nil {
 		slog.Error("Could not connect to the database", "err", err)

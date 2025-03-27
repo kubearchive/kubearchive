@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package fake
@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubearchive/kubearchive/pkg/database"
-	"github.com/kubearchive/kubearchive/pkg/models"
+	"github.com/kronicler/kronicler/pkg/database"
+	"github.com/kronicler/kronicler/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -256,7 +256,7 @@ func TestWriteUrls(t *testing.T) {
 	k8sObj := &unstructured.Unstructured{}
 	k8sObj.SetUID(types.UID("abc-123-xyz"))
 	newUrls := []models.LogTuple{
-		{Url: "https://github.com/kubearchive", ContainerName: "container-1"},
+		{Url: "https://github.com/kronicler", ContainerName: "container-1"},
 		{Url: "https://example.com", ContainerName: "container-2"},
 	}
 	jsonPath := "$.hits.hits[*]._source.message"

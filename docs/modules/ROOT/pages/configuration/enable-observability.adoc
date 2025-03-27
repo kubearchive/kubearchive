@@ -1,10 +1,10 @@
-= Enabling Observability on KubeArchive
+= Enabling Observability on Kronicler
 
-KubeArchive is instrumented to emit observability data: metrics,
+Kronicler is instrumented to emit observability data: metrics,
 traces and logs. This can be enabled and configured with the following environment
-variables present on all of the KubeArchive components:
+variables present on all of the Kronicler components:
 
-* `KUBEARCHIVE_OTEL_MODE`: one of "enabled", "delegated" or "disabled". Defaults to
+* `KRONICLER_OTEL_MODE`: one of "enabled", "delegated" or "disabled". Defaults to
 an "disabled". It controls when observability data is sent to `OTEL_EXPORTER_OTLP_ENDPOINT`:
 ** "disabled": do not send traces or metrics.
 ** "enabled": always send traces and metrics. Useful for observability in development.
@@ -13,16 +13,16 @@ link:https://www.w3.org/TR/trace-context-2/#sampled-flag[W3 Trace Context `sampl
 Useful for observability in production.
 * `OTEL_EXPORTER_OTLP_ENDPOINT`: an OTLP compatible endpoint where traces are
     sent. By default it is set to an empty string.
-* `KUBEARCHIVE_OTLP_SEND_LOGS`: if set to "true" logs are sent to the
+* `KRONICLER_OTLP_SEND_LOGS`: if set to "true" logs are sent to the
     `OTEL_EXPOTER_OTLP_ENDPOINT` and not printed to stdout. Defaults to
     "false", so logs are printed on stdout by default. When enabled, a single log line
     is printed to stdout informing that logs will be redirected.
 
 To change these environment variables values, edit or patch the
-`kubearchive-api-server`, `kubearchive-sink` and `kubearchive-operator`
-Deployments on the `kubearchive` namespace:
+`kronicler-api-server`, `kronicler-sink` and `kronicler-operator`
+Deployments on the `kronicler` namespace:
 
-. Patch for the `kubearchive-api-server` Deployment:
+. Patch for the `kronicler-api-server` Deployment:
 +
 [source,yaml]
 ----
@@ -33,15 +33,15 @@ spec:
   template:
     spec:
       containers:
-        - name: kubearchive-api-server
+        - name: kronicler-api-server
           env:
-            - name: KUBEARCHIVE_OTEL_MODE
+            - name: KRONICLER_OTEL_MODE
               value: "delegated"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.observability.svc.cluster.local:4318"
 ----
 
-. Patch for the `kubearchive-sink` Deployment:
+. Patch for the `kronicler-sink` Deployment:
 +
 [source,yaml]
 ----
@@ -52,15 +52,15 @@ spec:
   template:
     spec:
       containers:
-        - name: kubearchive-sink
+        - name: kronicler-sink
           env:
-            - name: KUBEARCHIVE_OTEL_MODE
+            - name: KRONICLER_OTEL_MODE
               value: "delegated"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://otel-collector.observability.svc.cluster.local:4318"
 ----
 
-. Patch for the `kubearchive-operator` Deployment:
+. Patch for the `kronicler-operator` Deployment:
 +
 [source,yaml]
 ----
@@ -73,7 +73,7 @@ spec:
       containers:
         - name: manager
           env:
-            - name: KUBEARCHIVE_OTEL_MODE
+            - name: KRONICLER_OTEL_MODE
               value: "delegated"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "http://traces-collector.observability.svc.cluster.local:4318"
@@ -83,5 +83,5 @@ spec:
 +
 [source,bash]
 ----
-kubectl patch -n kubearchive deployment <deployment-name> --patch-file path/to/patch.yaml
+kubectl patch -n kronicler deployment <deployment-name> --patch-file path/to/patch.yaml
 ----

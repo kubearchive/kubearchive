@@ -1,4 +1,4 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: batch/v1
@@ -15,7 +15,7 @@ spec:
         spec:
           containers:
             - name: generate1
-              image: quay.io/kubearchive/mingrammer/flog
+              image: quay.io/kronicler/mingrammer/flog
               imagePullPolicy: IfNotPresent
               args:
                 - "-n"
@@ -23,7 +23,7 @@ spec:
                 - "-d"
                 - "20ms"
             - name: generate2
-              image: quay.io/kubearchive/mingrammer/flog
+              image: quay.io/kronicler/mingrammer/flog
               imagePullPolicy: IfNotPresent
               args:
                 - "-n"
@@ -31,7 +31,7 @@ spec:
                 - "-d"
                 - "20ms"
             - name: generate3
-              image: quay.io/kubearchive/mingrammer/flog
+              image: quay.io/kronicler/mingrammer/flog
               imagePullPolicy: IfNotPresent
               args:
                 - "-n"

@@ -1,4 +1,4 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 name: Performance Recap
@@ -14,7 +14,7 @@ jobs:
   setup:
     uses: ./.github/workflows/log_run_details.yml
   integration:
-    name: KubeArchive Performance Recap
+    name: Kronicler Performance Recap
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code

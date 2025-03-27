@@ -1,10 +1,10 @@
 = Release Process
 
-This document explains the process of a KubeArchive release and its requirements.
+This document explains the process of a Kronicler release and its requirements.
 
 == Commits
 
-The KubeArchive release process scans commits from the latest tag up to the current
+The Kronicler release process scans commits from the latest tag up to the current
 commit. The commits must mention the GitHub Pull Requests they come from on their
 title (first line). A commit merged from the Pull Request with ID 100 should have
 this title:
@@ -19,13 +19,13 @@ Pull Request merge.
 
 == Pull Request Labels
 
-KubeArchive follows the
+Kronicler follows the
 link:https://semver.org/[Semantic Versioning]
 system with a leading `v`: `vMAJOR.MINOR.PATCH`. To summarize, `MAJOR` releases
 break user-facing interfaces, `MINOR` releases introduce new features and `PATCH`
 versions introduce bug fixes or documentation changes.
 
-The KubeArchive release process relies on the labels on the GitHub Pull Requests
+The Kronicler release process relies on the labels on the GitHub Pull Requests
 when determining the next version number for the release. The following labels
 impact which number is updated in the next release:
 
@@ -39,7 +39,7 @@ A Pull Request requires at least one of these labels.
 
 == Release Notes
 
-The KubeArchive release process creates release notes for users. Changes
+The Kronicler release process creates release notes for users. Changes
 that have user-visible impact are required to provide release notes.
 
 Some examples of changes that would require release notes are:
@@ -65,7 +65,7 @@ annotated with `release-note`. An example of a `release-note` code block:
 ----
 ```release-note
 Introduced new feature called `feature-a`. To enable it, set to `true` the
-`feature-a` flag in the `feature-flags` ConfigMap in the `kubearchive` namespace.
+`feature-a` flag in the `feature-flags` ConfigMap in the `kronicler` namespace.
 ```
 ----
 
@@ -79,13 +79,13 @@ NONE
 ```
 ----
 
-This code block is included in KubeArchive's Pull Request template.
+This code block is included in Kronicler's Pull Request template.
 
 == Steps
 
 . Merge the changes needed into `main`.
 . Make sure the latest commit in `main` has passed every test.
-. Go to the Actions tab on the KubeArchive repository.
+. Go to the Actions tab on the Kronicler repository.
 . Trigger the "Release" workflow.
 
 == Release Results
@@ -93,7 +93,7 @@ This code block is included in KubeArchive's Pull Request template.
 . A release commit is created adding the `VERSION` files.
 . A release tag is created from the release commit.
 . A GitHub release is created from the release tag.
-. Images are pushed with the `<version>` tag to https://quay.io/kubearchive.
+. Images are pushed with the `<version>` tag to https://quay.io/kronicler.
 
 == Testing
 

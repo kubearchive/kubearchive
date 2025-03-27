@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package routers
@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/kubearchive/kubearchive/pkg/database"
-	"github.com/kubearchive/kubearchive/pkg/database/fake"
+	"github.com/kronicler/kronicler/pkg/database"
+	"github.com/kronicler/kronicler/pkg/database/fake"
 )
 
 var testResources = fake.CreateTestResources()
@@ -71,7 +71,7 @@ func TestLabelSelectorQueryParameter(t *testing.T) {
 		},
 		{
 			name:          "invalid label selector operator",
-			labelSelector: "app>kubearchive",
+			labelSelector: "app>kronicler",
 			expected:      400,
 		},
 		{
@@ -91,37 +91,37 @@ func TestLabelSelectorQueryParameter(t *testing.T) {
 		},
 		{
 			name:          "valid equals operator",
-			labelSelector: "app=kubearchive",
+			labelSelector: "app=kronicler",
 			expected:      200,
 		},
 		{
 			name:          "invalid equals operator",
-			labelSelector: "app==kubearchive",
+			labelSelector: "app==kronicler",
 			expected:      400,
 		},
 		{
 			name:          "valid not equals operator",
-			labelSelector: "app!=kubearchive",
+			labelSelector: "app!=kronicler",
 			expected:      200,
 		},
 		{
 			name:          "valid in operator",
-			labelSelector: "app in (kubearchive, postgresql)",
+			labelSelector: "app in (kronicler, postgresql)",
 			expected:      200,
 		},
 		{
 			name:          "valid notin operator",
-			labelSelector: "app notin (kubearchive, postgresql)",
+			labelSelector: "app notin (kronicler, postgresql)",
 			expected:      200,
 		},
 		{
 			name:          "invalid notin operator",
-			labelSelector: "app not in (kubearchive, postgresql)",
+			labelSelector: "app not in (kronicler, postgresql)",
 			expected:      400,
 		},
 		{
 			name:          "all operators",
-			labelSelector: "environment, !control-plane, app.kubernetes.io/part-of=kubernetes, environment!= dev, app in (kubearchive-api-server, kubearchive-sink), version notin (0.1, 0.2)",
+			labelSelector: "environment, !control-plane, app.kubernetes.io/part-of=kubernetes, environment!= dev, app in (kronicler-api-server, kronicler-sink), version notin (0.1, 0.2)",
 			expected:      200,
 		},
 	}

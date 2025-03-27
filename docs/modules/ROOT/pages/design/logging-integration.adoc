@@ -2,15 +2,15 @@
 
 == Overview
 
-KubeArchive needs to support logging, but it is not a logging system itself and
-does not implement logging. Instead, KubeArchive will integrate with logging systems
+Kronicler needs to support logging, but it is not a logging system itself and
+does not implement logging. Instead, Kronicler will integrate with logging systems
 and provide URLs for retrieving log files from the logging system for a specific
 Kubernetes resource.
 
 It is important to note that logs are tied to `Pods`. When a user requests the logs
 for a Tekton `PipelineRun`, what they expect to get back are the logs attached to the
 `Pods` that were part of the `PipelineRun`. Similar cases exist for requesting logs for
-`Jobs` and `CronJobs`. KubeArchive has to be able to handle this seamlessly for the user.
+`Jobs` and `CronJobs`. Kronicler has to be able to handle this seamlessly for the user.
 
 == Retrieving Log Information
 
@@ -19,23 +19,23 @@ sort of backwards recursive search. When a `PipelineRun` is deleted, all the `Ta
 associated with the `PipelineRun`, and `Pods` associated with those `TaskRuns`, are
 deleted. This is done using the owner references.
 
-KubeArchive can do things similarly. When logs for a resource are requested, a query
+Kronicler can do things similarly. When logs for a resource are requested, a query
 is made to find all the resources that have that initial resource as an owner. Then
 each resource returned is processed similarly, eventually building up a list of log
 file links. This generic approach should work for any resource.
 
-This also implies that KubeArchive is configured correctly to support this. It must
+This also implies that Kronicler is configured correctly to support this. It must
 be configured so that the initial resource and any dependent resources, all the way
 down to and including the `Pods`, are archived.
 
-Here's a sample `KubeArchiveConfig` as an example:
+Here's a sample `KroniclerConfig` as an example:
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: test
 spec:
   resources:
@@ -51,7 +51,7 @@ spec:
 So in this case, the `CronJob` is configured to be archived and deleted when
 the status contains a "completionTime" key. When that deletion happens,
 kubernetes will turn around and delete the associated `Pod`. Since we have
-configured `archiveOnDelete` for `Pods` to be true, KubeArchive will archive
+configured `archiveOnDelete` for `Pods` to be true, Kronicler will archive
 the `Pod` itself and generate the URLs for all the associated logs. The
 configuration would be similar for `PipelineRuns`, with the addition of
 the archiving of the `TaskRuns`.
@@ -59,22 +59,22 @@ the archiving of the `TaskRuns`.
 [IMPORTANT]
 ====
 
-- KubeArchive has no responsibility for sending the logs to the logging system.
-This is all configured elsewhere and outside of KubeArchive.
+- Kronicler has no responsibility for sending the logs to the logging system.
+This is all configured elsewhere and outside of Kronicler.
 - When the `Pod` is archived, the URL for accessing the log should be generated
 and stored with it. There is no attempt to query the logging system to verify
 the existence of the log.
 
 ====
 
-Here's another sample `KubeArchiveConfig` for `PipelineRuns`:
+Here's another sample `KroniclerConfig` for `PipelineRuns`:
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: test
 spec:
   resources:
@@ -99,7 +99,7 @@ In this case the following happens:
 
 == Configuration
 
-The logging system is an integration in KubeArchive.
+The logging system is an integration in Kronicler.
 The integration requires the successful generation of a URL to access the log for a
 specific `Pod` in the logging system and the credentials
 to access that logging system. URLs will ONLY be generated for `Pods`.
@@ -108,19 +108,19 @@ to access that logging system. URLs will ONLY be generated for `Pods`.
 
 To support multiple logging systems, the URLs must be able to be parameterized
 based on the logging system. This is done via a `ConfigMap` named
-`kubearchive-logging`.
+`kronicler-logging`.
 The ConfigMap contains entries that are used to generate logging URLs.
 The only required key in this ConfigMap is `LOG_URL`.
 
-.Example of kubearchive-logging ConfigMap for Splunk
+.Example of kronicler-logging ConfigMap for Splunk
 [source,yaml]
 ----
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubearchive-logging
-  namespace: kubearchive
+  name: kronicler-logging
+  namespace: kronicler
 data:
   # CONTAINER_NAME: "cel:spec.containers.map(m, m.name)" <1>
   POD_ID: "cel:metadata.uid" <2>
@@ -128,7 +128,7 @@ data:
   LOG_URL_JSONPATH: "$.hits.hits[*]._source.message" <4>
 ----
 
-<1> The `CONTAINER_NAME` parameter is provided at URL generation time by KubeArchive.
+<1> The `CONTAINER_NAME` parameter is provided at URL generation time by Kronicler.
 <2> The string to replace `POD_ID` inside the `LOG_URL` template.
 If it's prefixed with `cel:`, it is considered as a CEL expression to locate its value
 within the body of the Cloud Event where the resource is stored.
@@ -143,15 +143,15 @@ applied by the API Server to the output of the response body.
 The credentials to authorize the access to the logging backend API are stored in a `Secret`
 named `kubearhive-logging` with the mandatory keys `USER` and `PASSWORD`:
 
-.Example of kubearchive-logging Secret
+.Example of kronicler-logging Secret
 [source, yaml]
 ----
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: kubearchive-logging
-  namespace: kubearchive
+  name: kronicler-logging
+  namespace: kronicler
 type: Opaque
 stringData: <1>
   USER: user
@@ -164,7 +164,7 @@ stringData: <1>
 
 === Database
 
-The KubeArchive database will have a table named `log_url` with three fields:
+The Kronicler database will have a table named `log_url` with three fields:
 
 1. A `uuid` field which is a foreign key to `resource.uuid`.
 1. A `url` field which is the URL for one of the logs.
@@ -182,7 +182,7 @@ The sink should first delete any existing entries in the `log_url` table for the
 `Pod` being archived. Earlier archival requests may have already created records
 in the `log_url` table, and they should be removed to avoid duplicates.
 
-The sink will mount and use the `kubearchive-logging` `ConfigMap`
+The sink will mount and use the `kronicler-logging` `ConfigMap`
 for logging.
 
 When generating the logging URL to be stored when a `Pod` is archived,
@@ -198,7 +198,7 @@ substitutions are done, resulting in the final URL to the log in the logging sys
 
 === API
 
-The API mounts and use the `kubearchive-logging` `Secret` to authenticate
+The API mounts and use the `kronicler-logging` `Secret` to authenticate
 against the backend logging API and the `ConfigMap` to retrieve the optional `JSON_PATH`
 key.
 

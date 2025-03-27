@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 //go:build integration
 
@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/kubearchive/kubearchive/test"
+	"github.com/kronicler/kronicler/test"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,7 +26,7 @@ func TestDatabaseConnection(t *testing.T) {
 
 	// Fence database to make it unavailable - https://cloudnative-pg.io/documentation/1.24/fencing/
 	clusterResource := schema.GroupVersionResource{Group: "postgresql.cnpg.io", Version: "v1", Resource: "clusters"}
-	resource, err := dynclient.Resource(clusterResource).Namespace("postgresql").Get(context.Background(), "kubearchive", metav1.GetOptions{})
+	resource, err := dynclient.Resource(clusterResource).Namespace("postgresql").Get(context.Background(), "kronicler", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,17 +40,17 @@ func TestDatabaseConnection(t *testing.T) {
 	}
 	t.Logf("Fenced database")
 
-	podName := test.GetPodName(t, clientset, "kubearchive", "kubearchive-sink")
+	podName := test.GetPodName(t, clientset, "kronicler", "kronicler-sink")
 
 	// restart sink pod - replicas = 0
-	deploymentScaleSink, err := clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
+	deploymentScaleSink, err := clientset.AppsV1().Deployments("kronicler").GetScale(context.Background(), "kronicler-sink", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	scaleSink := *deploymentScaleSink
 	scaleSink.Spec.Replicas = 0
-	usSink, err := clientset.AppsV1().Deployments("kubearchive").UpdateScale(context.Background(), "kubearchive-sink", &scaleSink, metav1.UpdateOptions{})
+	usSink, err := clientset.AppsV1().Deployments("kronicler").UpdateScale(context.Background(), "kronicler-sink", &scaleSink, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,18 +59,18 @@ func TestDatabaseConnection(t *testing.T) {
 
 	t.Logf("Waiting for sink pod '%s' to disappear", podName)
 	err = retry.Do(func() error {
-		_, e := clientset.CoreV1().Pods("kubearchive").Get(context.Background(), podName, metav1.GetOptions{})
+		_, e := clientset.CoreV1().Pods("kronicler").Get(context.Background(), podName, metav1.GetOptions{})
 		return e
 	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
 
 	// restart sink pod - replicas = 1
-	deploymentScaleSink, err = clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
+	deploymentScaleSink, err = clientset.AppsV1().Deployments("kronicler").GetScale(context.Background(), "kronicler-sink", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	scaleSink = *deploymentScaleSink
 	scaleSink.Spec.Replicas = 1
-	usSink, err = clientset.AppsV1().Deployments("kubearchive").UpdateScale(context.Background(), "kubearchive-sink", &scaleSink, metav1.UpdateOptions{})
+	usSink, err = clientset.AppsV1().Deployments("kronicler").UpdateScale(context.Background(), "kronicler-sink", &scaleSink, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestDatabaseConnection(t *testing.T) {
 	// wait to sink pod ready and generate connection retries with the database
 	t.Logf("Waiting for sink to be up, and to generate retries with the database")
 	retryErr := retry.Do(func() error {
-		logs, err := test.GetPodLogs(t, "kubearchive", "kubearchive-sink")
+		logs, err := test.GetPodLogs(t, "kronicler", "kronicler-sink")
 		if err != nil {
 			return err
 		}
@@ -97,7 +97,7 @@ func TestDatabaseConnection(t *testing.T) {
 	}
 
 	// Unfence database
-	resource, err = dynclient.Resource(clusterResource).Namespace("postgresql").Get(context.Background(), "kubearchive", metav1.GetOptions{})
+	resource, err = dynclient.Resource(clusterResource).Namespace("postgresql").Get(context.Background(), "kronicler", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestDatabaseConnection(t *testing.T) {
 	t.Logf("Unfenced database")
 
 	retryErr = retry.Do(func() error {
-		logs, err := test.GetPodLogs(t, "kubearchive", "kubearchive-sink")
+		logs, err := test.GetPodLogs(t, "kronicler", "kronicler-sink")
 		if err != nil {
 			return nil
 		}
@@ -129,9 +129,9 @@ func TestDatabaseConnection(t *testing.T) {
 	}
 
 	// Wait for sink pod to be ready.
-	podName = test.GetPodName(t, clientset, "kubearchive", "kubearchive-sink")
+	podName = test.GetPodName(t, clientset, "kronicler", "kronicler-sink")
 	err = retry.Do(func() error {
-		pod, e := clientset.CoreV1().Pods("kubearchive").Get(context.Background(), podName, metav1.GetOptions{})
+		pod, e := clientset.CoreV1().Pods("kronicler").Get(context.Background(), podName, metav1.GetOptions{})
 		if e != nil {
 			return e
 		}

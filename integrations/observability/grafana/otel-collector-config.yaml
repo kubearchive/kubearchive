@@ -1,4 +1,4 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 receivers:
@@ -9,7 +9,7 @@ receivers:
   prometheus:
     config:
       scrape_configs:
-        - job_name: 'kubearchive-otel-collector'
+        - job_name: 'kronicler-otel-collector'
           static_configs:
             - targets: ['localhost:8888']
 

@@ -1,7 +1,7 @@
 <!--  Thanks for sending a pull request!
 
 Please read our contributor guidelines:
-https://kubearchive.github.io/kubearchive/main/contributors/guide.html
+https://kronicler.github.io/kronicler/main/contributors/guide.html
 -->
 
 ## Which Issue(s) this Pull Request Resolves
@@ -20,7 +20,7 @@ If this change has user-visible impact, write a release note in the block
 below. Include the string "action required" if additional action is required of
 users switching to the new release, for example in case of a breaking change.
 
-Write as if you are speaking to users, not other KubeArchive contributors. If this
+Write as if you are speaking to users, not other Kronicler contributors. If this
 change has no user-visible impact, leave the code block as is.
 -->
 
@@ -37,7 +37,7 @@ specific place.
 <!--
 Please label this pull request according to what type of issue you are addressing.
 For reference on required PR/issue labels, read here:
-https://kubearchive.github.io/kubearchive/main/contributors/release.html#_pull_request_labels
+https://kronicler.github.io/kronicler/main/contributors/release.html#_pull_request_labels
 
 Add one of the following labels:
 kind/bug

@@ -9,7 +9,7 @@ Install [DBeaver Community](https://dbeaver.io/).
 1. Create a port-forward in a new terminal tab.
 
   ```bash
-  $ kubectl port-forward -n kubearchive svc/kubearchive-database 5432:5432
+  $ kubectl port-forward -n kronicler svc/kronicler-database 5432:5432
   ```
 
 1. DBeaver settings.
@@ -35,7 +35,7 @@ These queries can be executed from the database.
 Connect to the database.
 
 ```bash
-kubectl exec -it  $(kubectl get -n kubearchive pods --no-headers -o custom-columns=":metadata.name" | grep database) -n kubearchive -- psql -h localhost -U ps_user --password -p 5432 postgresdb
+kubectl exec -it  $(kubectl get -n kronicler pods --no-headers -o custom-columns=":metadata.name" | grep database) -n kronicler -- psql -h localhost -U ps_user --password -p 5432 postgresdb
 ```
 
 ```sql

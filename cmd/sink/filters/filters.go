@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package filters
@@ -13,8 +13,8 @@ import (
 	"sync"
 
 	"github.com/google/cel-go/cel"
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
-	ocel "github.com/kubearchive/kubearchive/pkg/cel"
+	kroniclerapi "github.com/kronicler/kronicler/cmd/operator/api/v1alpha1"
+	ocel "github.com/kronicler/kronicler/pkg/cel"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	globalKeyEnvVar = "KUBEARCHIVE_NAMESPACE"
+	globalKeyEnvVar = "KRONICLER_NAMESPACE"
 	filtersCmName   = "sink-filters"
 )
 
@@ -67,16 +67,16 @@ func NewFilters(clientset kubernetes.Interface) *Filters {
 // getGlobalCelExprs returns three maps:
 // The first map is archive cel expressions, the second map is delete cel expressions, and the third map is archive on
 // delete cel expression. If no global key exists, it returns ErrNoGlobal. Otherwise it will return any error it
-// encounters to yaml.Unmarshal the []KubeArchiveConfigResources for the global key.
+// encounters to yaml.Unmarshal the []KroniclerConfigResources for the global key.
 func getGlobalCelExprs(stringResources map[string]string) (map[schema.GroupVersionKind]string, map[schema.GroupVersionKind]string, map[schema.GroupVersionKind]string, error) {
 	archiveExprs := make(map[schema.GroupVersionKind]string)
 	deleteExprs := make(map[schema.GroupVersionKind]string)
 	archiveOnDelete := make(map[schema.GroupVersionKind]string)
-	kacResources, exists := stringResources[globalKey]
+	kronResources, exists := stringResources[globalKey]
 	if !exists {
 		return archiveExprs, deleteExprs, archiveOnDelete, ErrNoGlobal
 	}
-	resources, err := kubearchiveapi.LoadFromString(kacResources)
+	resources, err := kroniclerapi.LoadFromString(kronResources)
 	if err != nil {
 		return archiveExprs, deleteExprs, archiveOnDelete, err
 	}
@@ -100,8 +100,8 @@ func (f *Filters) changeGlobalFilters(stringResources map[string]string) error {
 	archiveMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	deleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	archiveOnDeleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
-	for namespace, kacResources := range stringResources {
-		nsArchive, nsDelete, nsArchiveOnDelete, nsErr := f.createFilters(namespace, kacResources, globalArchive, globalDelete, globalArchiveOnDelete)
+	for namespace, kronResources := range stringResources {
+		nsArchive, nsDelete, nsArchiveOnDelete, nsErr := f.createFilters(namespace, kronResources, globalArchive, globalDelete, globalArchiveOnDelete)
 		maps.Copy(archiveMap, nsArchive)
 		maps.Copy(deleteMap, nsDelete)
 		maps.Copy(archiveOnDeleteMap, nsArchiveOnDelete)
@@ -125,7 +125,7 @@ func (f *Filters) changeGlobalFilters(stringResources map[string]string) error {
 // wraps all errors it encounters while creating filters and returns the wrapped error. Even if the returned error is
 // not nil, the maps returned can still be used.
 func (f *Filters) createFilters(
-	namespace, kacResources string,
+	namespace, kronResources string,
 	globalArchive, globalDelete, globalArchiveOnDelete map[schema.GroupVersionKind]string,
 ) (
 	map[NamespaceGroupVersionKind]cel.Program,
@@ -136,7 +136,7 @@ func (f *Filters) createFilters(
 	archiveMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	deleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	archiveOnDeleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
-	resources, err := kubearchiveapi.LoadFromString(kacResources)
+	resources, err := kroniclerapi.LoadFromString(kronResources)
 	if err != nil {
 		return archiveMap, deleteMap, archiveOnDeleteMap, err
 	}

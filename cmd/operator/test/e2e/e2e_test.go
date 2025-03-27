@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package e2e
@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/kubearchive/kubearchive/cmd/operator/test/utils"
+	"github.com/kronicler/kronicler/cmd/operator/test/utils"
 )
 
 const namespace = "operator-system"

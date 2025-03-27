@@ -1,6 +1,6 @@
 = Database Schema
 
-This document lists and details the database schema used by KubeArchive.
+This document lists and details the database schema used by Kronicler.
 
 == Table `resource`
 
@@ -48,7 +48,7 @@ This document lists and details the database schema used by KubeArchive.
 
 |cluster_deleted_ts
 |timestamp not null
-|Timestamp when KubeArchive deleted the resource from the cluster.
+|Timestamp when Kronicler deleted the resource from the cluster.
 
 |data
 |jsonb not null

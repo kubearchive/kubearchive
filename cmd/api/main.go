@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package main
@@ -15,23 +15,23 @@ import (
 
 	"github.com/Cyprinus12138/otelgin"
 	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/cmd/api/auth"
-	"github.com/kubearchive/kubearchive/cmd/api/discovery"
-	"github.com/kubearchive/kubearchive/cmd/api/logging"
-	"github.com/kubearchive/kubearchive/cmd/api/pagination"
-	"github.com/kubearchive/kubearchive/cmd/api/routers"
-	"github.com/kubearchive/kubearchive/pkg/cache"
-	"github.com/kubearchive/kubearchive/pkg/database"
-	kaLogging "github.com/kubearchive/kubearchive/pkg/logging"
-	"github.com/kubearchive/kubearchive/pkg/middleware"
-	"github.com/kubearchive/kubearchive/pkg/observability"
+	"github.com/kronicler/kronicler/cmd/api/auth"
+	"github.com/kronicler/kronicler/cmd/api/discovery"
+	"github.com/kronicler/kronicler/cmd/api/logging"
+	"github.com/kronicler/kronicler/cmd/api/pagination"
+	"github.com/kronicler/kronicler/cmd/api/routers"
+	"github.com/kronicler/kronicler/pkg/cache"
+	"github.com/kronicler/kronicler/pkg/database"
+	kaLogging "github.com/kronicler/kronicler/pkg/logging"
+	"github.com/kronicler/kronicler/pkg/middleware"
+	"github.com/kronicler/kronicler/pkg/observability"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
 const (
-	otelServiceName                   = "kubearchive.api"
+	otelServiceName                   = "kronicler.api"
 	cacheExpirationAuthorizedEnvVar   = "CACHE_EXPIRATION_AUTHORIZED"
 	cacheExpirationUnauthorizedEnvVar = "CACHE_EXPIRATION_UNAUTHORIZED"
 )
@@ -89,7 +89,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 
 	observability.SetupPprof(router)
 
-	creds, credsErr := logging.GetKubeArchiveLoggingCredentials()
+	creds, credsErr := logging.GetKroniclerLoggingCredentials()
 
 	apisGroup.GET("/:group/:version/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetResources)
@@ -120,7 +120,7 @@ func main() {
 		slog.Info("Could not start opentelemetry", "error", err.Error())
 	}
 
-	slog.Info("Starting KubeArchive API", "version", version, "commit", commit, "built", date)
+	slog.Info("Starting Kronicler API", "version", version, "commit", commit, "built", date)
 	cacheExpirations, err := getCacheExpirations()
 	if err != nil {
 		slog.Error(err.Error())
@@ -154,7 +154,7 @@ func main() {
 	}
 
 	go func() {
-		shutdownErr := httpServer.ListenAndServeTLS("/etc/kubearchive/ssl/tls.crt", "/etc/kubearchive/ssl/tls.key")
+		shutdownErr := httpServer.ListenAndServeTLS("/etc/kronicler/ssl/tls.crt", "/etc/kronicler/ssl/tls.key")
 		if shutdownErr != nil && shutdownErr != http.ErrServerClosed {
 			slog.Error("Error listening", "error", shutdownErr.Error())
 			os.Exit(1)

@@ -40,13 +40,11 @@ func NewReader() (DBReader, error) {
 func (db *DatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error) {
 	sb := db.selector.ResourceSelector()
-	sb.Where(
-		db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion),
-	)
-
+	sb.Where(db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion))
 	if namespace != "" {
 		sb.Where(db.filter.NamespaceFilter(sb.Cond, namespace))
 	}
+	mainWhereClause := sqlbuilder.CopyWhereClause(sb.WhereClause)
 	if name != "" {
 		sb.Where(db.filter.NameFilter(sb.Cond, name))
 	} else {
@@ -54,22 +52,22 @@ func (db *DatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, na
 			sb.Where(db.filter.CreationTSAndIDFilter(sb.Cond, continueDate, continueId))
 		}
 		if labelFilters.Exists != nil {
-			sb.Where(db.filter.ExistsLabelFilter(sb.Cond, labelFilters.Exists))
+			sb.Where(db.filter.ExistsLabelFilter(sb.Cond, labelFilters.Exists, mainWhereClause))
 		}
 		if labelFilters.NotExists != nil {
-			sb.Where(db.filter.NotExistsLabelFilter(sb.Cond, labelFilters.NotExists))
+			sb.Where(db.filter.NotExistsLabelFilter(sb.Cond, labelFilters.NotExists, mainWhereClause))
 		}
 		if labelFilters.Equals != nil {
-			sb.Where(db.filter.EqualsLabelFilter(sb.Cond, labelFilters.Equals))
+			sb.Where(db.filter.EqualsLabelFilter(sb.Cond, labelFilters.Equals, mainWhereClause))
 		}
 		if labelFilters.NotEquals != nil {
-			sb.Where(db.filter.NotEqualsLabelFilter(sb.Cond, labelFilters.NotEquals))
+			sb.Where(db.filter.NotEqualsLabelFilter(sb.Cond, labelFilters.NotEquals, mainWhereClause))
 		}
 		if labelFilters.In != nil {
-			sb.Where(db.filter.InLabelFilter(sb.Cond, labelFilters.In))
+			sb.Where(db.filter.InLabelFilter(sb.Cond, labelFilters.In, mainWhereClause))
 		}
 		if labelFilters.NotIn != nil {
-			sb.Where(db.filter.NotInLabelFilter(sb.Cond, labelFilters.NotIn))
+			sb.Where(db.filter.NotInLabelFilter(sb.Cond, labelFilters.NotIn, mainWhereClause))
 		}
 		sb = db.sorter.CreationTSAndIDSorter(sb)
 		sb.Limit(limit)

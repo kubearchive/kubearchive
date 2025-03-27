@@ -10,9 +10,11 @@ to automatically close it. If this PR covers part of the work, instead of
 "Resolves #", use "Related to #"
 
 Usage: `Resolves #<issue number>`, or `Resolves (paste link of issue)`.
+
+If the issue resolve more than one issue, repeat the verb: `Resolves #<issue number>, resolves #<issue number>`
 -->
 
-Resolves #
+Resolves # <!-- , resolves # -->
 
 ## Release Note
 <!--
@@ -39,7 +41,8 @@ Please label this pull request according to what type of issue you are addressin
 For reference on required PR/issue labels, read here:
 https://kubearchive.github.io/kubearchive/main/contributors/release.html#_pull_request_labels
 
-Add one of the following labels:
+The labels from the linked issues are copied, but make sure at least one of the following labels
+are in place after creating the issue:
 kind/bug
 kind/documentation
 kind/feature

@@ -1,0 +1,22 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: "Pull Request Label Reviewers"
+on:
+  pull_request:
+    types:
+      - unlabeled
+      - labeled
+
+jobs:
+  setup:
+    uses: ./.github/workflows/log_run_details.yml
+  assign_and_unassign:
+    name: assign and unassign reviewers
+    runs-on: ubuntu-latest
+    steps:
+      - name: main
+        id: assign-reviewers
+        uses: totallymoney/assign-reviewers-by-labels-action@v1
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"

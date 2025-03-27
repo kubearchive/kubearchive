@@ -218,7 +218,7 @@ func (r *KubeArchiveConfigReconciler) reconcileA13eServiceAccount(ctx context.Co
 			log.Error(err, "Failed to create ServiceAccount")
 			return sa, err
 		}
-	} else {
+	} else if err != nil {
 		log.Error(err, "Failed to reconcile ServiceAccount")
 		return sa, err
 	}
@@ -297,7 +297,7 @@ func (r *KubeArchiveConfigReconciler) deleteRole(ctx context.Context, kaconfig *
 	}
 
 	err = r.Delete(ctx, role)
-	if err != nil {
+	if err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to delete Role "+roleName)
 	}
 }
@@ -445,7 +445,7 @@ func (r *KubeArchiveConfigReconciler) deleteRoleBinding(ctx context.Context, kac
 		return
 	}
 	err = r.Delete(ctx, binding)
-	if err != nil {
+	if err != nil && !errors.IsNotFound(err) {
 		log.Error(err, "Failed to delete RoleBinding "+name)
 	}
 }
@@ -510,15 +510,15 @@ func (r *KubeArchiveConfigReconciler) deleteA13e(ctx context.Context) {
 
 	existing := &sourcesv1.ApiServerSource{}
 	err := r.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: k9eNs}, existing)
-	if err == nil {
-		err = r.Delete(ctx, existing)
-		if err != nil {
-			log.Error(err, "Failed to delete ApiServerSource")
-		}
-	} else if errors.IsNotFound(err) {
+	if errors.IsNotFound(err) {
 		log.Info("No ApiServerSource to delete")
-	} else {
+	} else if err != nil {
 		log.Error(err, "Error retrieving ApiServerSource")
+	}
+
+	err = r.Delete(ctx, existing)
+	if err != nil {
+		log.Error(err, "Failed to delete ApiServerSource")
 	}
 }
 
@@ -661,18 +661,17 @@ func (r *KubeArchiveConfigReconciler) deleteNamespaceFromFilterConfigMap(ctx con
 
 	cm := &corev1.ConfigMap{}
 	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: k9eNs}, cm)
-	if err == nil {
-		delete(cm.Data, kaconfig.Namespace)
-		err = r.Update(ctx, cm)
-		if err != nil {
-			log.Error(err, "Failed to remove namespace '"+kaconfig.Namespace+"' from filter ConfigMap "+SinkFilterConfigMapName)
-			return nil, err
-		}
-	} else {
+	if err != nil {
 		log.Error(err, "Failed to get filter ConfigMap "+SinkFilterConfigMapName)
 		return nil, err
 	}
 
+	delete(cm.Data, kaconfig.Namespace)
+	err = r.Update(ctx, cm)
+	if err != nil {
+		log.Error(err, "Failed to remove namespace '"+kaconfig.Namespace+"' from filter ConfigMap "+SinkFilterConfigMapName)
+		return nil, err
+	}
 	return cm, nil
 }
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 
 # Create a CronJob that run every minute, creating an Apache log file 1024 lines long.

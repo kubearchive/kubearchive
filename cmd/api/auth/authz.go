@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package auth
@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubearchive/kubearchive/pkg/abort"
-	"github.com/kubearchive/kubearchive/pkg/cache"
+	"github.com/kronicler/kronicler/pkg/abort"
+	"github.com/kronicler/kronicler/pkg/cache"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/gin-gonic/gin"

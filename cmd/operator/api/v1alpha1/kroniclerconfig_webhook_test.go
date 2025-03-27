@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package v1alpha1
@@ -11,54 +11,54 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestKubeArchiveConfigCustomDefaulter(t *testing.T) {
-	defaulter := KubeArchiveConfigCustomDefaulter{}
-	kac := &KubeArchiveConfig{}
-	err := defaulter.Default(context.Background(), kac)
+func TestKroniclerConfigCustomDefaulter(t *testing.T) {
+	defaulter := KroniclerConfigCustomDefaulter{}
+	kron := &KroniclerConfig{}
+	err := defaulter.Default(context.Background(), kron)
 	assert.NoError(t, err)
-	assert.Equal(t, KubeArchiveConfigSpec{Resources: nil}, kac.Spec)
+	assert.Equal(t, KroniclerConfigSpec{Resources: nil}, kron.Spec)
 }
 
-func TestKubeArchiveConfigValidateName(t *testing.T) {
-	k9eResourceName := "kubearchive"
+func TestKroniclerConfigValidateName(t *testing.T) {
+	kroniclerResourceName := "kronicler"
 	tests := []struct {
 		name      string
-		kacName   string
+		kronName  string
 		validated bool
 	}{
 		{
 			name:      "Valid name",
-			kacName:   k9eResourceName,
+			kronName:  kroniclerResourceName,
 			validated: true,
 		},
 		{
 			name:      "Invalid name",
-			kacName:   "otherName",
+			kronName:  "otherName",
 			validated: false,
 		},
 	}
-	validator := KubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
+	validator := KroniclerConfigCustomValidator{kroniclerResourceName: kroniclerResourceName}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create resource
-			kac := &KubeArchiveConfig{ObjectMeta: metav1.ObjectMeta{Name: test.kacName}}
-			warns, err := validator.ValidateCreate(context.Background(), kac)
+			kron := &KroniclerConfig{ObjectMeta: metav1.ObjectMeta{Name: test.kronName}}
+			warns, err := validator.ValidateCreate(context.Background(), kron)
 			assert.Nil(t, warns)
 			if test.validated {
 				assert.NoError(t, err)
 			} else {
-				assert.Errorf(t, err, "invalid resource name %s", test.kacName)
+				assert.Errorf(t, err, "invalid resource name %s", test.kronName)
 			}
 			// Update resource
-			warns, err = validator.ValidateUpdate(context.Background(), &KubeArchiveConfig{}, kac)
+			warns, err = validator.ValidateUpdate(context.Background(), &KroniclerConfig{}, kron)
 			assert.Nil(t, warns)
 			if test.validated {
 				assert.NoError(t, err)
 			} else {
-				assert.Errorf(t, err, "invalid resource name %s", test.kacName)
+				assert.Errorf(t, err, "invalid resource name %s", test.kronName)
 			}
 			// Delete resource
-			warns, err = validator.ValidateDelete(context.Background(), kac)
+			warns, err = validator.ValidateDelete(context.Background(), kron)
 			assert.Nil(t, warns)
 			assert.NoError(t, err)
 		})
@@ -66,7 +66,7 @@ func TestKubeArchiveConfigValidateName(t *testing.T) {
 }
 
 func TestValidateCELExpression(t *testing.T) {
-	k9eResourceName := "kubearchive"
+	kroniclerResourceName := "kronicler"
 	invalid := "status.state *^ Completed'"
 	valid := "status.state == 'Completed'"
 	tests := []struct {
@@ -112,14 +112,14 @@ func TestValidateCELExpression(t *testing.T) {
 			validated:       true,
 		},
 	}
-	validator := KubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
+	validator := KroniclerConfigCustomValidator{kroniclerResourceName: kroniclerResourceName}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create resource
-			kac := &KubeArchiveConfig{
-				ObjectMeta: metav1.ObjectMeta{Name: k9eResourceName},
-				Spec: KubeArchiveConfigSpec{
-					Resources: []KubeArchiveConfigResource{
+			kron := &KroniclerConfig{
+				ObjectMeta: metav1.ObjectMeta{Name: kroniclerResourceName},
+				Spec: KroniclerConfigSpec{
+					Resources: []KroniclerConfigResource{
 						{
 							ArchiveWhen:     test.archiveWhen,
 							DeleteWhen:      test.deleteWhen,
@@ -127,7 +127,7 @@ func TestValidateCELExpression(t *testing.T) {
 						},
 					}},
 			}
-			warns, err := validator.ValidateCreate(context.Background(), kac)
+			warns, err := validator.ValidateCreate(context.Background(), kron)
 			assert.Nil(t, warns)
 			if test.validated {
 				assert.NoError(t, err)
@@ -135,7 +135,7 @@ func TestValidateCELExpression(t *testing.T) {
 				assert.Contains(t, err.Error(), "Syntax error")
 			}
 			// Update resource
-			warns, err = validator.ValidateUpdate(context.Background(), &KubeArchiveConfig{}, kac)
+			warns, err = validator.ValidateUpdate(context.Background(), &KroniclerConfig{}, kron)
 			assert.Nil(t, warns)
 			if test.validated {
 				assert.NoError(t, err)
@@ -143,7 +143,7 @@ func TestValidateCELExpression(t *testing.T) {
 				assert.Contains(t, err.Error(), "Syntax error")
 			}
 			// Delete resource
-			warns, err = validator.ValidateDelete(context.Background(), kac)
+			warns, err = validator.ValidateDelete(context.Background(), kron)
 			assert.Nil(t, warns)
 			assert.NoError(t, err)
 		})

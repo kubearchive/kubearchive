@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 package main
 
@@ -38,12 +38,12 @@ var metrics = []struct {
 }{
 	{
 		Name:  "memory",
-		Query: `sum by (job) (go_memory_used_bytes{job=~"kubearchive.*"})`,
+		Query: `sum by (job) (go_memory_used_bytes{job=~"kronicler.*"})`,
 		Step:  "15s",
 	},
 	{
 		Name:  "cpu",
-		Query: `sum by (job) (irate(process_cpu_time_seconds_total{job=~"kubearchive.*"}[5m]))`,
+		Query: `sum by (job) (irate(process_cpu_time_seconds_total{job=~"kronicler.*"}[5m]))`,
 		Step:  "15s",
 	},
 }

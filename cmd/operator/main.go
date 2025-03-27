@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package main
@@ -30,31 +30,31 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/go-logr/logr"
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
-	"github.com/kubearchive/kubearchive/cmd/operator/internal/controller"
-	"github.com/kubearchive/kubearchive/pkg/logging"
-	"github.com/kubearchive/kubearchive/pkg/observability"
+	kroniclerapi "github.com/kronicler/kronicler/cmd/operator/api/v1alpha1"
+	"github.com/kronicler/kronicler/cmd/operator/internal/controller"
+	"github.com/kronicler/kronicler/pkg/logging"
+	"github.com/kronicler/kronicler/pkg/observability"
 
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 	//+kubebuilder:scaffold:imports
 )
 
 const (
-	otelServiceName = "kubearchive.operator"
+	otelServiceName = "kronicler.operator"
 )
 
 var (
-	version = "main"
-	commit  = ""
-	date    = ""
-	scheme  = runtime.NewScheme()
-	k9eNs   = os.Getenv("KUBEARCHIVE_NAMESPACE")
+	version     = "main"
+	commit      = ""
+	date        = ""
+	scheme      = runtime.NewScheme()
+	kroniclerNs = os.Getenv("KRONICLER_NAMESPACE")
 )
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(kubearchiveapi.AddToScheme(scheme))
+	utilruntime.Must(kroniclerapi.AddToScheme(scheme))
 	utilruntime.Must(sourcesv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -116,7 +116,7 @@ func main() {
 
 	cacheOptions := crcache.Options{
 		ByObject: map[client.Object]crcache.ByObject{
-			&kubearchiveapi.KubeArchiveConfig{}: {
+			&kroniclerapi.KroniclerConfig{}: {
 				Namespaces: make(map[string]crcache.Config),
 				Label:      k8slabels.Everything(),
 			},
@@ -130,7 +130,7 @@ func main() {
 			},
 		},
 		DefaultNamespaces: map[string]crcache.Config{
-			k9eNs: {LabelSelector: k8slabels.Everything()},
+			kroniclerNs: {LabelSelector: k8slabels.Everything()},
 		},
 		DefaultLabelSelector: k8slabels.Nothing(),
 	}
@@ -141,7 +141,7 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "e7a70c64.kubearchive.org",
+		LeaderElectionID:       "e7a70c64.kronicler.org",
 		Logger:                 logr.FromSlogHandler(slog.Default().Handler()),
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
@@ -166,17 +166,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.KubeArchiveConfigReconciler{
+	if err = (&controller.KroniclerConfigReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 		Mapper: mgr.GetRESTMapper(),
 	}).SetupWithManager(mgr); err != nil {
-		slog.Error("unable to create controller", "controller", "KubeArchiveConfig", "err", err)
+		slog.Error("unable to create controller", "controller", "KroniclerConfig", "err", err)
 		os.Exit(1)
 	}
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = kubearchiveapi.SetupWebhookWithManager(mgr); err != nil {
-			slog.Error("unable to create webhook", "webhook", "KubeArchiveConfig", "err", err)
+		if err = kroniclerapi.SetupWebhookWithManager(mgr); err != nil {
+			slog.Error("unable to create webhook", "webhook", "KroniclerConfig", "err", err)
 			os.Exit(1)
 		}
 	}

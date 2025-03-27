@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package observability
@@ -28,9 +28,9 @@ import (
 )
 
 // the name of the environment variable that will determine if instrumentation needs to be started
-const OtelStartEnvVar = "KUBEARCHIVE_OTEL_MODE"
-const OtelMetricsInterval = "KUBEARCHIVE_METRICS_INTERVAL"
-const OtelLogsEnvVar = "KUBEARCHIVE_OTLP_SEND_LOGS"
+const OtelStartEnvVar = "KRONICLER_OTEL_MODE"
+const OtelMetricsInterval = "KRONICLER_METRICS_INTERVAL"
+const OtelLogsEnvVar = "KRONICLER_OTLP_SEND_LOGS"
 
 var tp *trace.TracerProvider
 

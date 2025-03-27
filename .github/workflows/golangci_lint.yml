@@ -1,4 +1,4 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 name: golangci-lint
@@ -43,7 +43,7 @@ jobs:
           only-new-issues: ${{ github.event_name != 'schedule' }}
       - name: Notify golangci-lint failed
         uses: jayqi/failed-build-issue-action@v1
-        if: failure() && github.event_name == 'schedule' && github.repository == 'kubearchive/kubearchive'
+        if: failure() && github.event_name == 'schedule' && github.repository == 'kronicler/kronicler'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           title-template: GolangCI Linting found errors
@@ -53,7 +53,7 @@ jobs:
             problems they did not introduce. However we need to solve those problems from time to time.
             The URL of the failed job is:
 
-            https://github.com/kubearchive/kubearchive/actions/runs/{{ runId }}
+            https://github.com/kronicler/kronicler/actions/runs/{{ runId }}
 
             Run `golanci-lint` to see the errors locally, visit the worfklow run, make sure the problems
             you found locally match. Investigate if they do not match. Solve the problems and open a

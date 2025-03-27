@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-* Install the normal KubeArchive development tools, see the [README](../README.md).
+* Install the normal Kronicler development tools, see the [README](../README.md).
 * Install [ko](https://ko.build/install/).
 
 ## Run the tests

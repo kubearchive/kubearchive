@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 //go:build integration
 
@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/kubearchive/kubearchive/test"
+	"github.com/kronicler/kronicler/test"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// TestKubeArchiveDeployments is redundant with the kubectl rollout status from the hack/quick-install.sh
+// TestKroniclerDeployments is redundant with the kubectl rollout status from the hack/quick-install.sh
 // ,but it serves as a valid integration test, not a dummy that is not testing anything real.
 func TestAllDeploymentsReady(t *testing.T) {
 	t.Parallel()
@@ -24,13 +24,13 @@ func TestAllDeploymentsReady(t *testing.T) {
 	client, _ := test.GetKubernetesClient(t)
 
 	retryErr := retry.Do(func() error {
-		deployments, errList := client.AppsV1().Deployments("kubearchive").List(context.Background(), metav1.ListOptions{})
+		deployments, errList := client.AppsV1().Deployments("kronicler").List(context.Background(), metav1.ListOptions{})
 		if errList != nil {
-			return fmt.Errorf("Failed to get Deployments from the 'kubearchive' namespace: %w", errList)
+			return fmt.Errorf("Failed to get Deployments from the 'kronicler' namespace: %w", errList)
 		}
 
 		if len(deployments.Items) == 0 {
-			return errors.New("No deployments found in the 'kubearchive' namespace, something went wrong.")
+			return errors.New("No deployments found in the 'kronicler' namespace, something went wrong.")
 		}
 
 		areAllReady := true
@@ -78,7 +78,7 @@ func TestNormalOperation(t *testing.T) {
 		},
 	}
 
-	test.CreateKAC(t, namespaceName, resources)
+	test.CreateKroniclerConfig(t, namespaceName, resources)
 	test.RunLogGenerator(t, namespaceName)
 
 	// Retrieve the objects from the DB using the API.

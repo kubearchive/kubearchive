@@ -1,0 +1,64 @@
+= Accessing Kronicler
+
+This document explains how to access Kronicler after installing it
+in your cluster.
+
+[NOTE]
+====
+This document only covers the basic development scenario, the process
+may be different for a production cluster.
+====
+
+== Port Forward Kronicler
+
+After installing, Kronicler creates different services. Use [command]`kubectl` to forward the port of the Kronicler API:
+
+[source,bash]
+----
+kubectl port-forward -n kronicler svc/kronicler-api-server 8081:8081
+----
+
+== Authentication and Authorization
+
+Kronicler delegates authentication and authorization to the Kubernetes
+RBAC service. In order to retrieve resources from Kronicler,
+you need to pass an identity when you make a request. The easiest
+way is to use a service account. Create one and assign it permissions,
+for example:
+
+[source,bash]
+----
+kubectl create serviceaccount \
+    kronicler-view --namespace default
+
+kubectl create role kronicler-view-pods \
+    --verb=get,list --resource=pods --namespace default
+
+kubectl create rolebinding kronicler-view-pods \
+    --serviceaccount=default:kronicler-view \
+    --role=kronicler-view-pods --namespace default
+
+kubectl auth can-i list pods \
+    --as=system:serviceaccount:default:kronicler-view --namespace default
+----
+
+== Query Kronicler
+
+After creating the service account and configuring its access, generate a token
+and use it to query Kronicler:
+
+[source,bash]
+----
+$ export SA_TOKEN=$(kubectl create token kronicler-view --namespace default)
+$ curl --insecure \
+    -H "Authorization: Bearer ${SA_TOKEN}" \
+    https://localhost:8081/api/v1/namespaces/default/pods
+
+{"apiVersion":"v1","items":null,"kind":"List","metadata":{"continue":"","resourceVersion":""}}
+----
+
+== Next steps
+
+Continue reading
+xref:getting-started/configuration.adoc[]
+to learn how to use Kronicler to archive and delete resources.

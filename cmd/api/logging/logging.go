@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package logging
@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/pkg/abort"
-	"github.com/kubearchive/kubearchive/pkg/files"
+	"github.com/kronicler/kronicler/pkg/abort"
+	"github.com/kronicler/kronicler/pkg/files"
 	"github.com/ohler55/ojg/jp"
 	"github.com/ohler55/ojg/oj"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -27,9 +27,9 @@ const (
 	passwordKey string = "PASSWORD"
 )
 
-// GetKubeArchiveLoggingCredentials retrieves the kubearchive-logging secret data and
+// GetKroniclerLoggingCredentials retrieves the kronicler-logging secret data and
 // an error if there isn't available
-func GetKubeArchiveLoggingCredentials() (map[string]string, error) {
+func GetKroniclerLoggingCredentials() (map[string]string, error) {
 	loggingDir, exists := os.LookupEnv(files.LoggingDirEnvVar)
 	errMsg := fmt.Sprintf("environment variable not set: %s", files.LoggingDirEnvVar)
 	if !exists {
@@ -43,7 +43,7 @@ func GetKubeArchiveLoggingCredentials() (map[string]string, error) {
 		return nil, errors.New(errMsg)
 	}
 	if len(configFiles) == 0 {
-		errMsg = "Logging secret is empty. To configure logging update the kubearchive-logging Secret"
+		errMsg = "Logging secret is empty. To configure logging update the kronicler-logging Secret"
 		slog.Warn(errMsg)
 		return nil, errors.New(errMsg)
 	}

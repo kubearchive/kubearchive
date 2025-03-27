@@ -2,36 +2,36 @@
 
 == Overview
 
-KubeArchive supports logging, but it is not a logging system itself and
-does not implement logging. Instead, KubeArchive integrates with logging systems
+Kronicler supports logging, but it is not a logging system itself and
+does not implement logging. Instead, Kronicler integrates with logging systems
 and provide URLs for retrieving log files from the logging system for a specific
 Kubernetes resource.
 
 It is important to note that logs are tied to `Pods`. When a user requests the logs
 for a Tekton `PipelineRun`, what they expect to get back are the logs attached to the
 `Pods` that were part of the `PipelineRun`. Similar cases exist for requesting logs for
-`Jobs` and `CronJobs`. KubeArchive handles this seamlessly for the user.
+`Jobs` and `CronJobs`. Kronicler handles this seamlessly for the user.
 
-== KubeArchiveConfig Configuration
+== KroniclerConfig Configuration
 
-KubeArchive retrieves log URLs using the owner references field of a resource.
+Kronicler retrieves log URLs using the owner references field of a resource.
 When logs for a resource are requested, a query is made to find all the resources
 that have that initial resource as an owner. Then each resource returned is
 processed similarly, eventually building up a list of `Pods` and from those a
 list of log file links. This generic approach works for any resource.
 
-A `KubeArchiveConfig` needs to be configured correctly to support this, meaning it must
+A `KroniclerConfig` needs to be configured correctly to support this, meaning it must
 be configured so that the initial resource and any dependent resources, all the way
 down to and including the `Pods`, are archived.
 
-.Example of KubeArchiveConfig that allows the retrieval of Job logs
+.Example of KroniclerConfig that allows the retrieval of Job logs
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: test
 spec:
   resources:
@@ -47,28 +47,28 @@ spec:
 In this example, the `Job` is configured to be archived and deleted when
 the status contains a "completionTime" key. When that deletion happens,
 kubernetes will in turn delete the associated `Pod`. Since we have
-configured `archiveOnDelete` for `Pods` to be true, KubeArchive will archive
+configured `archiveOnDelete` for `Pods` to be true, Kronicler will archive
 the `Pod` itself and generate the URLs for all the associated logs.
 
 [IMPORTANT]
 ====
 
-- KubeArchive has no responsibility for sending the logs to the logging system.
-This is all configured elsewhere and outside of KubeArchive.
+- Kronicler has no responsibility for sending the logs to the logging system.
+This is all configured elsewhere and outside of Kronicler.
 - When the `Pod` is archived, the URL for accessing the log are generated
 and stored with it. There is no attempt to query the logging system to verify
 the existence of the log.
 
 ====
 
-.Example of KubeArchiveConfig allowing the retrieval of PipelineRuns and TaskRuns
+.Example of KroniclerConfig allowing the retrieval of PipelineRuns and TaskRuns
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: test
 spec:
   resources:
@@ -95,14 +95,14 @@ In this example the following happens:
 
 [IMPORTANT]
 ====
-The KubeArchive Sink and API are not aware of changes to the `kubearchive-logging` `ConfigMap` or `Secret`.
+The Kronicler Sink and API are not aware of changes to the `kronicler-logging` `ConfigMap` or `Secret`.
 After making changes to them, both elements should be restarted. The following
 command can be used to perform the restart:
 
 [source, bash]
 ----
-kubectl rollout restart deployment --selector=app=kubearchive-sink
-kubectl rollout restart deployment --selector=app=kubearchive-api-server
+kubectl rollout restart deployment --selector=app=kronicler-sink
+kubectl rollout restart deployment --selector=app=kronicler-api-server
 ----
 ====
 
@@ -110,19 +110,19 @@ kubectl rollout restart deployment --selector=app=kubearchive-api-server
 
 To support multiple logging systems, the URLs must be able to be parameterized
 based on the logging system. This is done via a `ConfigMap` named
-`kubearchive-logging`.
+`kronicler-logging`.
 The ConfigMap contains entries that are used to generate logging URLs.
 The only required key in this ConfigMap is `LOG_URL`.
 
-.Example of kubearchive-logging ConfigMap for Splunk
+.Example of kronicler-logging ConfigMap for Splunk
 [source,yaml]
 ----
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubearchive-logging
-  namespace: kubearchive
+  name: kronicler-logging
+  namespace: kronicler
 data:
   # CONTAINER_NAME: "cel:spec.containers.map(m, m.name)" <1>
   POD_ID: "cel:metadata.uid" <2>
@@ -130,7 +130,7 @@ data:
   LOG_URL_JSONPATH: "$.hits.hits[*]._source.message" <4>
 ----
 
-<1> The `CONTAINER_NAME` parameter is provided at URL generation time by KubeArchive.
+<1> The `CONTAINER_NAME` parameter is provided at URL generation time by Kronicler.
 <2> The string to replace `POD_ID` inside the `LOG_URL` template.
 If it's prefixed with `cel:`, it is considered as a CEL expression to locate its value
 within the body of the Cloud Event where the resource is stored.
@@ -145,15 +145,15 @@ applied by the API Server to the output of the response body.
 The credentials to authorize the access to the logging backend API are stored in a `Secret`
 named `kubearhive-logging` with the mandatory keys `USER` and `PASSWORD`:
 
-.Example of kubearchive-logging Secret
+.Example of kronicler-logging Secret
 [source, yaml]
 ----
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: kubearchive-logging
-  namespace: kubearchive
+  name: kronicler-logging
+  namespace: kronicler
 type: Opaque
 stringData: <1>
   USER: user
@@ -164,19 +164,19 @@ stringData: <1>
 
 == Supported Logging Systems
 
-KubeArchive currently integrates with both Splunk and Elasticsearch
+Kronicler currently integrates with both Splunk and Elasticsearch
 
 === Elasticsearch
 
-.Example of kubearchive-logging ConfigMap fot ElasticSearch integration
+.Example of kronicler-logging ConfigMap fot ElasticSearch integration
 [source,yaml]
 ----
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubearchive-logging
-  namespace: kubearchive
+  name: kronicler-logging
+  namespace: kronicler
 data:
   POD_ID: "cel:metadata.uid"
   LOG_URL: "https://localhost:9200/fluentd/_search?_source_includes=message&size=10000&sort=_doc&q=kubernetes.pod_id:{POD_ID}%20AND%20kubernetes.container_name:{CONTAINER_NAME}"
@@ -185,15 +185,15 @@ data:
 
 === Splunk
 
-.Example of kubearchive-logging ConfigMap for Splunk integration
+.Example of kronicler-logging ConfigMap for Splunk integration
 [source,yaml]
 ----
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubearchive-logging
-  namespace: kubearchive
+  name: kronicler-logging
+  namespace: kronicler
 data:
   POD_ID: "cel:metadata.uid"
   LOG_URL: "https://splunk-single-standalone-service.splunk-operator.svc.cluster.local:8089/services/search/jobs/export?search=search%20%2A%20%7C%20spath%20%22kubernetes.pod_id%22%20%7C%20search%20%22kubernetes.pod_id%22%3D%22{POD_ID}%22%20%7C%20spath%20%22kubernetes.container_name%22%20%7C%20search%20%22kubernetes.container_name%22%3D%22{CONTAINER_NAME}%22%20%7C%20sort%20time%20%7C%20table%20%22message%22&output_mode=json"

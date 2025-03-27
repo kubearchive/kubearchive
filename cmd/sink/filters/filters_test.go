@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package filters
@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kroniclerapi "github.com/kronicler/kronicler/cmd/operator/api/v1alpha1"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
@@ -27,7 +27,7 @@ import (
 
 // nolint:staticcheck
 func TestMain(m *testing.M) {
-	globalKey = "kubearchive"
+	globalKey = "kronicler"
 	m.Run()
 }
 
@@ -43,7 +43,7 @@ func newMockWatcher(t testing.TB, ch <-chan watch.Event) func(metav1.ListOptions
 
 func TestHandleUpdates(t *testing.T) {
 	f := NewFilters(fake.NewSimpleClientset())
-	fooCfg := []kubearchiveapi.KubeArchiveConfigResource{
+	fooCfg := []kroniclerapi.KroniclerConfigResource{
 		{
 			Selector: sourcev1.APIVersionKindSelector{
 				APIVersion: "batch/v1",
@@ -56,9 +56,9 @@ func TestHandleUpdates(t *testing.T) {
 	}
 	fooCfgBytes, err := yaml.Marshal(fooCfg)
 	if err != nil {
-		assert.FailNow(t, "Could not marshall KubeArchiveConfig")
+		assert.FailNow(t, "Could not marshall KroniclerConfig")
 	}
-	barCfg := []kubearchiveapi.KubeArchiveConfigResource{
+	barCfg := []kroniclerapi.KroniclerConfigResource{
 		{
 			Selector: sourcev1.APIVersionKindSelector{
 				APIVersion: "batch/v1",
@@ -70,9 +70,9 @@ func TestHandleUpdates(t *testing.T) {
 	}
 	barCfgBytes, err := yaml.Marshal(barCfg)
 	if err != nil {
-		assert.FailNow(t, "Could not marshall KubeArchiveConfig")
+		assert.FailNow(t, "Could not marshall KroniclerConfig")
 	}
-	bazCfg := []kubearchiveapi.KubeArchiveConfigResource{
+	bazCfg := []kroniclerapi.KroniclerConfigResource{
 		{
 			Selector: sourcev1.APIVersionKindSelector{
 				APIVersion: "batch/v1",
@@ -83,7 +83,7 @@ func TestHandleUpdates(t *testing.T) {
 	}
 	bazCfgBytes, err := yaml.Marshal(bazCfg)
 	if err != nil {
-		assert.FailNow(t, "Could not marshall KubeArchiveConfig")
+		assert.FailNow(t, "Could not marshall KroniclerConfig")
 	}
 
 	tests := []struct {
@@ -156,7 +156,7 @@ func TestHandleUpdates(t *testing.T) {
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            "sink-filters",
-					Namespace:       "kubearchive",
+					Namespace:       "kronicler",
 					ResourceVersion: fmt.Sprintf("%d", i),
 				},
 				Data: tt.data,

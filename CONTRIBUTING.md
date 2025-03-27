@@ -1,5 +1,5 @@
 # Contributing
 
-Welcome to KubeArchive! Check our
-[contribution guide](https://kubearchive.github.io/kubearchive/main/contributors/guide.html)
+Welcome to Kronicler! Check our
+[contribution guide](https://kronicler.github.io/kronicler/main/contributors/guide.html)
 in our documentation.

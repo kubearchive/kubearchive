@@ -1,13 +1,13 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: k8s.mariadb.com/v1alpha1
 kind: Database
 metadata:
-  name: kubearchive
+  name: kronicler
 spec:
   mariaDbRef:
-    name: kubearchive
+    name: kronicler
   characterSet: utf8
   collate: utf8_general_ci
   # Delete the resource in the database whenever the CR gets deleted.

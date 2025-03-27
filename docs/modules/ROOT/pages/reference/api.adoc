@@ -1,6 +1,6 @@
 = API reference
 
-This document contains the endpoints of the KubeArchive API and
+This document contains the endpoints of the Kronicler API and
 the query parameters they support.
 
 == Related to Kubernetes
@@ -65,13 +65,13 @@ Set not based::
 Label selectors can be combined based on a logical AND by separating them with a comma.
 
 For example to retrieve pods in the `default` namespace with the following label selector:
-`app=kubearchive, env in (stage, dev), release!=stable`
+`app=kronicler, env in (stage, dev), release!=stable`
 
 The API call is:
 
 [source,text]
 ----
-/api/v1/namespaces/default/pods?labelSelector=app%3Dkubearchive%2C+env+in+%28stage%2C+dev%29%2C+release%21%3Dstable
+/api/v1/namespaces/default/pods?labelSelector=app%3Dkronicler%2C+env+in+%28stage%2C+dev%29%2C+release%21%3Dstable
 ----
 ====
 

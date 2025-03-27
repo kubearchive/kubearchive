@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
@@ -24,21 +24,21 @@ strategy: Webhook
 webhook:
   clientConfig:
     service:
-      namespace: kubearchive
+      namespace: kronicler
       name: webhook-service
       path: /convert
   conversionReviewVersions:
   - v1
 EOF
-CRD="../../config/crds/kubearchive.kubearchive.org_kubearchiveconfigs.yaml"
-yq -i '.metadata.annotations."cert-manager.io/inject-ca-from"="kubearchive/kubearchive-operator-certificate"' ${CRD}
+CRD="../../config/crds/kronicler.kronicler.org_kroniclerconfigs.yaml"
+yq -i '.metadata.annotations."cert-manager.io/inject-ca-from"="kronicler/kronicler-operator-certificate"' ${CRD}
 yq -i ".spec.conversion = load(\"${PATCH}\")" ${CRD}
 
 rm -f ${PATCH}
 
 # Generate role.
 echo "Generating role."
-${LOCALBIN}/controller-gen rbac:roleName="kubearchive-operator" \
+${LOCALBIN}/controller-gen rbac:roleName="kronicler-operator" \
     paths="./..." output:stdout > ../../config/templates/operator/role.yaml
 
 echo "Generating deep copy code."

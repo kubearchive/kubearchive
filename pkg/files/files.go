@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package files
@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const LoggingDirEnvVar = "KUBEARCHIVE_LOGGING_DIR"
+const LoggingDirEnvVar = "KRONICLER_LOGGING_DIR"
 
 func FilesInDir(path string) (map[string]string, error) {
 	dir, err := os.ReadDir(path)

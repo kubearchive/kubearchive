@@ -1,14 +1,14 @@
-# KubeArchive Developer Resources
+# Kronicler Developer Resources
 
 ## Scope
-This page provides links to resources useful to a KubeArchive developer.
+This page provides links to resources useful to a Kronicler developer.
 
-KubeArchive is a utility that stores Kubernetes resources off of the
+Kronicler is a utility that stores Kubernetes resources off of the
 Kubernetes cluster. This enables users to delete those resources from
 the cluster without losing the information contained in those resources.
 
 ## Communication
-Chat rooms and email addresses for KubeArchive communication.
+Chat rooms and email addresses for Kronicler communication.
 
 TBD
 
@@ -16,9 +16,9 @@ TBD
 TBD
 
 ## Code Repositories
-Git repository for the KubeArchive source code.
+Git repository for the Kronicler source code.
 
-* [GitHub KubeArchive Repository](https://github.com/kubearchive/kubearchive)
+* [GitHub Kronicler Repository](https://github.com/kronicler/kronicler)
 
 ## Development Resources
 
@@ -30,7 +30,7 @@ the deployment, scaling, and management of containerized applications.
 
 ### Programming Languages
 The Go programming language is an open-source programming language.
-Go is the preferred language for KubeArchive development.
+Go is the preferred language for Kronicler development.
 
 * [Go](https://go.dev/)
 * [Exercism Learning Track for Go](https://exercism.org/tracks/go)
@@ -48,7 +48,7 @@ performance and behavior.
 * [OpenTelemetry Repository for Go Instrumentation](https://github.com/open-telemetry/opentelemetry-go-instrumentation)
 
 ### Tools
-Additional software that KubeArchive uses.
+Additional software that Kronicler uses.
 
 * [Helm - Package Managment for Kubernetes](https://helm.sh/)
 * [Kind - Local Kubernetes Cluster](https://kind.sigs.k8s.io/)
@@ -63,7 +63,7 @@ To interact directly with the database:
     ```
 
 A SQL client is recommended to interact easily with the database. For example [DBeaver Community](https://dbeaver.io/). To configure DBeaver, check these 
-[instructions](https://github.com/kubearchive/kubearchive/blob/main/database/README.md).
+[instructions](https://github.com/kronicler/kronicler/blob/main/database/README.md).
 
 If you use a Professional version of a Jetbrains IDE like `Goland` it already provides a built-in 
 [SQL client](https://www.jetbrains.com/help/go/relational-databases.html).

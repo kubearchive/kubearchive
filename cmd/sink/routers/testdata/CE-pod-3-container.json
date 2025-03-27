@@ -92,7 +92,7 @@
       "containers": [
         {
           "args": ["-n", "1024", "-d", "20ms"],
-          "image": "quay.io/kubearchive/mingrammer/flog",
+          "image": "quay.io/kronicler/mingrammer/flog",
           "imagePullPolicy": "IfNotPresent",
           "name": "generate1",
           "resources": {},
@@ -108,7 +108,7 @@
         },
         {
           "args": ["-n", "1024", "-d", "20ms"],
-          "image": "quay.io/kubearchive/mingrammer/flog",
+          "image": "quay.io/kronicler/mingrammer/flog",
           "imagePullPolicy": "IfNotPresent",
           "name": "generate2",
           "resources": {},
@@ -124,7 +124,7 @@
         },
         {
           "args": ["-n", "1024", "-d", "20ms"],
-          "image": "quay.io/kubearchive/mingrammer/flog",
+          "image": "quay.io/kronicler/mingrammer/flog",
           "imagePullPolicy": "IfNotPresent",
           "name": "generate3",
           "resources": {},

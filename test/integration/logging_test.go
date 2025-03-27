@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 //go:build integration
 
@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/kubearchive/kubearchive/test"
+	"github.com/kronicler/kronicler/test"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -44,7 +44,7 @@ func TestLogging(t *testing.T) {
 		},
 	}
 
-	test.CreateKAC(t, namespaceName, resources)
+	test.CreateKroniclerConfig(t, namespaceName, resources)
 	job := test.RunLogGenerator(t, namespaceName)
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespaceName, job)
 	retryErr := retry.Do(func() error {
@@ -90,7 +90,7 @@ func TestDefaultContainer(t *testing.T) {
 		},
 	}
 
-	test.CreateKAC(t, namespaceName, resources)
+	test.CreateKroniclerConfig(t, namespaceName, resources)
 
 	// Create a pod
 	pod := &corev1.Pod{

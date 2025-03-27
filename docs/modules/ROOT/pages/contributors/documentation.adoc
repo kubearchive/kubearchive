@@ -1,6 +1,6 @@
 = Documentation Style
 
-When contributing documentation to KubeArchive you are expected to follow
+When contributing documentation to Kronicler you are expected to follow
 the guidelines listed below:
 
 * Use present tense, instead of future or past.
@@ -15,9 +15,9 @@ the guidelines listed below:
 
 Use present tense whenever possible:
 
-NO: When configured in this way KubeArchive will delete resources.
+NO: When configured in this way Kronicler will delete resources.
 
-YES: When configured in this way KubeArchive deletes resources.
+YES: When configured in this way Kronicler deletes resources.
 
 == Voice
 
@@ -27,18 +27,18 @@ NO: This feature is configured in the ConfigMap.
 
 YES: Configure this feature in the ConfigMap.
 
-NO: Resources are deleted by KubeArchive when `deleteWhen` is configured.
+NO: Resources are deleted by Kronicler when `deleteWhen` is configured.
 
-YES: KubeArchive deletes resources when you configure `deleteWhen`.
+YES: Kronicler deletes resources when you configure `deleteWhen`.
 
 == Persons
 
 Avoid first person and use second to interact with the reader and third to describe
 things:
 
-NO: We create the following `KubeArchiveConfig` resource.
+NO: We create the following `KroniclerConfig` resource.
 
-YES: Create the following `KubeArchiveConfig` resource.
+YES: Create the following `KroniclerConfig` resource.
 
 NO: Execute the file we provide.
 
@@ -53,18 +53,18 @@ NO: Do not set the field when its value is redundant.
 
 YES: Set the field if its value is different to avoid redundancy.
 
-NO: If the feature is not configured KubeArchive does not delete resources.
+NO: If the feature is not configured Kronicler does not delete resources.
 
-YES: If the feature is configured KubeArchive deletes resources.
+YES: If the feature is configured Kronicler deletes resources.
 
 == Claims and Recommendations
 
 Use a "cautious" language when talking about some topics as performance, benefits, best
 practices or security:
 
-NO: KubeArchive improves the performance of your Kubernetes cluster.
+NO: Kronicler improves the performance of your Kubernetes cluster.
 
-YES: KubeArchive can improve the performance of your Kubernetes cluster.
+YES: Kronicler can improve the performance of your Kubernetes cluster.
 
 NO: It is recommended that you increase the number of API replicas when facing performance problems.
 

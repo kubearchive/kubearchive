@@ -1,6 +1,6 @@
-# KubeArchive Documentation
+# Kronicler Documentation
 
-Source-code for the KubeArchive documentation.
+Source-code for the Kronicler documentation.
 
 ## Development
 

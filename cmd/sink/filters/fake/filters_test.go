@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package fake
@@ -7,7 +7,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kubearchive/kubearchive/cmd/sink/filters"
+	"github.com/kronicler/kronicler/cmd/sink/filters"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )

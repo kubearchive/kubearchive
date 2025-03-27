@@ -1,46 +1,46 @@
-= Configuring KubeArchive
+= Configuring Kronicler
 
-This document explains how to configure KubeArchive so you can archive
+This document explains how to configure Kronicler so you can archive
 resources and query them.
 
 == Prerequisites
-* KubeArchive installed and running in a cluster (xref:getting-started/installation.adoc[])
-* Know how to query the KubeArchive API (xref:getting-started/kubearchive-api.adoc[])
+* Kronicler installed and running in a cluster (xref:getting-started/installation.adoc[])
+* Know how to query the Kronicler API (xref:getting-started/kronicler-api.adoc[])
 
-== The KubeArchiveConfig resource
+== The KroniclerConfig resource
 
-To configure KubeArchive to archive or delete resources from the cluster create a
-KubeArchiveConfig custom resource. KubeArchiveConfigs are limited to one per namespace
-and `kubearchive` is the only name allowed. KubeArchiveConfigs have this general form:
+To configure Kronicler to archive or delete resources from the cluster create a
+KroniclerConfig custom resource. KroniclerConfigs are limited to one per namespace
+and `kronicler` is the only name allowed. KroniclerConfigs have this general form:
 
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: default
 spec:
   resources: [...] <1>
 ----
 
-<1> `spec.resources` is a list of elements, each defining rules for a specific kind, so KubeArchive knows
+<1> `spec.resources` is a list of elements, each defining rules for a specific kind, so Kronicler knows
 when to archive or delete them.
 
 ==  `selector`: Selecting Resources
 
-The key `selector` within KubeArchiveConfigs define resources. It requires
+The key `selector` within KroniclerConfigs define resources. It requires
 two keys: `kind` and `apiVersion`. Each entry on `spec.resources`
 requires a `selector`:
 
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: default
 spec:
   resources:
@@ -58,28 +58,28 @@ spec:
       ...
 ----
 
-With each entry on `spec.resources` KubeArchive requires one of
+With each entry on `spec.resources` Kronicler requires one of
 `archiveWhen`, `deleteWhen` and `archiveOnDelete`. These keys accept
 a string which is an expression in the
 link:https://cel.dev[CEL language format].
-When a resource defined by `selector` changes or gets deleted KubeArchive
+When a resource defined by `selector` changes or gets deleted Kronicler
 evaluates the expressions. They must evaluate to either true or false.
 
 
 == `archiveWhen`: Archiving Resources
 
-The most basic feature that KubeArchive offers is archiving. Use it with the
+The most basic feature that Kronicler offers is archiving. Use it with the
 `archiveWhen` key within the entry for a resource. The following
-example configures KubeArchive to archive pods when they match the
+example configures Kronicler to archive pods when they match the
 `status.phase == "Succeeded"` condition:
 
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: default
 spec:
   resources:
@@ -91,11 +91,11 @@ spec:
 
 [TIP]
 ====
-`archiveWhen: "true"` is also a valid expression that configures KubeArchive
+`archiveWhen: "true"` is also a valid expression that configures Kronicler
 to archive the resource every time its updated.
 ====
 
-To see it in action apply the KubeArchiveConfig in your namespace and
+To see it in action apply the KroniclerConfig in your namespace and
 run a pod:
 
 [source,bash]
@@ -103,7 +103,7 @@ run a pod:
 kubectl run fedora --image quay.io/fedora/fedora:latest --restart Never -- sleep 10
 ----
 
-The pod does not appear in KubeArchive until it completes. After completion, it is present in KubeArchive:
+The pod does not appear in Kronicler until it completes. After completion, it is present in Kronicler:
 
 [source,bash]
 ----
@@ -131,25 +131,25 @@ fedora   0/1     Completed   0          4m50s
 
 == `deleteWhen`: Deleting Resources
 
-The key feature of KubeArchive is deleting resources from the Kubernetes
+The key feature of Kronicler is deleting resources from the Kubernetes
 cluster. This feature keeps the Kubernetes cluster free of resources that
 are not needed anymore. To enable deletion of resources use the `deleteWhen` key.
 
 [IMPORTANT]
 ====
-KubeArchive archives resources deleted using `deleteWhen`.
+Kronicler archives resources deleted using `deleteWhen`.
 ====
 
-The following KubeArchiveConfig configures KubeArchive to delete (and archive)
+The following KroniclerConfig configures Kronicler to delete (and archive)
 pods when they match `status.phase == "Succeeded"`:
 
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: default
 spec:
   resources:
@@ -159,7 +159,7 @@ spec:
       deleteWhen: status.phase == "Succeeded"
 ----
 
-To see it in action apply the KubeArchiveConfig in your namespace and
+To see it in action apply the KroniclerConfig in your namespace and
 run a pod:
 
 [source,bash]
@@ -167,7 +167,7 @@ run a pod:
 kubectl run auto-deleted --image quay.io/fedora/fedora:latest --restart Never -- echo "sleep 10"
 ----
 
-Watch pods to see that after they complete, KubeArchive removes them automatically:
+Watch pods to see that after they complete, Kronicler removes them automatically:
 
 [source,bash]
 ----
@@ -181,7 +181,7 @@ auto-deleted   0/1     Terminating         0          14s
 auto-deleted   0/1     Terminating         0          14s
 ----
 
-After KubeArchive removes the pod from the cluster, retrieve it using the command:
+After Kronicler removes the pod from the cluster, retrieve it using the command:
 
 [source,bash]
 ----
@@ -197,8 +197,8 @@ $ curl --insecure \
 == `archiveOnDelete`: Archiving on Deletion From the Cluster
 
 You can use KubeArchvie with other applications that clean up resources.
-This enables you to keep using a specialized tool for deletion and use KubeArchive
-to store the resources. The following KubeArchiveConfig configures KubeArchive
+This enables you to keep using a specialized tool for deletion and use Kronicler
+to store the resources. The following KroniclerConfig configures Kronicler
 to archive pods when they get deleted from the cluster only if they match the
 condition `status.phase == "Succeeded"` so failed pods that get deleted
 do not get archived.
@@ -206,10 +206,10 @@ do not get archived.
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: default
 spec:
   resources:
@@ -219,7 +219,7 @@ spec:
       archiveOnDelete: status.phase == "Succeeded"
 ----
 
-To see it in action apply the KubeArchiveConfig in your namespace and
+To see it in action apply the KroniclerConfig in your namespace and
 run a couple of pods:
 
 [source,bash]
@@ -236,7 +236,7 @@ kubectl delete pod archived-on-deletion
 kubectl delete pod failed
 ----
 
-Query KubeArchive to check that it only archives the pod that completed correctly (archived-on-deletion):
+Query Kronicler to check that it only archives the pod that completed correctly (archived-on-deletion):
 
 [source,bash]
 ----
@@ -251,8 +251,8 @@ $ curl --insecure \
 
 == Next Steps
 
-These are the three main functionalities KubeArchive offers related
+These are the three main functionalities Kronicler offers related
 to resource archiving. Explore the documentation to learn more
-about KubeArchive and go to
+about Kronicler and go to
 link:https://cel.dev/[cel.dev]
-to learn more about the expression language KubeArchive uses.
+to learn more about the expression language Kronicler uses.

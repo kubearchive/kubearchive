@@ -141,7 +141,7 @@
                 "-d",
                 "20ms"
               ],
-              "image": "quay.io/kubearchive/mingrammer/flog",
+              "image": "quay.io/kronicler/mingrammer/flog",
               "imagePullPolicy": "IfNotPresent",
               "name": "generate",
               "resources": {},

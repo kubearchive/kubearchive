@@ -1,14 +1,14 @@
 * Getting Started
 ** xref:getting-started/installation.adoc[]
-** xref:getting-started/kubearchive-api.adoc[]
+** xref:getting-started/kronicler-api.adoc[]
 ** xref:getting-started/configuration.adoc[]
 
 * Configuration
-** xref:configuration/kubearchiveconfig.adoc[KubeArchiveConfig CRD]
+** xref:configuration/kroniclerconfig.adoc[KroniclerConfig CRD]
 ** xref:configuration/global-filters.adoc[Global Filters]
 ** xref:configuration/cache-expiration-time.adoc[Cache Expiration Time]
 ** xref:configuration/enable-observability.adoc[Enable Observability]
-** xref:configuration/kubearchive-logs.adoc[]
+** xref:configuration/kronicler-logs.adoc[]
 ** xref:configuration/pprof.adoc[]
 
 * Contributors

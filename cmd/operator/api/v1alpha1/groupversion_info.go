@@ -1,9 +1,9 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package v1alpha1 contains API Schema definitions for the kubearchive v1alpha1 API group
+// Package v1alpha1 contains API Schema definitions for the kronicler v1alpha1 API group
 // +kubebuilder:object:generate=true
-// +groupName=kubearchive.kubearchive.org
+// +groupName=kronicler.kronicler.org
 package v1alpha1
 
 import (
@@ -13,7 +13,7 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "kubearchive.kubearchive.org", Version: "v1alpha1"}
+	GroupVersion = schema.GroupVersion{Group: "kronicler.kronicler.org", Version: "v1alpha1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}

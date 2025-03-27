@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package database
@@ -14,7 +14,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/jmoiron/sqlx"
-	"github.com/kubearchive/kubearchive/pkg/models"
+	"github.com/kronicler/kronicler/pkg/models"
 	"github.com/stretchr/testify/assert"
 )
 

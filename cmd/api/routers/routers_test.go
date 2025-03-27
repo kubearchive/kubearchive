@@ -13,10 +13,10 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
-	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/database/fake"
 )
 
@@ -34,7 +34,7 @@ func retrieveLogURL(c *gin.Context) {
 	c.JSON(http.StatusOK, fmt.Sprintf("%s-%s", c.GetString("logURL"), c.GetString("jsonPath")))
 }
 
-func setupRouter(db database.Database, core bool) *gin.Engine {
+func setupRouter(db interfaces.DBReader, core bool) *gin.Engine {
 	router := gin.Default()
 	ctrl := Controller{Database: db}
 	router.Use(func(c *gin.Context) {

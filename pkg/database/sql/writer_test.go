@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package database
+package sql
 
 import (
 	"database/sql"
@@ -34,11 +34,11 @@ func TestWriteResource(t *testing.T) {
 				time.Time
 			}{
 				{
-					"testdata/pod-3-containers.json",
+					"../testdata/pod-3-containers.json",
 					time.Now(),
 				},
 				{
-					"testdata/job.json",
+					"../testdata/job.json",
 					time.Now(),
 				},
 			},
@@ -51,11 +51,11 @@ func TestWriteResource(t *testing.T) {
 				time.Time
 			}{
 				{
-					"testdata/pod-3-containers.json",
+					"../testdata/pod-3-containers.json",
 					time.Now(),
 				},
 				{
-					"testdata/pod-3-containers.json",
+					"../testdata/pod-3-containers.json",
 					time.Now(),
 				},
 			},
@@ -68,11 +68,11 @@ func TestWriteResource(t *testing.T) {
 				time.Time
 			}{
 				{
-					"testdata/pod-3-containers.json",
+					"../testdata/pod-3-containers.json",
 					time.Now(),
 				},
 				{
-					"testdata/pod-3-containers.json",
+					"../testdata/pod-3-containers.json",
 					time.Time{},
 				},
 			},
@@ -85,7 +85,7 @@ func TestWriteResource(t *testing.T) {
 				time.Time
 			}{
 				{
-					"testdata/pod-3-containers.json",
+					"../testdata/pod-3-containers.json",
 					time.Now(),
 				},
 			},

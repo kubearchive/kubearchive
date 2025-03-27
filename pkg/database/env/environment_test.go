@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package database
+package env
 
 import (
 	"errors"
@@ -50,7 +50,7 @@ func TestGetDatabaseEnvironmentVars(t *testing.T) {
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
-			got1, got2 := newDatabaseEnvironment()
+			got1, got2 := NewDatabaseEnvironment()
 			if tt.want1 != (got1 == nil) {
 				t.Errorf("WANT: %t\nGOT: %t", tt.want1, reflect.ValueOf(got1).Kind() == reflect.Map)
 			}

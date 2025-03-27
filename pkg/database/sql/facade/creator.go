@@ -5,5 +5,5 @@ package facade
 
 type DBCreator interface {
 	GetDriverName() string
-	GetConnectionString() string
+	GetConnectionString(env map[string]string) string
 }

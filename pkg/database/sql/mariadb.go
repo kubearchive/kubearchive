@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package database
+package sql
 
 import (
 	"database/sql"
@@ -10,30 +10,19 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
-	"github.com/kubearchive/kubearchive/pkg/database/facade"
+	"github.com/kubearchive/kubearchive/pkg/database/env"
+	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
 )
 
-func init() {
-	RegisteredDatabases["mariadb"] = newMariaDBDatabase
-	RegisteredDBCreators["mariadb"] = newMariaDBCreator
-}
+type mariaDBDatabaseCreator struct{}
 
-type mariaDBDatabaseCreator struct {
-	env map[string]string
-}
-
-func newMariaDBCreator(env map[string]string) facade.DBCreator {
-	return &mariaDBDatabaseCreator{env: env}
-}
-
-func (creator mariaDBDatabaseCreator) GetDriverName() string {
+func (mariaDBDatabaseCreator) GetDriverName() string {
 	return "mysql"
 }
 
-func (creator mariaDBDatabaseCreator) GetConnectionString() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", creator.env[DbUserEnvVar],
-		creator.env[DbPasswordEnvVar], creator.env[DbHostEnvVar], creator.env[DbPortEnvVar], creator.env[DbNameEnvVar])
+func (mariaDBDatabaseCreator) GetConnectionString(e map[string]string) string {
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", e[env.DbUserEnvVar],
+		e[env.DbPasswordEnvVar], e[env.DbHostEnvVar], e[env.DbPortEnvVar], e[env.DbNameEnvVar])
 }
 
 type mariaDBSelector struct {
@@ -140,17 +129,17 @@ func (mariaDBInserter) ResourceInserter(
 }
 
 type mariaDBDatabase struct {
-	*DatabaseImpl
+	*sqlDatabaseImpl
 }
 
-func newMariaDBDatabase(conn *sqlx.DB) Database {
-	return mariaDBDatabase{&DatabaseImpl{
-		db:       conn,
+func NewMariaDBDatabase() *mariaDBDatabase {
+	return &mariaDBDatabase{&sqlDatabaseImpl{
 		flavor:   sqlbuilder.MySQL,
 		selector: mariaDBSelector{},
 		filter:   mariaDBFilter{},
 		sorter:   mariaDBSorter{},
 		inserter: mariaDBInserter{},
 		deleter:  facade.DBDeleterImpl{},
+		creator:  mariaDBDatabaseCreator{},
 	}}
 }

@@ -10,13 +10,19 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Update _VERSION variables in bash files and in the documentation",
-      "fileMatch": [".sh", ".adoc"],
+      "description": "Update _VERSION variables in bash files",
+      "fileMatch": [".sh"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))? packageName=(?<packageName>.+?)(?: versioning=(?<versioning>[a-z-]+?))?\\s(?:export) .+?_VERSION=(?<currentValue>.+?)\\s",
+        "# renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))? packageName=(?<packageName>.+?)(?: versioning=(?<versioning>[a-z-]+?))?\\s(?:export) .+?_VERSION=(?<currentValue>.+?)\\s"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Update versions listed in the documentation",
+      "fileMatch": [".adoc"],
+      "matchStrings": [
         "\\/\\/ renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))? packageName=(?<packageName>.+?)(?: versioning=(?<versioning>[a-z-]+?))?\\s.+? \\(\\+(?<currentValue>.+?)\\)"
-      ],
-      "versioningTemplate": ""
+      ]
     }
   ]
 }

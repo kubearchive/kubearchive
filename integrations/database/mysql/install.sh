@@ -7,7 +7,8 @@ set -o errexit -o errtrace
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd ${SCRIPT_DIR}
 
-VERSION="9.0.1-2.2.1"
+# renovate: datasource=github-tags depName=mysql-operator packageName=mysql/mysql-operator
+VERSION=9.0.1-2.2.1
 NAMESPACE="mysql"
 
 # Install MySQL operator.

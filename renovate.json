@@ -6,5 +6,17 @@
     "gomodTidy"
   ],
   "automerge": true,
-  "prHourlyLimit": 1
+  "prHourlyLimit": 1,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update _VERSION variables in bash files and in the documentation",
+      "fileMatch": [".sh", ".adoc"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))? packageName=(?<packageName>.+?)(?: versioning=(?<versioning>[a-z-]+?))?\\s(?:export) .+?_VERSION=(?<currentValue>.+?)\\s",
+        "\\/\\/ renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))? packageName=(?<packageName>.+?)(?: versioning=(?<versioning>[a-z-]+?))?\\s.+? \\(\\+(?<currentValue>.+?)\\)"
+      ],
+      "versioningTemplate": ""
+    }
+  ]
 }

@@ -7,7 +7,8 @@ set -o errexit
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd ${SCRIPT_DIR}
 
-VERSION="1.24.1"
+# renovate: datasource=github-releases depName=cloudnative-pg packageName=cloudnative-pg/cloudnative-pg
+VERSION=1.24.1
 NAMESPACE="postgresql"
 
 # Install cloudnative-pg operator.

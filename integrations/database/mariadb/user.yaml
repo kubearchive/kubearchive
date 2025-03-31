@@ -1,15 +1,15 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: k8s.mariadb.com/v1alpha1
 kind: User
 metadata:
-  name: kubearchive
+  name: kronicler
 spec:
   mariaDbRef:
-    name: kubearchive
+    name: kronicler
   passwordSecretKeyRef:
-    name: kubearchive
+    name: kronicler
     key: password
   # This field is immutable and defaults to 10
   maxUserConnections: 20

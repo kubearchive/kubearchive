@@ -23,7 +23,7 @@ The two pillars of this proposal are:
 To add a new DBMS the following interfaces must be implemented:
 
 `DBInterface`::
-Include the methods that should be used by the rest of the KubeArchive application.
+Include the methods that should be used by the rest of the Kronicler application.
 Encapsulates the business logic related to the different read/write database operations:
 `QueryResources`, `WriteResources`, `WriteUrls`, `QueryLogUrls`, etc.
 
@@ -101,5 +101,5 @@ overwriting them is required.
 
 === Currently supported DBMS
 
-KubeArchive currently supports `PostgreSQL` and `MariaDB`.
+Kronicler currently supports `PostgreSQL` and `MariaDB`.
 Examples of those implementations can be found in the `pkg/database` go package.

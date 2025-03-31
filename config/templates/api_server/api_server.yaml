@@ -1,36 +1,36 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: "kubearchive-api-server"
-  namespace: kubearchive
+  name: "kronicler-api-server"
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: "kubearchive-api-server"
+    app.kubernetes.io/name: "kronicler-api-server"
     app.kubernetes.io/component: api-server
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 spec:
   replicas: 1
   selector:
     matchLabels: &labels
-      app: kubearchive-api-server
+      app: kronicler-api-server
   template:
     metadata:
       labels: *labels
     spec:
-      serviceAccountName: kubearchive-api-server
+      serviceAccountName: kronicler-api-server
       volumes:
         - name: tls-secret
           secret:
-            secretName: kubearchive-api-server-tls
+            secretName: kronicler-api-server-tls
         - name: logging-secret
           secret:
-            secretName: kubearchive-logging
+            secretName: kronicler-logging
       containers:
-        - name: kubearchive-api-server
-          image: ko://github.com/kubearchive/kubearchive/cmd/api
+        - name: kronicler-api-server
+          image: ko://github.com/kronicler/kronicler/cmd/api
           resources:
             requests:
               cpu: 200m
@@ -44,25 +44,25 @@ spec:
           volumeMounts:
             - name: tls-secret
               readOnly: true
-              mountPath: /etc/kubearchive/ssl/
+              mountPath: /etc/kronicler/ssl/
             - mountPath: /data/logging
               name: logging-secret
           envFrom:
             # Provide DB URL, user, password, database and port as env vars
             - secretRef:
-                name: kubearchive-database-credentials
+                name: kronicler-database-credentials
           env:
-            - name: KUBEARCHIVE_ENABLE_PPROF
+            - name: KRONICLER_ENABLE_PPROF
               value: "true"
             - name: LOG_LEVEL
               value: INFO
             - name: GIN_MODE
               value: "release"
-            - name: KUBEARCHIVE_OTEL_MODE
+            - name: KRONICLER_OTEL_MODE
               value: "disabled"
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: ""
-            - name: KUBEARCHIVE_OTLP_SEND_LOGS
+            - name: KRONICLER_OTLP_SEND_LOGS
               value: "false"
             - name: OTEL_GO_X_DEPRECATED_RUNTIME_METRICS
               value: "false"
@@ -78,7 +78,7 @@ spec:
               value: "10m"
             - name: CACHE_EXPIRATION_UNAUTHORIZED
               value: "1m"
-            - name: KUBEARCHIVE_LOGGING_DIR
+            - name: KRONICLER_LOGGING_DIR
               value: /data/logging
           ports:
             - containerPort: 8081
@@ -98,16 +98,16 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: "kubearchive-api-server"
-  namespace: kubearchive
+  name: "kronicler-api-server"
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: "kubearchive-api-server"
+    app.kubernetes.io/name: "kronicler-api-server"
     app.kubernetes.io/component: api-server
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 spec:
   selector:
-    app: kubearchive-api-server
+    app: kronicler-api-server
   ports:
     - protocol: TCP
       port: 8081

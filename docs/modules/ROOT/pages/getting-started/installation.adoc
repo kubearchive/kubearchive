@@ -1,32 +1,32 @@
 = Installation
 
 ifeval::["{page-component-display-version}" == "main"]
-:download-path: https://github.com/kubearchive/kubearchive/releases/latest/download
+:download-path: https://github.com/kronicler/kronicler/releases/latest/download
 endif::[]
 ifeval::["{page-component-display-version}" != "main"]
-:download-path: https://github.com/kubearchive/kubearchive/releases/download/{page-component-display-version}
+:download-path: https://github.com/kronicler/kronicler/releases/download/{page-component-display-version}
 endif::[]
 
-This document explains how to install and configure KubeArchive in your Kubernetes cluster.
+This document explains how to install and configure Kronicler in your Kubernetes cluster.
 
 == Prerequisites
 
-* A PostgreSQL instance protected with TLS (can be self-signed, KubeArchive does not verify it)
+* A PostgreSQL instance protected with TLS (can be self-signed, Kronicler does not verify it)
 * CertManager is installed on the Kubernetes cluster (+v1.9.1)
 * Knative Eventing is installed on the Kubernetes cluster (+v1.15.0)
 
 == Prepare the Database
 
-. Create a database user `kubearchive`.
-. With a DB admin account, apply the schema provided in the [filename]`kubearchive.sql` file
-within the KubeArchive release:
+. Create a database user `kronicler`.
+. With a DB admin account, apply the schema provided in the [filename]`kronicler.sql` file
+within the Kronicler release:
 +
 [source,bash,subs="attributes"]
 ----
-wget {download-path}/kubearchive.sql
+wget {download-path}/kronicler.sql
 psql -h database.example.com \
 -U admin \
--f kubearchive.sql
+-f kronicler.sql
 ----
 
 More information about the schema and its customization in the
@@ -35,7 +35,7 @@ section.
 
 == Configure Knative Eventing
 
-KubeArchive uses a broker to avoid missing Kubernetes resource updates. By default, it is an `MTChannelBasedBroker`, but
+Kronicler uses a broker to avoid missing Kubernetes resource updates. By default, it is an `MTChannelBasedBroker`, but
 the broker type can be changed if desired.
 
 [IMPORTANT]
@@ -45,21 +45,21 @@ link:https://knative.dev/docs/eventing/brokers/broker-types/[other broker types]
 in production environments.
 ====
 
-[_install_and_configure_kubearchive]
-== Install and Configure KubeArchive
+[_install_and_configure_kronicler]
+== Install and Configure Kronicler
 
-. Apply the release YAML to install KubeArchive:
+. Apply the release YAML to install Kronicler:
 +
 [source,bash,subs="attributes"]
 ----
-kubectl apply -n kubearchive -f {download-path}/kubearchive.yaml
+kubectl apply -n kronicler -f {download-path}/kronicler.yaml
 ----
 
-. Provide the credentials for the database in the `kubearchive-database-credentials` secret:
+. Provide the credentials for the database in the `kronicler-database-credentials` secret:
 +
 [source, bash]
 ----
-kubectl patch secret -n kubearchive kubearchive-database-credentials \
+kubectl patch secret -n kronicler kronicler-database-credentials \
 --patch='{"stringData": {
 "DATABASE_URL": "database.example.com", <1>
 "DATABASE_PASSWORD": "password" <2>
@@ -73,16 +73,16 @@ More info about this Secret in the
 xref:integrations/database.adoc#_configuration_and_customization[Database Integration]
 section.
 
-. Restart the `kubearchive-api-server` and `kubearchive-sink` Deployments to update
+. Restart the `kronicler-api-server` and `kronicler-sink` Deployments to update
 the database credentials secret:
 +
 [source,bash]
 ----
-kubectl rollout -n kubearchive restart deployment kubearchive-sink kubearchive-api-server
+kubectl rollout -n kronicler restart deployment kronicler-sink kronicler-api-server
 ----
 
 == Next steps
 
 Continue with
-xref:getting-started/kubearchive-api.adoc[]
+xref:getting-started/kronicler-api.adoc[]
 to learn how to access archived resources.

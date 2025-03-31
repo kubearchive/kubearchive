@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 package main
 
@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/kubearchive/kubearchive/test/performance/pkg"
+	"github.com/kronicler/kronicler/test/performance/pkg"
 )
 
 func main() {

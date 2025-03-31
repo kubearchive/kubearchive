@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 
 set -o errexit
@@ -18,4 +18,4 @@ kubectl apply -f https://github.com/knative/eventing/releases/download/knative-$
 kubectl rollout status deployment --namespace=cert-manager --timeout=30s
 kubectl rollout status deployment --namespace=knative-eventing --timeout=50s
 
-bash hack/kubearchive-install.sh
+bash hack/kronicler-install.sh

@@ -1,10 +1,10 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package controller
 
 // a13e => shorthand for ApiServerSource
-// k9e  => shorthand for KubeArchive
+// kronicler  => shorthand for Kronicler
 
 import (
 	"context"
@@ -30,81 +30,81 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kroniclerv1alpha1 "github.com/kronicler/kronicler/cmd/operator/api/v1alpha1"
 )
 
 const (
 	SinkFilterConfigMapName   = "sink-filters"
-	ApiServerSourceLabelName  = "kubearchive.org/enabled"
+	ApiServerSourceLabelName  = "kronicler.org/enabled"
 	ApiServerSourceLabelValue = "true"
 )
 
 var (
-	k9eNs         = os.Getenv("KUBEARCHIVE_NAMESPACE")
-	a13eName      = k9eNs + "-a13e"
-	k9eSinkName   = "kubearchive-sink"
-	k9eBrokerName = "kubearchive-broker"
+	kroniclerNs         = os.Getenv("KRONICLER_NAMESPACE")
+	a13eName            = kroniclerNs + "-a13e"
+	kroniclerSinkName   = "kronicler-sink"
+	kroniclerBrokerName = "kronicler-broker"
 )
 
-// KubeArchiveConfigReconciler reconciles a KubeArchiveConfig object
-type KubeArchiveConfigReconciler struct {
+// KroniclerConfigReconciler reconciles a KroniclerConfig object
+type KroniclerConfigReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	Mapper meta.RESTMapper
 }
 
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=kronicler.kronicler.org,resources=kroniclerconfigs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=kronicler.kronicler.org,resources=kroniclerconfigs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=kronicler.kronicler.org,resources=kroniclerconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;roles;rolebindings,verbs=bind;create;delete;escalate;get;list;update;watch
 //+kubebuilder:rbac:groups=sources.knative.dev,resources=apiserversources,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;update;watch
 
-func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *KroniclerConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	log.Info("Reconciling KubeArchiveConfig")
+	log.Info("Reconciling KroniclerConfig")
 
-	kaconfig := &kubearchivev1alpha1.KubeArchiveConfig{}
-	if err := r.Get(ctx, req.NamespacedName, kaconfig); err != nil {
+	kron := &kroniclerv1alpha1.KroniclerConfig{}
+	if err := r.Get(ctx, req.NamespacedName, kron); err != nil {
 		// Ignore not-found errors, since they can't be fixed by an immediate requeue (we need
 		// to wait for a new notification), and we can get them on deleted requests.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	finalizerName := "kubearchive.org/finalizer"
+	finalizerName := "kronicler.org/finalizer"
 
-	if kaconfig.ObjectMeta.DeletionTimestamp.IsZero() {
+	if kron.ObjectMeta.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, add the finalizer if necessary.
-		if !controllerutil.ContainsFinalizer(kaconfig, finalizerName) {
-			controllerutil.AddFinalizer(kaconfig, finalizerName)
-			if err := r.Update(ctx, kaconfig); err != nil {
+		if !controllerutil.ContainsFinalizer(kron, finalizerName) {
+			controllerutil.AddFinalizer(kron, finalizerName)
+			if err := r.Update(ctx, kron); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
 		// The object is being deleted.
-		if controllerutil.ContainsFinalizer(kaconfig, finalizerName) {
+		if controllerutil.ContainsFinalizer(kron, finalizerName) {
 			// Finalizer is present, clean up filters from ConfigMap and remove Namespace label.
 
-			log.Info("Deleting KubeArchiveConfig")
+			log.Info("Deleting KroniclerConfig")
 
 			// Reconcile all a13e resources to clean filters and potentially delete the a13e instance.
-			err := r.cleanupK9eResources(ctx, kaconfig)
+			err := r.cleanupKroniclerResources(ctx, kron)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
 
-			if err := r.removeNamespaceLabel(ctx, kaconfig); err != nil {
+			if err := r.removeNamespaceLabel(ctx, kron); err != nil {
 				// If label removal fails, return with error so that it can be retried.
 				return ctrl.Result{}, err
 			}
 
 			// Remove the finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(kaconfig, finalizerName)
-			if err := r.Update(ctx, kaconfig); err != nil {
+			controllerutil.RemoveFinalizer(kron, finalizerName)
+			if err := r.Update(ctx, kron); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
@@ -113,7 +113,7 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, nil
 	}
 
-	cm, err := r.reconcileFilterConfigMap(ctx, kaconfig)
+	cm, err := r.reconcileFilterConfigMap(ctx, kron)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -129,7 +129,7 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, err
 	}
 
-	_, err = r.reconcileA13eRoleBinding(ctx, kaconfig, clusterrole)
+	_, err = r.reconcileA13eRoleBinding(ctx, kron, clusterrole)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -143,17 +143,17 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		log.Info("No resources, not reconciling ApiServerSource")
 	}
 
-	role, err := r.reconcileSinkRole(ctx, kaconfig)
+	role, err := r.reconcileSinkRole(ctx, kron)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	_, err = r.reconcileSinkRoleBinding(ctx, kaconfig, role)
+	_, err = r.reconcileSinkRoleBinding(ctx, kron, role)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	_, err = r.reconcileNamespace(ctx, kaconfig)
+	_, err = r.reconcileNamespace(ctx, kron)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -161,20 +161,20 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	return ctrl.Result{}, nil
 }
 
-func (r *KubeArchiveConfigReconciler) cleanupK9eResources(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) error {
+func (r *KroniclerConfigReconciler) cleanupKroniclerResources(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig) error {
 	log := log.FromContext(ctx)
 
-	log.Info("in cleanupK9eResources")
+	log.Info("in cleanupKroniclerResources")
 
-	cm, err := r.deleteNamespaceFromFilterConfigMap(ctx, kaconfig)
+	cm, err := r.deleteNamespaceFromFilterConfigMap(ctx, kron)
 	if err != nil {
 		return err
 	}
 	resources := r.parseConfigMap(ctx, cm)
 
-	r.deleteRoleBinding(ctx, kaconfig, k9eSinkName, "Role")
-	r.deleteRoleBinding(ctx, kaconfig, a13eName, "ClusterRole")
-	r.deleteSinkRole(ctx, kaconfig)
+	r.deleteRoleBinding(ctx, kron, kroniclerSinkName, "Role")
+	r.deleteRoleBinding(ctx, kron, a13eName, "ClusterRole")
+	r.deleteSinkRole(ctx, kron)
 
 	if len(resources) > 0 {
 		_, err := r.reconcileA13eRole(ctx, resources)
@@ -197,21 +197,21 @@ func (r *KubeArchiveConfigReconciler) cleanupK9eResources(ctx context.Context, k
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *KubeArchiveConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *KroniclerConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&kubearchivev1alpha1.KubeArchiveConfig{}).
+		For(&kroniclerv1alpha1.KroniclerConfig{}).
 		//Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
 		Complete(r)
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileA13eServiceAccount(ctx context.Context) (*corev1.ServiceAccount, error) {
+func (r *KroniclerConfigReconciler) reconcileA13eServiceAccount(ctx context.Context) (*corev1.ServiceAccount, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileServiceAccount")
 	sa := &corev1.ServiceAccount{}
 
-	err := r.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: k9eNs}, sa)
+	err := r.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: kroniclerNs}, sa)
 	if errors.IsNotFound(err) {
 		err = r.Create(ctx, r.desiredA13eServiceAccount())
 		if err != nil {
@@ -226,41 +226,41 @@ func (r *KubeArchiveConfigReconciler) reconcileA13eServiceAccount(ctx context.Co
 	return sa, nil
 }
 
-func (r *KubeArchiveConfigReconciler) desiredA13eServiceAccount() *corev1.ServiceAccount {
+func (r *KroniclerConfigReconciler) desiredA13eServiceAccount() *corev1.ServiceAccount {
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      a13eName,
-			Namespace: k9eNs,
+			Namespace: kroniclerNs,
 		},
 	}
 	return sa
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileA13eRole(ctx context.Context, resources []sourcesv1.APIVersionKindSelector) (*rbacv1.ClusterRole, error) {
+func (r *KroniclerConfigReconciler) reconcileA13eRole(ctx context.Context, resources []sourcesv1.APIVersionKindSelector) (*rbacv1.ClusterRole, error) {
 	return r.reconcileClusterRole(ctx, a13eName, r.getRules(ctx, resources, []string{"get", "list", "watch"}))
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.Role, error) {
+func (r *KroniclerConfigReconciler) reconcileSinkRole(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig) (*rbacv1.Role, error) {
 	resources := make([]sourcesv1.APIVersionKindSelector, 0)
-	for _, kar := range kaconfig.Spec.Resources {
+	for _, kar := range kron.Spec.Resources {
 		resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
 		resources = append(resources, resource)
 	}
-	return r.reconcileRole(ctx, kaconfig, k9eSinkName, r.getRules(ctx, resources, []string{"delete"}))
+	return r.reconcileRole(ctx, kron, kroniclerSinkName, r.getRules(ctx, resources, []string{"delete"}))
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {
+func (r *KroniclerConfigReconciler) reconcileRole(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileRole " + roleName)
-	desired, err := r.desiredRole(kaconfig, roleName, rules)
+	desired, err := r.desiredRole(kron, roleName, rules)
 	if err != nil {
 		log.Error(err, "Unable to get desired Role "+roleName)
 		return nil, err
 	}
 
 	existing := &rbacv1.Role{}
-	err = r.Get(ctx, types.NamespacedName{Name: roleName, Namespace: kaconfig.Namespace}, existing)
+	err = r.Get(ctx, types.NamespacedName{Name: roleName, Namespace: kron.Namespace}, existing)
 	if errors.IsNotFound(err) {
 		err = r.Create(ctx, desired)
 		if err != nil {
@@ -282,15 +282,15 @@ func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfi
 	return existing, nil
 }
 
-func (r *KubeArchiveConfigReconciler) deleteSinkRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) {
-	r.deleteRole(ctx, kaconfig, k9eSinkName)
+func (r *KroniclerConfigReconciler) deleteSinkRole(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig) {
+	r.deleteRole(ctx, kron, kroniclerSinkName)
 }
 
-func (r *KubeArchiveConfigReconciler) deleteRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string) {
+func (r *KroniclerConfigReconciler) deleteRole(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig, roleName string) {
 	log := log.FromContext(ctx)
 
 	log.Info("in deleteRole " + roleName)
-	role, err := r.desiredRole(kaconfig, roleName, []rbacv1.PolicyRule{})
+	role, err := r.desiredRole(kron, roleName, []rbacv1.PolicyRule{})
 	if err != nil {
 		log.Error(err, "Unable to get desired Role "+roleName)
 		return
@@ -302,22 +302,22 @@ func (r *KubeArchiveConfigReconciler) deleteRole(ctx context.Context, kaconfig *
 	}
 }
 
-func (r *KubeArchiveConfigReconciler) desiredRole(kaconfig *kubearchivev1alpha1.KubeArchiveConfig, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {
+func (r *KroniclerConfigReconciler) desiredRole(kron *kroniclerv1alpha1.KroniclerConfig, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {
 	role := &rbacv1.Role{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roleName,
-			Namespace: kaconfig.Namespace,
+			Namespace: kron.Namespace,
 		},
 		Rules: rules,
 	}
 
-	if err := ctrl.SetControllerReference(kaconfig, role, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(kron, role, r.Scheme); err != nil {
 		return nil, err
 	}
 	return role, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileClusterRole(ctx context.Context, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
+func (r *KroniclerConfigReconciler) reconcileClusterRole(ctx context.Context, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileClusterRole " + roleName)
@@ -346,7 +346,7 @@ func (r *KubeArchiveConfigReconciler) reconcileClusterRole(ctx context.Context, 
 	return existing, nil
 }
 
-func (r *KubeArchiveConfigReconciler) desiredClusterRole(roleName string, rules []rbacv1.PolicyRule) *rbacv1.ClusterRole {
+func (r *KroniclerConfigReconciler) desiredClusterRole(roleName string, rules []rbacv1.PolicyRule) *rbacv1.ClusterRole {
 	role := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: roleName,
@@ -357,7 +357,7 @@ func (r *KubeArchiveConfigReconciler) desiredClusterRole(roleName string, rules 
 	return role
 }
 
-func (r *KubeArchiveConfigReconciler) getRules(ctx context.Context, resources []sourcesv1.APIVersionKindSelector, verbs []string) []rbacv1.PolicyRule {
+func (r *KroniclerConfigReconciler) getRules(ctx context.Context, resources []sourcesv1.APIVersionKindSelector, verbs []string) []rbacv1.PolicyRule {
 	log := log.FromContext(ctx)
 	groups := make(map[string][]string)
 
@@ -393,26 +393,26 @@ func (r *KubeArchiveConfigReconciler) getRules(ctx context.Context, resources []
 	return rules
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileA13eRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, role *rbacv1.ClusterRole) (*rbacv1.RoleBinding, error) {
-	return r.reconcileRoleBinding(ctx, kaconfig, role.Name, "ClusterRole")
+func (r *KroniclerConfigReconciler) reconcileA13eRoleBinding(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig, role *rbacv1.ClusterRole) (*rbacv1.RoleBinding, error) {
+	return r.reconcileRoleBinding(ctx, kron, role.Name, "ClusterRole")
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileSinkRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, role *rbacv1.Role) (*rbacv1.RoleBinding, error) {
-	return r.reconcileRoleBinding(ctx, kaconfig, role.Name, "Role")
+func (r *KroniclerConfigReconciler) reconcileSinkRoleBinding(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig, role *rbacv1.Role) (*rbacv1.RoleBinding, error) {
+	return r.reconcileRoleBinding(ctx, kron, role.Name, "Role")
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, name string, kind string) (*rbacv1.RoleBinding, error) {
+func (r *KroniclerConfigReconciler) reconcileRoleBinding(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig, name string, kind string) (*rbacv1.RoleBinding, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileRoleBinding " + name)
-	desired, err := r.desiredRoleBinding(kaconfig, name, kind)
+	desired, err := r.desiredRoleBinding(kron, name, kind)
 	if err != nil {
 		log.Error(err, "Unable to get desired RoleBinding "+name)
 		return nil, err
 	}
 
 	existing := &rbacv1.RoleBinding{}
-	err = r.Get(ctx, types.NamespacedName{Name: name, Namespace: kaconfig.Namespace}, existing)
+	err = r.Get(ctx, types.NamespacedName{Name: name, Namespace: kron.Namespace}, existing)
 	if errors.IsNotFound(err) {
 		err = r.Create(ctx, desired)
 		if err != nil {
@@ -435,11 +435,11 @@ func (r *KubeArchiveConfigReconciler) reconcileRoleBinding(ctx context.Context, 
 	return existing, nil
 }
 
-func (r *KubeArchiveConfigReconciler) deleteRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, name string, kind string) {
+func (r *KroniclerConfigReconciler) deleteRoleBinding(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig, name string, kind string) {
 	log := log.FromContext(ctx)
 
 	log.Info("in deleteRoleBinding " + name)
-	binding, err := r.desiredRoleBinding(kaconfig, name, kind)
+	binding, err := r.desiredRoleBinding(kron, name, kind)
 	if err != nil {
 		log.Error(err, "Unable to get desired RoleBinding "+name)
 		return
@@ -450,11 +450,11 @@ func (r *KubeArchiveConfigReconciler) deleteRoleBinding(ctx context.Context, kac
 	}
 }
 
-func (r *KubeArchiveConfigReconciler) desiredRoleBinding(kaconfig *kubearchivev1alpha1.KubeArchiveConfig, name string, kind string) (*rbacv1.RoleBinding, error) {
+func (r *KroniclerConfigReconciler) desiredRoleBinding(kron *kroniclerv1alpha1.KroniclerConfig, name string, kind string) (*rbacv1.RoleBinding, error) {
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: kaconfig.Namespace,
+			Namespace: kron.Namespace,
 		},
 		RoleRef: rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
@@ -464,24 +464,24 @@ func (r *KubeArchiveConfigReconciler) desiredRoleBinding(kaconfig *kubearchivev1
 		Subjects: []rbacv1.Subject{{
 			Kind:      "ServiceAccount",
 			Name:      name,
-			Namespace: k9eNs,
+			Namespace: kroniclerNs,
 		}},
 	}
 
-	if err := ctrl.SetControllerReference(kaconfig, binding, r.Scheme); err != nil {
+	if err := ctrl.SetControllerReference(kron, binding, r.Scheme); err != nil {
 		return nil, err
 	}
 	return binding, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileA13e(ctx context.Context, resources []sourcesv1.APIVersionKindSelector) error {
+func (r *KroniclerConfigReconciler) reconcileA13e(ctx context.Context, resources []sourcesv1.APIVersionKindSelector) error {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileApiServerSource")
 	desired := r.desiredA13e(resources)
 
 	existing := &sourcesv1.ApiServerSource{}
-	err := r.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: k9eNs}, existing)
+	err := r.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: kroniclerNs}, existing)
 	if errors.IsNotFound(err) {
 		err = r.Create(ctx, desired)
 		if err != nil {
@@ -503,13 +503,13 @@ func (r *KubeArchiveConfigReconciler) reconcileA13e(ctx context.Context, resourc
 	return nil
 }
 
-func (r *KubeArchiveConfigReconciler) deleteA13e(ctx context.Context) {
+func (r *KroniclerConfigReconciler) deleteA13e(ctx context.Context) {
 	log := log.FromContext(ctx)
 
 	log.Info("in deleteApiServerSource")
 
 	existing := &sourcesv1.ApiServerSource{}
-	err := r.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: k9eNs}, existing)
+	err := r.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: kroniclerNs}, existing)
 	if errors.IsNotFound(err) {
 		log.Info("No ApiServerSource to delete")
 	} else if err != nil {
@@ -522,15 +522,15 @@ func (r *KubeArchiveConfigReconciler) deleteA13e(ctx context.Context) {
 	}
 }
 
-func (r *KubeArchiveConfigReconciler) parseConfigMap(ctx context.Context, cm *corev1.ConfigMap) []sourcesv1.APIVersionKindSelector {
+func (r *KroniclerConfigReconciler) parseConfigMap(ctx context.Context, cm *corev1.ConfigMap) []sourcesv1.APIVersionKindSelector {
 	log := log.FromContext(ctx)
 
 	resourceMap := map[string]sourcesv1.APIVersionKindSelector{}
 	resourceKeys := make([]string, 0)
 	for namespace, yaml := range cm.Data {
-		kars, err := kubearchivev1alpha1.LoadFromString(yaml)
+		kars, err := kroniclerv1alpha1.LoadFromString(yaml)
 		if err != nil {
-			log.Error(err, "Failed to load KubeArchiveConfigResource for namespace "+namespace)
+			log.Error(err, "Failed to load KroniclerConfigResource for namespace "+namespace)
 			continue
 		}
 		for _, kar := range kars {
@@ -551,7 +551,7 @@ func (r *KubeArchiveConfigReconciler) parseConfigMap(ctx context.Context, cm *co
 	return resources
 }
 
-func (r *KubeArchiveConfigReconciler) desiredA13e(resources []sourcesv1.APIVersionKindSelector) *sourcesv1.ApiServerSource {
+func (r *KroniclerConfigReconciler) desiredA13e(resources []sourcesv1.APIVersionKindSelector) *sourcesv1.ApiServerSource {
 
 	source := &sourcesv1.ApiServerSource{
 		TypeMeta: metav1.TypeMeta{
@@ -560,7 +560,7 @@ func (r *KubeArchiveConfigReconciler) desiredA13e(resources []sourcesv1.APIVersi
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      a13eName,
-			Namespace: k9eNs,
+			Namespace: kroniclerNs,
 		},
 		Spec: sourcesv1.ApiServerSourceSpec{
 			EventMode:          "Resource",
@@ -571,8 +571,8 @@ func (r *KubeArchiveConfigReconciler) desiredA13e(resources []sourcesv1.APIVersi
 					Ref: &duckv1.KReference{
 						APIVersion: "eventing.knative.dev/v1",
 						Kind:       "Broker",
-						Name:       k9eBrokerName,
-						Namespace:  k9eNs,
+						Name:       kroniclerBrokerName,
+						Namespace:  kroniclerNs,
 					},
 				},
 			},
@@ -585,15 +585,15 @@ func (r *KubeArchiveConfigReconciler) desiredA13e(resources []sourcesv1.APIVersi
 	return source
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileFilterConfigMap(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.ConfigMap, error) {
+func (r *KroniclerConfigReconciler) reconcileFilterConfigMap(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig) (*corev1.ConfigMap, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileFilterConfigMap")
 
 	cm := &corev1.ConfigMap{}
-	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: k9eNs}, cm)
+	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: kroniclerNs}, cm)
 	if errors.IsNotFound(err) {
-		cm, err = r.desiredFilterConfigMap(ctx, kaconfig, nil)
+		cm, err = r.desiredFilterConfigMap(ctx, kron, nil)
 		if err != nil {
 			log.Error(err, "Unable to get desired filter ConfigMap "+SinkFilterConfigMapName)
 			return nil, err
@@ -609,7 +609,7 @@ func (r *KubeArchiveConfigReconciler) reconcileFilterConfigMap(ctx context.Conte
 		return nil, err
 	}
 
-	cm, err = r.desiredFilterConfigMap(ctx, kaconfig, cm)
+	cm, err = r.desiredFilterConfigMap(ctx, kron, cm)
 	if err != nil {
 		log.Error(err, "Unable to get desired ConfigMap "+SinkFilterConfigMapName)
 		return nil, err
@@ -622,7 +622,7 @@ func (r *KubeArchiveConfigReconciler) reconcileFilterConfigMap(ctx context.Conte
 	return cm, nil
 }
 
-func (r *KubeArchiveConfigReconciler) desiredFilterConfigMap(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
+func (r *KroniclerConfigReconciler) desiredFilterConfigMap(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig, cm *corev1.ConfigMap) (*corev1.ConfigMap, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in desiredFilterConfigMap")
@@ -631,7 +631,7 @@ func (r *KubeArchiveConfigReconciler) desiredFilterConfigMap(ctx context.Context
 		cm = &corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      SinkFilterConfigMapName,
-				Namespace: k9eNs,
+				Namespace: kroniclerNs,
 			},
 			Data: map[string]string{},
 		}
@@ -641,71 +641,71 @@ func (r *KubeArchiveConfigReconciler) desiredFilterConfigMap(ctx context.Context
 		cm.Data = make(map[string]string)
 	}
 
-	yamlBytes, err := yaml.Marshal(kaconfig.Spec.Resources)
+	yamlBytes, err := yaml.Marshal(kron.Spec.Resources)
 	if err != nil {
-		log.Error(err, "Failed to convert KubeArchiveConfig resources to JSON")
+		log.Error(err, "Failed to convert KroniclerConfig resources to JSON")
 		return cm, err
 	}
 
-	cm.Data[kaconfig.Namespace] = string(yamlBytes)
+	cm.Data[kron.Namespace] = string(yamlBytes)
 
 	// Note that the owner reference is NOT set on the ConfigMap.  It should not be deleted when
-	// the KubeArchiveConfig object is deleted.
+	// the KroniclerConfig object is deleted.
 	return cm, nil
 }
 
-func (r *KubeArchiveConfigReconciler) deleteNamespaceFromFilterConfigMap(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.ConfigMap, error) {
+func (r *KroniclerConfigReconciler) deleteNamespaceFromFilterConfigMap(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig) (*corev1.ConfigMap, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in deleteNamespaceFromFilterConfigMap")
 
 	cm := &corev1.ConfigMap{}
-	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: k9eNs}, cm)
+	err := r.Get(ctx, types.NamespacedName{Name: SinkFilterConfigMapName, Namespace: kroniclerNs}, cm)
 	if err != nil {
 		log.Error(err, "Failed to get filter ConfigMap "+SinkFilterConfigMapName)
 		return nil, err
 	}
 
-	delete(cm.Data, kaconfig.Namespace)
+	delete(cm.Data, kron.Namespace)
 	err = r.Update(ctx, cm)
 	if err != nil {
-		log.Error(err, "Failed to remove namespace '"+kaconfig.Namespace+"' from filter ConfigMap "+SinkFilterConfigMapName)
+		log.Error(err, "Failed to remove namespace '"+kron.Namespace+"' from filter ConfigMap "+SinkFilterConfigMapName)
 		return nil, err
 	}
 	return cm, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileNamespace(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.Namespace, error) {
+func (r *KroniclerConfigReconciler) reconcileNamespace(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig) (*corev1.Namespace, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileNamespace")
 
 	ns := &corev1.Namespace{}
-	err := r.Get(ctx, types.NamespacedName{Name: kaconfig.Namespace}, ns)
+	err := r.Get(ctx, types.NamespacedName{Name: kron.Namespace}, ns)
 	if err != nil {
-		log.Error(err, "Failed to get Namespace "+kaconfig.Namespace)
+		log.Error(err, "Failed to get Namespace "+kron.Namespace)
 		return nil, err
 	}
 
 	ns.ObjectMeta.Labels[ApiServerSourceLabelName] = ApiServerSourceLabelValue
 	err = r.Update(ctx, ns)
 	if err != nil {
-		log.Error(err, "Failed to update Namespace "+kaconfig.Namespace)
+		log.Error(err, "Failed to update Namespace "+kron.Namespace)
 		return nil, err
 	}
 
 	return ns, nil
 }
 
-func (r *KubeArchiveConfigReconciler) removeNamespaceLabel(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) error {
+func (r *KroniclerConfigReconciler) removeNamespaceLabel(ctx context.Context, kron *kroniclerv1alpha1.KroniclerConfig) error {
 	log := log.FromContext(ctx)
 
 	log.Info("in removeNamespaceLabel")
 
 	ns := &corev1.Namespace{}
-	err := r.Get(ctx, types.NamespacedName{Name: kaconfig.Namespace}, ns)
+	err := r.Get(ctx, types.NamespacedName{Name: kron.Namespace}, ns)
 	if err != nil {
-		log.Error(err, "Failed to get Namespace "+kaconfig.Namespace)
+		log.Error(err, "Failed to get Namespace "+kron.Namespace)
 		return err
 	}
 
@@ -713,7 +713,7 @@ func (r *KubeArchiveConfigReconciler) removeNamespaceLabel(ctx context.Context, 
 
 	err = r.Update(ctx, ns)
 	if err != nil {
-		log.Error(err, "Failed to update Namespace "+kaconfig.Namespace)
+		log.Error(err, "Failed to update Namespace "+kron.Namespace)
 		return err
 	}
 

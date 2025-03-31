@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 #
 # Tools:
@@ -9,7 +9,7 @@
 #
 # Externally provided variables
 # export OCI_REPOSITORY="quay.io/username"
-# export RELEASE_REPOSITORY="username/kubearchive"
+# export RELEASE_REPOSITORY="username/kronicler"
 # export GITHUB_TOKEN="token-string"  # auth for 'release-notes'
 # export GH_TOKEN="token-string"  # auth for 'gh'
 #
@@ -33,7 +33,7 @@ release-notes generate \
     --required-author="" \
     --format json \
     --output ./release-notes.json \
-    --repo kubearchive --org kubearchive
+    --repo kronicler --org kronicler
 
 go run hack/get-next-version.go \
     --release-notes-file ./release-notes.json \
@@ -45,7 +45,7 @@ release-notes generate \
     --required-author="" \
     --output ./release-notes.md \
     --dependencies=false \
-    --repo kubearchive --org kubearchive
+    --repo kronicler --org kronicler
 echo -e "# Release notes for ${NEXT_VERSION}\n" >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}
 cat ./release-notes.md >> ${GITHUB_STEP_SUMMARY:-/dev/stdout}
 
@@ -56,7 +56,7 @@ git tag -a "${NEXT_VERSION}" -m "Release ${NEXT_VERSION}"
 
 # Build and push
 bash cmd/operator/generate.sh
-kubectl kustomize config/ | envsubst | ko resolve -f - --base-import-paths --tags=${NEXT_VERSION} > kubearchive.yaml
+kubectl kustomize config/ | envsubst | ko resolve -f - --base-import-paths --tags=${NEXT_VERSION} > kronicler.yaml
 
 git push
 git push --tags
@@ -65,7 +65,7 @@ gh release create "${NEXT_VERSION}" \
     --notes-file ./release-notes.md \
     --title "Release ${NEXT_VERSION}" \
     --repo ${RELEASE_REPOSITORY} \
-    kubearchive.yaml \
-    integrations/database/postgresql/kubearchive.sql
+    kronicler.yaml \
+    integrations/database/postgresql/kronicler.sql
 rm ./release-notes.md
-rm ./kubearchive.yaml
+rm ./kronicler.yaml

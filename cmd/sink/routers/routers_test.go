@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package routers
@@ -13,12 +13,12 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/cmd/sink/filters"
-	fakeFilters "github.com/kubearchive/kubearchive/cmd/sink/filters/fake"
-	"github.com/kubearchive/kubearchive/cmd/sink/logs"
-	"github.com/kubearchive/kubearchive/pkg/database"
-	fakeDb "github.com/kubearchive/kubearchive/pkg/database/fake"
-	"github.com/kubearchive/kubearchive/pkg/files"
+	"github.com/kronicler/kronicler/cmd/sink/filters"
+	fakeFilters "github.com/kronicler/kronicler/cmd/sink/filters/fake"
+	"github.com/kronicler/kronicler/cmd/sink/logs"
+	"github.com/kronicler/kronicler/pkg/database"
+	fakeDb "github.com/kronicler/kronicler/pkg/database/fake"
+	"github.com/kronicler/kronicler/pkg/files"
 	"github.com/stretchr/testify/assert"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -730,7 +730,7 @@ func TestReadyz(t *testing.T) {
 			filter := fakeFilters.NewFilters(nil, nil, nil)
 			builder, _ := logs.NewUrlBuilder()
 			if tt.k8sApiConn {
-				t.Setenv(namespaceEnvVar, "kubearchive")
+				t.Setenv(namespaceEnvVar, "kronicler")
 			}
 			if tt.dbConnReady {
 				db = fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{}, "$.")

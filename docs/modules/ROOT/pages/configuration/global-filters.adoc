@@ -1,20 +1,20 @@
-= Configuring Global Filters on KubeArchive
+= Configuring Global Filters on Kronicler
 
-KubeArchive allows cluster owners to configure global filters. These are applied
-to any KubeArchive namespace containing a `KubeArchiveConfig` custom resource.
+Kronicler allows cluster owners to configure global filters. These are applied
+to any Kronicler namespace containing a `KroniclerConfig` custom resource.
 
-To configure the global filters create a `KubeArchiveConfig` in the
-"kubearchive" namespace. When it is created in the "kubearchive" namespace
+To configure the global filters create a `KroniclerConfig` in the
+"kronicler" namespace. When it is created in the "kronicler" namespace
 these filters are considered global:
 
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
-  namespace: kubearchive
+  name: kronicler
+  namespace: kronicler
 spec:
   resources:
     - selector:
@@ -25,23 +25,23 @@ spec:
 
 == Interaction With Local Filters
 
-Global filters only work in namespaces containing a `KubeArchiveConfig` custom
+Global filters only work in namespaces containing a `KroniclerConfig` custom
 resource. These can be understood as "local" filters in opposition with global
 filters. Both global and local filters are combined with an "OR" type of logic
 and used for that specific namespace.
 
-For example the following `KubeArchiveConfig` in the namespace "my-team" KubeArchive
+For example the following `KroniclerConfig` in the namespace "my-team" Kronicler
 archives jobs as long as they have `status.startTime` and deletes them when they
-have `status.completionTime`. However KubeArchive also archives pods when they are
+have `status.completionTime`. However Kronicler also archives pods when they are
 about to be deleted, as configured in the global filters in the previous section:
 
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: my-team
 spec:
   resources:
@@ -52,22 +52,22 @@ spec:
       deleteWhen: has(status.completionTime)
 ----
 
-For example the following `KubeArchiveConfig` in the namespace "production" KubeArchive
+For example the following `KroniclerConfig` in the namespace "production" Kronicler
 only archives pods when they are about to be deleted, as configured in the global filters
 in the previous section:
 
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+apiVersion: kronicler.kronicler.org/v1alpha1
+kind: KroniclerConfig
 metadata:
-  name: kubearchive
+  name: kronicler
   namespace: production
 spec: {}
 ----
 
 [NOTE]
 ====
-The 'KubeArchiveConfig` resource must be named "kubearchive".
+The 'KroniclerConfig` resource must be named "kronicler".
 ====

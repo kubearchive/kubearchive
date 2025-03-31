@@ -1,10 +1,10 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: kubearchive
+  name: kronicler
 spec:
   instances: 1
   postgresql:
@@ -14,10 +14,10 @@ spec:
       - hostnossl  all  all  all  reject
   bootstrap:
     initdb:
-      database: kubearchive
+      database: kronicler
       secret:
-        name: kubearchive-user
-      owner: kubearchive
+        name: kronicler-user
+      owner: kronicler
   enableSuperuserAccess: true
   imageName: ghcr.io/cloudnative-pg/postgresql:16.6
   storage:

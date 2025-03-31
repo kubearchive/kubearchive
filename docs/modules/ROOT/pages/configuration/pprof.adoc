@@ -1,6 +1,6 @@
 = Performance Profiling (pprof) Support
 
-KubeArchive ships with
+Kronicler ships with
 link:https://pkg.go.dev/net/http/pprof[HTTP pprof endpoints]
 enabled on all of its components. Each component exposes the endpoint
 in its own port:
@@ -9,7 +9,7 @@ in its own port:
 * Sink: `:80/debug/pprof/`
 * API: `:8081/debug/pprof/`
 
-This feature is controlled by an environment variable called `KUBEARCHIVE_ENABLE_PPROF`.
+This feature is controlled by an environment variable called `KRONICLER_ENABLE_PPROF`.
 By default it is set as `"true"` (lowercase "true" string), change it to any other value
 to disable the pprof instrumentation.
 

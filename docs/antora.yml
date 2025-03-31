@@ -1,8 +1,8 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 name: ROOT  # make this the base component
-title: KubeArchive
+title: Kronicler
 version: true  # get the version from the git refname
 nav:
   - modules/ROOT/nav.adoc

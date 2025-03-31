@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package controller
@@ -14,10 +14,10 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kroniclerv1alpha1 "github.com/kronicler/kronicler/cmd/operator/api/v1alpha1"
 )
 
-var _ = Describe("KubeArchiveConfig Controller", func() {
+var _ = Describe("KroniclerConfig Controller", func() {
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
@@ -27,14 +27,14 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 			Name:      resourceName,
 			Namespace: "default", // TODO(user):Modify as needed
 		}
-		kubearchiveconfig := &kubearchivev1alpha1.KubeArchiveConfig{}
+		kroniclerconfig := &kroniclerv1alpha1.KroniclerConfig{}
 
 		BeforeEach(func() {
 			Skip("NYI")
-			By("creating the custom resource for the Kind KubeArchiveConfig")
-			err := k8sClient.Get(ctx, typeNamespacedName, kubearchiveconfig)
+			By("creating the custom resource for the Kind KroniclerConfig")
+			err := k8sClient.Get(ctx, typeNamespacedName, kroniclerconfig)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &kubearchivev1alpha1.KubeArchiveConfig{
+				resource := &kroniclerv1alpha1.KroniclerConfig{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -47,16 +47,16 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 
 		AfterEach(func() {
 			// TODO(user): Cleanup logic after each test, like removing the resource instance.
-			resource := &kubearchivev1alpha1.KubeArchiveConfig{}
+			resource := &kroniclerv1alpha1.KroniclerConfig{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("Cleanup the specific resource instance KubeArchiveConfig")
+			By("Cleanup the specific resource instance KroniclerConfig")
 			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
 		})
 		It("should successfully reconcile the resource", func() {
 			By("Reconciling the created resource")
-			controllerReconciler := &KubeArchiveConfigReconciler{
+			controllerReconciler := &KroniclerConfigReconciler{
 				Client: k8sClient,
 				Scheme: k8sClient.Scheme(),
 			}

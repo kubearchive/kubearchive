@@ -1,2 +1,2 @@
-DROP ROLE IF EXISTS kubearchive;
-CREATE USER kubearchive WITH ENCRYPTED PASSWORD 'P0stgr3sdbP@ssword';
+DROP ROLE IF EXISTS kronicler;
+CREATE USER kronicler WITH ENCRYPTED PASSWORD 'P0stgr3sdbP@ssword';

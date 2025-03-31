@@ -1,15 +1,15 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: "kubearchive-ca"
-  namespace: kubearchive
+  name: "kronicler-ca"
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: kubearchive-ca
+    app.kubernetes.io/name: kronicler-ca
     app.kubernetes.io/component: certs
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 spec:
   selfSigned: {}
@@ -18,22 +18,22 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: "kubearchive-ca"
-  namespace: kubearchive
+  name: "kronicler-ca"
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: kubearchive-ca
+    app.kubernetes.io/name: kronicler-ca
     app.kubernetes.io/component: certs
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 spec:
   isCA: true
-  commonName: kubearchive-ca-certificate
-  secretName: "kubearchive-ca"
+  commonName: kronicler-ca-certificate
+  secretName: "kronicler-ca"
   privateKey:
     algorithm: ECDSA
     size: 256
   issuerRef:
-    name: "kubearchive-ca"
+    name: "kronicler-ca"
     kind: Issuer
     group: cert-manager.io
 
@@ -41,13 +41,13 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: "kubearchive"
-  namespace: kubearchive
+  name: "kronicler"
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: kubearchive
+    app.kubernetes.io/name: kronicler
     app.kubernetes.io/component: certs
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 spec:
   ca:
-    secretName: "kubearchive-ca"
+    secretName: "kronicler-ca"

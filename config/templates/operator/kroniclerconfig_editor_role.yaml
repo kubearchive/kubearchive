@@ -1,21 +1,21 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
-# Permissions for end users to edit kubearchiveconfigs.
+# Permissions for end users to edit kroniclerconfigs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: kubearchive-operator-config-editor
+  name: kronicler-operator-config-editor
   labels:
-    app.kubernetes.io/name: kubearchive-operator-config-editor
+    app.kubernetes.io/name: kronicler-operator-config-editor
     app.kubernetes.io/component: operator
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 rules:
   - apiGroups:
-      - kubearchive.kubearchive.org
+      - kronicler.kronicler.org
     resources:
-      - kubearchiveconfigs
+      - kroniclerconfigs
     verbs:
       - create
       - delete
@@ -25,8 +25,8 @@ rules:
       - update
       - watch
   - apiGroups:
-      - kubearchive.kubearchive.org
+      - kronicler.kronicler.org
     resources:
-      - kubearchiveconfigs/status
+      - kroniclerconfigs/status
     verbs:
       - get

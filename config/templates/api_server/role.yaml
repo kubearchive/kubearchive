@@ -1,14 +1,14 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: "kubearchive-api-server"
+  name: "kronicler-api-server"
   labels:
-    app.kubernetes.io/name: "kubearchive-api-server"
+    app.kubernetes.io/name: "kronicler-api-server"
     app.kubernetes.io/component: api-server
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 rules:
   - apiGroups:

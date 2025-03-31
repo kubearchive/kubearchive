@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package fake
@@ -9,8 +9,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/kubearchive/kubearchive/pkg/database"
-	"github.com/kubearchive/kubearchive/pkg/models"
+	"github.com/kronicler/kronicler/pkg/database"
+	"github.com/kronicler/kronicler/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 )

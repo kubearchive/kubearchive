@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package server
@@ -14,9 +14,9 @@ import (
 
 	"github.com/Cyprinus12138/otelgin"
 	"github.com/gin-gonic/gin"
-	"github.com/kubearchive/kubearchive/cmd/sink/routers"
-	"github.com/kubearchive/kubearchive/pkg/middleware"
-	"github.com/kubearchive/kubearchive/pkg/observability"
+	"github.com/kronicler/kronicler/cmd/sink/routers"
+	"github.com/kronicler/kronicler/pkg/middleware"
+	"github.com/kronicler/kronicler/pkg/observability"
 )
 
 type Server struct {

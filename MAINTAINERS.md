@@ -1,4 +1,4 @@
-The current Maintainers Group for the KubeArchive Project consists of:
+The current Maintainers Group for the Kronicler Project consists of:
 
 * [Andrea Fernández](https://github.com/mafh314), [Red Hat](https://www.redhat.com)
 * [Chris Beer](https://github.com/beerparty), [Red Hat](https://www.redhat.com)

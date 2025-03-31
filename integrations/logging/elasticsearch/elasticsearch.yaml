@@ -1,10 +1,10 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: elasticsearch.k8s.elastic.co/v1
 kind: Elasticsearch
 metadata:
-  name: kubearchive
+  name: kronicler
 spec:
   version: 8.15.0
   nodeSets:

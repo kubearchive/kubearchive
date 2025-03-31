@@ -1,14 +1,14 @@
-# Copyright KubeArchive Authors
+# Copyright Kronicler Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubearchive-logging
-  namespace: kubearchive
+  name: kronicler-logging
+  namespace: kronicler
   labels:
-    app.kubernetes.io/name: kubearchive-logging
+    app.kubernetes.io/name: kronicler-logging
     app.kubernetes.io/component: logging
-    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/part-of: kronicler
     app.kubernetes.io/version: "${NEXT_VERSION}"
 data:

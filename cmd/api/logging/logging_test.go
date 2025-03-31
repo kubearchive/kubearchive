@@ -1,4 +1,4 @@
-// Copyright KubeArchive Authors
+// Copyright Kronicler Authors
 // SPDX-License-Identifier: Apache-2.0
 
 package logging
@@ -97,21 +97,21 @@ func TestLogRetrievalError(t *testing.T) {
 		errStr        string
 	}{
 		{
-			name:          "Empty kubearchive-logging secret",
+			name:          "Empty kronicler-logging secret",
 			contextValues: map[string]string{"logURL": "http://example.com"},
 			jsonPath:      "",
 			expectedCode:  http.StatusInternalServerError,
 			errStr:        "Logging credentials are unset",
 		},
 		{
-			name:          "No user in kubearchive-logging secret",
+			name:          "No user in kronicler-logging secret",
 			contextValues: map[string]string{passwordKey: "pwd", "logURL": "http://example.com"},
 			jsonPath:      "",
 			expectedCode:  http.StatusInternalServerError,
 			errStr:        "Logging credentials are unset",
 		},
 		{
-			name:          "No password in kubearchive-logging secret",
+			name:          "No password in kronicler-logging secret",
 			contextValues: map[string]string{userKey: "user", "logURL": "http://example.com"},
 			jsonPath:      "",
 			expectedCode:  http.StatusInternalServerError,

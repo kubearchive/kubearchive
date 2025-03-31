@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
@@ -25,8 +26,10 @@ type GetOptions struct {
 
 	KubeArchiveHost string
 
-	RESTConfig *rest.Config
-	kubeFlags  *genericclioptions.ConfigFlags
+	RESTConfig    *rest.Config
+	kubeFlags     *genericclioptions.ConfigFlags
+	Output        string
+	IsValidOutput bool
 }
 
 func NewGetOptions() *GetOptions {
@@ -62,6 +65,7 @@ func NewGetCmd() *cobra.Command {
 	o.kubeFlags.AddFlags(cmd.Flags())
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringVar(&o.KubeArchiveHost, "kubearchive-host", o.KubeArchiveHost, fmt.Sprintf("Host where the KubeArchive API Server is listening. Defaults to '%s'", o.KubeArchiveHost))
+	cmd.Flags().StringVarP(&o.Output, "output", "o", "", "Output format. One of: (json, yaml).")
 
 	return cmd
 }
@@ -90,6 +94,27 @@ func (o *GetOptions) Complete(args []string) error {
 
 	o.RESTConfig = config
 
+	if o.Output != "" {
+		err = o.Validate()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (o *GetOptions) Validate() error {
+	validOutputFormats := []string{"json", "yaml"}
+	o.IsValidOutput = false
+	for _, validOutputFormat := range validOutputFormats {
+		if validOutputFormat == o.Output {
+			o.IsValidOutput = true
+		}
+	}
+	if !o.IsValidOutput {
+		return fmt.Errorf("unable to match a printer suitable for the output format %s, allowed formats are: json, yaml", o.Output)
+	}
 	return nil
 }
 
@@ -145,6 +170,38 @@ func (o *GetOptions) Run() error {
 	var objs []unstructured.Unstructured
 	objs = append(objs, clusterResources...)
 	objs = append(objs, kubearchiveResources...)
+
+	if o.Output != "" {
+		type List struct {
+			Items      []*unstructured.Unstructured `json:"items"`
+			ApiVersion string                       `json:"apiVersion" yaml:"apiVersion"`
+			Kind       string                       `json:"kind"`
+			Metadata   map[string]any               `json:"metadata"`
+		}
+		list := &List{
+			ApiVersion: "v1",
+			Kind:       "List",
+			Metadata:   map[string]any{},
+		}
+		for _, obj := range objs {
+			list.Items = append(list.Items, &obj)
+		}
+		if o.Output == "json" {
+			listData, err := json.MarshalIndent(list, "", "    ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(listData))
+			return nil
+		} else if o.Output == "yaml" {
+			listYaml, err := yaml.Marshal(list)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(listYaml))
+			return nil
+		}
+	}
 
 	for ix := range objs {
 		fmt.Println(objs[ix].GetName())

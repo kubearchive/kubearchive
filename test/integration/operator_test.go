@@ -187,6 +187,10 @@ func TestGlobalAndLocalKAC(t *testing.T) {
 		},
 	}
 
+	t.Cleanup(func() {
+		test.DeleteKAC(t, test.K9eNamespace)
+	})
+
 	clientset, _ := test.GetKubernetesClient(t)
 	port := test.PortForwardApiServer(t, clientset)
 	namespace, token := test.CreateTestNamespace(t, false)
@@ -218,6 +222,4 @@ func TestGlobalAndLocalKAC(t *testing.T) {
 	if retryErr != nil {
 		t.Fatal(retryErr)
 	}
-
-	test.DeleteKAC(t, test.K9eNamespace)
 }

@@ -57,7 +57,7 @@ func TestPagination(t *testing.T) {
 	}
 
 	for i := range 30 {
-		pod.ObjectMeta.SetName("pod-" + strconv.Itoa(i))
+		pod.SetName("pod-" + strconv.Itoa(i))
 		_, err := clientset.CoreV1().Pods(namespaceName).Create(context.Background(), pod, metav1.CreateOptions{})
 		if err != nil {
 			t.Fatal(err)

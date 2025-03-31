@@ -102,7 +102,8 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 
 	logURL, jsonPath, err := c.Database.QueryLogURL(
 		context.Request.Context(), kind, apiVersion, namespace, name)
-	if errors.Is(err, dbErrors.ResourceNotFoundError) {
+
+	if errors.Is(err, dbErrors.ErrResourceNotFound) {
 		abort.Abort(context, err, http.StatusNotFound)
 	}
 	if err != nil {

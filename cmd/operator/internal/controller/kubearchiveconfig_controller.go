@@ -76,7 +76,7 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	finalizerName := "kubearchive.org/finalizer"
 
-	if kaconfig.ObjectMeta.DeletionTimestamp.IsZero() {
+	if kaconfig.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, add the finalizer if necessary.
 		if !controllerutil.ContainsFinalizer(kaconfig, finalizerName) {
 			controllerutil.AddFinalizer(kaconfig, finalizerName)
@@ -687,7 +687,7 @@ func (r *KubeArchiveConfigReconciler) reconcileNamespace(ctx context.Context, ka
 		return nil, err
 	}
 
-	ns.ObjectMeta.Labels[ApiServerSourceLabelName] = ApiServerSourceLabelValue
+	ns.Labels[ApiServerSourceLabelName] = ApiServerSourceLabelValue
 	err = r.Update(ctx, ns)
 	if err != nil {
 		log.Error(err, "Failed to update Namespace "+kaconfig.Namespace)
@@ -709,7 +709,7 @@ func (r *KubeArchiveConfigReconciler) removeNamespaceLabel(ctx context.Context, 
 		return err
 	}
 
-	delete(ns.ObjectMeta.Labels, ApiServerSourceLabelName)
+	delete(ns.Labels, ApiServerSourceLabelName)
 
 	err = r.Update(ctx, ns)
 	if err != nil {

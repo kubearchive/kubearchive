@@ -34,7 +34,7 @@ func TestDatabaseConnection(t *testing.T) {
 	annotations["cnpg.io/fencedInstances"] = "[\"*\"]"
 	resource.SetAnnotations(annotations)
 
-	resource, err = dynclient.Resource(clusterResource).Namespace("postgresql").Update(context.Background(), resource, metav1.UpdateOptions{})
+	_, err = dynclient.Resource(clusterResource).Namespace("postgresql").Update(context.Background(), resource, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,6 +62,9 @@ func TestDatabaseConnection(t *testing.T) {
 		_, e := clientset.CoreV1().Pods("kubearchive").Get(context.Background(), podName, metav1.GetOptions{})
 		return e
 	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// restart sink pod - replicas = 1
 	deploymentScaleSink, err = clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
@@ -80,9 +83,9 @@ func TestDatabaseConnection(t *testing.T) {
 	// wait to sink pod ready and generate connection retries with the database
 	t.Logf("Waiting for sink to be up, and to generate retries with the database")
 	retryErr := retry.Do(func() error {
-		logs, err := test.GetPodLogs(t, "kubearchive", "kubearchive-sink")
-		if err != nil {
-			return err
+		logs, getErr := test.GetPodLogs(t, "kubearchive", "kubearchive-sink")
+		if getErr != nil {
+			return getErr
 		}
 
 		if strings.Contains(logs, "connection refused") {
@@ -105,16 +108,16 @@ func TestDatabaseConnection(t *testing.T) {
 	delete(annotations, "cnpg.io/fencedInstances")
 	resource.SetAnnotations(annotations)
 
-	resource, err = dynclient.Resource(clusterResource).Namespace("postgresql").Update(context.Background(), resource, metav1.UpdateOptions{})
+	_, err = dynclient.Resource(clusterResource).Namespace("postgresql").Update(context.Background(), resource, metav1.UpdateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("Unfenced database")
 
 	retryErr = retry.Do(func() error {
-		logs, err := test.GetPodLogs(t, "kubearchive", "kubearchive-sink")
-		if err != nil {
-			return nil
+		logs, getErr := test.GetPodLogs(t, "kubearchive", "kubearchive-sink")
+		if getErr != nil {
+			return getErr
 		}
 
 		if strings.Contains(logs, "Successfully connected to the database") {
@@ -143,4 +146,7 @@ func TestDatabaseConnection(t *testing.T) {
 		}
 		return errors.New("Sink pod is not in 'Ready' status")
 	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
 }

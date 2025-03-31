@@ -303,8 +303,6 @@ func getUrl(t testing.TB, client *http.Client, token string, url string) ([]byte
 	return body, nil
 }
 
-var logGenMutex sync.Mutex
-
 // Run a job to generate a log. Returns the job name.
 func RunLogGenerator(t testing.TB, namespace string) string {
 	clientset, _ := GetKubernetesClient(t)

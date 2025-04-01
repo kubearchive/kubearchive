@@ -51,13 +51,13 @@ func NewController(
 	}
 	ceProtocol, err := ceOtelObs.NewObservedHTTP()
 	if err != nil {
-		return nil, fmt.Errorf("Could not create controller: %w", err)
+		return nil, fmt.Errorf("could not create controller: %w", err)
 	}
 	controller.ceProtocol = ceProtocol
 	// using context.Background() because the context passed to this function does not get used
 	ceHandler, err := cloudevents.NewHTTPReceiveHandler(context.Background(), ceProtocol, controller.receiveCloudEvent)
 	if err != nil {
-		return nil, fmt.Errorf("Could not create controller: %w", err)
+		return nil, fmt.Errorf("could not create controller: %w", err)
 	}
 	controller.ceHandler = ceHandler
 	return controller, nil
@@ -285,7 +285,7 @@ func (c *Controller) Readyz(ctx *gin.Context) {
 	ns := os.Getenv(namespaceEnvVar)
 	if ns == "" {
 		err = fmt.Errorf(
-			"Could not determine the KubeArchive namespace. Environment variable %s is not set", namespaceEnvVar,
+			"could not determine the KubeArchive namespace. Environment variable %s is not set", namespaceEnvVar,
 		)
 		abort.Abort(ctx, err, http.StatusServiceUnavailable)
 	}

@@ -186,7 +186,7 @@ func main() {
 func getCacheExpirations() (*routers.CacheExpirations, error) {
 	expirationAuthorizedString := os.Getenv(cacheExpirationAuthorizedEnvVar)
 	if expirationAuthorizedString == "" {
-		return nil, fmt.Errorf("The environment variable '%s' should be set.", cacheExpirationAuthorizedEnvVar)
+		return nil, fmt.Errorf("the environment variable '%s' should be set", cacheExpirationAuthorizedEnvVar)
 	}
 
 	expirationAuthorized, err := time.ParseDuration(expirationAuthorizedString)
@@ -196,7 +196,7 @@ func getCacheExpirations() (*routers.CacheExpirations, error) {
 
 	expirationUnauthorizedString := os.Getenv(cacheExpirationUnauthorizedEnvVar)
 	if expirationUnauthorizedString == "" {
-		return nil, fmt.Errorf("The environment variable '%s' should be set.", cacheExpirationUnauthorizedEnvVar)
+		return nil, fmt.Errorf("the environment variable '%s' should be set", cacheExpirationUnauthorizedEnvVar)
 	}
 
 	expirationUnauthorized, err := time.ParseDuration(expirationUnauthorizedString)

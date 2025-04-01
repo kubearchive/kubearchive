@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	dbConnectionErrStr string = "Could not create database connection string: %s must be set"
+	dbConnectionErrStr string = "could not create database connection string: %s must be set"
 
 	DbKindEnvVar     string = "DATABASE_KIND"
 	DbNameEnvVar     string = "DATABASE_DB"

@@ -26,19 +26,19 @@ const (
 func getKubeArchiveLoggingConfig() (map[string]string, error) {
 	loggingDir, exists := os.LookupEnv(files.LoggingDirEnvVar)
 	if !exists {
-		return nil, errors.New("Environment variable not set: " + files.LoggingDirEnvVar)
+		return nil, errors.New("environment variable not set: " + files.LoggingDirEnvVar)
 	}
 	configFiles, err := files.FilesInDir(loggingDir)
 	if err != nil {
-		return nil, fmt.Errorf("Could not read logging config: %w", err)
+		return nil, fmt.Errorf("eould not read logging config: %w", err)
 	}
 	if len(configFiles) == 0 {
-		return nil, errors.New("Logging Config is empty. To configure logging update the kubearchive-logging ConfigMap")
+		return nil, errors.New("logging Config is empty. To configure logging update the kubearchive-logging ConfigMap")
 	}
 
 	loggingConf, err := files.LoggingConfigFromFiles(configFiles)
 	if err != nil {
-		return nil, fmt.Errorf("Could not get value for logging config: %w", err)
+		return nil, fmt.Errorf("could not get value for logging config: %w", err)
 	}
 	return loggingConf, nil
 }
@@ -55,7 +55,7 @@ func NewUrlBuilder() (*UrlBuilder, error) {
 	}
 	_, exists := loggingConf[logurls.LogURL]
 	if !exists {
-		return nil, errors.New("Invalid logging config. The kubearchive-logging ConfigMap must have a key 'LOG_URL'")
+		return nil, errors.New("invalid logging config. The kubearchive-logging ConfigMap must have a key 'LOG_URL'")
 	}
 	// Set CONTAINER_NAME and overwrite it if already defined
 	loggingConf[logurls.ContainerName] = containerNameCel
@@ -66,7 +66,7 @@ func NewUrlBuilder() (*UrlBuilder, error) {
 			celProg, err := ocel.CompileCELExpr(celExpr)
 			if err != nil {
 				return nil, fmt.Errorf(
-					"Cannot create UrlBuilder. CEL expression '%s' does not compile: %w",
+					"cannot create UrlBuilder. CEL expression '%s' does not compile: %w",
 					celExpr,
 					err,
 				)

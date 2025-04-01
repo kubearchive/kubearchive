@@ -18,18 +18,16 @@ linters:
     - wastedassign
   settings:
     staticcheck:
-      checks:
+      checks: # https://staticcheck.dev/docs/checks
         # defaut
         - all
         - -ST1000
         - -ST1003
         - -ST1016
         - -ST1020
-        - -ST1021
         - -ST1022
         # /default
         - -QF1003 # use switch instead of if/ifelse/else
-        - -ST1005 # do not capitalize errors
     govet:
       enable:
         - loopclosure
@@ -39,6 +37,7 @@ linters:
       disable-all: false
   exclusions:
     generated: lax
+    # false positives section
     presets:
       - comments
       - common-false-positives

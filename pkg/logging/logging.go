@@ -23,7 +23,7 @@ func ConfigureLogging() error {
 	var level slog.Level
 	err := level.UnmarshalText([]byte(levelText))
 	if err != nil {
-		return fmt.Errorf("Log level '%s' does not exist", levelText)
+		return fmt.Errorf("log level '%s' does not exist", levelText)
 	}
 
 	slogHandler := slog.NewTextHandler(

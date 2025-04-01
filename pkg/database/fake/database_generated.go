@@ -178,7 +178,7 @@ func (f *fakeDatabase) WriteUrls(_ context.Context, k8sObj *unstructured.Unstruc
 	}
 
 	if k8sObj == nil {
-		return errors.New("Cannot write log urls to the database when k8sObj is nil")
+		return errors.New("cannot write log urls to the database when k8sObj is nil")
 	}
 
 	newLogUrls := make([]LogUrlRow, 0)

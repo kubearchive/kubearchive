@@ -73,7 +73,7 @@ func Start(serviceName string) error {
 		tracerProviderOptions = append(tracerProviderOptions, trace.WithSampler(trace.ParentBased(trace.AlwaysSample())))
 	} else {
 		// "disabled" is not checked in this if/else because the code does not get here when the value is "disabled"
-		return fmt.Errorf("Value '%s' for '%s' not valid. Use 'disabled', 'enabled' or 'delegated'.", otelMode, OtelStartEnvVar)
+		return fmt.Errorf("value '%s' for '%s' not valid. Use 'disabled', 'enabled' or 'delegated'", otelMode, OtelStartEnvVar)
 	}
 
 	tp = trace.NewTracerProvider(tracerProviderOptions...)
@@ -113,7 +113,7 @@ func Start(serviceName string) error {
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
 
 	if os.Getenv(OtelLogsEnvVar) == "true" {
-		slog.Info(fmt.Sprintf("'%s' is set to 'true' so logs will be redirected to the OTLP endpoint.", OtelLogsEnvVar))
+		slog.Info(fmt.Sprintf("'%s' is set to 'true' so logs will be redirected to the OTLP endpoint", OtelLogsEnvVar))
 
 		logger := otelslog.NewLogger("root")
 		slog.SetDefault(logger)
@@ -149,7 +149,7 @@ func FlushSpanBuffer(ctx context.Context) error {
 		return tp.ForceFlush(ctx)
 	}
 
-	return fmt.Errorf("Cannot flush spans. No TracerProvider has been configured.")
+	return fmt.Errorf("cannot flush spans. No TracerProvider has been configured")
 }
 
 // Shutdown shuts down the TracerProvider, any SpanProcessors that have been registered, and exporters associated with
@@ -164,7 +164,7 @@ func Shutdown(ctx context.Context) error {
 		return tp.Shutdown(ctx)
 	}
 
-	return fmt.Errorf("Cannot shutdown TracerProvider. None have been started")
+	return fmt.Errorf("cannot shutdown TracerProvider. None have been started")
 }
 
 func Status() string {

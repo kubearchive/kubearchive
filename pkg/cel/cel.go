@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/decls"
@@ -36,6 +37,16 @@ func CompileCELExpr(expr string) (*cel.Program, error) {
 			decls.NewVariable("metadata", mapStrDyn),
 			decls.NewVariable("spec", mapStrDyn),
 			decls.NewVariable("status", mapStrDyn),
+		),
+		cel.Function("now",
+			cel.Overload("now",
+				[]*cel.Type{},
+				cel.TimestampType,
+				cel.FunctionBinding(func(args ...ref.Val) ref.Val {
+					return types.Timestamp{Time: time.Now()}
+				},
+				),
+			),
 		),
 	)
 	if err != nil {

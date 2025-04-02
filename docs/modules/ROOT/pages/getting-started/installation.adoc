@@ -11,9 +11,9 @@ This document explains how to install and configure KubeArchive in your Kubernet
 
 == Prerequisites
 
-* A PostgreSQL instance protected with TLS (can be self-signed, KubeArchive does not verify it)
+* A PostgreSQL instance (+v16.6) protected with TLS (can be self-signed, KubeArchive does not verify it)
 * CertManager is installed on the Kubernetes cluster (+v1.9.1)
-* Knative Eventing is installed on the Kubernetes cluster (+v1.15.0)
+* Knative Eventing is installed on the Kubernetes cluster (+v1.17.4)
 
 == Prepare the Database
 

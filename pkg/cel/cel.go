@@ -17,17 +17,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// CompileOrCELExpression attempts to compile cel expression strings into a cel.Program. If exprs contains more than one cel
-// expression string, it will surround each cell expression in parentheses and or them together.
-func CompileOrCELExpression(exprs ...string) (*cel.Program, error) {
-	exprs = FormatCelExprs(exprs...)
-	expr := strings.Join(exprs, " || ")
-	return CompileCELExpr(expr)
-}
+var mapStrDyn = types.NewMapType(types.StringType, types.DynType)
+var env *cel.Env
 
-func CompileCELExpr(expr string) (*cel.Program, error) {
-	mapStrDyn := types.NewMapType(types.StringType, types.DynType)
-	env, err := cel.NewEnv(
+func init() {
+	var err error
+	env, err = cel.NewEnv(
 		celext.Strings(),
 		celext.Encoders(),
 		celext.Sets(),
@@ -50,8 +45,19 @@ func CompileCELExpr(expr string) (*cel.Program, error) {
 		),
 	)
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("Error creating CEL environment: %s", err.Error()))
 	}
+}
+
+// CompileOrCELExpression attempts to compile cel expression strings into a cel.Program. If exprs contains more than one cel
+// expression string, it will surround each cell expression in parentheses and or them together.
+func CompileOrCELExpression(exprs ...string) (*cel.Program, error) {
+	exprs = FormatCelExprs(exprs...)
+	expr := strings.Join(exprs, " || ")
+	return CompileCELExpr(expr)
+}
+
+func CompileCELExpr(expr string) (*cel.Program, error) {
 	parsed, issues := env.Parse(expr)
 	if issues != nil && issues.Err() != nil {
 		return nil, issues.Err()

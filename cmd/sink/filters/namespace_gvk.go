@@ -21,9 +21,16 @@ func NamespaceGVKFromObject(obj *unstructured.Unstructured) NamespaceGroupVersio
 	if obj == nil {
 		return ":"
 	}
-	return NamespaceGroupVersionKind(
-		fmt.Sprintf("%s:%s", obj.GetNamespace(), obj.GetObjectKind().GroupVersionKind()),
-	)
+	return NamespaceGVKFromNamespaceAndGvk(obj.GetNamespace(), obj.GetObjectKind().GroupVersionKind())
+}
+
+// GlobalNGVKFromObject returns a NamespaceGroupVersionKind that is based on the kubearchive namespace and the
+// GroupVersionKind of obj.
+func GlobalNGVKFromObject(obj *unstructured.Unstructured) NamespaceGroupVersionKind {
+	if obj == nil {
+		return ":"
+	}
+	return NamespaceGVKFromNamespaceAndGvk(globalKey, obj.GetObjectKind().GroupVersionKind())
 }
 
 // NamespaceGroupVersionKind returns a NamespaceGroupVersionKind from a namespace and GroupVersionKind.

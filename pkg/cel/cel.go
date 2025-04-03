@@ -6,7 +6,6 @@ package cel
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/cel-go/cel"
@@ -49,14 +48,6 @@ func init() {
 	}
 }
 
-// CompileOrCELExpression attempts to compile cel expression strings into a cel.Program. If exprs contains more than one cel
-// expression string, it will surround each cell expression in parentheses and or them together.
-func CompileOrCELExpression(exprs ...string) (*cel.Program, error) {
-	exprs = FormatCelExprs(exprs...)
-	expr := strings.Join(exprs, " || ")
-	return CompileCELExpr(expr)
-}
-
 func CompileCELExpr(expr string) (*cel.Program, error) {
 	parsed, issues := env.Parse(expr)
 	if issues != nil && issues.Err() != nil {
@@ -71,21 +62,6 @@ func CompileCELExpr(expr string) (*cel.Program, error) {
 		return nil, err
 	}
 	return &program, err
-}
-
-// FormatCelExprs takes a []string of cel expression strings and surrounds them with parentheses so that the can be
-// combined into a larger expression. Any empty strings in exprs, are removed from the []string returned.
-func FormatCelExprs(exprs ...string) []string {
-	newExprs := []string{}
-	if len(exprs) < 2 {
-		return exprs
-	}
-	for _, expr := range exprs {
-		if expr != "" {
-			newExprs = append(newExprs, fmt.Sprintf("( %s )", expr))
-		}
-	}
-	return newExprs
 }
 
 // ExecuteBoolean CEL executes the cel program with obj as the input. If the program returns and error or

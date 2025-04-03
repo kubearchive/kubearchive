@@ -99,19 +99,19 @@ func (kaccv *KubeArchiveConfigCustomValidator) validateKAC(kac *KubeArchiveConfi
 	}
 	for _, resource := range kac.Spec.Resources {
 		if resource.ArchiveWhen != "" {
-			_, err := cel.CompileOrCELExpression(resource.ArchiveWhen)
+			_, err := cel.CompileCELExpr(resource.ArchiveWhen)
 			if err != nil {
 				errList = append(errList, err)
 			}
 		}
 		if resource.DeleteWhen != "" {
-			_, err := cel.CompileOrCELExpression(resource.DeleteWhen)
+			_, err := cel.CompileCELExpr(resource.DeleteWhen)
 			if err != nil {
 				errList = append(errList, err)
 			}
 		}
 		if resource.ArchiveOnDelete != "" {
-			_, err := cel.CompileOrCELExpression(resource.ArchiveOnDelete)
+			_, err := cel.CompileCELExpr(resource.ArchiveOnDelete)
 			if err != nil {
 				errList = append(errList, err)
 			}

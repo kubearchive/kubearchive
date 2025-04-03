@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Get kubearchive-renovate Github App Api Token
         id: get_token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v2
         with:
           private-key: ${{ secrets.KUBEARCHIVE_RENOVATE_PRIVATE_KEY }}
           app-id: ${{ secrets.KUBEARCHIVE_RENOVATE_APP_ID }}

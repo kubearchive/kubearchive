@@ -9,7 +9,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,7 +47,6 @@ type LogUrlRow struct {
 }
 
 type fakeDatabase struct {
-	database.DatabaseImpl
 	resources []*unstructured.Unstructured
 	logUrl    []LogUrlRow
 	jsonPath  string
@@ -76,6 +74,10 @@ func NewFakeDatabaseWithUrlError(err error) *fakeDatabase {
 	return &fakeDatabase{resources: resources, logUrl: logUrls, urlErr: err}
 }
 
+func (f *fakeDatabase) Init(_ map[string]string) error {
+	return nil
+}
+
 func (f *fakeDatabase) Ping(_ context.Context) error {
 	return f.err
 }
@@ -96,7 +98,7 @@ func (f *fakeDatabase) QueryLogURL(_ context.Context, _, _, _, _ string) (string
 }
 
 func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namespace, name,
-	continueId, continueDate string, _ *database.LabelFilters, limit int) ([]string, int64, string, error) {
+	continueId, continueDate string, _ *models.LabelFilters, limit int) ([]string, int64, string, error) {
 	var resources []*unstructured.Unstructured
 
 	if name != "" {

@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package database
+package sql
 
 import (
 	"context"
@@ -18,6 +18,7 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
+	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -179,7 +180,7 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 					defer cancel()
 
 					resources, lastId, _, err := tt.database.QueryResources(ctx, podKind, version,
-						"", "", "", "", &LabelFilters{}, 100)
+						"", "", "", "", &models.LabelFilters{}, 100)
 					if ttt.numResources == 0 {
 						assert.Nil(t, resources)
 						assert.Equal(t, int64(0), lastId)
@@ -222,7 +223,7 @@ func TestQueryResources(t *testing.T) {
 					defer cancel()
 
 					resources, _, _, err := tt.database.QueryResources(ctx, podKind, version, namespace,
-						"", "", "", &LabelFilters{}, 100)
+						"", "", "", &models.LabelFilters{}, 100)
 					if ttt.numResources == 0 {
 						assert.Nil(t, resources)
 					} else {
@@ -280,24 +281,24 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 	// The reason behind is that the order of arguments in a map is not deterministic
 	var filterTests = []struct {
 		name         string
-		labelFilters LabelFilters
+		labelFilters models.LabelFilters
 		args         *arrayArg
 	}{
 		{
 			name: "existence", // kubectl get pods -l 'key1, key2'
-			labelFilters: LabelFilters{
+			labelFilters: models.LabelFilters{
 				Exists: []string{"key1", "key2"},
 			},
 		},
 		{
 			name: "not-existence", // kubectl get pods -l '!key1, !key2'
-			labelFilters: LabelFilters{
+			labelFilters: models.LabelFilters{
 				NotExists: []string{"key1", "key2"},
 			},
 		},
 		{
 			name: "equality", // kubectl get pods -l 'key1=value1,key2=value2'
-			labelFilters: LabelFilters{
+			labelFilters: models.LabelFilters{
 				Equals: map[string]string{
 					"key1": "value1",
 					"key2": "value2",
@@ -306,7 +307,7 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 		},
 		{
 			name: "inequality", // kubectl get pods -l 'key1!=value1,key2!=value2'
-			labelFilters: LabelFilters{
+			labelFilters: models.LabelFilters{
 				NotEquals: map[string]string{
 					"key1": "value1",
 					"key2": "value2",
@@ -316,7 +317,7 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 		},
 		{
 			name: "set based", // kubectl get pods -l 'key1 in (value1, value3), key2 in (value2)'
-			labelFilters: LabelFilters{
+			labelFilters: models.LabelFilters{
 				In: map[string][]string{
 					"key1": {"value1", "value3"},
 					"key2": {"value2"},
@@ -326,7 +327,7 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 		},
 		{
 			name: "set not based", // kubectl get pods -l 'key1 notin (value1, value3), key2 notin (value2)'
-			labelFilters: LabelFilters{
+			labelFilters: models.LabelFilters{
 				NotIn: map[string][]string{
 					"key1": {"value1", "value3"},
 					"key2": {"value2"},
@@ -336,7 +337,7 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 		},
 		{
 			name: "all filters", // kubectl get pods -l 'key1, !key2, key3=value3, key4!=value4, key5 in (value5,value6), key6 notin (value6)'
-			labelFilters: LabelFilters{
+			labelFilters: models.LabelFilters{
 				Exists:    []string{"key1"},
 				NotExists: []string{"key2"},
 				Equals:    map[string]string{"key3": "value3"},
@@ -438,7 +439,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 					defer cancel()
 
 					resources, _, _, err := tt.database.QueryResources(ctx, kind, version, namespace, podName,
-						"", "", &LabelFilters{}, 100)
+						"", "", &models.LabelFilters{}, 100)
 					if ttt.numResources == 0 {
 						assert.Empty(t, resources)
 					} else {
@@ -489,7 +490,7 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 				filter := tt.database.getFilter()
 				tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
 
-				file, err := os.Open("testdata/pod-3-containers.json")
+				file, err := os.Open("../testdata/pod-3-containers.json")
 				if err != nil {
 					t.Fatal(err)
 				}

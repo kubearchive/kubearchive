@@ -1,11 +1,11 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package database
+package sql
 
 import (
 	"database/sql"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/XSAM/otelsql"
@@ -15,10 +15,11 @@ import (
 )
 
 func establishConnection(driver, connectionString string) (*sqlx.DB, error) {
+	slog.Info("Establishing database connection")
 	configs := []retry.Option{
 		retry.Attempts(10),
 		retry.OnRetry(func(n uint, err error) {
-			log.Printf("Retry request %d, get error: %v", n+1, err)
+			slog.Warn("Retry request", "retry", n+1, "error", err.Error())
 		}),
 		retry.Delay(time.Second),
 	}
@@ -34,16 +35,16 @@ func establishConnection(driver, connectionString string) (*sqlx.DB, error) {
 		},
 		configs...)
 	if errRetry != nil {
-		log.Printf("Unable to connect to the database, error: %v", errRetry)
+		slog.Error("Unable to connect to the database", "error", errRetry.Error())
 		return nil, errRetry
 	}
 
 	err = otelsql.RegisterDBStatsMetrics(conn, otelsql.WithAttributes(semconv.DBSystemKey.String(driver)))
 	if err != nil {
-		log.Printf("Unable to instrument the DB properly, error: %v", err)
+		slog.Error("Unable to instrument the DB properly", "error", err.Error())
 		return nil, err
 	}
 
-	log.Println("Successfully connected to the database")
+	slog.Info("Successfully connected to the database")
 	return sqlx.NewDb(conn, driver), nil
 }

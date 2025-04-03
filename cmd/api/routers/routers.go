@@ -14,7 +14,9 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/api/discovery"
 	"github.com/kubearchive/kubearchive/cmd/api/pagination"
 	"github.com/kubearchive/kubearchive/pkg/abort"
-	"github.com/kubearchive/kubearchive/pkg/database"
+	dbErrors "github.com/kubearchive/kubearchive/pkg/database/errors"
+	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
+	labelFilter "github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -25,7 +27,7 @@ type CacheExpirations struct {
 }
 
 type Controller struct {
-	Database           database.DBReader
+	Database           interfaces.DBReader
 	CacheConfiguration CacheExpirations
 }
 
@@ -48,7 +50,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 		abort.Abort(context, parserErr, http.StatusBadRequest)
 	}
 	reqs, _ := selector.Requirements()
-	labelFilters, labelFiltersErr := database.NewLabelFilters(reqs)
+	labelFilters, labelFiltersErr := labelFilter.NewLabelFilters(reqs)
 	if labelFiltersErr != nil {
 		abort.Abort(context, labelFiltersErr, http.StatusBadRequest)
 	}
@@ -58,7 +60,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
-	// We send namespace even if it's an empty string (non-namespaced resources) the DatabaseImpl
+	// We send namespace even if it's an empty string (non-namespaced resources) the Database
 	// knows what to do
 	resources, lastId, lastDate, err := c.Database.QueryResources(
 		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters, limit)
@@ -100,7 +102,7 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 
 	logURL, jsonPath, err := c.Database.QueryLogURL(
 		context.Request.Context(), kind, apiVersion, namespace, name)
-	if errors.Is(err, database.ResourceNotFoundError) {
+	if errors.Is(err, dbErrors.ResourceNotFoundError) {
 		abort.Abort(context, err, http.StatusNotFound)
 	}
 	if err != nil {

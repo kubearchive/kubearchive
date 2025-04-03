@@ -16,8 +16,8 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/sink/filters"
 	fakeFilters "github.com/kubearchive/kubearchive/cmd/sink/filters/fake"
 	"github.com/kubearchive/kubearchive/cmd/sink/logs"
-	"github.com/kubearchive/kubearchive/pkg/database"
 	fakeDb "github.com/kubearchive/kubearchive/pkg/database/fake"
+	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/files"
 	"github.com/stretchr/testify/assert"
 	batchv1 "k8s.io/api/batch/v1"
@@ -32,7 +32,7 @@ import (
 
 func setupRouter(
 	t testing.TB,
-	db database.Database,
+	db interfaces.DBWriter,
 	filter filters.Interface,
 	k8sClient dynamic.Interface,
 	builder *logs.UrlBuilder,
@@ -726,7 +726,7 @@ func TestReadyz(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			var db database.Database
+			var db interfaces.DBWriter
 			filter := fakeFilters.NewFilters(nil, nil, nil)
 			builder, _ := logs.NewUrlBuilder()
 			if tt.k8sApiConn {

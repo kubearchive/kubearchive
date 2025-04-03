@@ -56,10 +56,7 @@ Encapsulate the different `DELETE` SQL statement without the `WHERE` clauses.
 
 ==== Additional requirements for new engine
 
-* Add a `Database` to the `RegisteredDatabases` map assigned to a key with the driver name.
-* Add a `DBCreator` constructor function.
-The function receives a map parameter with all the environment variables.
-These are meant to be used in the `GetConnectionString()` method.
+* Add a `Database` implementation to the `RegisteredDatabases` map assigned to a key with the driver name.
 
 === SQL Builder
 
@@ -107,7 +104,7 @@ of the methods that don't depend on specific DBMS functions will be provided.
 Then the DBMS implementation can inherit from the Partials and skip some of the method implementations unless
 overwriting them is required.
 
-=== Currently supported DBMS
+=== Currently supported engines
 
-KubeArchive currently supports `PostgreSQL` and `MariaDB`.
+KubeArchive currently supports the sql engines `PostgreSQL` and `MariaDB`.
 Examples of those implementations can be found in the `pkg/database` go package.

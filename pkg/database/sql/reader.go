@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package database
+package sql
 
 import (
 	"context"
@@ -14,31 +14,14 @@ import (
 	"strings"
 
 	"github.com/huandu/go-sqlbuilder"
-	"github.com/jmoiron/sqlx"
-	"github.com/kubearchive/kubearchive/pkg/database/facade"
+	dbErrors "github.com/kubearchive/kubearchive/pkg/database/errors"
+	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
+	"github.com/kubearchive/kubearchive/pkg/models"
 	corev1 "k8s.io/api/core/v1"
 )
 
-type DBReader interface {
-	QueryResources(ctx context.Context, kind, apiVersion, namespace,
-		name, continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error)
-	QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error)
-	Ping(ctx context.Context) error
-	CloseDB() error
-
-	getSelector() facade.DBSelector
-	getSorter() facade.DBSorter
-	getFilter() facade.DBFilter
-	getFlavor() sqlbuilder.Flavor
-	setConn(*sqlx.DB)
-}
-
-func NewReader() (DBReader, error) {
-	return newDatabase()
-}
-
-func (db *DatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
-	continueId, continueDate string, labelFilters *LabelFilters, limit int) ([]string, int64, string, error) {
+func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
+	continueId, continueDate string, labelFilters *models.LabelFilters, limit int) ([]string, int64, string, error) {
 	sb := db.selector.ResourceSelector()
 	sb.Where(db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion))
 	if namespace != "" {
@@ -82,7 +65,7 @@ type uuidKindDate struct {
 }
 
 // Returns the log url, the json path and an error given a selector builder for a Pod
-func (db *DatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbuilder.SelectBuilder, namespace, name string) (string, string, error) {
+func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbuilder.SelectBuilder, namespace, name string) (string, string, error) {
 	type logURLJsonPath struct {
 		LogURL   string `db:"url"`
 		JsonPath string `db:"json_path"`
@@ -95,7 +78,7 @@ func (db *DatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbuilde
 	}
 
 	if len(podString) == 0 {
-		return "", "", ResourceNotFoundError
+		return "", "", dbErrors.ResourceNotFoundError
 	}
 
 	var pod corev1.Pod
@@ -132,11 +115,11 @@ func (db *DatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbuilde
 	if len(logUrls) >= 1 {
 		return logUrls[0].LogURL, logUrls[0].JsonPath, nil
 	} else {
-		return "", "", ResourceNotFoundError
+		return "", "", dbErrors.ResourceNotFoundError
 	}
 }
 
-func (db *DatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error) {
+func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error) {
 	if kind == "Pod" {
 		sb := db.selector.ResourceSelector()
 		sb = db.sorter.CreationTSAndIDSorter(sb) // If resources are named the same, select the newest
@@ -161,7 +144,7 @@ func (db *DatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, names
 	strQueryPerformer := newQueryPerformer[string](db.db, db.flavor)
 	uuid, err := strQueryPerformer.performSingleRowQuery(ctx, sb)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", "", ResourceNotFoundError
+		return "", "", dbErrors.ResourceNotFoundError
 	}
 
 	if err != nil {
@@ -180,7 +163,7 @@ func (db *DatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, names
 		return "", "", err
 	}
 	if len(pods) == 0 {
-		return "", "", ResourceNotFoundError
+		return "", "", dbErrors.ResourceNotFoundError
 	}
 
 	// Get the most recent pod from owned by the provided resource
@@ -194,7 +177,7 @@ func (db *DatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, names
 	return db.getLogsForPodSelector(ctx, sb, namespace, name)
 }
 
-func (db *DatabaseImpl) getOwnedPodsUuids(ctx context.Context, ownersUuids []string, podUuids []uuidKindDate,
+func (db *sqlDatabaseImpl) getOwnedPodsUuids(ctx context.Context, ownersUuids []string, podUuids []uuidKindDate,
 ) ([]uuidKindDate, error) {
 
 	if len(ownersUuids) == 0 {
@@ -218,7 +201,7 @@ func (db *DatabaseImpl) getOwnedPodsUuids(ctx context.Context, ownersUuids []str
 	}
 }
 
-func (db *DatabaseImpl) performResourceQuery(ctx context.Context, sb *sqlbuilder.SelectBuilder) ([]string, int64, string, error) {
+func (db *sqlDatabaseImpl) performResourceQuery(ctx context.Context, sb *sqlbuilder.SelectBuilder) ([]string, int64, string, error) {
 	type resourceFields struct {
 		Date     string `db:"created_at"`
 		Id       int64  `db:"id"`
@@ -244,10 +227,10 @@ func (db *DatabaseImpl) performResourceQuery(ctx context.Context, sb *sqlbuilder
 	return resources, lastRow.Id, lastRow.Date, nil
 }
 
-func (db *DatabaseImpl) getSelector() facade.DBSelector {
+func (db *sqlDatabaseImpl) getSelector() facade.DBSelector {
 	return db.selector
 }
 
-func (db *DatabaseImpl) getSorter() facade.DBSorter {
+func (db *sqlDatabaseImpl) getSorter() facade.DBSorter {
 	return db.sorter
 }

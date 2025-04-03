@@ -199,7 +199,7 @@ func TestChangeGlobalFilters(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = filters.changeGlobalFilters(cm.Data)
+	err = filters.changeFilters(cm.Data)
 	if err != nil {
 		t.Fatal(err)
 	}

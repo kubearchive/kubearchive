@@ -15,12 +15,14 @@ type DBFilter interface {
 	OwnerFilter(cond sqlbuilder.Cond, ownersUuids []string) string
 	UuidsFilter(cond sqlbuilder.Cond, uuids []string) string
 	UuidFilter(cond sqlbuilder.Cond, uuid string) string
-	ExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string
-	NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string
-	EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string
-	NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string
-	InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string
-	NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string
+
+	ExistsLabelFilter(cond sqlbuilder.Cond, labels []string, clause *sqlbuilder.WhereClause) string
+	NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string, clause *sqlbuilder.WhereClause) string
+	EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string
+	NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string
+	InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string
+	NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string
+
 	ContainerNameFilter(cond sqlbuilder.Cond, containerName string) string
 }
 

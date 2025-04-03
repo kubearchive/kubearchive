@@ -22,10 +22,18 @@ The two pillars of this proposal are:
 
 To add a new DBMS the following interfaces must be implemented:
 
-`DBInterface`::
-Include the methods that should be used by the rest of the KubeArchive application.
-Encapsulates the business logic related to the different read/write database operations:
-`QueryResources`, `WriteResources`, `WriteUrls`, `QueryLogUrls`, etc.
+`DBReader`::
+Include the methods that should be used by KubeArchive API.
+Encapsulates the business logic related to the different read database operations:
+`QueryResources`, `QueryLogUrls`, etc.
+
+`DBWriter`::
+Include the methods that should be used by KubeArchive sink.
+Encapsulates the business logic related to the different write database operations:
+`WriteResources`, `WriteUrls`, etc.
+
+`Database`::
+Composed of `DBReader` and `DBWriter`
 
 `DBCreator`::
 Include the methods `GetDriverName()` and `GetConnectionString()`.
@@ -46,10 +54,9 @@ Encapsulate the different `INSERT` SQL statements.
 `DBDeleter`::
 Encapsulate the different `DELETE` SQL statement without the `WHERE` clauses.
 
-==== Additional requirements for new DBMS
+==== Additional requirements for new engine
 
-* Add a `DBInterface` constructor function to the `RegisteredDatabases` map assigned to a key with the driver name.
-The function receive no parameters.
+* Add a `Database` to the `RegisteredDatabases` map assigned to a key with the driver name.
 * Add a `DBCreator` constructor function.
 The function receives a map parameter with all the environment variables.
 These are meant to be used in the `GetConnectionString()` method.
@@ -88,6 +95,7 @@ track of the different arguments and expressions involved so:
 
 * All the exposed `DBFilter` functions should receive a `Cond` object of a `sqlbuilder` and should be
 used to create the returned expression as a string.
+Some filters that are expected to be more complex also have a `sqlbuilder.WhereClause` as a parameter.
 
 ==== Common code
 

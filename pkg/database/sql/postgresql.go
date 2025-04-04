@@ -15,7 +15,6 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/database/env"
 	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
 	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 )
 
 type postgreSQLCreator struct{}

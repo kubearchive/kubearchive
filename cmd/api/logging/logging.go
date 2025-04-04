@@ -43,7 +43,7 @@ func GetKubeArchiveLoggingCredentials() (map[string]string, error) {
 		return nil, errors.New(errMsg)
 	}
 	if len(configFiles) == 0 {
-		errMsg = "Logging secret is empty. To configure logging update the kubearchive-logging Secret"
+		errMsg = "logging configuration not specified"
 		slog.Warn(errMsg)
 		return nil, errors.New(errMsg)
 	}

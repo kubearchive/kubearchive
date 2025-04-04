@@ -26,7 +26,7 @@ func GenerateLogURLs(ctx context.Context, cm map[string]interface{}, data *unstr
 	urls := []models.LogTuple{}
 	r, err := regexp.Compile(variableRegex)
 	if err != nil {
-		return urls, fmt.Errorf("Could not compile Regex: %w", err)
+		return urls, fmt.Errorf("could not compile Regex: %w", err)
 	}
 	// Generate a new map with any CEL expressions evaluated.
 	m := make(map[string]interface{})

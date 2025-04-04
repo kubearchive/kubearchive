@@ -189,19 +189,19 @@ func GetPodLogs(t testing.TB, namespace, podPrefix string) (logs string, err err
 
 	podName := GetPodName(t, clientset, namespace, podPrefix)
 	if podName == "" {
-		return "", fmt.Errorf("Unable to find pod with prefix '%s'", podPrefix)
+		return "", fmt.Errorf("unable to find pod with prefix '%s'", podPrefix)
 	}
 
 	req := clientset.CoreV1().Pods("kubearchive").GetLogs(podName, &corev1.PodLogOptions{})
 	logStream, err := req.Stream(context.TODO())
 	if err != nil {
-		return "", fmt.Errorf("Could not get logs for pod '%s' in the '%s' namespace: %w", podName, namespace, err)
+		return "", fmt.Errorf("could not get logs for pod '%s' in the '%s' namespace: %w", podName, namespace, err)
 	}
 
 	buf := new(bytes.Buffer)
 	_, err = buf.ReadFrom(logStream)
 	if err != nil {
-		return "", fmt.Errorf("Could not process ReadFrom the stream: %w", err)
+		return "", fmt.Errorf("could not process ReadFrom the stream: %w", err)
 	}
 	logBytes := buf.Bytes()
 	logs = string(logBytes)
@@ -302,8 +302,6 @@ func getUrl(t testing.TB, client *http.Client, token string, url string) ([]byte
 
 	return body, nil
 }
-
-var logGenMutex sync.Mutex
 
 // Run a job to generate a log. Returns the job name.
 func RunLogGenerator(t testing.TB, namespace string) string {
@@ -470,7 +468,7 @@ func DeleteKAC(t testing.TB, namespace string) {
 		}
 		_, exists := sinkFilters.Data[namespace]
 		if exists {
-			return fmt.Errorf("Sink filters ConfigMap still has filters for namespace '%s'", namespace)
+			return fmt.Errorf("sink filters ConfigMap still has filters for namespace '%s'", namespace)
 		}
 		return nil
 	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))

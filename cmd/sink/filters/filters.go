@@ -213,7 +213,7 @@ func (f *Filters) Update() (UpdateStopper, error) {
 	}
 	retryWatcher, err := toolsWatch.NewRetryWatcherWithContext(context.Background(), "1", &cache.ListWatch{WatchFunc: watcher})
 	if err != nil {
-		return noopUpdateStopper, fmt.Errorf("Could not create a watcher for the %s ConfigMap: %s", filtersCmName, err)
+		return noopUpdateStopper, fmt.Errorf("could not create a watcher for the %s ConfigMap: %s", filtersCmName, err)
 	}
 	go f.handleUpdates(retryWatcher)
 	return retryWatcher.Stop, nil
@@ -227,7 +227,7 @@ func (f *Filters) handleUpdates(watcher watch.Interface) {
 			slog.Info("Received watch event of type. Updating filters", "event type", string(event.Type))
 			configMap, ok := event.Object.(*corev1.ConfigMap)
 			if !ok {
-				slog.Error("Could not convert object from the event to a ConfigMap")
+				slog.Error("could not convert object from the event to a ConfigMap")
 				continue
 			}
 			err := f.changeGlobalFilters(configMap.Data)

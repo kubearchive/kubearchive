@@ -316,7 +316,7 @@ func TestWriteUrls(t *testing.T) {
 			jsonPath:       jsonPath,
 			newUrls:        newUrls,
 			expected:       testLogUrls,
-			error:          errors.New("Cannot write log urls to the database when k8sObj is nil"),
+			error:          errors.New("cannot write log urls to the database when k8sObj is nil"),
 		},
 		{
 			name:           "WriteUrls fails when urlErr is not nil",

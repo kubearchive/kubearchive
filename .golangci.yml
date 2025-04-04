@@ -1,25 +1,53 @@
 # Copyright KubeArchive Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
+version: '2'
 run:
-  timeout: 10m
+  build-tags:
+    - integration
 linters:
   enable:
     - bodyclose
     - containedctx
     - fatcontext
-    - goimports
     - gosec
     - nilerr
     - nilnil
+    - unparam
     - usestdlibvars
     - wastedassign
-    - unparam
-linters-settings:
-  govet:
-    enable-all: false
-    disable-all: false
-    enable:
-      - loopclosure
-      - nilness
-      - shadow
+  settings:
+    staticcheck:
+      checks: # https://staticcheck.dev/docs/checks
+        - all
+        - -ST1000 # Incorrect or missing package comment
+        - -ST1003 # Poorly chosen identifier
+        - -QF1003 # use switch instead of if/ifelse/else
+    govet:
+      enable:
+        - loopclosure
+        - nilness
+        - shadow
+      enable-all: false
+      disable-all: false
+  exclusions:
+    generated: lax
+    # false positives section
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

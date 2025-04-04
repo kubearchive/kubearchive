@@ -64,7 +64,7 @@ func (db *sqlDatabaseImpl) WriteUrls(
 	// The sink performs checks before WriteUrls is called, which currently make it not possible for this check to
 	// evaluate to true during normal program execution. This check is here purely as a safeguard.
 	if k8sObj == nil {
-		return errors.New("Cannot write log urls to the database when k8sObj is nil")
+		return errors.New("cannot write log urls to the database when k8sObj is nil")
 	}
 
 	tx, err := db.db.BeginTx(ctx, nil)

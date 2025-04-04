@@ -78,7 +78,7 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 	}
 
 	if len(podString) == 0 {
-		return "", "", dbErrors.ResourceNotFoundError
+		return "", "", dbErrors.ErrResourceNotFound
 	}
 
 	var pod corev1.Pod
@@ -115,7 +115,7 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 	if len(logUrls) >= 1 {
 		return logUrls[0].LogURL, logUrls[0].JsonPath, nil
 	} else {
-		return "", "", dbErrors.ResourceNotFoundError
+		return "", "", dbErrors.ErrResourceNotFound
 	}
 }
 
@@ -144,7 +144,7 @@ func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, na
 	strQueryPerformer := newQueryPerformer[string](db.db, db.flavor)
 	uuid, err := strQueryPerformer.performSingleRowQuery(ctx, sb)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", "", dbErrors.ResourceNotFoundError
+		return "", "", dbErrors.ErrResourceNotFound
 	}
 
 	if err != nil {
@@ -163,7 +163,7 @@ func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, na
 		return "", "", err
 	}
 	if len(pods) == 0 {
-		return "", "", dbErrors.ResourceNotFoundError
+		return "", "", dbErrors.ErrResourceNotFound
 	}
 
 	// Get the most recent pod from owned by the provided resource

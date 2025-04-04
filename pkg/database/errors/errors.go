@@ -5,4 +5,4 @@ package errors
 
 import "errors"
 
-var ResourceNotFoundError = errors.New("resource not found")
+var ErrResourceNotFound = errors.New("resource not found")

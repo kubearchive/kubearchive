@@ -45,7 +45,7 @@ func main() {
 		prMap := pr.(map[string]any)
 		kinds, ok := prMap["kinds"]
 		if !ok {
-			errs = errors.Join(fmt.Errorf("PR '%v' does not have 'kind/*' labels, please add one.", prMap["pr_number"]), errs)
+			errs = errors.Join(fmt.Errorf("pull request '%v' does not have 'kind/*' labels, please add one", prMap["pr_number"]), errs)
 			continue
 		}
 

@@ -1,0 +1,27 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: "Check labels of the Pull Request"
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - labeled
+      - unlabeled
+
+jobs:
+  setup:
+    uses: ./.github/workflows/log_run_details.yml
+  check-labels:
+    permissions:
+      pull-requests: read
+    runs-on: ubuntu-latest
+    name: Check if required labels are assigned to the PR
+    steps:
+      - name: Check labels
+        id: check-labels
+        uses: docker://agilepathway/pull-request-label-checker:latest
+        with:
+          one_of: kind/feature,kind/bug,kind/documentation
+          repo_token: ${{ secrets.GITHUB_TOKEN }}

@@ -126,7 +126,7 @@ func TestGetCacheExpirationsErrorPaths(t *testing.T) {
 			name:                   "AUTH not set",
 			authExpirationString:   "",
 			unauthExpirationString: "",
-			errorContains:          "CACHE_EXPIRATION_AUTHORIZED' should be set.",
+			errorContains:          "CACHE_EXPIRATION_AUTHORIZED' should be set",
 		},
 		{
 			name:                   "AUTH wrong",
@@ -138,7 +138,7 @@ func TestGetCacheExpirationsErrorPaths(t *testing.T) {
 			name:                   "UNAUTH not set",
 			authExpirationString:   "10s",
 			unauthExpirationString: "",
-			errorContains:          "CACHE_EXPIRATION_UNAUTHORIZED' should be set.",
+			errorContains:          "CACHE_EXPIRATION_UNAUTHORIZED' should be set",
 		},
 		{
 			name:                   "UNAUTH wrong",

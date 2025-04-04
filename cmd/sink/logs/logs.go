@@ -30,10 +30,10 @@ func getKubeArchiveLoggingConfig() (map[string]string, error) {
 	}
 	configFiles, err := files.FilesInDir(loggingDir)
 	if err != nil {
-		return nil, fmt.Errorf("eould not read logging config: %w", err)
+		return nil, fmt.Errorf("could not read logging config: %w", err)
 	}
 	if len(configFiles) == 0 {
-		return nil, errors.New("logging Config is empty. To configure logging update the kubearchive-logging ConfigMap")
+		return nil, errors.New("no logging configuration specified")
 	}
 
 	loggingConf, err := files.LoggingConfigFromFiles(configFiles)

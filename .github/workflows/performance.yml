@@ -6,7 +6,7 @@ run-name: Performance Tests
 on:
   workflow_dispatch:
   schedule:
-    - cron: "00 03 * * *"  # 3 AM UTC
+    - cron: "00 03 * * *" # 3 AM UTC
 permissions:
   contents: read
   pull-requests: read
@@ -40,7 +40,7 @@ jobs:
           sudo swapoff -a
           sudo rm -f /swapfile
 
-          curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.21.0/kind-$(uname)-amd64
+          curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.26.0/kind-$(uname)-amd64
           chmod +x ./kind
           sudo mv kind /usr/local/bin
       - name: Install ko

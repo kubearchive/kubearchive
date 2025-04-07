@@ -1,0 +1,73 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: "Set up PR"
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+
+jobs:
+  setup:
+    uses: ./.github/workflows/log_run_details.yml
+  copy-labels:
+    permissions:
+      issues: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    name: Copy labels from linked issues
+    steps:
+      - name: Copy labels
+        id: copy-labels
+        uses: michalvankodev/copy-issue-labels@v1.3.0
+        with:
+          repo-token: ${{ secrets.PR_LABELS_TOKEN }}
+  add-assignee:
+    permissions:
+      pull-requests: write
+    runs-on: ubuntu-latest
+    name: Add assignee to the PR
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v2
+      - name: Add assignee to the PR
+        id: add-assignee
+        if: ${{ github.event.pull_request.assignee == null }}
+        run: gh pr edit ${PR_ID} --add-assignee ${AUTHOR}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_ID: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+  check-issue-linked:
+    permissions:
+      pull-requests: read
+    runs-on: ubuntu-latest
+    name: Check issue linked to PR
+    steps:
+      - name: Get linked issues
+        id: get-linked-issues
+        run: |
+          REPO=$(echo ${{ github.repository }} | cut -d'/' -f2)
+          QUERY=$(cat <<EOF
+          {
+            repository(owner:"${OWNER}", name:"${REPO}") {
+              pullRequest(number: ${PR_ID}) {
+                closingIssuesReferences(first: 10) {
+                  totalCount
+                }
+              }
+            }
+          }
+          EOF
+          )
+          ISSUE_COUNT=$(gh api graphql -f query="$QUERY" --jq '.data.repository.pullRequest.closingIssuesReferences.totalCount')
+          echo "issue_count=$ISSUE_COUNT" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          PR_ID: ${{ github.event.pull_request.number }}
+      - name: Fail if no issue
+        id: fail-if-no-issue
+        if: env.issue_count == '0'
+        run: echo "No linked issues found. Please link an issue to this PR" && exit 1

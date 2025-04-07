@@ -1,0 +1,14 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+assign:
+  area/ci: ['maruiz93', 'rh-hemartin']
+  area/database: ['mafh314']
+  area/deployment: ['rh-hemartin', 'skoved']
+  area/metrics: ['skoved']
+  area/performance: ['rh-hemartin']
+  area/release: ['rh-hemartin']
+  component/api: ['maruiz93']
+  component/cli: ['maruiz93', 'rh-hemartin']
+  component/operator: ['ggallen']
+  component/sink: ['skoved']

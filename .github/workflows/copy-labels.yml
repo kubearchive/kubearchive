@@ -30,7 +30,7 @@ jobs:
     name: Add assignee to the PR
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Add assignee to the PR
         id: add-assignee
         if: ${{ github.event.pull_request.assignee == null }}

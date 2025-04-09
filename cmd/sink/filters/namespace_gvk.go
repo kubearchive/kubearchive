@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/google/cel-go/cel"
+	"github.com/kubearchive/kubearchive/pkg/constants"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -30,7 +31,7 @@ func GlobalNGVKFromObject(obj *unstructured.Unstructured) NamespaceGroupVersionK
 	if obj == nil {
 		return ":"
 	}
-	return NamespaceGVKFromNamespaceAndGvk(globalKey, obj.GetObjectKind().GroupVersionKind())
+	return NamespaceGVKFromNamespaceAndGvk(constants.SinkFiltersGlobalNamespace, obj.GetObjectKind().GroupVersionKind())
 }
 
 // NamespaceGroupVersionKind returns a NamespaceGroupVersionKind from a namespace and GroupVersionKind.

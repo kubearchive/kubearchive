@@ -22,8 +22,12 @@ If this change has user-visible impact, write a release note in the block
 below. Include the string "action required" if additional action is required of
 users switching to the new release, for example in case of a breaking change.
 
-Write as if you are speaking to users, not other KubeArchive contributors. If this
-change has no user-visible impact, leave the code block as is.
+Write as if you are speaking to users, not other KubeArchive contributors.
+If this change has no user-visible impact, leave the code block as is.
+
+See
+https://kubearchive.github.io/kubearchive/main/contributors/release.html#_writing_release_notes
+for guidelines on how to write Release Notes.
 -->
 
 ```release-note

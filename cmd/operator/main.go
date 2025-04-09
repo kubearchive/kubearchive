@@ -116,6 +116,9 @@ func main() {
 
 	cacheOptions := crcache.Options{
 		ByObject: map[client.Object]crcache.ByObject{
+			&kubearchiveapi.ClusterKubeArchiveConfig{}: {
+				Label: k8slabels.Everything(),
+			},
 			&kubearchiveapi.KubeArchiveConfig{}: {
 				Namespaces: make(map[string]crcache.Config),
 				Label:      k8slabels.Everything(),
@@ -170,12 +173,26 @@ func main() {
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 		Mapper: mgr.GetRESTMapper(),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupKubeArchiveConfigWithManager(mgr); err != nil {
 		slog.Error("unable to create controller", "controller", "KubeArchiveConfig", "err", err)
 		os.Exit(1)
 	}
+
+	if err = (&controller.ClusterKubeArchiveConfigReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Mapper: mgr.GetRESTMapper(),
+	}).SetupClusterKubeArchiveConfigWithManager(mgr); err != nil {
+		slog.Error("unable to create controller", "controller", "ClusterKubeArchiveConfig", "err", err)
+		os.Exit(1)
+	}
+
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = kubearchiveapi.SetupWebhookWithManager(mgr); err != nil {
+		if err = kubearchiveapi.SetupCKACWebhookWithManager(mgr); err != nil {
+			slog.Error("unable to create webhook", "webhook", "ClusterKubeArchiveConfig", "err", err)
+			os.Exit(1)
+		}
+		if err = kubearchiveapi.SetupKACWebhookWithManager(mgr); err != nil {
 			slog.Error("unable to create webhook", "webhook", "KubeArchiveConfig", "err", err)
 			os.Exit(1)
 		}

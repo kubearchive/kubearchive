@@ -81,6 +81,48 @@ NONE
 
 This code block is included in KubeArchive's Pull Request template.
 
+=== Writing Release Notes
+
+The Release Notes should comply with the following rules:
+
+* They should be clear for users that install and operate KubeArchive but that did
+not look at the source code.
+* They are capitalized and start with a verb in the present tense. Often the verb
+will be "Adds", "Fixes", "Changes".
+* They should not mention specific internal implementation details. For example do
+not mention method names. They can mention KubeArchive's components: Sink, API and
+Operator. They can mention external specific details, for example a configuration key.
+
+=== Examples of Release Notes
+
+* Adds [pprof](https://pkg.go.dev/net/http/pprof) endpoints enabled by default.
+* Changes the default log returned from the first container to the one specified in
+the annotation `kubectl.kubernetes.io/default-container`.
+* Adds optional [labelSelector](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/)
+query parameter in most of the API endpoints.
+* Adds documentation about how to support a new database.
+* Adds retries when resource updates are not processed correctly.
+* Fixes a bug where resource updates were always rejected, causing performance problems.
+* Improves API speed when requesting resources cluster-wide.
+
+=== Examples of Bad Release notes
+
+* Adds [pprof](https://pkg.go.dev/net/http/pprof) endpoints enabled by default controlled
+by the environment variable `KUBEARCHIVE_ENABLE_PPROF`. Endpoints are on different ports
+for each KubeArchive's Component (KubeArchive Operator 8082, KubeArchive Sink 80,
+KubeArchive API 8081). The endpoint is `/debug/pprof/` for all of them. Use it with `curl`
+or directly with `go tool pprof -http :8083 http://localhost:8080/debug/pprof/heap`.
+Implementation is in `pkg/observability/pprof.go`.
+** This release note is useful but questionably long,
+it gives too much detail which means that it probably needs a dedicated documentation
+page, it also mentions too many technical details.
+* KubeArchive had a bug where resource updates were always rejected, causing
+performance problems. This was in the method `receiveCloudEvent` on the Sink. It was wrong
+because it was returning an HTTP code that was not aligned with CloudEvents implementation.
+** This release note mentions method names and has superfluous wording as "KubeArchive had a bug"
+instead of directly "Fixes a bug", "It was wrong because it was returning..." instead of "The Sink
+returned a wrong HTTP Code".
+
 == Steps
 
 . Merge the changes needed into `main`.

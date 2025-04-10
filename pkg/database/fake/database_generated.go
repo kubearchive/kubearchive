@@ -9,6 +9,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -84,6 +85,10 @@ func (f *fakeDatabase) Ping(_ context.Context) error {
 
 func (f *fakeDatabase) TestConnection(_ map[string]string) error {
 	return f.err
+}
+
+func (f *fakeDatabase) QueryDatabaseSchemaVersion(ctx context.Context) (string, error) {
+	return database.CurrentDatabaseSchemaVersion, nil
 }
 
 func (f *fakeDatabase) queryResources(_ context.Context, kind, version, _, _ string, _ int) []*unstructured.Unstructured {

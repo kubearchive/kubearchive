@@ -21,7 +21,7 @@ type DBReader interface {
 }
 
 type DBWriter interface {
-	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, lastUpdated time.Time) error
+	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, lastUpdated time.Time) (bool, error)
 	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error
 	Ping(ctx context.Context) error
 	CloseDB() error

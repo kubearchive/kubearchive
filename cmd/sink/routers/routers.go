@@ -24,6 +24,8 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/kubearchive/kubearchive/pkg/observability"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	corev1 "k8s.io/api/core/v1"
 	errs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -114,7 +116,8 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 	lastUpdateTs := k8s.GetLastUpdateTs(obj)
 	dbCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
-	err := c.Db.WriteResource(dbCtx, obj, event.Data(), lastUpdateTs)
+
+	inserted, err := c.Db.WriteResource(dbCtx, obj, event.Data(), lastUpdateTs)
 	if err != nil {
 		slog.Error(
 			"Failed to write object from cloudevent to the database",
@@ -137,6 +140,13 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 		"namespace", obj.GetNamespace(),
 		"name", obj.GetName(),
 	)
+
+	if inserted {
+		observability.ArchivedResources.Add(
+			ctx, 1, metric.WithAttributes(attribute.String("kind", obj.GetKind())),
+		)
+	}
+
 	// only write logs for k8s resources likes pods that have them and UrlBuilder is configured
 	if c.LogUrlBuilder != nil && strings.ToLower(obj.GetKind()) == "pod" {
 		err = c.writeLogs(ctx, obj)

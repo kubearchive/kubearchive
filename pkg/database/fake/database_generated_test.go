@@ -408,7 +408,7 @@ func TestWriteResources(t *testing.T) {
 			} else {
 				db = NewFakeDatabase([]*unstructured.Unstructured{}, []LogUrlRow{}, "$.")
 			}
-			err := db.WriteResource(context.Background(), tt.obj, tt.data, time.Now())
+			_, err := db.WriteResource(context.Background(), tt.obj, tt.data, time.Now())
 			if tt.err != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tt.err, err)

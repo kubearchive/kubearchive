@@ -164,12 +164,12 @@ func (f *fakeDatabase) filterResourceByKindApiVersionNamespaceAndName(kind, apiV
 	return filteredResources
 }
 
-func (f *fakeDatabase) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte, _ time.Time) error {
+func (f *fakeDatabase) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte, _ time.Time) (bool, error) {
 	if f.err != nil {
-		return f.err
+		return false, f.err
 	}
 	f.resources = append(f.resources, k8sObj)
-	return nil
+	return true, nil
 }
 
 func (f *fakeDatabase) WriteUrls(_ context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error {

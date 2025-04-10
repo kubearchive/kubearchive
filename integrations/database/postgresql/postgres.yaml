@@ -12,12 +12,6 @@ spec:
     # columns: connection-type database user address auth-options
     pg_hba:
       - hostnossl  all  all  all  reject
-  bootstrap:
-    initdb:
-      database: kubearchive
-      secret:
-        name: kubearchive-user
-      owner: kubearchive
   enableSuperuserAccess: true
   imageName: ghcr.io/cloudnative-pg/postgresql:16.6
   storage:

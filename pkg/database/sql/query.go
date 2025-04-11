@@ -11,24 +11,24 @@ import (
 )
 
 type queryPerformer[T any] struct {
-	db     *sqlx.DB
-	flavor sqlbuilder.Flavor
+	querier sqlx.QueryerContext
+	flavor  sqlbuilder.Flavor
 }
 
-func newQueryPerformer[T any](db *sqlx.DB, flavor sqlbuilder.Flavor) queryPerformer[T] {
-	return queryPerformer[T]{db, flavor}
+func newQueryPerformer[T any](querier sqlx.QueryerContext, flavor sqlbuilder.Flavor) queryPerformer[T] {
+	return queryPerformer[T]{querier, flavor}
 }
 
 func (q queryPerformer[T]) performSingleRowQuery(ctx context.Context, builder sqlbuilder.Builder) (T, error) {
 	var t T
 	query, args := builder.BuildWithFlavor(q.flavor)
-	err := q.db.GetContext(ctx, &t, query, args...)
+	err := sqlx.GetContext(ctx, q.querier, &t, query, args...)
 	return t, err
 }
 
 func (q queryPerformer[T]) performQuery(ctx context.Context, builder sqlbuilder.Builder) ([]T, error) {
 	var res []T
 	query, args := builder.BuildWithFlavor(q.flavor)
-	err := q.db.SelectContext(ctx, &res, query, args...)
+	err := sqlx.SelectContext(ctx, q.querier, &res, query, args...)
 	return res, err
 }

@@ -4,8 +4,10 @@
 package sql
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -14,7 +16,9 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/kubearchive/kubearchive/pkg/database/env"
 	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
+	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/lib/pq"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type postgreSQLCreator struct{}
@@ -165,11 +169,51 @@ func (postgreSQLInserter) ResourceInserter(
 		"WHERE resource.cluster_updated_ts < $?",
 		clusterUpdatedTs,
 	)))
+	ib.Returning("(xmax = 0) AS inserted")
 	return ib
 }
 
 type postgreSQLDatabase struct {
 	*sqlDatabaseImpl
+}
+
+func (db *postgreSQLDatabase) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, lastUpdated time.Time) (bool, error) {
+	tx, err := db.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)
+	}
+	inserter := db.inserter.ResourceInserter(
+		string(k8sObj.GetUID()),
+		k8sObj.GetAPIVersion(),
+		k8sObj.GetKind(),
+		k8sObj.GetName(),
+		k8sObj.GetNamespace(),
+		k8sObj.GetResourceVersion(),
+		lastUpdated,
+		models.OptionalTimestamp(k8sObj.GetDeletionTimestamp()),
+		data,
+	)
+
+	boolQueryPerformer := newQueryPerformer[bool](tx, db.flavor)
+	inserted, execErr := boolQueryPerformer.performSingleRowQuery(ctx, inserter)
+
+	if execErr != nil && !errors.Is(execErr, sql.ErrNoRows) {
+		rollbackErr := tx.Rollback()
+		if rollbackErr != nil {
+			return false, fmt.Errorf("write to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
+		}
+		return false, fmt.Errorf("write to database failed: %s", execErr)
+	}
+	execErr = tx.Commit()
+	if execErr != nil {
+		rollbackErr := tx.Rollback()
+		if rollbackErr != nil {
+			return false, fmt.Errorf("commit to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
+		}
+		return false, fmt.Errorf("commit to database failed and the transactions was rolled back: %s", execErr)
+	}
+
+	return inserted, nil
 }
 
 func NewPostgreSQLDatabase() *postgreSQLDatabase {

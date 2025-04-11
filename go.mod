@@ -40,7 +40,7 @@ require (
 	k8s.io/api v0.33.0-rc.0
 	k8s.io/apimachinery v0.33.0-rc.0
 	k8s.io/cli-runtime v0.32.3
-	k8s.io/client-go v0.33.0-beta.0
+	k8s.io/client-go v0.33.0-rc.0
 	k8s.io/klog/v2 v2.130.1
 	knative.dev/eventing v0.44.4
 	knative.dev/pkg v0.0.0-20250411024212-b9bfb4527367
@@ -98,7 +98,7 @@ require (
 	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.1 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect

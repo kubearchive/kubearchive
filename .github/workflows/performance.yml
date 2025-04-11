@@ -44,7 +44,7 @@ jobs:
           chmod +x ./kind
           sudo mv kind /usr/local/bin
       - name: Install ko
-        uses: ko-build/setup-ko@v0.8
+        uses: ko-build/setup-ko@v0.9
       - name: Create KinD cluster
         run: kind create cluster
       - name: Install KubeArchive

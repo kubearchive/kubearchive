@@ -11,15 +11,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestKubeArchiveConfigCustomDefaulter(t *testing.T) {
-	defaulter := KubeArchiveConfigCustomDefaulter{}
-	kac := &KubeArchiveConfig{}
+func TestClusterKubeArchiveConfigCustomDefaulter(t *testing.T) {
+	defaulter := ClusterKubeArchiveConfigCustomDefaulter{}
+	kac := &ClusterKubeArchiveConfig{}
 	err := defaulter.Default(context.Background(), kac)
 	assert.NoError(t, err)
-	assert.Equal(t, KubeArchiveConfigSpec{Resources: nil}, kac.Spec)
+	assert.Equal(t, ClusterKubeArchiveConfigSpec{Resources: nil}, kac.Spec)
 }
 
-func TestKubeArchiveConfigValidateName(t *testing.T) {
+func TestClusterKubeArchiveConfigValidateName(t *testing.T) {
 	k9eResourceName := "kubearchive"
 	tests := []struct {
 		name      string
@@ -37,11 +37,11 @@ func TestKubeArchiveConfigValidateName(t *testing.T) {
 			validated: false,
 		},
 	}
-	validator := KubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
+	validator := ClusterKubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create resource
-			kac := &KubeArchiveConfig{ObjectMeta: metav1.ObjectMeta{Name: test.kacName}}
+			kac := &ClusterKubeArchiveConfig{ObjectMeta: metav1.ObjectMeta{Name: test.kacName}}
 			warns, err := validator.ValidateCreate(context.Background(), kac)
 			assert.Nil(t, warns)
 			if test.validated {
@@ -50,7 +50,7 @@ func TestKubeArchiveConfigValidateName(t *testing.T) {
 				assert.Errorf(t, err, "invalid resource name %s", test.kacName)
 			}
 			// Update resource
-			warns, err = validator.ValidateUpdate(context.Background(), &KubeArchiveConfig{}, kac)
+			warns, err = validator.ValidateUpdate(context.Background(), &ClusterKubeArchiveConfig{}, kac)
 			assert.Nil(t, warns)
 			if test.validated {
 				assert.NoError(t, err)
@@ -65,7 +65,7 @@ func TestKubeArchiveConfigValidateName(t *testing.T) {
 	}
 }
 
-func TestKubeArchiveConfigValidateCELExpression(t *testing.T) {
+func TestClusterKubeArchiveConfigValidateCELExpression(t *testing.T) {
 	k9eResourceName := "kubearchive"
 	invalid := "status.state *^ Completed'"
 	valid := "status.state == 'Completed'"
@@ -112,13 +112,13 @@ func TestKubeArchiveConfigValidateCELExpression(t *testing.T) {
 			validated:       true,
 		},
 	}
-	validator := KubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
+	validator := ClusterKubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create resource
-			kac := &KubeArchiveConfig{
+			kac := &ClusterKubeArchiveConfig{
 				ObjectMeta: metav1.ObjectMeta{Name: k9eResourceName},
-				Spec: KubeArchiveConfigSpec{
+				Spec: ClusterKubeArchiveConfigSpec{
 					Resources: []KubeArchiveConfigResource{
 						{
 							ArchiveWhen:     test.archiveWhen,
@@ -135,7 +135,7 @@ func TestKubeArchiveConfigValidateCELExpression(t *testing.T) {
 				assert.Contains(t, err.Error(), "Syntax error")
 			}
 			// Update resource
-			warns, err = validator.ValidateUpdate(context.Background(), &KubeArchiveConfig{}, kac)
+			warns, err = validator.ValidateUpdate(context.Background(), &ClusterKubeArchiveConfig{}, kac)
 			assert.Nil(t, warns)
 			if test.validated {
 				assert.NoError(t, err)

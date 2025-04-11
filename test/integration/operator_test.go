@@ -20,7 +20,6 @@ import (
 )
 
 const (
-	a13eName    = test.KACName + "-a13e"
 	sinkName    = test.KACName + "-sink"
 	filtersName = "sink-filters"
 )
@@ -48,6 +47,12 @@ func TestKACs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			namespace, _ := test.CreateTestNamespace(t, false)
 
+			t.Cleanup(func() {
+				// Delete any created API server source created.
+				_, dynaclient := test.GetKubernetesClient(t)
+				gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
+				_ = dynaclient.Resource(gvr).Namespace(test.K9eNamespace).Delete(context.Background(), test.A13eName, metav1.DeleteOptions{})
+			})
 			test.CreateKAC(t, namespace, values.resources)
 			checkResourcesAfterApply(t, namespace, name, values.applyNS)
 			test.DeleteKAC(t, namespace)
@@ -63,7 +68,7 @@ func checkResourcesAfterApply(t testing.TB, namespace string, testName string, a
 
 	err := retry.Do(func() error {
 		gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
-		_, getErr := dynaclient.Resource(gvr).Namespace(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
+		_, getErr := dynaclient.Resource(gvr).Namespace(test.K9eNamespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
 		if testName == "emptyKAC" {
 			if !errs.IsNotFound(getErr) {
 				return errors.New("Unexpectedly found an ApiServerSource.")
@@ -79,15 +84,15 @@ func checkResourcesAfterApply(t testing.TB, namespace string, testName string, a
 		} else if len(cm.Data) != applyNS {
 			return fmt.Errorf("Found %d namespaces in ConfigMap, expected %d", len(cm.Data), applyNS)
 		}
-		_, getErr = clientset.CoreV1().ServiceAccounts(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
+		_, getErr = clientset.CoreV1().ServiceAccounts(test.K9eNamespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
 		}
-		_, getErr = clientset.RbacV1().ClusterRoles().Get(context.Background(), a13eName, metav1.GetOptions{})
+		_, getErr = clientset.RbacV1().ClusterRoles().Get(context.Background(), test.A13eName, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
 		}
-		_, getErr = clientset.RbacV1().RoleBindings(namespace).Get(context.Background(), a13eName, metav1.GetOptions{})
+		_, getErr = clientset.RbacV1().RoleBindings(namespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
 		}
@@ -114,15 +119,13 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, testName string, 
 
 	err := retry.Do(func() error {
 		gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
-		_, getErr := dynaclient.Resource(gvr).Namespace(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
-		if testName == "emptyKAC" || testName == "nonEmptyKAC" {
+		_, getErr := dynaclient.Resource(gvr).Namespace(test.K9eNamespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
+		if testName == "emptyKAC" {
 			if !errs.IsNotFound(getErr) {
-				return errors.New("Unexpectedly found an ApiServerSource.")
-			}
-		} else {
-			if getErr != nil {
 				return getErr
 			}
+		} else if getErr != nil {
+			return getErr
 		}
 		cm, getErr := clientset.CoreV1().ConfigMaps(test.K9eNamespace).Get(context.Background(), filtersName, metav1.GetOptions{})
 		if getErr != nil {
@@ -130,17 +133,17 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, testName string, 
 		} else if len(cm.Data) != deleteNS {
 			return fmt.Errorf("Found %d namespaces in ConfigMap, expected %d", len(cm.Data), deleteNS)
 		}
-		_, getErr = clientset.CoreV1().ServiceAccounts(test.K9eNamespace).Get(context.Background(), a13eName, metav1.GetOptions{})
+		_, getErr = clientset.CoreV1().ServiceAccounts(test.K9eNamespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
 		}
-		_, getErr = clientset.RbacV1().ClusterRoles().Get(context.Background(), a13eName, metav1.GetOptions{})
+		_, getErr = clientset.RbacV1().ClusterRoles().Get(context.Background(), test.A13eName, metav1.GetOptions{})
 		if getErr != nil {
 			return getErr
 		}
-		_, getErr = clientset.RbacV1().RoleBindings(namespace).Get(context.Background(), a13eName, metav1.GetOptions{})
+		_, getErr = clientset.RbacV1().RoleBindings(namespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
 		if !errs.IsNotFound(getErr) {
-			return errors.New("Unexpectedly found Rolebinding " + a13eName + " in namespace " + namespace + ".")
+			return errors.New("Unexpectedly found Rolebinding " + test.A13eName + " in namespace " + namespace + ".")
 		}
 		_, getErr = clientset.RbacV1().Roles(namespace).Get(context.Background(), sinkName, metav1.GetOptions{})
 		if !errs.IsNotFound(getErr) {
@@ -188,14 +191,14 @@ func TestGlobalAndLocalKAC(t *testing.T) {
 	}
 
 	t.Cleanup(func() {
-		test.DeleteKAC(t, test.K9eNamespace)
+		test.DeleteCKAC(t)
 	})
 
 	clientset, _ := test.GetKubernetesClient(t)
 	port := test.PortForwardApiServer(t, clientset)
 	namespace, token := test.CreateTestNamespace(t, false)
 
-	test.CreateKAC(t, test.K9eNamespace, globalres)
+	test.CreateCKAC(t, globalres)
 	test.CreateKAC(t, namespace, localres)
 
 	job := test.RunLogGenerator(t, namespace)

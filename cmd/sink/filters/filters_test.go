@@ -5,6 +5,7 @@ package filters
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -13,13 +14,14 @@ import (
 	"time"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/tools/cache"
 	toolsWatch "k8s.io/client-go/tools/watch"
 	sourcev1 "knative.dev/eventing/pkg/apis/sources/v1"
@@ -41,7 +43,17 @@ func newMockWatcher(t testing.TB, ch <-chan watch.Event) func(metav1.ListOptions
 }
 
 func TestHandleUpdates(t *testing.T) {
-	f := NewFilters(fake.NewSimpleClientset())
+	unstruct := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "kubearchive.kubearchive.org/v1alpha1",
+			"kind":       "SinkFilter",
+			"metadata": map[string]interface{}{
+				"namespace": constants.KubeArchiveNamespace,
+				"name":      constants.SinkFilterResourceName,
+			},
+		},
+	}
+	f := NewFilters(fake.NewSimpleDynamicClient(runtime.NewScheme(), unstruct))
 	fooCfg := []kubearchiveapi.KubeArchiveConfigResource{
 		{
 			Selector: sourcev1.APIVersionKindSelector{
@@ -53,10 +65,6 @@ func TestHandleUpdates(t *testing.T) {
 			ArchiveOnDelete: "metadata.name.startsWith('tmp')",
 		},
 	}
-	fooCfgBytes, err := yaml.Marshal(fooCfg)
-	if err != nil {
-		assert.FailNow(t, "Could not marshall KubeArchiveConfig")
-	}
 	barCfg := []kubearchiveapi.KubeArchiveConfigResource{
 		{
 			Selector: sourcev1.APIVersionKindSelector{
@@ -67,10 +75,6 @@ func TestHandleUpdates(t *testing.T) {
 			DeleteWhen:  "has(status.completionTime)",
 		},
 	}
-	barCfgBytes, err := yaml.Marshal(barCfg)
-	if err != nil {
-		assert.FailNow(t, "Could not marshall KubeArchiveConfig")
-	}
 	bazCfg := []kubearchiveapi.KubeArchiveConfigResource{
 		{
 			Selector: sourcev1.APIVersionKindSelector{
@@ -80,14 +84,10 @@ func TestHandleUpdates(t *testing.T) {
 			ArchiveWhen: "has(status.startTime)",
 		},
 	}
-	bazCfgBytes, err := yaml.Marshal(bazCfg)
-	if err != nil {
-		assert.FailNow(t, "Could not marshall KubeArchiveConfig")
-	}
 
 	tests := []struct {
 		name                string
-		data                map[string]string
+		data                map[string][]kubearchiveapi.KubeArchiveConfigResource
 		eventType           watch.EventType
 		archiveSize         int
 		deleteSize          int
@@ -95,7 +95,7 @@ func TestHandleUpdates(t *testing.T) {
 	}{
 		{
 			name:                "Empty Map",
-			data:                make(map[string]string),
+			data:                make(map[string][]kubearchiveapi.KubeArchiveConfigResource),
 			eventType:           watch.Added,
 			archiveSize:         0,
 			deleteSize:          0,
@@ -103,10 +103,10 @@ func TestHandleUpdates(t *testing.T) {
 		},
 		{
 			name: "Many namespaces with filters",
-			data: map[string]string{
-				"foo": string(fooCfgBytes),
-				"bar": string(barCfgBytes),
-				"baz": string(bazCfgBytes),
+			data: map[string][]kubearchiveapi.KubeArchiveConfigResource{
+				"foo": fooCfg,
+				"bar": barCfg,
+				"baz": bazCfg,
 			},
 			eventType:           watch.Modified,
 			archiveSize:         3,
@@ -115,7 +115,7 @@ func TestHandleUpdates(t *testing.T) {
 		},
 		{
 			name:                "Delete event removes all filters",
-			data:                make(map[string]string),
+			data:                make(map[string][]kubearchiveapi.KubeArchiveConfigResource),
 			eventType:           watch.Deleted,
 			archiveSize:         0,
 			deleteSize:          0,
@@ -123,7 +123,7 @@ func TestHandleUpdates(t *testing.T) {
 		},
 		{
 			name:                "Error event does not update filters",
-			data:                make(map[string]string),
+			data:                make(map[string][]kubearchiveapi.KubeArchiveConfigResource),
 			eventType:           watch.Error,
 			archiveSize:         0,
 			deleteSize:          0,
@@ -131,7 +131,7 @@ func TestHandleUpdates(t *testing.T) {
 		},
 		{
 			name:                "Bookmark event does not update filters",
-			data:                make(map[string]string),
+			data:                make(map[string][]kubearchiveapi.KubeArchiveConfigResource),
 			eventType:           watch.Bookmark,
 			archiveSize:         0,
 			deleteSize:          0,
@@ -148,19 +148,22 @@ func TestHandleUpdates(t *testing.T) {
 			if err != nil {
 				assert.FailNow(t, "Could not create a watcher")
 			}
-			cm := corev1.ConfigMap{
+			sf := kubearchiveapi.SinkFilter{
 				TypeMeta: metav1.TypeMeta{
-					Kind:       "ConfigMap",
-					APIVersion: "v1",
+					Kind:       "SinkFilter",
+					APIVersion: "kubearchive.kubearchive.org/v1alpha1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:            "sink-filters",
-					Namespace:       "kubearchive",
+					Name:            constants.SinkFilterResourceName,
+					Namespace:       constants.KubeArchiveNamespace,
 					ResourceVersion: fmt.Sprintf("%d", i),
 				},
-				Data: tt.data,
+				Spec: kubearchiveapi.SinkFilterSpec{
+					Namespaces: map[string][]kubearchiveapi.KubeArchiveConfigResource{},
+				},
 			}
-			event := watch.Event{Type: watch.Modified, Object: &cm}
+			sf.Spec.Namespaces = tt.data
+			event := watch.Event{Type: watch.Modified, Object: &sf}
 			ch <- event
 			wg.Add(1)
 			go func(rw *toolsWatch.RetryWatcher, filter *Filters) {
@@ -181,7 +184,7 @@ func TestHandleUpdates(t *testing.T) {
 
 func TestChangeGlobalFilters(t *testing.T) {
 	filters := NewFilters(nil)
-	fh, err := os.Open("testdata/cm.yaml")
+	fh, err := os.Open("testdata/sf.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,23 +195,34 @@ func TestChangeGlobalFilters(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var cm corev1.ConfigMap
-	err = yaml.Unmarshal(fileBytes, &cm)
+	var unstructuredData map[string]interface{}
+	err = yaml.Unmarshal(fileBytes, &unstructuredData)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = filters.changeFilters(cm.Data)
+	obj := &unstructured.Unstructured{Object: unstructuredData}
+	bytes, err := obj.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sf := &kubearchiveapi.SinkFilter{}
+
+	if err = json.Unmarshal(bytes, sf); err != nil {
+		t.Fatal(err)
+	}
+
+	err = filters.changeFilters(sf.Spec.Namespaces)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	tests := []struct {
-		name           string
-		resource       unstructured.Unstructured
-		sinkFilterPath string
-		mustArchive    bool
-		mustDelete     bool
+		name        string
+		resource    unstructured.Unstructured
+		mustArchive bool
+		mustDelete  bool
 	}{
 		{
 			name: "pod is archived because of local filters",
@@ -225,9 +239,8 @@ func TestChangeGlobalFilters(t *testing.T) {
 					},
 				},
 			},
-			sinkFilterPath: "testdata/cm.yaml",
-			mustArchive:    true,
-			mustDelete:     false,
+			mustArchive: true,
+			mustDelete:  false,
 		},
 		{
 			name: "pod is archived because of global filters",
@@ -244,9 +257,8 @@ func TestChangeGlobalFilters(t *testing.T) {
 					},
 				},
 			},
-			sinkFilterPath: "testdata/cm.yaml",
-			mustArchive:    true,
-			mustDelete:     false,
+			mustArchive: true,
+			mustDelete:  false,
 		},
 		{
 			name: "pod is not archived",
@@ -260,9 +272,8 @@ func TestChangeGlobalFilters(t *testing.T) {
 					},
 				},
 			},
-			sinkFilterPath: "testdata/cm.yaml",
-			mustArchive:    false,
-			mustDelete:     false,
+			mustArchive: false,
+			mustDelete:  false,
 		},
 		{
 			name: "cronjob is archived because global filters",
@@ -276,9 +287,8 @@ func TestChangeGlobalFilters(t *testing.T) {
 					},
 				},
 			},
-			sinkFilterPath: "testdata/cm.yaml",
-			mustArchive:    true,
-			mustDelete:     false,
+			mustArchive: true,
+			mustDelete:  false,
 		},
 		{
 			name: "job is archived because global filters and has a start time",
@@ -295,9 +305,8 @@ func TestChangeGlobalFilters(t *testing.T) {
 					},
 				},
 			},
-			sinkFilterPath: "testdata/cm.yaml",
-			mustArchive:    true,
-			mustDelete:     false,
+			mustArchive: true,
+			mustDelete:  false,
 		},
 		{
 			name: "job is deleted because global filters and has a completion time",
@@ -314,9 +323,8 @@ func TestChangeGlobalFilters(t *testing.T) {
 					},
 				},
 			},
-			sinkFilterPath: "testdata/cm.yaml",
-			mustArchive:    true,
-			mustDelete:     true,
+			mustArchive: true,
+			mustDelete:  true,
 		},
 	}
 

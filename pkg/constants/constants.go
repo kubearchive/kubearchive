@@ -8,18 +8,24 @@ import (
 )
 
 const (
-	SinkFiltersConfigMapName   = "sink-filters"
-	SinkFiltersGlobalNamespace = "___global___"
-	nsEnvVar                   = "KUBEARCHIVE_NAMESPACE"
+	KubeArchiveConfigResourceName = "kubearchive"
+	KubeArchiveNamespaceEnvVar    = "KUBEARCHIVE_NAMESPACE"
+	SinkFilterResourceName        = "sink-filters"
+	SinkFilterGlobalNamespace     = "___global___"
 )
 
 var (
-	KubeArchiveNamespace string // gets set in init() and should be treated as const
+	// These get set in init() and should be treated as const
+	KubeArchiveNamespace  string
+	KubeArchiveBrokerName string
+	KubeArchiveSinkName   string
 )
 
 func init() {
-	KubeArchiveNamespace = os.Getenv(nsEnvVar)
+	KubeArchiveNamespace = os.Getenv(KubeArchiveNamespaceEnvVar)
 	if KubeArchiveNamespace == "" {
 		KubeArchiveNamespace = "kubearchive" // Not set for testing!
 	}
+	KubeArchiveBrokerName = KubeArchiveNamespace + "-broker"
+	KubeArchiveSinkName = KubeArchiveNamespace + "-sink"
 }

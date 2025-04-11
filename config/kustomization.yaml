@@ -6,6 +6,7 @@ kind: Kustomization
 resources:
   - crds/kubearchive.kubearchive.org_clusterkubearchiveconfigs.yaml
   - crds/kubearchive.kubearchive.org_kubearchiveconfigs.yaml
+  - crds/kubearchive.kubearchive.org_sinkfilters.yaml
   - templates/api_server/api_server.yaml
   - templates/api_server/certificates.yaml
   - templates/api_server/role.yaml

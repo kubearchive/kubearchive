@@ -22,7 +22,7 @@ import (
 
 	"github.com/avast/retry-go/v4"
 
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 
 	"k8s.io/client-go/dynamic"
@@ -48,9 +48,7 @@ import (
 const (
 	letterBytes   = "abcdefghijklmnopqrstuvwxyz"
 	randSuffixLen = 8
-	K9eNamespace  = "kubearchive"
-	KACName       = "kubearchive"
-	A13eName      = KACName + "-a13e"
+	A13eName      = constants.KubeArchiveConfigResourceName + "-a13e"
 )
 
 func RandomString() string {
@@ -410,21 +408,21 @@ func CreateCKAC(t testing.TB, resources map[string]any) {
 }
 
 func CreateKAC(t testing.TB, namespace string, resources map[string]any) {
-	clientset, dynamicClient := GetKubernetesClient(t)
+	_, dynamicClient := GetKubernetesClient(t)
 	kac := newKAC(namespace, resources)
 
 	var gvr schema.GroupVersionResource
 	var err error
 	if namespace == "" {
-		gvr = kubearchivev1alpha1.GroupVersion.WithResource("clusterkubearchiveconfigs")
+		gvr = kubearchiveapi.GroupVersion.WithResource("clusterkubearchiveconfigs")
 		_, err = dynamicClient.Resource(gvr).Create(context.Background(), kac, metav1.CreateOptions{})
 		if err != nil {
 			t.Log("Could not create ClusterKubeArchiveConfig")
 			t.Fatal(err)
 		}
-		namespace = constants.SinkFiltersGlobalNamespace
+		namespace = constants.SinkFilterGlobalNamespace
 	} else {
-		gvr = kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
+		gvr = kubearchiveapi.GroupVersion.WithResource("kubearchiveconfigs")
 		_, err = dynamicClient.Resource(gvr).Namespace(namespace).Create(context.Background(), kac, metav1.CreateOptions{})
 		if err != nil {
 			t.Logf("Could not create KubeArchiveConfig in namespace '%s'", namespace)
@@ -444,13 +442,17 @@ func CreateKAC(t testing.TB, namespace string, resources map[string]any) {
 		}
 
 		err = retry.Do(func() error {
-			sinkFilters, retryErr := clientset.CoreV1().ConfigMaps(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFiltersConfigMapName, metav1.GetOptions{})
+			object, retryErr := dynamicClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 			if retryErr != nil {
 				return retryErr
 			}
-			_, exists := sinkFilters.Data[namespace]
+			sinkFilter, retryErr := kubearchiveapi.ConvertObjectToSinkFilter(object)
+			if retryErr != nil {
+				return retryErr
+			}
+			_, exists := sinkFilter.Spec.Namespaces[namespace]
 			if !exists {
-				return fmt.Errorf(constants.SinkFiltersConfigMapName+" ConfigMap does not yet have filters for the namespace %s", namespace)
+				return fmt.Errorf("SinkFilter "+constants.SinkFilterResourceName+" does not yet have filters for the namespace %s", namespace)
 			}
 			return nil
 		}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
@@ -465,20 +467,20 @@ func DeleteCKAC(t testing.TB) {
 }
 
 func DeleteKAC(t testing.TB, namespace string) {
-	clientset, dynamicClient := GetKubernetesClient(t)
+	_, dynamicClient := GetKubernetesClient(t)
 
 	var gvr schema.GroupVersionResource
 	var err error
 	if namespace == "" {
-		gvr = kubearchivev1alpha1.GroupVersion.WithResource("clusterkubearchiveconfigs")
-		err = dynamicClient.Resource(gvr).Delete(context.Background(), KACName, metav1.DeleteOptions{})
+		gvr = kubearchiveapi.GroupVersion.WithResource("clusterkubearchiveconfigs")
+		err = dynamicClient.Resource(gvr).Delete(context.Background(), constants.KubeArchiveConfigResourceName, metav1.DeleteOptions{})
 		if err != nil {
 			t.Log("Could not delete ClusterKubeArchiveConfig")
 			t.Fatal(err)
 		}
 	} else {
-		gvr = kubearchivev1alpha1.GroupVersion.WithResource("kubearchiveconfigs")
-		err = dynamicClient.Resource(gvr).Namespace(namespace).Delete(context.Background(), KACName, metav1.DeleteOptions{})
+		gvr = kubearchiveapi.GroupVersion.WithResource("kubearchiveconfigs")
+		err = dynamicClient.Resource(gvr).Namespace(namespace).Delete(context.Background(), constants.KubeArchiveConfigResourceName, metav1.DeleteOptions{})
 		if err != nil {
 			t.Logf("Could not delete KubeArchiveConfig in namespace '%s'", namespace)
 			t.Fatal(err)
@@ -489,9 +491,9 @@ func DeleteKAC(t testing.TB, namespace string) {
 	err = retry.Do(func() error {
 		var retryErr error
 		if namespace == "" {
-			_, retryErr = dynamicClient.Resource(gvr).Get(context.Background(), KACName, metav1.GetOptions{})
+			_, retryErr = dynamicClient.Resource(gvr).Get(context.Background(), constants.KubeArchiveConfigResourceName, metav1.GetOptions{})
 		} else {
-			_, retryErr = dynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), KACName, metav1.GetOptions{})
+			_, retryErr = dynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), constants.KubeArchiveConfigResourceName, metav1.GetOptions{})
 		}
 		return retryErr
 	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
@@ -501,13 +503,17 @@ func DeleteKAC(t testing.TB, namespace string) {
 
 	// Make sure the sink filters have been updated.
 	err = retry.Do(func() error {
-		sinkFilters, retryErr := clientset.CoreV1().ConfigMaps(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFiltersConfigMapName, metav1.GetOptions{})
+		object, retryErr := dynamicClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 		if retryErr != nil {
 			return retryErr
 		}
-		_, exists := sinkFilters.Data[namespace]
+		sinkFilter, retryErr := kubearchiveapi.ConvertObjectToSinkFilter(object)
+		if retryErr != nil {
+			return retryErr
+		}
+		_, exists := sinkFilter.Spec.Namespaces[namespace]
 		if exists {
-			return fmt.Errorf(constants.SinkFiltersConfigMapName+" ConfigMap still has filters for namespace '%s'", namespace)
+			return fmt.Errorf("SinkFilter "+constants.SinkFilterResourceName+" still has filters for namespace '%s'", namespace)
 		}
 		return nil
 	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
@@ -545,7 +551,7 @@ func DeleteTestNamespace(t testing.TB, namespace string) {
 func newKAC(namespace string, resources map[string]any) *unstructured.Unstructured {
 	kind := "ClusterKubeArchiveConfig"
 	metadata := map[string]string{
-		"name": KACName,
+		"name": constants.KubeArchiveConfigResourceName,
 	}
 	if namespace != "" {
 		kind = "KubeArchiveConfig"
@@ -555,8 +561,8 @@ func newKAC(namespace string, resources map[string]any) *unstructured.Unstructur
 		Object: map[string]interface{}{
 			"kind": kind,
 			"apiVersion": fmt.Sprintf("%s/%s",
-				kubearchivev1alpha1.SchemeBuilder.GroupVersion.Group,
-				kubearchivev1alpha1.SchemeBuilder.GroupVersion.Version),
+				kubearchiveapi.SchemeBuilder.GroupVersion.Group,
+				kubearchiveapi.SchemeBuilder.GroupVersion.Version),
 			"metadata": metadata,
 			"spec":     resources,
 		},

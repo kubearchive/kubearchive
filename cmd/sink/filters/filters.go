@@ -14,12 +14,11 @@ import (
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	ocel "github.com/kubearchive/kubearchive/pkg/cel"
 	"github.com/kubearchive/kubearchive/pkg/constants"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
 	toolsWatch "k8s.io/client-go/tools/watch"
 )
@@ -32,17 +31,17 @@ type Interface interface {
 
 type Filters struct {
 	*sync.RWMutex
-	clientset       kubernetes.Interface
+	dynclient       dynamic.Interface
 	archive         map[NamespaceGroupVersionKind]cel.Program
 	delete          map[NamespaceGroupVersionKind]cel.Program
 	archiveOnDelete map[NamespaceGroupVersionKind]cel.Program
 }
 
 // NewFilters creates a Filters struct with empty archive, delete, and archiveOnDelete slices.
-func NewFilters(clientset kubernetes.Interface) *Filters {
+func NewFilters(dynclient dynamic.Interface) *Filters {
 	return &Filters{
 		RWMutex:         &sync.RWMutex{},
-		clientset:       clientset,
+		dynclient:       dynclient,
 		archive:         make(map[NamespaceGroupVersionKind]cel.Program),
 		delete:          make(map[NamespaceGroupVersionKind]cel.Program),
 		archiveOnDelete: make(map[NamespaceGroupVersionKind]cel.Program),
@@ -50,12 +49,12 @@ func NewFilters(clientset kubernetes.Interface) *Filters {
 }
 
 // changeFilters must be called when global filters for f have changed. This includes when f is first created.
-func (f *Filters) changeFilters(stringResources map[string]string) error {
+func (f *Filters) changeFilters(namespaces map[string][]kubearchiveapi.KubeArchiveConfigResource) error {
 	errList := []error{}
 	archiveMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	deleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	archiveOnDeleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
-	for namespace, kacResources := range stringResources {
+	for namespace, kacResources := range namespaces {
 		nsErr := f.createFilters(namespace, kacResources, archiveMap, deleteMap, archiveOnDeleteMap)
 		if nsErr != nil {
 			errList = append(errList, nsErr)
@@ -77,16 +76,11 @@ func (f *Filters) changeFilters(stringResources map[string]string) error {
 // wraps all errors it encounters while creating filters and returns the wrapped error. Even if the returned error is
 // not nil, the maps returned can still be used.
 func (f *Filters) createFilters(
-	namespace, kacResources string,
+	namespace string, kacResources []kubearchiveapi.KubeArchiveConfigResource,
 	archiveMap, deleteMap, archiveOnDeleteMap map[NamespaceGroupVersionKind]cel.Program,
 ) error {
-	resources, err := kubearchiveapi.LoadKubeArchiveConfigFromString(kacResources)
-	if err != nil {
-		return err
-	}
-
 	var errList []error
-	for _, resource := range resources {
+	for _, resource := range kacResources {
 		gvk := schema.FromAPIVersionAndKind(resource.Selector.APIVersion, resource.Selector.Kind)
 		namespaceGvk := NamespaceGVKFromNamespaceAndGvk(namespace, gvk)
 
@@ -112,21 +106,21 @@ func addLocalFilters(expression string, localMap map[NamespaceGroupVersionKind]c
 
 type UpdateStopper func()
 
-// noopUpdateStopper implements UpdateStopper so that filters.Update can return an UpdateStopper if it fails to create a
-// watcher for the ConfigMap
+// noopUpdateStopper implements UpdateStopper so that filters. Update can return an UpdateStopper if it fails to create a
+// watcher for the SinkFilter resource.
 func noopUpdateStopper() {}
 
-// Update updates the archive, delete, and archiveOnDelete filters when the ConfigMap changes.
+// Update updates the archive, delete, and archiveOnDelete filters when the SinkFilter resouce changes.
 func (f *Filters) Update() (UpdateStopper, error) {
 	watcher := func(options metav1.ListOptions) (watch.Interface, error) {
-		return f.clientset.CoreV1().ConfigMaps(constants.KubeArchiveNamespace).Watch(
+		return f.dynclient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Watch(
 			context.Background(),
-			metav1.SingleObject(metav1.ObjectMeta{Name: constants.SinkFiltersConfigMapName, Namespace: constants.KubeArchiveNamespace}),
+			metav1.SingleObject(metav1.ObjectMeta{Name: constants.SinkFilterResourceName, Namespace: constants.KubeArchiveNamespace}),
 		)
 	}
 	retryWatcher, err := toolsWatch.NewRetryWatcherWithContext(context.Background(), "1", &cache.ListWatch{WatchFunc: watcher})
 	if err != nil {
-		return noopUpdateStopper, fmt.Errorf("could not create a watcher for the %s ConfigMap: %s", constants.SinkFiltersConfigMapName, err)
+		return noopUpdateStopper, fmt.Errorf("could not create a watcher for the %s SinkFilter: %s", constants.SinkFilterResourceName, err)
 	}
 	go f.handleUpdates(retryWatcher)
 	return retryWatcher.Stop, nil
@@ -137,24 +131,26 @@ func (f *Filters) handleUpdates(watcher watch.Interface) {
 	for event := range watcher.ResultChan() {
 		switch event.Type {
 		case watch.Added, watch.Modified:
-			slog.Info("Received watch event of type. Updating filters", "event type", string(event.Type))
-			configMap, ok := event.Object.(*corev1.ConfigMap)
-			if !ok {
-				slog.Error("could not convert object from the event to a ConfigMap")
+			slog.Info("Received watch event, updating filters", "event type", string(event.Type))
+
+			sinkFilter, err := kubearchiveapi.ConvertObjectToSinkFilter(event.Object)
+			if err != nil {
+				slog.Error("Unable to convert to SinkFilter", "error", err)
 				continue
 			}
-			err := f.changeFilters(configMap.Data)
+
+			err = f.changeFilters(sinkFilter.Spec.Namespaces)
 			if err != nil {
 				slog.Error("Error encountered while updating filters", "error", err)
 			}
 		case watch.Deleted:
-			slog.Info("Received watch event of type delete. Updating filters")
-			err := f.changeFilters(make(map[string]string))
+			slog.Info("Received watch event, updating filters", "event type", string(event.Type))
+			err := f.changeFilters(make(map[string][]kubearchiveapi.KubeArchiveConfigResource))
 			if err != nil {
 				slog.Error("Error encountered while updating filters", "error", err)
 			}
 		default:
-			slog.Info("Ignoring watch event of type", "event type", string(event.Type))
+			slog.Info("Ignoring watch event", "event type", string(event.Type))
 		}
 	}
 }

@@ -87,8 +87,8 @@ func (ckaccv *ClusterKubeArchiveConfigCustomValidator) ValidateDelete(_ context.
 func (ckaccv *ClusterKubeArchiveConfigCustomValidator) validateKAC(ckac *ClusterKubeArchiveConfig) (admission.Warnings, error) {
 	errList := make([]error, 0)
 	if ckac.Name != ckaccv.kubearchiveResourceName {
-		return nil, fmt.Errorf("invalid resource name '%s', resource must be named '%s'",
-			ckac.Name, ckaccv.kubearchiveResourceName)
+		errList = append(errList, fmt.Errorf("invalid resource name '%s', resource must be named '%s'",
+			ckac.Name, ckaccv.kubearchiveResourceName))
 	}
 	for _, resource := range ckac.Spec.Resources {
 		if resource.ArchiveWhen != "" {

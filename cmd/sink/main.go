@@ -56,13 +56,13 @@ func main() {
 		}
 	}(db)
 
-	clientset, err := k8s.GetKubernetesClientset()
+	dynClient, err := k8s.GetKubernetesClient()
 	if err != nil {
-		slog.Error("Could not get a kubernetes client", "error", err)
+		slog.Error("Could not get a kubernetes dynamic client", "error", err)
 		os.Exit(1)
 	}
 
-	filter := filters.NewFilters(clientset)
+	filter := filters.NewFilters(dynClient)
 	stopUpdating, err := filter.Update()
 	if err != nil {
 		slog.Error("Could not listen for updates to filters:", "error", err)
@@ -72,11 +72,6 @@ func main() {
 	builder, err := logs.NewUrlBuilder()
 	if err != nil {
 		slog.Error("Could not enable log url creation", "error", err)
-	}
-	dynClient, err := k8s.GetKubernetesClient()
-	if err != nil {
-		slog.Error("Could not get a kubernetes dynamic client", "error", err)
-		os.Exit(1)
 	}
 	controller, err := routers.NewController(db, filter, dynClient, builder)
 	if err != nil {

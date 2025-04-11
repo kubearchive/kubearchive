@@ -13,9 +13,11 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/cmd/sink/filters"
 	fakeFilters "github.com/kubearchive/kubearchive/cmd/sink/filters/fake"
 	"github.com/kubearchive/kubearchive/cmd/sink/logs"
+	"github.com/kubearchive/kubearchive/pkg/constants"
 	fakeDb "github.com/kubearchive/kubearchive/pkg/database/fake"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/files"
@@ -59,6 +61,10 @@ func setupClient(t testing.TB, objects ...runtime.Object) *fake.FakeDynamicClien
 		assert.FailNow(t, err.Error())
 	}
 	err = corev1.AddToScheme(testScheme)
+	if err != nil {
+		assert.FailNow(t, err.Error())
+	}
+	err = kubearchiveapi.AddToScheme(testScheme)
 	if err != nil {
 		assert.FailNow(t, err.Error())
 	}
@@ -698,30 +704,39 @@ func TestLivez(t *testing.T) {
 }
 
 func TestReadyz(t *testing.T) {
+	sf := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"kind":       "SinkFilter",
+			"apiVersion": "kubearchive.kubearchive.org/v1alpha1",
+			"metadata": map[string]interface{}{
+				"name":      constants.SinkFilterResourceName,
+				"namespace": constants.KubeArchiveNamespace,
+			},
+		},
+	}
+	objs := []runtime.Object{sf}
+
 	testCases := []struct {
 		name         string
 		dbConnReady  bool
 		namespaceSet bool
 		k8sApiConn   bool
 		expected     int
+		clusterObjs  []runtime.Object
 	}{
 		{
 			name:        "Sink is ready",
 			dbConnReady: true,
 			k8sApiConn:  true,
 			expected:    http.StatusOK,
-		},
-		{
-			name:        "Cannot check kubernetes api",
-			dbConnReady: true,
-			k8sApiConn:  false,
-			expected:    http.StatusServiceUnavailable,
+			clusterObjs: objs,
 		},
 		{
 			name:        "Database is not ready",
 			dbConnReady: false,
 			k8sApiConn:  true,
 			expected:    http.StatusServiceUnavailable,
+			clusterObjs: []runtime.Object{},
 		},
 	}
 	for _, tt := range testCases {
@@ -729,15 +744,12 @@ func TestReadyz(t *testing.T) {
 			var db interfaces.DBWriter
 			filter := fakeFilters.NewFilters(nil, nil, nil)
 			builder, _ := logs.NewUrlBuilder()
-			if tt.k8sApiConn {
-				t.Setenv(namespaceEnvVar, "kubearchive")
-			}
 			if tt.dbConnReady {
 				db = fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{}, "$.")
 			} else {
 				db = fakeDb.NewFakeDatabaseWithError(errors.New("test error"))
 			}
-			client := setupClient(t)
+			client := setupClient(t, tt.clusterObjs...)
 			router := setupRouter(t, db, filter, client, builder)
 			res := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)

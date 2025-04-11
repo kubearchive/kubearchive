@@ -71,7 +71,10 @@ func (c *Controller) GetResources(context *gin.Context) {
 	}
 
 	if name != "" {
-		if len(resources) > 1 {
+		if len(resources) == 0 {
+			abort.Abort(context, errors.New("resource not found"), http.StatusNotFound)
+			return
+		} else if len(resources) > 1 {
 			abort.Abort(context, errors.New("more than one resource found"), http.StatusInternalServerError)
 			return
 		}

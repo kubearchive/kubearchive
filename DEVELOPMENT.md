@@ -97,6 +97,12 @@ After you make changes to the code use the script to redeploy KubeArchive:
     https://localhost:8081/apis/batch/v1/jobs | jq
     ```
 
+    NOTE: If kubearchive is deployed in an Openshift cluster you can use your user's token.
+    You can also try insecure access.
+    ```bash
+    curl -k -H "Authorization: Bearer $(oc whoami --show-token)" https://localhost:8081/apis/batch/v1/jobs
+    ```
+
 1. Check the new logs on the KubeArchive API:
     ```bash
     kubectl logs -n kubearchive -l app=kubearchive-api-server

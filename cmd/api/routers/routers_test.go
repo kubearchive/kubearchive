@@ -13,11 +13,10 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kubearchive/kubearchive/pkg/database/fake"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	"github.com/kubearchive/kubearchive/pkg/database/fake"
 )
 
 var testResources = fake.CreateTestResources()
@@ -34,6 +33,7 @@ func retrieveLogURL(c *gin.Context) {
 	c.JSON(http.StatusOK, fmt.Sprintf("%s-%s", c.GetString("logURL"), c.GetString("jsonPath")))
 }
 
+// setupRouter set up the router the same way that NewServer does without the middleware
 func setupRouter(db interfaces.DBReader, core bool) *gin.Engine {
 	router := gin.Default()
 	ctrl := Controller{Database: db}
@@ -45,14 +45,14 @@ func setupRouter(db interfaces.DBReader, core bool) *gin.Engine {
 		}
 	})
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetResources)
-	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType", ctrl.GetResources)
-	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name", ctrl.GetResources)
-	router.GET("/apis/:group/:version/namespace/:namespace/:resourceType/:name/log",
+	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType", ctrl.GetResources)
+	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/:name", ctrl.GetResources)
+	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/:name/log",
 		ctrl.GetLogURL, retrieveLogURL)
 	router.GET("/api/:version/:resourceType", ctrl.GetResources)
-	router.GET("/api/:version/namespace/:namespace/:resourceType", ctrl.GetResources)
-	router.GET("/api/:version/namespace/:namespace/:resourceType/:name", ctrl.GetResources)
-	router.GET("/api/:version/namespace/:namespace/:resourceType/:name/log",
+	router.GET("/api/:version/namespaces/:namespace/:resourceType", ctrl.GetResources)
+	router.GET("/api/:version/namespaces/:namespace/:resourceType/:name", ctrl.GetResources)
+	router.GET("/api/:version/namespaces/:namespace/:resourceType/:name/log",
 		ctrl.GetLogURL, retrieveLogURL)
 	return router
 }
@@ -130,7 +130,7 @@ func TestLabelSelectorQueryParameter(t *testing.T) {
 			res := httptest.NewRecorder()
 			req := httptest.NewRequest(
 				http.MethodGet,
-				fmt.Sprintf("/apis/batch/v1/namespace/ns/cronjobs?labelSelector=%s", url.QueryEscape(tt.labelSelector)),
+				fmt.Sprintf("/apis/batch/v1/namespaces/ns/cronjobs?labelSelector=%s", url.QueryEscape(tt.labelSelector)),
 				nil,
 			)
 			router.ServeHTTP(res, req)
@@ -143,7 +143,7 @@ func TestGetCoreResourcesLogURLs(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), true)
 
 	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespace/ns/pods/my-pod/log", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespaces/ns/pods/my-pod/log", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -154,7 +154,7 @@ func TestGetResourcesLogURLs(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), false)
 
 	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/apis/batch/v1/namespace/ns/cronjobs/my-cronjob/log", nil)
+	req := httptest.NewRequest(http.MethodGet, "/apis/batch/v1/namespaces/ns/cronjobs/my-cronjob/log", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -180,7 +180,7 @@ func TestGetNamespacedResources(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), false)
 
 	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespaces/test/crontabs", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -192,38 +192,83 @@ func TestGetNamespacedResources(t *testing.T) {
 	assert.Equal(t, nonCoreResources, resources.Items)
 }
 
-func TestGetNamespacedResourcesByName(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), false)
-
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs/test", nil)
-	router.ServeHTTP(res, req)
-
-	assert.Equal(t, http.StatusOK, res.Code)
-	var resource *unstructured.Unstructured
-	if err := json.NewDecoder(res.Body).Decode(&resource); err != nil {
-		t.Fail()
+func TestGetResourceByName(t *testing.T) {
+	nonCoreResourceBytes, _ := json.Marshal(nonCoreResources[0])
+	coreResourceBytes, _ := json.Marshal(coreResources[0])
+	tests := []struct {
+		name           string
+		isCore         bool
+		endpoint       string
+		givenResources []*unstructured.Unstructured
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "Success namespaced non-core resource",
+			isCore:         false,
+			endpoint:       "/apis/stable.example.com/v1/namespaces/test/crontabs/test",
+			givenResources: testResources,
+			expectedStatus: http.StatusOK,
+			expectedBody:   string(nonCoreResourceBytes),
+		},
+		{
+			name:           "Success namespaced core resource",
+			isCore:         true,
+			endpoint:       "/api/v1/namespaces/test/pods/test",
+			givenResources: testResources,
+			expectedStatus: http.StatusOK,
+			expectedBody:   string(coreResourceBytes),
+		},
+		{
+			name:           "More than one resource found",
+			isCore:         false,
+			endpoint:       "/apis/stable.example.com/v1/namespaces/test/crontabs/test",
+			givenResources: append(testResources, testResources[0]),
+			expectedStatus: http.StatusInternalServerError,
+			expectedBody:   "more than one resource found",
+		},
+		{
+			name:           "Failed named non-core resource across all namespaces",
+			isCore:         false,
+			endpoint:       "/apis/stable.example.com/v1/crontabs/test",
+			givenResources: testResources,
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   "not found",
+		},
+		{
+			name:           "Failed named core resource across all namespaces",
+			isCore:         true,
+			endpoint:       "/api/v1/pods/test",
+			givenResources: testResources,
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   "not found",
+		},
+		{
+			name:           "Resource not found",
+			isCore:         false,
+			endpoint:       "/api/v1/namespaces/test/pods/notfound",
+			givenResources: testResources,
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   "not found",
+		},
 	}
-	assert.Equal(t, nonCoreResources[0], resource)
-}
-
-func TestGetNamespacedResourcesByNameMoreThanOne(t *testing.T) {
-	customResources := append(testResources, testResources[0])
-	router := setupRouter(fake.NewFakeDatabase(customResources, testLogUrls, testLogJsonPath), false)
-
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs/test", nil)
-	router.ServeHTTP(res, req)
-
-	assert.Equal(t, http.StatusInternalServerError, res.Code)
-	assert.Contains(t, res.Body.String(), "more than one resource found")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := setupRouter(fake.NewFakeDatabase(tt.givenResources, testLogUrls, testLogJsonPath), tt.isCore)
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tt.endpoint, nil)
+			router.ServeHTTP(res, req)
+			assert.Equal(t, tt.expectedStatus, res.Code)
+			assert.Contains(t, res.Body.String(), tt.expectedBody)
+		})
+	}
 }
 
 func TestGetResourcesEmpty(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase([]*unstructured.Unstructured{}, []fake.LogUrlRow{}, testLogJsonPath), false)
 
 	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespace/test/crontabs", nil)
+	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespaces/test/crontabs", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -253,7 +298,7 @@ func TestGetCoreNamespacedResources(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), true)
 
 	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespace/test/pods", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespaces/test/pods", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)
@@ -268,7 +313,7 @@ func TestGetCoreNamespacedResourcesByName(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), true)
 
 	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespace/test/pods/test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespaces/test/pods/test", nil)
 	router.ServeHTTP(res, req)
 
 	assert.Equal(t, http.StatusOK, res.Code)

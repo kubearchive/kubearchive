@@ -37,8 +37,8 @@ require (
 	go.opentelemetry.io/otel/sdk/log v0.11.0
 	go.opentelemetry.io/otel/sdk/metric v1.35.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.33.0-beta.0
-	k8s.io/apimachinery v0.33.0-beta.0
+	k8s.io/api v0.33.0-rc.0
+	k8s.io/apimachinery v0.33.0-rc.0
 	k8s.io/cli-runtime v0.32.3
 	k8s.io/client-go v0.33.0-beta.0
 	k8s.io/klog/v2 v2.130.1
@@ -176,7 +176,7 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apiextensions-apiserver v0.33.0-alpha.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20250304201544-e5f78fe3ede9 // indirect
+	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/utils v0.0.0-20241210054802-24370beab758 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/kustomize/api v0.18.0 // indirect

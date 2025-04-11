@@ -27,7 +27,6 @@ import (
 
 // nolint:staticcheck
 func TestMain(m *testing.M) {
-	globalKey = "kubearchive"
 	m.Run()
 }
 

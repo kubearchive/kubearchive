@@ -3,18 +3,17 @@
 KubeArchive allows cluster owners to configure global filters. These are applied
 to any KubeArchive namespace containing a `KubeArchiveConfig` custom resource.
 
-To configure the global filters create a `KubeArchiveConfig` in the
-"kubearchive" namespace. When it is created in the "kubearchive" namespace
-these filters are considered global:
+To configure the global filters create a `ClusterKubeArchiveConfig` custom resource.
+Only one `ClusterKubeArchiveConfig` resource is allowed, and it must be named
+"kubearchive".  When it is created namespace these filters are considered global:
 
 [source,yaml]
 ----
 ---
 apiVersion: kubearchive.kubearchive.org/v1alpha1
-kind: KubeArchiveConfig
+kind: ClusterKubeArchiveConfig
 metadata:
   name: kubearchive
-  namespace: kubearchive
 spec:
   resources:
     - selector:
@@ -30,10 +29,11 @@ resource. These can be understood as "local" filters in opposition with global
 filters. Both global and local filters are combined with an "OR" type of logic
 and used for that specific namespace.
 
-For example the following `KubeArchiveConfig` in the namespace "my-team" KubeArchive
+For example, the following `KubeArchiveConfig` in the namespace "my-team"
 archives jobs as long as they have `status.startTime` and deletes them when they
 have `status.completionTime`. However KubeArchive also archives pods when they are
-about to be deleted, as configured in the global filters in the previous section:
+about to be deleted, as configured in the global `ClusterKubeArchiveConfig` in
+the previous section:
 
 [source,yaml]
 ----
@@ -53,8 +53,8 @@ spec:
 ----
 
 For example the following `KubeArchiveConfig` in the namespace "production" KubeArchive
-only archives pods when they are about to be deleted, as configured in the global filters
-in the previous section:
+only archives pods when they are about to be deleted, as configured in the
+global `ClusterKubeArchiveConfig` in the previous section:
 
 [source,yaml]
 ----
@@ -69,5 +69,5 @@ spec: {}
 
 [NOTE]
 ====
-The 'KubeArchiveConfig` resource must be named "kubearchive".
+All `ClusterKubeArchiveConfig` and `KubeArchiveConfig` resources must be named "kubearchive".
 ====

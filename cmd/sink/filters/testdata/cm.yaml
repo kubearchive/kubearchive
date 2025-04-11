@@ -6,7 +6,7 @@ kind: ConfigMap
 metadata:
   name: sink-filters
 data:
-  kubearchive: |
+  ___global___: |
     - selector:
         apiversion: batch/v1
         kind: CronJob

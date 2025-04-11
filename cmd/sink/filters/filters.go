@@ -8,12 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"sync"
 
 	"github.com/google/cel-go/cel"
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	ocel "github.com/kubearchive/kubearchive/pkg/cel"
+	"github.com/kubearchive/kubearchive/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -23,17 +23,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	toolsWatch "k8s.io/client-go/tools/watch"
 )
-
-const (
-	globalKeyEnvVar = "KUBEARCHIVE_NAMESPACE"
-	filtersCmName   = "sink-filters"
-)
-
-var globalKey string // gets set in init() and should be treated as const
-
-func init() {
-	globalKey = os.Getenv(globalKeyEnvVar)
-}
 
 type Interface interface {
 	MustArchive(context.Context, *unstructured.Unstructured) bool
@@ -91,7 +80,7 @@ func (f *Filters) createFilters(
 	namespace, kacResources string,
 	archiveMap, deleteMap, archiveOnDeleteMap map[NamespaceGroupVersionKind]cel.Program,
 ) error {
-	resources, err := kubearchiveapi.LoadFromString(kacResources)
+	resources, err := kubearchiveapi.LoadKubeArchiveConfigFromString(kacResources)
 	if err != nil {
 		return err
 	}
@@ -130,14 +119,14 @@ func noopUpdateStopper() {}
 // Update updates the archive, delete, and archiveOnDelete filters when the ConfigMap changes.
 func (f *Filters) Update() (UpdateStopper, error) {
 	watcher := func(options metav1.ListOptions) (watch.Interface, error) {
-		return f.clientset.CoreV1().ConfigMaps(globalKey).Watch(
+		return f.clientset.CoreV1().ConfigMaps(constants.KubeArchiveNamespace).Watch(
 			context.Background(),
-			metav1.SingleObject(metav1.ObjectMeta{Name: filtersCmName, Namespace: globalKey}),
+			metav1.SingleObject(metav1.ObjectMeta{Name: constants.SinkFiltersConfigMapName, Namespace: constants.KubeArchiveNamespace}),
 		)
 	}
 	retryWatcher, err := toolsWatch.NewRetryWatcherWithContext(context.Background(), "1", &cache.ListWatch{WatchFunc: watcher})
 	if err != nil {
-		return noopUpdateStopper, fmt.Errorf("could not create a watcher for the %s ConfigMap: %s", filtersCmName, err)
+		return noopUpdateStopper, fmt.Errorf("could not create a watcher for the %s ConfigMap: %s", constants.SinkFiltersConfigMapName, err)
 	}
 	go f.handleUpdates(retryWatcher)
 	return retryWatcher.Stop, nil

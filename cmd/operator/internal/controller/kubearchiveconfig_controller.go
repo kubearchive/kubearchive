@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	"github.com/kubearchive/kubearchive/pkg/constants"
 )
 
 // KubeArchiveConfigReconciler reconciles a KubeArchiveConfig object
@@ -33,6 +34,7 @@ type KubeArchiveConfigReconciler struct {
 	Mapper meta.RESTMapper
 }
 
+//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=sinkfilters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs/finalizers,verbs=update
@@ -54,26 +56,22 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	finalizerName := "kubearchive.org/finalizer"
-
 	if kaconfig.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, add the finalizer if necessary.
-		if !controllerutil.ContainsFinalizer(kaconfig, finalizerName) {
-			controllerutil.AddFinalizer(kaconfig, finalizerName)
+		if !controllerutil.ContainsFinalizer(kaconfig, resourceFinalizerName) {
+			controllerutil.AddFinalizer(kaconfig, resourceFinalizerName)
 			if err := r.Client.Update(ctx, kaconfig); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
 		// The object is being deleted.
-		if controllerutil.ContainsFinalizer(kaconfig, finalizerName) {
+		if controllerutil.ContainsFinalizer(kaconfig, resourceFinalizerName) {
 			// Finalizer is present, clean up filters from ConfigMap and remove Namespace label.
 
 			log.Info("Deleting KubeArchiveConfig")
 
-			// Clean filters.
-			err := deleteNamespaceFromFilterConfigMap(ctx, r.Client, kaconfig.Namespace)
-			if err != nil {
+			if _, err := reconcileAllCommonResources(ctx, r.Client, r.Mapper, kaconfig.Namespace, nil); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -83,7 +81,7 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			}
 
 			// Remove the finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(kaconfig, finalizerName)
+			controllerutil.RemoveFinalizer(kaconfig, resourceFinalizerName)
 			if err := r.Client.Update(ctx, kaconfig); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -93,40 +91,15 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, nil
 	}
 
-	yaml, err := convertToYamlString(kaconfig.Spec.Resources)
-	if err != nil {
-		log.Error(err, "Failed to convert KubeArchiveConfig resources to YAML")
-		return ctrl.Result{}, err
-	}
-
-	cm, err := reconcileFilterConfigMap(ctx, r.Client, kaconfig.Namespace, yaml)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	resources := parseConfigMap(ctx, cm)
-
-	err = reconcileA13eServiceAccount(ctx, r.Client)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	clusterrole, err := reconcileA13eRole(ctx, r.Client, r.Mapper, resources)
-	if err != nil {
+	var err error
+	var clusterrole *rbacv1.ClusterRole
+	if clusterrole, err = reconcileAllCommonResources(ctx, r.Client, r.Mapper, kaconfig.Namespace, kaconfig.Spec.Resources); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	_, err = r.reconcileA13eRoleBinding(ctx, kaconfig, clusterrole)
 	if err != nil {
 		return ctrl.Result{}, err
-	}
-
-	if len(resources) > 0 {
-		err = reconcileA13e(ctx, r.Client, resources)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	} else {
-		log.Info("No resources, not reconciling ApiServerSource")
 	}
 
 	role, err := r.reconcileSinkRole(ctx, kaconfig)
@@ -162,7 +135,7 @@ func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kac
 		resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
 		resources = append(resources, resource)
 	}
-	return r.reconcileRole(ctx, kaconfig, k9eSinkName, createPolicyRules(ctx, r.Mapper, resources, []string{"delete"}))
+	return r.reconcileRole(ctx, kaconfig, constants.KubeArchiveSinkName, createPolicyRules(ctx, r.Mapper, resources, []string{"delete"}))
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, name string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {
@@ -269,7 +242,7 @@ func (r *KubeArchiveConfigReconciler) desiredRoleBinding(kaconfig *kubearchivev1
 		Subjects: []rbacv1.Subject{{
 			Kind:      "ServiceAccount",
 			Name:      name,
-			Namespace: k9eNs,
+			Namespace: constants.KubeArchiveNamespace,
 		}},
 	}
 

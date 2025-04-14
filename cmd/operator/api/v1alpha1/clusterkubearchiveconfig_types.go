@@ -35,14 +35,6 @@ type ClusterKubeArchiveConfigList struct {
 	Items           []ClusterKubeArchiveConfig `json:"items"`
 }
 
-func LoadClusterKubeArchiveConfigFromFile(path string) ([]KubeArchiveConfigResource, error) {
-	return LoadKubeArchiveConfigFromFile(path)
-}
-
-func LoadClusterKubeArchiveConfigFromString(yamlString string) ([]KubeArchiveConfigResource, error) {
-	return LoadKubeArchiveConfigFromString(yamlString)
-}
-
 func init() {
 	SchemeBuilder.Register(&ClusterKubeArchiveConfig{}, &ClusterKubeArchiveConfigList{})
 }

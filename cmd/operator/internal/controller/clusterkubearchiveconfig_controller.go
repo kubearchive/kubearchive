@@ -29,6 +29,7 @@ type ClusterKubeArchiveConfigReconciler struct {
 	Mapper meta.RESTMapper
 }
 
+//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=sinkfilters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfigs/finalizers,verbs=update
@@ -50,31 +51,27 @@ func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req 
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	finalizerName := "kubearchive.org/finalizer"
-
 	if ckaconfig.DeletionTimestamp.IsZero() {
 		// The object is not being deleted, add the finalizer if necessary.
-		if !controllerutil.ContainsFinalizer(ckaconfig, finalizerName) {
-			controllerutil.AddFinalizer(ckaconfig, finalizerName)
+		if !controllerutil.ContainsFinalizer(ckaconfig, resourceFinalizerName) {
+			controllerutil.AddFinalizer(ckaconfig, resourceFinalizerName)
 			if err := r.Client.Update(ctx, ckaconfig); err != nil {
 				return ctrl.Result{}, err
 			}
 		}
 	} else {
 		// The object is being deleted.
-		if controllerutil.ContainsFinalizer(ckaconfig, finalizerName) {
-			// Finalizer is present, clean up filters from ConfigMap and remove Namespace label.
+		if controllerutil.ContainsFinalizer(ckaconfig, resourceFinalizerName) {
+			// Finalizer is present, reconcile all with resources set to nil
 
 			log.Info("Deleting ClusterKubeArchiveConfig")
 
-			// Clean filters.
-			err := deleteNamespaceFromFilterConfigMap(ctx, r.Client, constants.SinkFiltersGlobalNamespace)
-			if err != nil {
+			if _, err := reconcileAllCommonResources(ctx, r.Client, r.Mapper, constants.SinkFilterGlobalNamespace, nil); err != nil {
 				return ctrl.Result{}, err
 			}
 
 			// Remove the finalizer from the list and update it.
-			controllerutil.RemoveFinalizer(ckaconfig, finalizerName)
+			controllerutil.RemoveFinalizer(ckaconfig, resourceFinalizerName)
 			if err := r.Client.Update(ctx, ckaconfig); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -84,35 +81,8 @@ func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req 
 		return ctrl.Result{}, nil
 	}
 
-	yaml, err := convertToYamlString(ckaconfig.Spec.Resources)
-	if err != nil {
-		log.Error(err, "Failed to convert ClusterKubeArchiveConfig resources to YAML")
+	if _, err := reconcileAllCommonResources(ctx, r.Client, r.Mapper, constants.SinkFilterGlobalNamespace, ckaconfig.Spec.Resources); err != nil {
 		return ctrl.Result{}, err
-	}
-
-	cm, err := reconcileFilterConfigMap(ctx, r.Client, constants.SinkFiltersGlobalNamespace, yaml)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	resources := parseConfigMap(ctx, cm)
-
-	err = reconcileA13eServiceAccount(ctx, r.Client)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	_, err = reconcileA13eRole(ctx, r.Client, r.Mapper, resources)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if len(resources) > 0 {
-		err = reconcileA13e(ctx, r.Client, resources)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	} else {
-		log.Info("No resources, not reconciling ApiServerSource")
 	}
 
 	return ctrl.Result{}, nil

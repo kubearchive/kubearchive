@@ -53,6 +53,26 @@ webhooks:
         resources:
           - clusterkubearchiveconfigs
     sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: kubearchive-operator-webhooks
+        namespace: kubearchive
+        path: /mutate-kubearchive-kubearchive-org-v1alpha1-sinkfilter
+    failurePolicy: Fail
+    name: msinkfilter.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - sinkfilter
+    sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -105,4 +125,24 @@ webhooks:
           - UPDATE
         resources:
           - clusterkubearchiveconfigs
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: kubearchive-operator-webhooks
+        namespace: kubearchive
+        path: /validate-kubearchive-kubearchive-org-v1alpha1-sinkfilter
+    failurePolicy: Fail
+    name: vsinkfilter.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - sinkfilter
     sideEffects: None

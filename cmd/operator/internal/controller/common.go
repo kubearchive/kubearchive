@@ -9,7 +9,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"os"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -35,22 +35,48 @@ import (
 const (
 	ApiServerSourceLabelName  = "kubearchive.org/enabled"
 	ApiServerSourceLabelValue = "true"
+	resourceFinalizerName     = "kubearchive.org/finalizer"
 )
 
 var (
-	k9eNs         = os.Getenv("KUBEARCHIVE_NAMESPACE")
-	a13eName      = k9eNs + "-a13e"
-	k9eSinkName   = "kubearchive-sink"
-	k9eBrokerName = "kubearchive-broker"
+	a13eName = constants.KubeArchiveNamespace + "-a13e"
 )
+
+func reconcileAllCommonResources(ctx context.Context, client client.Client, mapper meta.RESTMapper, namespace string, resources []kubearchivev1alpha1.KubeArchiveConfigResource) (*rbacv1.ClusterRole, error) {
+	log := log.FromContext(ctx)
+
+	log.Info("in ReconcileAllA13eCommonResources")
+
+	var err error
+	var sf *kubearchivev1alpha1.SinkFilter
+	if sf, err = reconcileSinkFilter(ctx, client, namespace, resources); err != nil {
+		return nil, err
+	}
+	sfres := getSinkFilterResources(sf)
+
+	if err = reconcileA13eServiceAccount(ctx, client); err != nil {
+		return nil, err
+	}
+
+	var clusterrole *rbacv1.ClusterRole
+	if clusterrole, err = reconcileA13eRole(ctx, client, mapper, sfres); err != nil {
+		return nil, err
+	}
+
+	if err = reconcileA13e(ctx, client, sfres); err != nil {
+		return nil, err
+	}
+
+	return clusterrole, nil
+}
 
 func reconcileA13eServiceAccount(ctx context.Context, client client.Client) error {
 	log := log.FromContext(ctx)
 
-	log.Info("in ReconcileServiceAccount")
+	log.Info("in reconcileServiceAccount")
 	sa := &corev1.ServiceAccount{}
 
-	err := client.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: k9eNs}, sa)
+	err := client.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: constants.KubeArchiveNamespace}, sa)
 	if errors.IsNotFound(err) {
 		err = client.Create(ctx, desiredA13eServiceAccount())
 		if err != nil {
@@ -69,7 +95,7 @@ func desiredA13eServiceAccount() *corev1.ServiceAccount {
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      a13eName,
-			Namespace: k9eNs,
+			Namespace: constants.KubeArchiveNamespace,
 		},
 	}
 	return sa
@@ -82,9 +108,10 @@ func reconcileA13eRole(ctx context.Context, client client.Client, mapper meta.RE
 func reconcileClusterRole(ctx context.Context, client client.Client, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
 	log := log.FromContext(ctx)
 
-	log.Info("in ReconcileClusterRole " + roleName)
+	log.Info("in reconcileClusterRole " + roleName)
 
 	desired := desiredClusterRole(roleName, rules)
+	log.Info("DESIRED => " + fmt.Sprintf("%+v", desired))
 	existing := &rbacv1.ClusterRole{}
 	err := client.Get(ctx, types.NamespacedName{Name: roleName}, existing)
 	if errors.IsNotFound(err) {
@@ -144,6 +171,7 @@ func createPolicyRules(ctx context.Context, mapper meta.RESTMapper, resources []
 
 	var rules []rbacv1.PolicyRule
 	for group, resList := range groups {
+		log.Info("RULE => group: " + group + " resources: " + strings.Join(resList, ","))
 		rules = append(rules, rbacv1.PolicyRule{
 			APIGroups: []string{group},
 			Resources: resList,
@@ -156,11 +184,11 @@ func createPolicyRules(ctx context.Context, mapper meta.RESTMapper, resources []
 func reconcileA13e(ctx context.Context, client client.Client, resources []sourcesv1.APIVersionKindSelector) error {
 	log := log.FromContext(ctx)
 
-	log.Info("in ReconcileApiServerSource")
+	log.Info("in reconcileApiServerSource")
 	desired := desiredA13e(resources)
 
 	existing := &sourcesv1.ApiServerSource{}
-	err := client.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: k9eNs}, existing)
+	err := client.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: constants.KubeArchiveNamespace}, existing)
 	if errors.IsNotFound(err) {
 		err = client.Create(ctx, desired)
 		if err != nil {
@@ -185,7 +213,7 @@ func reconcileA13e(ctx context.Context, client client.Client, resources []source
 func desiredA13e(resources []sourcesv1.APIVersionKindSelector) *sourcesv1.ApiServerSource {
 	if len(resources) == 0 {
 		// Make sure there's at least one entry to the ApiServerSource starts.
-		resources = append(resources, sourcesv1.APIVersionKindSelector{Kind: "ClusterKubeArchiveConfig", APIVersion: "kubearchive.org/v1alpha1"})
+		resources = append(resources, sourcesv1.APIVersionKindSelector{Kind: "ClusterKubeArchiveConfig", APIVersion: "kubearchive.kubearchive.org/v1alpha1"})
 	}
 
 	source := &sourcesv1.ApiServerSource{
@@ -195,7 +223,7 @@ func desiredA13e(resources []sourcesv1.APIVersionKindSelector) *sourcesv1.ApiSer
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      a13eName,
-			Namespace: k9eNs,
+			Namespace: constants.KubeArchiveNamespace,
 		},
 		Spec: sourcesv1.ApiServerSourceSpec{
 			EventMode:          "Resource",
@@ -206,8 +234,8 @@ func desiredA13e(resources []sourcesv1.APIVersionKindSelector) *sourcesv1.ApiSer
 					Ref: &duckv1.KReference{
 						APIVersion: "eventing.knative.dev/v1",
 						Kind:       "Broker",
-						Name:       k9eBrokerName,
-						Namespace:  k9eNs,
+						Name:       constants.KubeArchiveBrokerName,
+						Namespace:  constants.KubeArchiveNamespace,
 					},
 				},
 			},
@@ -220,22 +248,15 @@ func desiredA13e(resources []sourcesv1.APIVersionKindSelector) *sourcesv1.ApiSer
 	return source
 }
 
-func parseConfigMap(ctx context.Context, cm *corev1.ConfigMap) []sourcesv1.APIVersionKindSelector {
-	log := log.FromContext(ctx)
-
+func getSinkFilterResources(sf *kubearchivev1alpha1.SinkFilter) []sourcesv1.APIVersionKindSelector {
 	resourceMap := map[string]sourcesv1.APIVersionKindSelector{}
 	resourceKeys := make([]string, 0)
-	for namespace, yaml := range cm.Data {
-		kars, err := kubearchivev1alpha1.LoadKubeArchiveConfigFromString(yaml)
-		if err != nil {
-			log.Error(err, "Failed to load KubeArchiveConfigResource for namespace "+namespace)
-			continue
-		}
-		for _, kar := range kars {
-			key := kar.Selector.Kind + "-" + kar.Selector.APIVersion
+	for _, resources := range sf.Spec.Namespaces {
+		for _, resource := range resources {
+			key := resource.Selector.Kind + "-" + resource.Selector.APIVersion
 			if _, ok := resourceMap[key]; !ok {
-				// One include kind and apiVersion, ignore all other filter information.
-				resourceMap[key] = sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
+				// Only include kind and apiVersion, ignore all other filter information.
+				resourceMap[key] = sourcesv1.APIVersionKindSelector{Kind: resource.Selector.Kind, APIVersion: resource.Selector.APIVersion}
 				resourceKeys = append(resourceKeys, key)
 			}
 		}
@@ -249,80 +270,65 @@ func parseConfigMap(ctx context.Context, cm *corev1.ConfigMap) []sourcesv1.APIVe
 	return resources
 }
 
-func reconcileFilterConfigMap(ctx context.Context, client client.Client, namespace string, data string) (*corev1.ConfigMap, error) {
+func reconcileSinkFilter(ctx context.Context, client client.Client, namespace string, resources []kubearchivev1alpha1.KubeArchiveConfigResource) (*kubearchivev1alpha1.SinkFilter, error) {
 	log := log.FromContext(ctx)
 
-	log.Info("in reconcileFilterConfigMap")
+	log.Info("in reconcileSinkFilter")
 
-	cm := &corev1.ConfigMap{}
-	err := client.Get(ctx, types.NamespacedName{Name: constants.SinkFiltersConfigMapName, Namespace: k9eNs}, cm)
+	sf := &kubearchivev1alpha1.SinkFilter{}
+	err := client.Get(ctx, types.NamespacedName{Name: constants.SinkFilterResourceName, Namespace: constants.KubeArchiveNamespace}, sf)
 	if errors.IsNotFound(err) {
-		cm = desiredFilterConfigMap(ctx, nil, namespace, data)
-		err = client.Create(ctx, cm)
+		sf = desiredSinkFilter(ctx, nil, namespace, resources)
+		err = client.Create(ctx, sf)
 		if err != nil {
-			log.Error(err, "Failed to create filter ConfigMap "+constants.SinkFiltersConfigMapName)
+			log.Error(err, "Failed to create SinkFilter "+constants.SinkFilterResourceName)
 			return nil, err
 		}
-		return cm, nil
+		return sf, nil
 	} else if err != nil {
-		log.Error(err, "Failed to reconcile filter ConfigMap "+constants.SinkFiltersConfigMapName)
+		log.Error(err, "Failed to reconcile SinkFilter "+constants.SinkFilterResourceName)
 		return nil, err
 	}
 
-	cm = desiredFilterConfigMap(ctx, cm, namespace, data)
-	err = client.Update(ctx, cm)
+	sf = desiredSinkFilter(ctx, sf, namespace, resources)
+	err = client.Update(ctx, sf)
 	if err != nil {
-		log.Error(err, "Failed to update filter ConfigMap "+constants.SinkFiltersConfigMapName)
+		log.Error(err, "Failed to update SinkFilter "+constants.SinkFilterResourceName)
 		return nil, err
 	}
-	return cm, nil
+	return sf, nil
 }
 
-func desiredFilterConfigMap(ctx context.Context, cm *corev1.ConfigMap, namespace string, data string) *corev1.ConfigMap {
+func desiredSinkFilter(ctx context.Context, sf *kubearchivev1alpha1.SinkFilter, namespace string, resources []kubearchivev1alpha1.KubeArchiveConfigResource) *kubearchivev1alpha1.SinkFilter {
 	log := log.FromContext(ctx)
 
-	log.Info("in desiredFilterConfigMap")
+	log.Info("in desiredSinkFilter")
 
-	if cm == nil {
-		cm = &corev1.ConfigMap{
+	if sf == nil {
+		sf = &kubearchivev1alpha1.SinkFilter{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.SinkFiltersConfigMapName,
-				Namespace: k9eNs,
+				Name:      constants.SinkFilterResourceName,
+				Namespace: constants.KubeArchiveNamespace,
 			},
-			Data: map[string]string{},
+			Spec: kubearchivev1alpha1.SinkFilterSpec{
+				Namespaces: map[string][]kubearchivev1alpha1.KubeArchiveConfigResource{},
+			},
 		}
 	}
 
-	if cm.Data == nil {
-		cm.Data = make(map[string]string)
+	if sf.Spec.Namespaces == nil {
+		sf.Spec.Namespaces = make(map[string][]kubearchivev1alpha1.KubeArchiveConfigResource)
 	}
 
-	cm.Data[namespace] = data
+	if resources != nil {
+		sf.Spec.Namespaces[namespace] = resources
+	} else {
+		delete(sf.Spec.Namespaces, namespace)
+	}
 
-	// Note that the owner reference is NOT set on the ConfigMap.  It should not be deleted when
+	// Note that the owner reference is NOT set on the SinkFilter resource.  It should not be deleted when
 	// the KubeArchiveConfig object is deleted.
-	return cm
-}
-
-func deleteNamespaceFromFilterConfigMap(ctx context.Context, client client.Client, namespace string) error {
-	log := log.FromContext(ctx)
-
-	log.Info("in deleteNamespaceFromFilterConfigMap")
-
-	cm := &corev1.ConfigMap{}
-	err := client.Get(ctx, types.NamespacedName{Name: constants.SinkFiltersConfigMapName, Namespace: k9eNs}, cm)
-	if err != nil {
-		log.Error(err, "Failed to get filter ConfigMap "+constants.SinkFiltersConfigMapName)
-		return err
-	}
-
-	delete(cm.Data, namespace)
-	err = client.Update(ctx, cm)
-	if err != nil {
-		log.Error(err, "Failed to remove namespace '"+namespace+"' from filter ConfigMap "+constants.SinkFiltersConfigMapName)
-		return err
-	}
-	return nil
+	return sf
 }
 
 func convertToYamlString(resources []kubearchivev1alpha1.KubeArchiveConfigResource) (string, error) {

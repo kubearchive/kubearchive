@@ -4,11 +4,6 @@
 package v1alpha1
 
 import (
-	"encoding/json"
-	"os"
-
-	"gopkg.in/yaml.v3"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
@@ -22,7 +17,7 @@ type KubeArchiveConfigResource struct {
 
 // KubeArchiveConfigSpec defines the desired state of KubeArchiveConfig
 type KubeArchiveConfigSpec struct {
-	Resources []KubeArchiveConfigResource `json:"resources,omitempty" yaml:"resources,omitempty"`
+	Resources []KubeArchiveConfigResource `json:"resources" yaml:"resources"`
 }
 
 // KubeArchiveConfigStatus defines the observed state of KubeArchiveConfig
@@ -49,39 +44,6 @@ type KubeArchiveConfigList struct {
 	metav1.TypeMeta `json:",inline" yaml:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Items           []KubeArchiveConfig `json:"items" yaml:"items"`
-}
-
-func LoadKubeArchiveConfigFromFile(path string) ([]KubeArchiveConfigResource, error) {
-	yamlBytes, err := os.ReadFile(path)
-	if err != nil {
-		return []KubeArchiveConfigResource{}, err
-	}
-	return LoadKubeArchiveConfigFromString(string(yamlBytes))
-}
-
-func LoadKubeArchiveConfigFromString(yamlString string) ([]KubeArchiveConfigResource, error) {
-	// Go through the hoops of unmarshalling to JSON so that fields are not lost. Not
-	// all structs have yaml tags on them, which can cause issues when YAML is used directly.
-	var data []interface{}
-
-	// Unmarshal YAML string to generic array
-	err := yaml.Unmarshal([]byte(yamlString), &data)
-	if err != nil {
-		return nil, err
-	}
-	// Marshal to JSON bytes
-	jsonBytes, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
-	// Unmarshall using json package to better preserve data.
-	resources := []KubeArchiveConfigResource{}
-	err = json.Unmarshal(jsonBytes, &resources)
-	if err != nil {
-		return nil, err
-	}
-	return resources, err
 }
 
 func init() {

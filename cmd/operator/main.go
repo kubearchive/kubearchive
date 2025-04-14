@@ -196,6 +196,10 @@ func main() {
 			slog.Error("unable to create webhook", "webhook", "KubeArchiveConfig", "err", err)
 			os.Exit(1)
 		}
+		if err = kubearchiveapi.SetupSinkFilterWebhookWithManager(mgr); err != nil {
+			slog.Error("unable to create webhook", "webhook", "SinkFilter", "err", err)
+			os.Exit(1)
+		}
 	}
 	//+kubebuilder:scaffold:builder
 

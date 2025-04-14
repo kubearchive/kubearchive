@@ -31,7 +31,7 @@ func GlobalNGVKFromObject(obj *unstructured.Unstructured) NamespaceGroupVersionK
 	if obj == nil {
 		return ":"
 	}
-	return NamespaceGVKFromNamespaceAndGvk(constants.SinkFiltersGlobalNamespace, obj.GetObjectKind().GroupVersionKind())
+	return NamespaceGVKFromNamespaceAndGvk(constants.SinkFilterGlobalNamespace, obj.GetObjectKind().GroupVersionKind())
 }
 
 // NamespaceGroupVersionKind returns a NamespaceGroupVersionKind from a namespace and GroupVersionKind.

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -17,22 +16,21 @@ import (
 	ceClient "github.com/cloudevents/sdk-go/v2/client"
 	"github.com/cloudevents/sdk-go/v2/protocol"
 	"github.com/gin-gonic/gin"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
 	"github.com/kubearchive/kubearchive/cmd/sink/filters"
 	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	"github.com/kubearchive/kubearchive/cmd/sink/logs"
 	"github.com/kubearchive/kubearchive/pkg/abort"
+	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/kubearchive/kubearchive/pkg/observability"
-	corev1 "k8s.io/api/core/v1"
 	errs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 )
-
-const namespaceEnvVar = "KUBEARCHIVE_NAMESPACE"
 
 type Controller struct {
 	ceHandler     *ceClient.EventReceiver
@@ -282,21 +280,8 @@ func (c *Controller) Readyz(ctx *gin.Context) {
 		abort.Abort(ctx, err, http.StatusServiceUnavailable)
 		return
 	}
-	ns := os.Getenv(namespaceEnvVar)
-	if ns == "" {
-		err = fmt.Errorf(
-			"could not determine the KubeArchive namespace. Environment variable %s is not set", namespaceEnvVar,
-		)
-		abort.Abort(ctx, err, http.StatusServiceUnavailable)
-	}
-	cm := corev1.ConfigMap{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		},
-	}
-	resource, _ := meta.UnsafeGuessKindToResource(cm.GroupVersionKind())
-	_, err = c.K8sClient.Resource(resource).Namespace(ns).List(ctx.Request.Context(), metav1.ListOptions{})
+
+	_, err = c.K8sClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).List(ctx.Request.Context(), metav1.ListOptions{})
 	if err != nil {
 		abort.Abort(ctx, err, http.StatusServiceUnavailable)
 	}

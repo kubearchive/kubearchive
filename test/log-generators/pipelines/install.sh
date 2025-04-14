@@ -58,6 +58,11 @@ for i in $(seq 1 ${NUM_JOBS}); do
     sed -e "s/name: submit-generate-log/name: submit-generate-log-${i}/" ${CRONJOB}.orig > ${SCRIPT_DIR}/cronjob-${i}.yaml
 done
 
+kubectl apply -f https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml
+kubectl apply -f https://storage.googleapis.com/tekton-releases/triggers/latest/release.yaml
+kubectl apply -f https://storage.googleapis.com/tekton-releases/triggers/latest/interceptors.yaml
+kubectl wait -n tekton-pipelines pod --all --for=condition=ready
+
 kubectl create ns ${NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
 cat ${SCRIPT_DIR}/*.yaml | envsubst | kubectl -n ${NAMESPACE} apply -f -
 kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=90s

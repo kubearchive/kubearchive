@@ -115,5 +115,5 @@ metadata:
   namespace: knative-eventing
 data:
   backend: "zipkin"
-  zipkin-endpoint: "http://grafana-lgtm.kubearchive.svc.cluster.local:9411"
+  zipkin-endpoint: "http://grafana-lgtm.observability.svc.cluster.local:9411"
   sample-rate: "1"

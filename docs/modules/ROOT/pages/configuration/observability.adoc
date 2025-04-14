@@ -1,0 +1,46 @@
+= Observability on KubeArchive
+
+KubeArchive emits observability data using OpenTelemetry: metrics, traces and
+logs. Environment variables on KubeArchive's components control the enablement
+and configuration of features related with observability.
+
+## Custom Metrics
+
+KubeArchive exposes the following custom metrics:
+
+### kubearchive.cloudevents.total
+
+**Labels**: `result`, `event_type` `resource_type`
+
+Tracks the total number of Cloud Events (resource updates) received aggregated by `resource_type`,
+`event_type` and `result`.
+
+* `result`: one of `insert`, `update`, `none`, `error` or `no_match`. `none` is returned when the
+Cloud Event contains data older than the one already persisted (out of order).
+* `resource_type`: a combination of the resource `apiVersion` and `kind`. For example `apps/v1/Deployment`,
+`v1/Pods` or `tekton.dev/v1/PipelineRun`.
+* `event_type`: one of `dev.knative.apiserver.resource.new`, `dev.knative.apiserver.resource.update`
+or `dev.knative.apiserver.resource.delete`.
+
+## Configuring Observability
+
+The following environment variables present on all of the KubeArchive components
+and control the observability behavior:
+
+* `KUBEARCHIVE_OTEL_MODE`: one of "enabled", "delegated" or "disabled". Defaults to
+ "disabled". It controls when observability data is sent to `OTEL_EXPORTER_OTLP_ENDPOINT`:
+** "disabled": do not send traces or metrics.
+** "enabled": always send traces and metrics. Useful for observability in development.
+** "delegated": always send metrics but send traces only when the incoming request sent its traces (see
+link:https://www.w3.org/TR/trace-context-2/#sampled-flag[W3 Trace Context `sampled` flag]).
+Useful for observability in production.
+* `OTEL_EXPORTER_OTLP_ENDPOINT`: an OTLP compatible endpoint where traces are
+    sent. By default it is set to an empty string.
+* `KUBEARCHIVE_OTLP_SEND_LOGS`: if set to "true" logs are sent to the
+    `OTEL_EXPOTER_OTLP_ENDPOINT` and not printed to stdout. Defaults to
+    "false", so logs are printed on stdout by default. When enabled, a single log line
+    is printed to stdout informing that logs will be redirected.
+
+To change these environment variables values, edit or patch KubeArchive's
+components: `deployments/kubearchive-api-server`, `deployments/kubearchive-sink`
+and `deployments/kubearchive-operator`.

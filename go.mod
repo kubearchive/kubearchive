@@ -43,7 +43,7 @@ require (
 	k8s.io/client-go v0.33.0-rc.0
 	k8s.io/klog/v2 v2.130.1
 	knative.dev/eventing v0.44.4
-	knative.dev/pkg v0.0.0-20250411133814-a8e20d9db3aa
+	knative.dev/pkg v0.0.0-20250414114716-4e8ebbe1949a
 	sigs.k8s.io/controller-runtime v0.20.4
 )
 
@@ -156,16 +156,16 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/arch v0.11.0 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
+	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/exp v0.0.0-20250210185358-939b2ce775ac // indirect
-	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/net v0.39.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/sys v0.32.0 // indirect
-	golang.org/x/term v0.30.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/term v0.31.0 // indirect
+	golang.org/x/text v0.24.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
-	golang.org/x/tools v0.31.0 // indirect
+	golang.org/x/tools v0.32.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/api v0.183.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect

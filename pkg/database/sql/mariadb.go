@@ -4,6 +4,7 @@
 package sql
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -11,7 +12,10 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/kubearchive/kubearchive/pkg/database/env"
+	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
+	"github.com/kubearchive/kubearchive/pkg/models"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type mariaDBDatabaseCreator struct{}
@@ -130,6 +134,50 @@ func (mariaDBInserter) ResourceInserter(
 
 type mariaDBDatabase struct {
 	*sqlDatabaseImpl
+}
+
+// FIXME: the WriteResourceResult return value must indicate if the query resulted in an insertion, update, nothing or an error
+func (db *mariaDBDatabase) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, lastUpdated time.Time) (interfaces.WriteResourceResult, error) {
+	tx, err := db.db.BeginTx(ctx, nil)
+	if err != nil {
+		return interfaces.WriteResourceResultError, fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)
+	}
+
+	query, args := db.inserter.ResourceInserter(
+		string(k8sObj.GetUID()),
+		k8sObj.GetAPIVersion(),
+		k8sObj.GetKind(),
+		k8sObj.GetName(),
+		k8sObj.GetNamespace(),
+		k8sObj.GetResourceVersion(),
+		lastUpdated,
+		models.OptionalTimestamp(k8sObj.GetDeletionTimestamp()),
+		data,
+	).BuildWithFlavor(db.flavor)
+
+	_, execErr := tx.ExecContext(
+		ctx,
+		query,
+		args...,
+	)
+	if execErr != nil {
+		rollbackErr := tx.Rollback()
+		if rollbackErr != nil {
+			return interfaces.WriteResourceResultError, fmt.Errorf("write to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
+		}
+		return interfaces.WriteResourceResultError, fmt.Errorf("write to database failed: %s", execErr)
+	}
+
+	execErr = tx.Commit()
+	if execErr != nil {
+		rollbackErr := tx.Rollback()
+		if rollbackErr != nil {
+			return interfaces.WriteResourceResultError, fmt.Errorf("commit to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
+		}
+		return interfaces.WriteResourceResultError, fmt.Errorf("commit to database failed and the transactions was rolled back: %s", execErr)
+	}
+
+	return interfaces.WriteResourceResultInserted, nil
 }
 
 func NewMariaDBDatabase() *mariaDBDatabase {

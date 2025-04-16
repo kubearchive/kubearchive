@@ -12,6 +12,7 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/database/sql"
 )
 
+var CurrentDatabaseSchemaVersion = "1"
 var RegisteredDatabases = map[string]interfaces.Database{
 	"postgresql": sql.NewPostgreSQLDatabase(),
 	"mariadb":    sql.NewMariaDBDatabase(),
@@ -30,7 +31,6 @@ func NewWriter() (interfaces.DBWriter, error) {
 
 func newDatabase() (interfaces.Database, error) {
 	var err error
-
 	once.Do(func() {
 		e, errEnv := env.NewDatabaseEnvironment()
 		if errEnv != nil {

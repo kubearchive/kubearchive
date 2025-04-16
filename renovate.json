@@ -6,5 +6,39 @@
     "gomodTidy"
   ],
   "automerge": true,
-  "prHourlyLimit": 1
+  "prHourlyLimit": 1,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Update _VERSION variables in bash files",
+      "fileMatch": [".sh"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))? packageName=(?<packageName>.+?)(?: versioning=(?<versioning>[a-z-]+?))?\\s(?:export) .+?_VERSION=(?<currentValue>.+?)\\s"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Update versions listed in the documentation",
+      "fileMatch": [".adoc"],
+      "matchStrings": [
+        "\\/\\/ renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))? packageName=(?<packageName>.+?)(?: versioning=(?<versioning>[a-z-]+?))?\\s.+? \\(\\+(?<currentValue>.+?)\\)"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["regex"],
+      "automerge": false
+    },
+    {
+      "matchManagers": ["regex"],
+      "matchDepNames": ["knative-eventing"],
+      "groupName": "knative eventing"
+    },
+    {
+      "matchManagers": ["regex"],
+      "matchDepNames": ["cert-manager"],
+      "groupName": "cert manager"
+    }
+  ]
 }

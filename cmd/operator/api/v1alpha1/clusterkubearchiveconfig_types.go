@@ -47,11 +47,12 @@ func ConvertUnstructuredToClusterKubeArchiveConfig(object *unstructured.Unstruct
 		return nil, err
 	}
 
-	kac := &ClusterKubeArchiveConfig{}
-	if err := json.Unmarshal(bytes, kac); err != nil {
+	ckac := &ClusterKubeArchiveConfig{}
+
+	if err := json.Unmarshal(bytes, ckac); err != nil {
 		return nil, err
 	}
-	return kac, nil
+	return ckac, nil
 }
 
 func init() {

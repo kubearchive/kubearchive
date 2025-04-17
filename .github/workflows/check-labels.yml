@@ -18,6 +18,7 @@ jobs:
       pull-requests: read
     runs-on: ubuntu-latest
     name: Check if required labels are assigned to the PR
+    if: github.actor != 'kubearchive-renovate[bot]'
     steps:
       - name: Check labels
         id: check-labels

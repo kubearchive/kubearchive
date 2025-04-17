@@ -4,7 +4,10 @@
 package v1alpha1
 
 import (
+	"encoding/json"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // ClusterKubeArchiveConfigSpec defines the desired state of ClusterKubeArchiveConfig
@@ -33,6 +36,20 @@ type ClusterKubeArchiveConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []ClusterKubeArchiveConfig `json:"items"`
+}
+
+func ConvertUnstructuredToClusterKubeArchiveConfig(object *unstructured.Unstructured) (*ClusterKubeArchiveConfig, error) {
+	bytes, err := object.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	ckac := &ClusterKubeArchiveConfig{}
+
+	if err := json.Unmarshal(bytes, ckac); err != nil {
+		return nil, err
+	}
+	return ckac, nil
 }
 
 func init() {

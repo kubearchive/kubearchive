@@ -90,7 +90,7 @@ func (f *fakeDatabase) queryResources(_ context.Context, kind, version, _, _ str
 	return f.filterResourcesByKindAndApiVersion(kind, version)
 }
 
-func (f *fakeDatabase) QueryLogURL(_ context.Context, _, _, _, _ string) (string, string, error) {
+func (f *fakeDatabase) QueryLogURL(_ context.Context, _, _, _, _, _ string) (string, string, error) {
 	if len(f.logUrl) == 0 {
 		return "", "", f.err
 	}

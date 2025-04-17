@@ -90,3 +90,34 @@ Examples:
 /apis/batch/v1/namespaces/default/cronjobs/cleanup-tasks
 /api/v1/namespaces/default/pods/busybox-tooling
 ----
+
+=== Logs
+
+[source,text]
+----
+/apis/:group/:version/namespaces/:namespace/:resourceType/:name/log
+/api/:version/namespaces/:namespace/:resourceType/:name/log
+----
+
+Examples:
+
+[source,text]
+----
+/apis/batch/v1/namespaces/default/cronjobs/cleanup-tasks/log
+/api/v1/namespaces/default/pods/busybox-tooling/log
+----
+
+Parameters allowed:
+* `container`: name of the container to select the log from, defaults to an
+empty string.
+
+When `/log` endpoint is called for a resource other than a `Pod`, KubeArchive
+searches, recursively, for any `Pod` owned by the resource. If a `Pod` is found
+its log is returned.
+
+When a `Pod` has multiple containers, a single container is selected in the following
+order of preference:
+
+* `container` parameter
+* `kubectl.kubernetes.io/default-container` Pod annotation
+* First container listed in the Pod definition

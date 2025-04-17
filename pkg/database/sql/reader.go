@@ -89,7 +89,8 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 
 	annotations := pod.GetAnnotations()
 	containerName, ok := annotations[defaultContainerAnnotation]
-	if !ok {
+	// If the annotation is empty get the first container
+	if !ok || containerName == "" {
 		// This is to avoid index out of bounds error with no context
 		if len(pod.Spec.Containers) == 0 {
 			return "", "", fmt.Errorf("pod '%s/%s' does not have containers, something went wrong", namespace, name)

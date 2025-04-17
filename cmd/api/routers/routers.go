@@ -97,6 +97,7 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 	version := context.Param("version")
 	namespace := context.Param("namespace")
 	name := context.Param("name")
+	containerName := context.Query("container")
 
 	apiVersion := version
 	if group != "" {
@@ -104,7 +105,7 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 	}
 
 	logURL, jsonPath, err := c.Database.QueryLogURL(
-		context.Request.Context(), kind, apiVersion, namespace, name)
+		context.Request.Context(), kind, apiVersion, namespace, name, containerName)
 
 	if errors.Is(err, dbErrors.ErrResourceNotFound) {
 		abort.Abort(context, err, http.StatusNotFound)

@@ -62,7 +62,7 @@ func TestLogURLsFromNonExistentResource(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrl, jp, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName)
+			logUrl, jp, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName, "")
 			assert.Equal(t, "", logUrl)
 			assert.Equal(t, "", jp)
 			assert.ErrorContains(t, err, "resource not found")
@@ -136,7 +136,7 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrl, jp, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName)
+			logUrl, jp, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName, "")
 			assert.NoError(t, err)
 			assert.Equal(t, "mock-log-url-pod1-container1", logUrl)
 			assert.Equal(t, jsonPath, jp)
@@ -543,7 +543,7 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 				rows.AddRow(innerTest.expectedLogUrl, "")
 				mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
-				logUrl, jp, err := tt.database.QueryLogURL(context.Background(), pod.Kind, pod.APIVersion, pod.Namespace, pod.Name)
+				logUrl, jp, err := tt.database.QueryLogURL(context.Background(), pod.Kind, pod.APIVersion, pod.Namespace, pod.Name, "")
 				assert.NoError(t, err)
 				assert.Equal(t, innerTest.expectedLogUrl, logUrl)
 				assert.Equal(t, "", jp)

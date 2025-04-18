@@ -17,6 +17,7 @@ resources:
   - templates/logging/configmap.yaml
   - templates/logging/secret.yaml
   - templates/operator/certificates.yaml
+  - templates/operator/cluster_role.yaml
   - templates/operator/kubearchiveconfig_editor_role.yaml
   - templates/operator/kubearchiveconfig_viewer_role.yaml
   - templates/operator/leader_election_role.yaml
@@ -26,7 +27,6 @@ resources:
   - templates/operator/role_binding.yaml
   - templates/operator/service.yaml
   - templates/operator/service_account.yaml
-  - templates/operator/sink_filters.yaml
   - templates/operator/webhooks.yaml
   - templates/sink/role.yaml
   - templates/sink/role_binding.yaml

@@ -9,7 +9,6 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sort"
 	"strings"
 
@@ -54,7 +53,7 @@ func reconcileAllCommonResources(ctx context.Context, client client.Client, mapp
 	}
 	sfres := getSinkFilterResources(sf)
 
-	if err = reconcileA13eServiceAccount(ctx, client); err != nil {
+	if _, err = reconcileServiceAccount(ctx, client, constants.KubeArchiveNamespace, a13eName); err != nil {
 		return nil, err
 	}
 
@@ -70,32 +69,32 @@ func reconcileAllCommonResources(ctx context.Context, client client.Client, mapp
 	return clusterrole, nil
 }
 
-func reconcileA13eServiceAccount(ctx context.Context, client client.Client) error {
+func reconcileServiceAccount(ctx context.Context, client client.Client, namespace string, name string) (*corev1.ServiceAccount, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileServiceAccount")
 	sa := &corev1.ServiceAccount{}
 
-	err := client.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: constants.KubeArchiveNamespace}, sa)
+	err := client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, sa)
 	if errors.IsNotFound(err) {
-		err = client.Create(ctx, desiredA13eServiceAccount())
+		err = client.Create(ctx, desiredServiceAccount(namespace, name))
 		if err != nil {
 			log.Error(err, "Failed to create ServiceAccount")
-			return err
+			return nil, err
 		}
 	} else if err != nil {
 		log.Error(err, "Failed to reconcile ServiceAccount")
-		return err
+		return nil, err
 	}
 
-	return nil
+	return sa, nil
 }
 
-func desiredA13eServiceAccount() *corev1.ServiceAccount {
+func desiredServiceAccount(namespace string, name string) *corev1.ServiceAccount {
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      a13eName,
-			Namespace: constants.KubeArchiveNamespace,
+			Name:      name,
+			Namespace: namespace,
 		},
 	}
 	return sa
@@ -111,7 +110,6 @@ func reconcileClusterRole(ctx context.Context, client client.Client, roleName st
 	log.Info("in reconcileClusterRole " + roleName)
 
 	desired := desiredClusterRole(roleName, rules)
-	log.Info("DESIRED => " + fmt.Sprintf("%+v", desired))
 	existing := &rbacv1.ClusterRole{}
 	err := client.Get(ctx, types.NamespacedName{Name: roleName}, existing)
 	if errors.IsNotFound(err) {
@@ -171,7 +169,6 @@ func createPolicyRules(ctx context.Context, mapper meta.RESTMapper, resources []
 
 	var rules []rbacv1.PolicyRule
 	for group, resList := range groups {
-		log.Info("RULE => group: " + group + " resources: " + strings.Join(resList, ","))
 		rules = append(rules, rbacv1.PolicyRule{
 			APIGroups: []string{group},
 			Resources: resList,

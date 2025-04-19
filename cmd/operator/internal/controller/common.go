@@ -9,7 +9,6 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"sort"
 	"strings"
 
@@ -111,7 +110,6 @@ func reconcileClusterRole(ctx context.Context, client client.Client, roleName st
 	log.Info("in reconcileClusterRole " + roleName)
 
 	desired := desiredClusterRole(roleName, rules)
-	log.Info("DESIRED => " + fmt.Sprintf("%+v", desired))
 	existing := &rbacv1.ClusterRole{}
 	err := client.Get(ctx, types.NamespacedName{Name: roleName}, existing)
 	if errors.IsNotFound(err) {
@@ -171,7 +169,6 @@ func createPolicyRules(ctx context.Context, mapper meta.RESTMapper, resources []
 
 	var rules []rbacv1.PolicyRule
 	for group, resList := range groups {
-		log.Info("RULE => group: " + group + " resources: " + strings.Join(resList, ","))
 		rules = append(rules, rbacv1.PolicyRule{
 			APIGroups: []string{group},
 			Resources: resList,

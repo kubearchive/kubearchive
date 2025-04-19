@@ -17,6 +17,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/klog/v2"
 
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,12 +117,22 @@ func main() {
 
 	cacheOptions := crcache.Options{
 		ByObject: map[client.Object]crcache.ByObject{
+			&corev1.ServiceAccount{}: {
+				Namespaces: make(map[string]crcache.Config),
+				Label:      k8slabels.Everything(),
+			},
 			&kubearchiveapi.ClusterKubeArchiveConfig{}: {
 				Label: k8slabels.Everything(),
 			},
 			&kubearchiveapi.KubeArchiveConfig{}: {
 				Namespaces: make(map[string]crcache.Config),
 				Label:      k8slabels.Everything(),
+			},
+			&rbacv1.ClusterRole{}: {
+				Label: k8slabels.Everything(),
+			},
+			&rbacv1.ClusterRoleBinding{}: {
+				Label: k8slabels.Everything(),
 			},
 			&rbacv1.Role{}: {
 				Namespaces: make(map[string]crcache.Config),

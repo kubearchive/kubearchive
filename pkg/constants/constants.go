@@ -8,17 +8,21 @@ import (
 )
 
 const (
-	KubeArchiveConfigResourceName = "kubearchive"
-	KubeArchiveNamespaceEnvVar    = "KUBEARCHIVE_NAMESPACE"
-	SinkFilterResourceName        = "sink-filters"
-	SinkFilterGlobalNamespace     = "___global___"
+	ClusterKubeArchiveConfigClusterRoleBindingName = "clusterkubearchiveconfig-read"
+	KubeArchiveConfigResourceName                  = "kubearchive"
+	KubeArchiveNamespaceEnvVar                     = "KUBEARCHIVE_NAMESPACE"
+	SinkFilterResourceName                         = "sink-filters"
+	SinkFilterGlobalNamespace                      = "___global___"
 )
 
 var (
 	// These get set in init() and should be treated as const
-	KubeArchiveNamespace  string
-	KubeArchiveBrokerName string
-	KubeArchiveSinkName   string
+	KubeArchiveNamespace         string
+	KubeArchiveBrokerName        string
+	KubeArchiveSinkName          string
+	KubeArchiveVacuumName        string
+	KubeArchiveVacuumBroker      string
+	KubeArchiveClusterVacuumName string
 )
 
 func init() {
@@ -28,4 +32,7 @@ func init() {
 	}
 	KubeArchiveBrokerName = KubeArchiveNamespace + "-broker"
 	KubeArchiveSinkName = KubeArchiveNamespace + "-sink"
+	KubeArchiveVacuumName = KubeArchiveNamespace + "-vacuum"
+	KubeArchiveVacuumBroker = KubeArchiveVacuumName + "-broker"
+	KubeArchiveClusterVacuumName = KubeArchiveNamespace + "-cluster-vacuum"
 }

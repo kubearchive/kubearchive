@@ -211,6 +211,14 @@ func main() {
 			slog.Error("unable to create webhook", "webhook", "SinkFilter", "err", err)
 			os.Exit(1)
 		}
+		if err = kubearchiveapi.SetupNamespaceVacuumConfigWebhookWithManager(mgr); err != nil {
+			slog.Error("unable to create webhook", "webhook", "NamespaceVacuumConfig", "err", err)
+			os.Exit(1)
+		}
+		if err = kubearchiveapi.SetupClusterVacuumConfigWebhookWithManager(mgr); err != nil {
+			slog.Error("unable to create webhook", "webhook", "ClusterVacuumConfig", "err", err)
+			os.Exit(1)
+		}
 	}
 	//+kubebuilder:scaffold:builder
 

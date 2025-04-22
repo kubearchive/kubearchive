@@ -65,7 +65,7 @@ type uuidKindDate struct {
 }
 
 // Returns the log url, the json path and an error given a selector builder for a Pod
-func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbuilder.SelectBuilder, namespace, name string) (string, string, error) {
+func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbuilder.SelectBuilder, namespace, name, containerName string) (string, string, error) {
 	type logURLJsonPath struct {
 		LogURL   string `db:"url"`
 		JsonPath string `db:"json_path"`
@@ -87,14 +87,17 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 		return "", "", fmt.Errorf("failed to deserialize pod '%s/%s': %s", namespace, name, err.Error())
 	}
 
-	annotations := pod.GetAnnotations()
-	containerName, ok := annotations[defaultContainerAnnotation]
-	if !ok {
-		// This is to avoid index out of bounds error with no context
-		if len(pod.Spec.Containers) == 0 {
-			return "", "", fmt.Errorf("pod '%s/%s' does not have containers, something went wrong", namespace, name)
+	if containerName == "" {
+		annotations := pod.GetAnnotations()
+		var ok bool
+		containerName, ok = annotations[defaultContainerAnnotation]
+		if !ok {
+			// This is to avoid index out of bounds error with no context
+			if len(pod.Spec.Containers) == 0 {
+				return "", "", fmt.Errorf("pod '%s/%s' does not have containers, something went wrong", namespace, name)
+			}
+			containerName = pod.Spec.Containers[0].Name
 		}
-		containerName = pod.Spec.Containers[0].Name
 	}
 
 	slog.Debug(
@@ -119,7 +122,7 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 	}
 }
 
-func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name string) (string, string, error) {
+func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (string, string, error) {
 	if kind == "Pod" {
 		sb := db.selector.ResourceSelector()
 		sb = db.sorter.CreationTSAndIDSorter(sb) // If resources are named the same, select the newest
@@ -129,7 +132,7 @@ func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, na
 			db.filter.NameFilter(sb.Cond, name),
 		)
 
-		return db.getLogsForPodSelector(ctx, sb, namespace, name)
+		return db.getLogsForPodSelector(ctx, sb, namespace, name, containerName)
 	}
 
 	// Not a Pod
@@ -174,7 +177,7 @@ func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, na
 	sb = db.selector.ResourceSelector()
 	sb.Where(db.filter.UuidFilter(sb.Cond, pods[0].Uuid))
 
-	return db.getLogsForPodSelector(ctx, sb, namespace, name)
+	return db.getLogsForPodSelector(ctx, sb, namespace, name, containerName)
 }
 
 func (db *sqlDatabaseImpl) getOwnedPodsUuids(ctx context.Context, ownersUuids []string, podUuids []uuidKindDate,

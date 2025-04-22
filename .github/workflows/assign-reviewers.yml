@@ -17,6 +17,7 @@ jobs:
       pull-requests: write
     name: assign and unassign reviewers
     runs-on: ubuntu-latest
+    if: github.actor != 'kubearchive-renovate[bot]'
     steps:
       - name: Assign reviewers by label
         id: assign-reviewers

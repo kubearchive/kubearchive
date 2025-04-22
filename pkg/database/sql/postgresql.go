@@ -77,7 +77,7 @@ func (postgreSQLFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string,
 
 func (postgreSQLFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string, _ *sqlbuilder.WhereClause) string {
 	return fmt.Sprintf(
-		"NOT data->'metadata'->'labels' ?| %s",
+		"((NOT data->'metadata'->'labels' ?| %s) OR data->'metadata'->'labels' IS NULL)",
 		cond.Var(pq.Array(labels)),
 	)
 }
@@ -96,7 +96,7 @@ func (postgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[st
 		jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
 	}
 
-	uuidWithAnyLabelQuery := sqlbuilder.Select("uuid").From("resources")
+	uuidWithAnyLabelQuery := sqlbuilder.Select("uuid").From("resource")
 	uuidWithAnyLabelQuery.AddWhereClause(clause)
 	uuidWithAnyLabelQuery.Where(fmt.Sprintf(
 		"data->'metadata'->'labels' @> ANY(%s::jsonb[])",

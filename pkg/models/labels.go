@@ -27,12 +27,12 @@ func NewLabelFilters(labelRequirements []labels.Requirement) (*LabelFilters, err
 		switch r.Operator() {
 		case selection.Exists:
 			if lf.Exists == nil {
-				lf.Exists = make([]string, 1)
+				lf.Exists = []string{}
 			}
 			lf.Exists = append(lf.Exists, r.Key())
 		case selection.DoesNotExist:
 			if lf.NotExists == nil {
-				lf.NotExists = make([]string, 1)
+				lf.NotExists = []string{}
 			}
 			lf.NotExists = append(lf.NotExists, r.Key())
 		case selection.Equals:

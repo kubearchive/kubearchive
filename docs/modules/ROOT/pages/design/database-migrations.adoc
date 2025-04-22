@@ -1,0 +1,54 @@
+= Database Migrations
+
+This document details the database migration strategy KubeArchive uses. The main goals
+of the migrations are:
+
+* Make the upgrade experience easier
+* Undo DB changes if something goes wrong
+
+**Note**: the implementation of database migrations does not include the execution of those
+migrations. We believe that you should not modify production databases in an unattended way
+so we expect the KubeArchive operator to execute the migrations.
+
+== Requirements
+
+* The same database user that KubeArchive uses runs the migrations to avoid permissions problems.
+* Migrations migrate data as well as the schema.
+* Migrations have forward and backwards implementations (`up` and `down` files).
+
+== Implementation
+
+We decided to use the
+link:https://github.com/golang-migrate/migrate[`migrate` tool]
+due to its popularity and because it's well maintained. It automates part of the migration
+process but you can replace it if needed.
+
+Each database engine integration provides a `migrations` folder (`integrations/database/<db-name>/migrations`).
+All migrations have two files: `up` for upgrades and `down` for downgrades.
+Each file should start with a two digit number and an underscore (for example
+`01_initial.up.sql` and `01_initial.down.sql`).
+
+== Execution
+
+=== Apply all migrations to get the schema up-to-date
+
+[source,bash]
+----
+migrate \
+    -path migrations/ \
+    -database <driver>://<username>:<password>@<ip/dns>:<port>/<database> \
+    up
+----
+
+=== Downgrade one version
+
+[source,bash]
+----
+migrate \
+    -path migrations/ \
+    -database <driver>://<username>:<password>@<ip/dns>:<port>/<database> \
+    down 1
+----
+
+For more details about the CLI usage of `migrate` see
+link:https://github.com/golang-migrate/migrate/tree/master/cmd/migrate[their CLI documentation].

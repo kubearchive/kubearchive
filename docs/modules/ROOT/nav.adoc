@@ -10,6 +10,7 @@
 ** xref:configuration/enable-observability.adoc[Enable Observability]
 ** xref:configuration/kubearchive-logs.adoc[]
 ** xref:configuration/pprof.adoc[]
+** xref:configuration/upgrading.adoc[]
 
 * Contributors
 ** xref:contributors/guide.adoc[Guide]
@@ -29,3 +30,4 @@
 ** xref:design/decisions.adoc[]
 ** xref:design/logging-integration.adoc[]
 ** xref:design/database-interface.adoc[]
+** xref:design/database-migrations.adoc[]

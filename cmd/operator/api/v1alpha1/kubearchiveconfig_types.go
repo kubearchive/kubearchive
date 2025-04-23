@@ -4,9 +4,15 @@
 package v1alpha1
 
 import (
+	"encoding/json"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
+
+var KubeArchiveConfigGVR = schema.GroupVersionResource{Group: "kubearchive.kubearchive.org", Version: "v1alpha1", Resource: "kubearchiveconfigs"}
 
 type KubeArchiveConfigResource struct {
 	Selector        sourcesv1.APIVersionKindSelector `json:"selector,omitempty" yaml:"selector,omitempty"`
@@ -44,6 +50,19 @@ type KubeArchiveConfigList struct {
 	metav1.TypeMeta `json:",inline" yaml:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 	Items           []KubeArchiveConfig `json:"items" yaml:"items"`
+}
+
+func ConvertUnstructuredToKubeArchiveConfig(object *unstructured.Unstructured) (*KubeArchiveConfig, error) {
+	bytes, err := object.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	kac := &KubeArchiveConfig{}
+	if err := json.Unmarshal(bytes, kac); err != nil {
+		return nil, err
+	}
+	return kac, nil
 }
 
 func init() {

@@ -71,7 +71,47 @@ webhooks:
           - CREATE
           - UPDATE
         resources:
-          - sinkfilter
+          - sinkfilters
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: kubearchive-operator-webhooks
+        namespace: kubearchive
+        path: /mutate-kubearchive-kubearchive-org-v1alpha1-namespacevacuumconfig
+    failurePolicy: Fail
+    name: mnamespacevacuumconfig.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - namespacevacuumconfigs
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: kubearchive-operator-webhooks
+        namespace: kubearchive
+        path: /mutate-kubearchive-kubearchive-org-v1alpha1-clustervacuumconfig
+    failurePolicy: Fail
+    name: mclustervacuumconfig.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - clustervacuumconfigs
     sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
@@ -144,5 +184,45 @@ webhooks:
           - CREATE
           - UPDATE
         resources:
-          - sinkfilter
+          - sinkfilters
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: kubearchive-operator-webhooks
+        namespace: kubearchive
+        path: /validate-kubearchive-kubearchive-org-v1alpha1-namespacevacuumconfig
+    failurePolicy: Fail
+    name: vnamespacevacuumconfig.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - namespacevacuumconfigs
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: kubearchive-operator-webhooks
+        namespace: kubearchive
+        path: /validate-kubearchive-kubearchive-org-v1alpha1-clustervacuumconfig
+    failurePolicy: Fail
+    name: vclustervacuumconfig.kb.io
+    rules:
+      - apiGroups:
+          - kubearchive.kubearchive.org
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - clustervacuumconfigs
     sideEffects: None

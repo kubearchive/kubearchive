@@ -29,8 +29,7 @@ type ClusterKubeArchiveConfigReconciler struct {
 	Mapper meta.RESTMapper
 }
 
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=sinkfilters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfigs,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfigs;clustervacuums;namespacevacuums;sinkfilters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=create;delete;get;list;update;watch

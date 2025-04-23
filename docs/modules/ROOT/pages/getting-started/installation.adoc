@@ -19,17 +19,24 @@ This document explains how to install and configure KubeArchive in your Kubernet
 
 == Prepare the Database
 
-. Create a database user `kubearchive`.
-. With a DB admin account, apply the schema provided in the [filename]`kubearchive.sql` file
-within the KubeArchive release:
+. Create a user and a password for KubeArchive to use.
+. Create a database for KubeArchive, with admin permissions granted to the new user.
+  Configure its timezone as UTC and its locale as UTF-8.
+. Clone the
+link:https://github.com/kubearchive/kubearchive[KubeArchive repository]
+and run the SQL migrations for your database, in this example PostgreSQL:
 +
 [source,bash,subs="attributes"]
 ----
-wget {download-path}/kubearchive.sql
-psql -h database.example.com \
--U admin \
--f kubearchive.sql
+git clone https://github.com/kubearchive/kubearchive.git --branch={page-component-display-version}
+cd kubearchive
+migrate \
+    -verbose -path integrations/database/postgresql/migrations/ \
+    -database postgresql://<kubearchive-user>:<kubearchive-password>@<postgresql-host>:<postgresql-port>/<kubearchive-database> \
+    up
 ----
++
+This configures the DB with the proper schema so KubeArchive can write and read resources.
 
 More information about the schema and its customization in the
 xref:integrations/database.adoc#_configuration_and_customization[Database Integration]

@@ -34,7 +34,10 @@ while ! nc -vz localhost ${LOCAL_PORT} > /dev/null 2>&1 ; do
     sleep 0.5
 done
 echo .
-psql -h localhost -U postgres -p ${LOCAL_PORT} -f kubearchive.sql
+psql -h localhost -U postgres -p ${LOCAL_PORT} -f setup.sql
+
+export PGPASSWORD="Databas3Passw0rd"  # notsecret
+migrate -verbose -path migrations/ -database postgresql://kubearchive:${PGPASSWORD}@localhost:${LOCAL_PORT}/kubearchive up
 
 # Kill all background jobs, including the port-forward started earlier.
 trap 'kill $(jobs -p)' EXIT

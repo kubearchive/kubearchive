@@ -1,0 +1,86 @@
+= Upgrading KubeArchive
+
+This document details the process to upgrade your KubeArchive installation.
+
+[IMPORTANT]
+====
+* KubeArchive is not backward compatible with database changes.
+  Both application and schema must be upgraded at the same time.
+* Backup your database before doing a KubeArchive upgrade.
+====
+
+. Scale down KubeArchive:
++
+[source,bash]
+----
+kubectl scale -n kubearchive deployment -l app.kubernetes.io/part-of=kubearchive --replicas 0
+----
+
+. Download the KubeArchive repository and switch to the version you would like to upgrade
+to.
++
+[source,bash]
+----
+git clone https://github.com/kubearchive/kubearchive.git --branch=v1.1.0 kubearchive-v1.1.0
+----
+
+. Run the database migrations:
++
+[source,bash]
+----
+cd kubearchive-v1.1.0
+migrate -verbose \
+    -path integrations/database/postgresql/migrations/ \
+    -database postgresql://<kubearchive-user>:<kubearchive-password>@<postgresql-host>:<postgresql-port>/<kubearchive-database> \
+    up
+----
+
+. Apply the new KubeArchive manifests and scale up KubeArchive:
++
+[source,bash]
+----
+kubectl apply -n kubearchive \
+    -f https://github.com/kubearchive/kubearchive/releases/download/v1.1.0/kubearchive.yaml
+kubectl scale -n kubearchive deployment -l app.kubernetes.io/part-of=kubearchive --replicas 1
+----
+
+. Check pods/deployments are running correctly:
++
+[source,bash]
+----
+kubectl get -n kubearchive all
+kubectl logs -n kubearchive deployment/kubearchive-sink
+kubectl logs -n kubearchive deployment/kubearchive-api-server
+kubectl logs -n kubearchive deployment/kubearchive-operator
+----
+
+== Handling Upgrade Or Downgrade Failure
+
+When a migration fails, the version of the database changes but it is left in a
+state with data and/or schema inconsistencies. That stops `migrate` from applying more migrations:
+
+[source,text]
+----
+error: Dirty database version <VERSION>. Fix and force version.
+----
+
+When this happens inspect the state of the database to decide how to proceed.
+When you fix the problem, force the migration to the desired version with
+link:https://github.com/golang-migrate/migrate/blob/master/GETTING_STARTED.md#forcing-your-database-version[the following command]
+(continuing the PostgreSQL example):
+
+[source,bash]
+----
+migrate -verbose \
+    -path integrations/database/postgresql/migrations/ \
+    -database postgresql://<kubearchive-user>:<kubearchive-password>@<postgresql-host>:<postgresql-port>/<kubearchive-database> \
+    force <VERSION>
+----
+
+[WARNING]
+====
+The schema version for `migrate force` must be:
+* `<VERSION -1>` when you rolled back the changes of `migrate` and you overrode the migration file.
+* `<VERSION>` when you manually completed the failed `migrate` execution.
+Then run `migrate up` again to make sure you apply the whole migration stack.
+====

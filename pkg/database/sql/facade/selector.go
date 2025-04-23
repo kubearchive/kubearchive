@@ -12,6 +12,7 @@ type DBSelector interface {
 	OwnedResourceSelector() *sqlbuilder.SelectBuilder
 	UrlFromResourceSelector() *sqlbuilder.SelectBuilder
 	UrlSelector() *sqlbuilder.SelectBuilder
+	VersionSelector() *sqlbuilder.SelectBuilder
 }
 
 // PartialDBSelectorImpl implements partially the DBSelector interface
@@ -34,4 +35,9 @@ func (PartialDBSelectorImpl) UrlFromResourceSelector() *sqlbuilder.SelectBuilder
 func (PartialDBSelectorImpl) UrlSelector() *sqlbuilder.SelectBuilder {
 	sb := sqlbuilder.NewSelectBuilder()
 	return sb.Select("url", "json_path").From("log_url")
+}
+
+func (PartialDBSelectorImpl) VersionSelector() *sqlbuilder.SelectBuilder {
+	sb := sqlbuilder.NewSelectBuilder()
+	return sb.Select("version").From("schema_migrations")
 }

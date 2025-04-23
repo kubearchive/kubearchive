@@ -46,6 +46,13 @@ func (db *sqlDatabaseImpl) Init(env map[string]string) error {
 	return nil
 }
 
+func (db *sqlDatabaseImpl) QueryDatabaseSchemaVersion(ctx context.Context) (string, error) {
+	strQueryPerformer := newQueryPerformer[string](db.db, db.flavor)
+
+	sb := db.selector.VersionSelector()
+	return strQueryPerformer.performSingleRowQuery(ctx, sb)
+}
+
 func (db *sqlDatabaseImpl) Ping(ctx context.Context) error {
 	return db.db.PingContext(ctx)
 }

@@ -6,9 +6,12 @@ package k8s
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 )
 
 // returns a dynamic.DynamicClient. This is different than the kubernetes.ClientSet used in the api server and allows the
@@ -38,4 +41,23 @@ func GetKubernetesClientset() (*kubernetes.Clientset, error) {
 		return nil, fmt.Errorf("error instantiating k8s from host %s: %s", config.Host, err)
 	}
 	return client, nil
+}
+
+func GetRESTMapper() (meta.RESTMapper, error) {
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving in-cluster k8s client config: %s", err)
+	}
+
+	discoveryClient, err := discovery.NewDiscoveryClientForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	groupResources, err := restmapper.GetAPIGroupResources(discoveryClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return restmapper.NewDiscoveryRESTMapper(groupResources), nil
 }

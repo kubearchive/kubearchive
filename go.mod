@@ -42,7 +42,7 @@ require (
 	k8s.io/cli-runtime v0.32.4
 	k8s.io/client-go v0.33.0-rc.1
 	k8s.io/klog/v2 v2.130.1
-	knative.dev/eventing v0.44.5
+	knative.dev/eventing v0.45.0
 	knative.dev/pkg v0.0.0-20250421155937-757c99c8c03f
 	sigs.k8s.io/controller-runtime v0.20.4
 )
@@ -62,6 +62,7 @@ require (
 	github.com/bytedance/sonic/loader v0.2.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/census-instrumentation/opencensus-proto v0.4.1 // indirect
+	github.com/cert-manager/cert-manager v1.16.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudevents/sdk-go/sql/v2 v2.0.0-20240712172937-3ce6b2f1f011 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
@@ -167,7 +168,7 @@ require (
 	golang.org/x/time v0.10.0 // indirect
 	golang.org/x/tools v0.32.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
-	google.golang.org/api v0.183.0 // indirect
+	google.golang.org/api v0.198.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/grpc v1.72.0 // indirect
@@ -179,6 +180,7 @@ require (
 	k8s.io/apiserver v0.33.0-alpha.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/utils v0.0.0-20241210054802-24370beab758 // indirect
+	sigs.k8s.io/gateway-api v1.1.0 // indirect
 	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/kustomize/api v0.18.0 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.18.1 // indirect

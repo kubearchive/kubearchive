@@ -31,6 +31,12 @@ jobs:
           curl -Lo ./kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
           chmod +x ./kubectl
           sudo mv kubectl /usr/local/bin
+      - name: Install latest migrate
+        run: |
+          set -x
+          curl -L https://github.com/golang-migrate/migrate/releases/latest/download/migrate.linux-amd64.tar.gz | tar xvz migrate
+          chmod +x ./migrate
+          sudo mv migrate /usr/local/bin
       - name: Install KinD
         run: |
           set -x

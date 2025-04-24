@@ -1,0 +1,14 @@
+{
+  "{batch/v1 Job}": [
+    {
+      "Name": "generate-log-wodzzrqa",
+      "Message": "Event sent successfully",
+      "StatusCode": 202
+    },
+    {
+      "Name": "namespace-vacuum-czgeuwcg",
+      "Message": "Event sent successfully",
+      "StatusCode": 202
+    }
+  ]
+}

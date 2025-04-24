@@ -11,10 +11,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -23,6 +25,7 @@ import (
 	"github.com/avast/retry-go/v4"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	"gopkg.in/yaml.v3"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 
 	"k8s.io/client-go/dynamic"
@@ -50,6 +53,8 @@ const (
 	randSuffixLen = 8
 	A13eName      = constants.KubeArchiveConfigResourceName + "-a13e"
 )
+
+var namespaceIndex = 1
 
 func RandomString() string {
 	suffix := make([]byte, randSuffixLen)
@@ -344,7 +349,8 @@ func CreateTestNamespace(t testing.TB, customCleanup bool) (string, *authenticat
 
 	clientset, _ := GetKubernetesClient(t)
 
-	namespace := fmt.Sprintf("test-%s", RandomString())
+	namespace := fmt.Sprintf("test-%03d-%s", namespaceIndex, RandomString())
+	namespaceIndex = namespaceIndex+1
 	t.Log("Creating test namespace '" + namespace + "'")
 
 	_, err := clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
@@ -403,37 +409,49 @@ func CreateTestNamespace(t testing.TB, customCleanup bool) (string, *authenticat
 	return namespace, token
 }
 
-func CreateCKAC(t testing.TB, resources map[string]any) {
-	CreateKAC(t, "", resources)
+func CreateCKAC(t testing.TB, filename string) *kubearchiveapi.ClusterKubeArchiveConfig {
+        object := createAKAC(t, filename, "", "clusterkubearchiveconfigs")
+	ckac, err := kubearchiveapi.ConvertUnstructuredToClusterKubeArchiveConfig(object)
+	if err != nil {
+		t.Fatal("unable to convert to ClusterKubeArchiveConfig:", err)
+	}
+	return ckac
 }
 
-func CreateKAC(t testing.TB, namespace string, resources map[string]any) {
-	_, dynamicClient := GetKubernetesClient(t)
-	kac := newKAC(namespace, resources)
+func CreateKAC(t testing.TB, filename string, namespace string) *kubearchiveapi.KubeArchiveConfig {
+        object := createAKAC(t, filename, namespace, "kubearchiveconfigs")
+	kac, err := kubearchiveapi.ConvertUnstructuredToKubeArchiveConfig(object)
+	if err != nil {
+		t.Fatal("unable to convert to KubeArchiveConfig:", err)
+	}
+	return kac
+}
 
-	var gvr schema.GroupVersionResource
-	var err error
+func createAKAC(t testing.TB, filename string, namespace string, resources string) *unstructured.Unstructured {
+	object := CreateObjectFromFile(t, filename, namespace, resources)
+
+	var haveResources bool
 	if namespace == "" {
-		gvr = kubearchiveapi.GroupVersion.WithResource("clusterkubearchiveconfigs")
-		_, err = dynamicClient.Resource(gvr).Create(context.Background(), kac, metav1.CreateOptions{})
+		ckac, err := kubearchiveapi.ConvertUnstructuredToClusterKubeArchiveConfig(object)
 		if err != nil {
-			t.Log("Could not create ClusterKubeArchiveConfig")
-			t.Fatal(err)
+			t.Fatal("unable to convert to ClusterKubeArchiveConfig:", err)
 		}
+		haveResources = len(ckac.Spec.Resources) > 0
 		namespace = constants.SinkFilterGlobalNamespace
 	} else {
-		gvr = kubearchiveapi.GroupVersion.WithResource("kubearchiveconfigs")
-		_, err = dynamicClient.Resource(gvr).Namespace(namespace).Create(context.Background(), kac, metav1.CreateOptions{})
+		kac, err := kubearchiveapi.ConvertUnstructuredToKubeArchiveConfig(object)
 		if err != nil {
-			t.Logf("Could not create KubeArchiveConfig in namespace '%s'", namespace)
-			t.Fatal(err)
+			t.Fatal("unable to convert to KubeArchiveConfig:", err)
 		}
+		haveResources = len(kac.Spec.Resources) > 0
 	}
 
-	if len(resources) > 0 {
+	if haveResources {
+		_, dynamicClient := GetKubernetesClient(t)
+
 		// If we have resources, make sure ApiServerSource is created and there are sink filters before returning.
 		a13eGvr := sourcesv1.SchemeGroupVersion.WithResource("apiserversources")
-		err = retry.Do(func() error {
+		err := retry.Do(func() error {
 			_, retryErr := dynamicClient.Resource(a13eGvr).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), "kubearchive-a13e", metav1.GetOptions{})
 			return retryErr
 		}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
@@ -460,6 +478,7 @@ func CreateKAC(t testing.TB, namespace string, resources map[string]any) {
 			t.Fatal(err)
 		}
 	}
+	return object
 }
 
 func DeleteCKAC(t testing.TB) {
@@ -489,13 +508,18 @@ func DeleteKAC(t testing.TB, namespace string) {
 
 	// Make sure ClusterKubeArchiveConfig/KubeArchiveConfig is deleted.
 	err = retry.Do(func() error {
-		var retryErr error
 		if namespace == "" {
-			_, retryErr = dynamicClient.Resource(gvr).Get(context.Background(), constants.KubeArchiveConfigResourceName, metav1.GetOptions{})
+			_, retryErr := dynamicClient.Resource(gvr).Get(context.Background(), constants.KubeArchiveConfigResourceName, metav1.GetOptions{})
+			if !errs.IsNotFound(retryErr) {
+				return errors.New("Waiting for ClusterKubeArchiveConfig to be deleted")
+			}
 		} else {
-			_, retryErr = dynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), constants.KubeArchiveConfigResourceName, metav1.GetOptions{})
+			_, retryErr := dynamicClient.Resource(gvr).Namespace(namespace).Get(context.Background(), constants.KubeArchiveConfigResourceName, metav1.GetOptions{})
+			if !errs.IsNotFound(retryErr) {
+				return errors.New("Waiting for KubeArchiveConfig to be deleted")
+			}
 		}
-		return retryErr
+		return nil
 	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
 	if err != nil {
 		t.Fatal(err)
@@ -548,31 +572,117 @@ func DeleteTestNamespace(t testing.TB, namespace string) {
 	}
 }
 
-func newKAC(namespace string, resources map[string]any) *unstructured.Unstructured {
-	kind := "ClusterKubeArchiveConfig"
-	metadata := map[string]string{
-		"name": constants.KubeArchiveConfigResourceName,
-	}
-	if namespace != "" {
-		kind = "KubeArchiveConfig"
-		metadata["namespace"] = namespace
-	}
-	return &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"kind": kind,
-			"apiVersion": fmt.Sprintf("%s/%s",
-				kubearchiveapi.SchemeBuilder.GroupVersion.Group,
-				kubearchiveapi.SchemeBuilder.GroupVersion.Version),
-			"metadata": metadata,
-			"spec":     resources,
-		},
-	}
-}
-
 func OutputLines(t testing.TB, output string) {
 	for _, line := range strings.Split(output, "\n") {
 		if len(line) > 0 {
 			t.Log(line)
 		}
+	}
+}
+
+func WaitForJob(t testing.TB, clientset *kubernetes.Clientset, namespace string, jobName string) {
+	retryErr := retry.Do(func() error {
+		job, err := clientset.BatchV1().Jobs(namespace).Get(context.Background(), jobName, metav1.GetOptions{})
+		if err != nil {
+			return errors.New("Could not find job " + jobName + " in namespace " + namespace + ".")
+		}
+
+		if job.Status.Succeeded == 0 {
+			return errors.New("Job " + jobName + " in namespace " + namespace + " has not completed.")
+		}
+
+		return nil
+	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+}
+
+func GetVacuumResults(t testing.TB, clientset *kubernetes.Clientset, namespace string, jobName string) string {
+	podList, err := clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("job-name=%s", jobName),
+	})
+	if err != nil {
+		t.Fatal(fmt.Sprintf("failed to list pods for job %s: %v", jobName, err))
+	}
+
+	if len(podList.Items) == 0 {
+		t.Fatal(fmt.Sprintf("no pods found for job %s", jobName))
+	}
+
+	podName := podList.Items[0].Name
+
+	req := clientset.CoreV1().Pods(namespace).GetLogs(podName, &corev1.PodLogOptions{})
+	podLogs, err := req.Stream(context.Background())
+	if err != nil {
+		t.Fatal(fmt.Sprintf("error opening stream for pod %s logs: %v", podName, err))
+	}
+	defer podLogs.Close()
+
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, podLogs)
+	if err != nil {
+		t.Fatal(fmt.Sprintf("error copying logs from pod %s: %v", podName, err))
+	}
+
+	//t.Log(buf.String())
+	regex := regexp.MustCompile("(?s)^.*(Cluster|Namespace) vacuum results:\n")
+	results := regex.ReplaceAllString(buf.String(), "")
+
+	return cleanResults(results)
+}
+
+func cleanResults(results string) string {
+	nameRegex := regexp.MustCompile("\"Name\": \"[^\"]+\"")
+	namespaceRegex := regexp.MustCompile("\"test-[^\"]+\"")
+	return namespaceRegex.ReplaceAllString(nameRegex.ReplaceAllString(results, "\"Name\": \"<name-scrubbed>\""), "\"<namespace-scrubbed>\"")
+
+}
+
+func ReadExpected(t testing.TB, file string) string {
+	content, err := ioutil.ReadFile(file)
+	if err != nil {
+		t.Fatal(fmt.Sprintf("unable to read result file: %v", err))
+	}
+
+	return cleanResults(string(content))
+}
+
+func ReadFileIntoUnstructured(t testing.TB, filename string) *unstructured.Unstructured {
+	contents, err := ioutil.ReadFile(filename)
+	if err != nil {
+		t.Fatal("unable to read result file:", err)
+	}
+
+	var object map[string]interface{}
+	err = yaml.Unmarshal([]byte(contents), &object)
+	if err != nil {
+		t.Fatal("unable to unmarshal object:", err)
+	}
+
+	return  &unstructured.Unstructured{Object: object}
+}
+
+func CreateObjectFromFile(t testing.TB, filename string, namespace string, resource string) *unstructured.Unstructured {
+	_, dynamicClient := GetKubernetesClient(t)
+
+	object := ReadFileIntoUnstructured(t, filename)
+
+	gvr := kubearchiveapi.GroupVersion.WithResource(resource)
+	if namespace == "" {
+		res, err := dynamicClient.Resource(gvr).Create(context.Background(), object, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(fmt.Sprintf("Could not create '%s' object from file '%s':", resource, filename), err)
+		}
+		t.Log(fmt.Sprintf("Created '%s' object from file '%s'", resource, filename))
+		return res
+	} else {
+		res, err := dynamicClient.Resource(gvr).Namespace(namespace).Create(context.Background(), object, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(fmt.Sprintf("Could not create '%s' object in namespace '%s' from file '%s':", resource, namespace, filename), err)
+		}
+		t.Log(fmt.Sprintf("Created '%s' object in namespace '%s' from file '%s'", resource, namespace, filename))
+		return res
 	}
 }

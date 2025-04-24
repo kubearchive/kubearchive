@@ -81,61 +81,76 @@ func TestClusterVacuumConfigValidateResources(t *testing.T) {
 		},
 		{
 			name:      "Empty namespaces",
-			spec:      ClusterVacuumConfigSpec{Namespaces: []ClusterVacuumConfigNamespaceSpec{}},
+			spec:      ClusterVacuumConfigSpec{Namespaces: map[string]ClusterVacuumConfigNamespaceSpec{}},
 			validated: true,
 		},
 		{
 			name: "One namespace",
 			spec: ClusterVacuumConfigSpec{
-				Namespaces: []ClusterVacuumConfigNamespaceSpec{
-					{Name: "namespace-1"},
-				}},
+				Namespaces: map[string]ClusterVacuumConfigNamespaceSpec{
+					"namespace-1": {},
+				},
+			},
 			validated: true,
 		},
 		{
 			name: "Muliple namespaces",
 			spec: ClusterVacuumConfigSpec{
-				Namespaces: []ClusterVacuumConfigNamespaceSpec{
-					{Name: "namespace-1"},
-					{Name: "namespace-2"},
-				}},
+				Namespaces: map[string]ClusterVacuumConfigNamespaceSpec{
+					"namespace-1": {},
+					"namespace-2": {},
+				},
+			},
 			validated: true,
 		},
 		{
 			name: "With one resource",
 			spec: ClusterVacuumConfigSpec{
-				Namespaces: []ClusterVacuumConfigNamespaceSpec{
-					{Name: "namespace-1"},
-					{Name: "namespace-2",
-						NamespaceVacuumConfigSpec: NamespaceVacuumConfigSpec{Resources: []sourcesv1.APIVersionKind{
-							{APIVersion: "tekton.dev/v1", Kind: "PipelineRun"},
-						}}},
-				}},
+				Namespaces: map[string]ClusterVacuumConfigNamespaceSpec{
+					"namespace-1": {},
+					"namespace-2": {
+						NamespaceVacuumConfigSpec: NamespaceVacuumConfigSpec{
+							Resources: []sourcesv1.APIVersionKind{
+								{APIVersion: "tekton.dev/v1", Kind: "PipelineRun"},
+							},
+						},
+					},
+				},
+			},
 			validated: true,
 		},
 		{
 			name: "With multiple resources",
 			spec: ClusterVacuumConfigSpec{
-				Namespaces: []ClusterVacuumConfigNamespaceSpec{
-					{Name: "namespace-1"},
-					{Name: "namespace-2",
-						NamespaceVacuumConfigSpec: NamespaceVacuumConfigSpec{Resources: []sourcesv1.APIVersionKind{
-							{APIVersion: "tekton.dev/v1", Kind: "PipelineRun"},
-							{APIVersion: "tekton.dev/v1", Kind: "TaskRun"},
-						}}},
-				}},
+				Namespaces: map[string]ClusterVacuumConfigNamespaceSpec{
+					"namespace-1": {},
+					"namespace-2": {
+						NamespaceVacuumConfigSpec: NamespaceVacuumConfigSpec{
+							Resources: []sourcesv1.APIVersionKind{
+								{APIVersion: "tekton.dev/v1", Kind: "PipelineRun"},
+								{APIVersion: "tekton.dev/v1", Kind: "TaskRun"},
+							},
+						},
+					},
+				},
+			},
 			validated: true,
 		},
 		{
 			name: "Non-configured resource",
 			spec: ClusterVacuumConfigSpec{
-				Namespaces: []ClusterVacuumConfigNamespaceSpec{
-					{Name: "namespace-1"},
-					{Name: "namespace-2",
-						NamespaceVacuumConfigSpec: NamespaceVacuumConfigSpec{Resources: []sourcesv1.APIVersionKind{
-							{APIVersion: "v1", Kind: "Event"},
-						}}},
-				}},
+				Namespaces: map[string]ClusterVacuumConfigNamespaceSpec{
+					"namespace-1": {},
+					"namespace-2": {
+						NamespaceVacuumConfigSpec: NamespaceVacuumConfigSpec{
+							Resources: []sourcesv1.APIVersionKind{
+								{APIVersion: "v1", Kind: "Event"},
+							},
+						},
+					},
+				},
+				
+			},
 			validated: false,
 		},
 	}

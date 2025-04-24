@@ -1,0 +1,8 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+resources:
+  - apiVersion: batch/v1
+    kind: Job
+  - apiVersion: v1
+    kind: Pod

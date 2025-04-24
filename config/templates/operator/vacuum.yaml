@@ -1,0 +1,143 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "kubearchive-cluster-vacuum"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-operator"
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: "kubearchive-cluster-vacuum"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: "kubearchive-operator"
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+rules:
+- apiGroups:
+  - eventing.knative.dev
+  resources:
+  - brokers
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - kubearchive.kubearchive.org
+  resources:
+  - sinkfilters
+  - clustervacuumconfigs
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: "kubearchive-cluster-vacuum"
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: kubearchive-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kubearchive-cluster-vacuum
+subjects:
+  - kind: ServiceAccount
+    name: kubearchive-cluster-vacuum
+    namespace: kubearchive
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterkubearchiveconfig-read
+  labels:
+    app.kubernetes.io/name: kubearchive-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+rules:
+- apiGroups:
+  - kubearchive.kubearchive.org
+  resources:
+  - clusterkubearchiveconfigs
+  verbs:
+  - get
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: clusterkubearchiveconfig-read
+  labels:
+    app.kubernetes.io/name: kubearchive-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: clusterkubearchiveconfig-read
+subjects:
+- kind: ServiceAccount
+  name: kubearchive-cluster-vacuum
+  namespace: kubearchive
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cluster-vacuum
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: kubearchive-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+spec:
+  schedule: "* */3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccount: kubearchive-cluster-vacuum
+          containers:
+            - name: vacuum
+              image: ko://github.com/kubearchive/kubearchive/cmd/vacuum
+              command: [ "/ko-app/vacuum" ]
+              args:
+                - "--type"
+                - "cluster"
+                - "--config"
+                - "cluster-vacuum"
+              env:
+                - name: KUBEARCHIVE_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                     fieldPath: metadata.namespace
+          restartPolicy: Never
+  suspend: true
+---
+apiVersion: kubearchive.kubearchive.org/v1alpha1
+kind: ClusterVacuumConfig
+metadata:
+  name: cluster-vacuum
+  namespace: kubearchive
+  labels:
+    app.kubernetes.io/name: kubearchive-operator
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/part-of: kubearchive
+    app.kubernetes.io/version: "${NEXT_VERSION}"
+spec:
+  namespaces:
+    ___all-namespaces___: {}

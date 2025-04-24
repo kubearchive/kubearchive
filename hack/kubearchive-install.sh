@@ -19,7 +19,8 @@ echo ${NEXT_VERSION}
 export NEXT_VERSION=${NEXT_VERSION}
 
 bash cmd/operator/generate.sh
-kubectl kustomize config/ | envsubst | ko apply -f - --base-import-paths
+kubectl kustomize config/crds | envsubst | kubectl apply -f -
+kubectl kustomize config/templates | envsubst | ko apply -f - --base-import-paths
 
 kubectl -n kubearchive rollout status deployment --timeout=90s
 

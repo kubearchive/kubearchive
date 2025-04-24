@@ -26,26 +26,7 @@ func TestLogging(t *testing.T) {
 	port := test.PortForwardApiServer(t, clientset)
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
-	resources := map[string]any{
-		"resources": []map[string]any{
-			{
-				"selector": map[string]string{
-					"apiVersion": "batch/v1",
-					"kind":       "Job",
-				},
-				"archiveWhen": "has(status.completionTime)",
-			},
-			{
-				"selector": map[string]string{
-					"apiVersion": "v1",
-					"kind":       "Pod",
-				},
-				"archiveWhen": "true",
-			},
-		},
-	}
-
-	test.CreateKAC(t, namespaceName, resources)
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 	job := test.RunLogGenerator(t, namespaceName)
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespaceName, job)
 	retryErr := retry.Do(func() error {
@@ -79,19 +60,7 @@ func TestLogOrder(t *testing.T) {
 	port := test.PortForwardApiServer(t, clientset)
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
-	resources := map[string]any{
-		"resources": []map[string]any{
-			{
-				"selector": map[string]string{
-					"apiVersion": "v1",
-					"kind":       "Pod",
-				},
-				"archiveWhen": "true",
-			},
-		},
-	}
-
-	test.CreateKAC(t, namespaceName, resources)
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 
 	// Create a pod
 	pod := &corev1.Pod{
@@ -148,18 +117,7 @@ func TestDefaultContainer(t *testing.T) {
 	port := test.PortForwardApiServer(t, clientset)
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
-	resources := map[string]any{
-		"resources": []map[string]any{
-			{
-				"selector": map[string]string{
-					"apiVersion": "v1",
-					"kind":       "Pod",
-				},
-				"archiveWhen": "true",
-			},
-		},
-	}
-	test.CreateKAC(t, namespaceName, resources)
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 
 	tests := []struct {
 		podName     string
@@ -252,19 +210,7 @@ func TestQueryContainer(t *testing.T) {
 	port := test.PortForwardApiServer(t, clientset)
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
-	resources := map[string]any{
-		"resources": []map[string]any{
-			{
-				"selector": map[string]string{
-					"apiVersion": "v1",
-					"kind":       "Pod",
-				},
-				"archiveWhen": "true",
-			},
-		},
-	}
-
-	test.CreateKAC(t, namespaceName, resources)
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 
 	// Create a pod
 	pod := &corev1.Pod{
@@ -352,19 +298,7 @@ func TestLogsWithResourceThatHasNoPods(t *testing.T) {
 	port := test.PortForwardApiServer(t, clientset)
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
-	resources := map[string]any{
-		"resources": []map[string]any{
-			{
-				"selector": map[string]string{
-					"apiVersion": "v1",
-					"kind":       "Service",
-				},
-				"archiveWhen": "true",
-			},
-		},
-	}
-
-	test.CreateKAC(t, namespaceName, resources)
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

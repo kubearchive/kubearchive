@@ -15,7 +15,7 @@ spec:
         apiVersion: batch/v1
         kind: Job
       archiveWhen: has(status.startTime)
-      deleteWhen: has(status.completionTime)
+      deleteWhen: timestamp(status.completionTime) < now() - duration("5m")
     - selector:
         apiVersion: v1
         kind: Pod

@@ -23,23 +23,20 @@ import (
 
 func TestKACs(t *testing.T) {
 	tests := map[string]struct {
-		resources map[string]any
-		applyNS   int // Number of namespaces in SinkFilter after apply.
-		deleteNS  int // Number of namespaces in SinkFilter after delete.
+		kac      string
+		applyNS  int // Number of namespaces in SinkFilter after apply.
+		deleteNS int // Number of namespaces in SinkFilter after delete.
 	}{
-		"emptyKAC": {resources: map[string]any{
-			"resources": []map[string]any{}}, applyNS: 1, deleteNS: 0},
-		"nonEmptyKAC": {resources: map[string]any{
-			"resources": []map[string]any{
-				{
-					"selector": map[string]string{
-						"apiVersion": "v1",
-						"kind":       "Pod",
-					},
-					"archiveWhen": "true",
-					"deleteWhen":  "status.phase == 'Succeeded'",
-				},
-			}}, applyNS: 1, deleteNS: 0},
+		"emptyKAC": {
+			kac:      "testdata/kac-empty.yaml",
+			applyNS:  1,
+			deleteNS: 0,
+		},
+		"nonEmptyKAC": {
+			kac:      "testdata/kac-with-job.yaml",
+			applyNS:  1,
+			deleteNS: 0,
+		},
 	}
 	for name, values := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -51,7 +48,7 @@ func TestKACs(t *testing.T) {
 				gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
 				_ = dynaclient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Delete(context.Background(), test.A13eName, metav1.DeleteOptions{})
 			})
-			test.CreateKAC(t, namespace, values.resources)
+			test.CreateKAC(t, values.kac, namespace)
 			checkResourcesAfterApply(t, namespace, name, values.applyNS)
 			test.DeleteKAC(t, namespace)
 			checkResourcesAfterDelete(t, namespace, name, values.deleteNS)
@@ -211,29 +208,6 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, testName string, 
 func TestGlobalAndLocalKAC(t *testing.T) {
 	t.Helper()
 
-	globalres := map[string]any{
-		"resources": []map[string]any{
-			{
-				"selector": map[string]string{
-					"apiVersion": "v1",
-					"kind":       "Pod",
-				},
-				"archiveWhen": "status.phase == 'Succeeded'",
-			},
-		},
-	}
-	localres := map[string]any{
-		"resources": []map[string]any{
-			{
-				"selector": map[string]string{
-					"apiVersion": "batch/v1",
-					"kind":       "Job",
-				},
-				"archiveWhen": "has(status.completionTime)",
-			},
-		},
-	}
-
 	t.Cleanup(func() {
 		test.DeleteCKAC(t)
 	})
@@ -242,8 +216,8 @@ func TestGlobalAndLocalKAC(t *testing.T) {
 	port := test.PortForwardApiServer(t, clientset)
 	namespace, token := test.CreateTestNamespace(t, false)
 
-	test.CreateCKAC(t, globalres)
-	test.CreateKAC(t, namespace, localres)
+	test.CreateCKAC(t, "testdata/ckac-with-pod.yaml")
+	test.CreateKAC(t, "testdata/kac-with-job.yaml", namespace)
 
 	job := test.RunLogGenerator(t, namespace)
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespace, job)

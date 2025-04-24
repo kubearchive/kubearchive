@@ -1,0 +1,11 @@
+{
+  "test-afojwktl": {
+    "{batch/v1 Job}": [
+      {
+        "Name": "generate-log-wbymbdol",
+        "Message": "Event sent successfully",
+        "StatusCode": 202
+      }
+    ]
+  }
+}

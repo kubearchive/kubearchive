@@ -116,7 +116,7 @@ func validateResources(client dynamic.Interface, namespace string, resources []s
 		_, nok := nres[resource]
 		if !gok && !nok {
 			errList = append(errList, errors.New("Resource with APIVersion '"+resource.APIVersion+"' and kind '"+
-				resource.Kind+"' is not configured for KubeArchive"))
+				resource.Kind+"' in namespace '"+namespace+"' is not configured for KubeArchive"))
 		}
 	}
 	return errors.Join(errList...)
@@ -146,11 +146,11 @@ func getGlobalResourceSet(client dynamic.Interface) (map[sourcesv1.APIVersionKin
 func getNamespaceResourceSet(client dynamic.Interface, namespace string) (map[sourcesv1.APIVersionKind]struct{}, error) {
 	object, err := client.Resource(KubeArchiveConfigGVR).Namespace(namespace).Get(context.Background(), constants.KubeArchiveConfigResourceName, metav1.GetOptions{})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("in namespace '%s': %v", namespace, err)
 	}
 	kac, err := ConvertUnstructuredToKubeArchiveConfig(object)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("in namespace '%s': %v", namespace, err)
 	}
 
 	resources := map[sourcesv1.APIVersionKind]struct{}{}

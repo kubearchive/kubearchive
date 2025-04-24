@@ -4,16 +4,20 @@
 package v1alpha1
 
 import (
+	"encoding/json"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
-var NamespaceVacuumConfigGVR = schema.GroupVersionResource{Group: "kubearchive.kubearchive.org", Version: "v1alpha1", Resource: "namespacevacuumconfigss"}
+var NamespaceVacuumConfigGVR = schema.GroupVersionResource{Group: "kubearchive.kubearchive.org", Version: "v1alpha1", Resource: "namespacevacuumconfigs"}
 
 // VacuumListSpec defines the desired state of VacuumList resource
 type NamespaceVacuumConfigSpec struct {
-	Resources []sourcesv1.APIVersionKind `json:"resources" yaml:"resources"`
+	Resources []sourcesv1.APIVersionKind `json:"resources,omitempty" yaml:"resources"`
 }
 
 // NamespaceVacuumConfigStatus defines the observed state of NamespaceVacuumConfig resource
@@ -40,6 +44,30 @@ type NamespaceVacuumConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []NamespaceVacuumConfig `json:"items"`
+}
+
+func ConvertObjectToNamespaceVacuumConfig(object runtime.Object) (*NamespaceVacuumConfig, error) {
+	unstructuredData, err := runtime.DefaultUnstructuredConverter.ToUnstructured(object)
+	if err != nil {
+		return nil, err
+	}
+	obj := &unstructured.Unstructured{Object: unstructuredData}
+
+	return ConvertUnstructuredToNamespaceVacuumConfig(obj)
+}
+
+func ConvertUnstructuredToNamespaceVacuumConfig(object *unstructured.Unstructured) (*NamespaceVacuumConfig, error) {
+	bytes, err := object.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	config := &NamespaceVacuumConfig{}
+
+	if err := json.Unmarshal(bytes, config); err != nil {
+		return nil, err
+	}
+	return config, nil
 }
 
 func init() {

@@ -90,10 +90,12 @@ func (cvcv *ClusterVacuumConfigCustomValidator) validateClusterVacuumConfig(cv *
 			cv.Namespace, constants.KubeArchiveNamespace))
 	}
 
-	for _, ns := range cv.Spec.Namespaces {
-		err := validateResources(dynaClient, ns.Name, ns.Resources)
-		if err != nil {
-			errList = append(errList, err)
+	for ns, value := range cv.Spec.Namespaces {
+		if ns != constants.ClusterVacuumAllNamespaces {
+			err := validateResources(dynaClient, ns, value.Resources)
+			if err != nil {
+				errList = append(errList, err)
+			}
 		}
 	}
 

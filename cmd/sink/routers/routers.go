@@ -25,6 +25,8 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/kubearchive/kubearchive/pkg/observability"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	errs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -108,11 +110,12 @@ func (c *Controller) writeLogs(ctx context.Context, obj *unstructured.Unstructur
 	return nil
 }
 
-func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstructured, event cloudevents.Event) error {
+func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstructured, event cloudevents.Event) (interfaces.WriteResourceResult, error) {
 	lastUpdateTs := k8s.GetLastUpdateTs(obj)
 	dbCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
-	err := c.Db.WriteResource(dbCtx, obj, event.Data(), lastUpdateTs)
+
+	result, err := c.Db.WriteResource(dbCtx, obj, event.Data(), lastUpdateTs)
 	if err != nil {
 		slog.Error(
 			"Failed to write object from cloudevent to the database",
@@ -124,7 +127,7 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 			"name", obj.GetName(),
 			"err", err,
 		)
-		return err
+		return result, err
 	}
 	slog.Info(
 		"Successfully wrote object from cloudevent to the database",
@@ -135,16 +138,32 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 		"namespace", obj.GetNamespace(),
 		"name", obj.GetName(),
 	)
+
 	// only write logs for k8s resources likes pods that have them and UrlBuilder is configured
 	if c.LogUrlBuilder != nil && strings.ToLower(obj.GetKind()) == "pod" {
 		err = c.writeLogs(ctx, obj)
 	}
-	return err
+	return result, err
 }
 
 // receiveCloudEvent returns an HTTP 422 if event.Data is not a kubernetes object. All other failures should return HTTP
 // 500 instead.
 func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Event) protocol.Result {
+	CEMetricAttrs := map[string]string{
+		"event_type": event.Type(),
+		// We default to error because error is the most duplicated result code path
+		"result": string(observability.CEResultError),
+	}
+
+	// We schedule the function call with `defer`, meanwhile `CEMetricAttrs` can be modified
+	defer func() {
+		attrs := []attribute.KeyValue{}
+		for k, v := range CEMetricAttrs {
+			attrs = append(attrs, attribute.String(k, v))
+		}
+		observability.CloudEvents.Add(ctx, 1, metric.WithAttributes(attrs...))
+	}()
+
 	ex := event.Extensions()
 	slog.Info("Received CloudEvent", "event-id", event.ID(), "event-type", event.Type(), "kind", ex["kind"], "name", ex["name"], "namespace", ex["namespace"])
 	k8sObj, err := models.UnstructuredFromByteSlice(event.Data())
@@ -153,12 +172,19 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 		return NewCEResult(http.StatusUnprocessableEntity)
 	}
 
+	CEMetricAttrs["resource_type"] = fmt.Sprintf("%s/%s", k8sObj.GetAPIVersion(), k8sObj.GetKind())
+
+	// If message is of type delete we end early
 	if strings.HasSuffix(event.Type(), ".delete") {
 		if c.Filters.MustArchiveOnDelete(ctx, k8sObj) {
-			err = c.writeResource(ctx, k8sObj, event)
-			if err != nil {
+			result, writeErr := c.writeResource(ctx, k8sObj, event)
+			if writeErr != nil {
 				return NewCEResult(http.StatusInternalServerError)
 			}
+
+			CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
+		} else {
+			CEMetricAttrs["result"] = string(observability.CEResultNoMatch)
 		}
 
 		slog.Info(
@@ -173,6 +199,7 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 		return NewCEResult(http.StatusAccepted)
 	}
 
+	// If resource does not match archival, we exit early
 	if !c.Filters.MustArchive(ctx, k8sObj) {
 		slog.Info(
 			"Resource was updated, no action is needed",
@@ -183,14 +210,17 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
 		)
+		CEMetricAttrs["result"] = string(observability.CEResultNoMatch)
 		return NewCEResult(http.StatusAccepted)
 	}
 
-	err = c.writeResource(ctx, k8sObj, event)
+	result, err := c.writeResource(ctx, k8sObj, event)
 	if err != nil {
 		return NewCEResult(http.StatusInternalServerError)
 	}
 
+	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
+	// If after archiving the resource does not need to be deleted we exit early
 	if !c.Filters.MustDelete(ctx, k8sObj) {
 		slog.Info(
 			"Resource was updated and archived",
@@ -204,6 +234,7 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 		return NewCEResult(http.StatusAccepted)
 	}
 
+	// We first schedule the deletion from the cluster
 	kind := k8sObj.GetObjectKind().GroupVersionKind()
 	resource, _ := meta.UnsafeGuessKindToResource(kind)     // we only need the plural resource
 	propagationPolicy := metav1.DeletePropagationBackground // can't get address of a const
@@ -240,13 +271,15 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 		return NewCEResult(http.StatusInternalServerError)
 	}
 
+	// After deleting the resource we persist it with deletionTimestamp
 	deleteTs := metav1.Now()
 	k8sObj.SetDeletionTimestamp(&deleteTs)
-	err = c.writeResource(ctx, k8sObj, event)
+	result, err = c.writeResource(ctx, k8sObj, event)
 	if err != nil {
 		return NewCEResult(http.StatusInternalServerError)
 	}
 
+	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
 	slog.Info(
 		"Resource was updated, archived and deleted from the cluster",
 		"event-id", event.ID(),
@@ -256,6 +289,7 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 		"namespace", k8sObj.GetNamespace(),
 		"name", k8sObj.GetName(),
 	)
+
 	return NewCEResult(http.StatusAccepted)
 }
 

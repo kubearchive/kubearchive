@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/kubearchive/kubearchive/pkg/database"
+	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -169,12 +170,12 @@ func (f *fakeDatabase) filterResourceByKindApiVersionNamespaceAndName(kind, apiV
 	return filteredResources
 }
 
-func (f *fakeDatabase) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte, _ time.Time) error {
+func (f *fakeDatabase) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte, _ time.Time) (interfaces.WriteResourceResult, error) {
 	if f.err != nil {
-		return f.err
+		return interfaces.WriteResourceResultError, f.err
 	}
 	f.resources = append(f.resources, k8sObj)
-	return nil
+	return interfaces.WriteResourceResultInserted, nil
 }
 
 func (f *fakeDatabase) WriteUrls(_ context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error {

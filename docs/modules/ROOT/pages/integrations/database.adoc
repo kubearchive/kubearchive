@@ -142,7 +142,8 @@ This section includes the development guidelines expected by the KubeArchive mai
 
 If the engine is a sql one, `Database` implementation should be a struct with
 link:https://github.com/kubearchive/kubearchive/blob/main/pkg/database/database.go#L40[`sqlDatabaseImpl`]
-embedded.
+embedded. `sqlDatabaseImpl` is a partial implementation, so make sure the new engine implementation
+fully implements all methods required by the `Database` interface.
 
 Make sure to implement the interfaces that are part of it:
 

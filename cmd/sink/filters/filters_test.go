@@ -45,7 +45,7 @@ func newMockWatcher(t testing.TB, ch <-chan watch.Event) func(metav1.ListOptions
 func TestHandleUpdates(t *testing.T) {
 	unstruct := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "kubearchive.kubearchive.org/v1alpha1",
+			"apiVersion": "kubearchive.org/v1alpha1",
 			"kind":       "SinkFilter",
 			"metadata": map[string]interface{}{
 				"namespace": constants.KubeArchiveNamespace,
@@ -151,7 +151,7 @@ func TestHandleUpdates(t *testing.T) {
 			sf := kubearchiveapi.SinkFilter{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "SinkFilter",
-					APIVersion: "kubearchive.kubearchive.org/v1alpha1",
+					APIVersion: "kubearchive.org/v1alpha1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            constants.SinkFilterResourceName,

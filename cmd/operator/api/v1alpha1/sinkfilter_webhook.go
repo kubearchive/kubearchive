@@ -28,7 +28,7 @@ func SetupSinkFilterWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-kubearchive-kubearchive-org-v1alpha1-sinkfilter,mutating=true,failurePolicy=fail,sideEffects=None,groups=kubearchive.kubearchive.org,resources=sinkfilter,verbs=create;update,versions=v1alpha1,name=msinkfilter.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-kubearchive-org-v1alpha1-sinkfilter,mutating=true,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=sinkfilter,verbs=create;update,versions=v1alpha1,name=msinkfilter.kb.io,admissionReviewVersions=v1
 
 type SinkFilterCustomDefaulter struct{}
 
@@ -44,7 +44,7 @@ func (sfcd *SinkFilterCustomDefaulter) Default(_ context.Context, obj runtime.Ob
 	return nil
 }
 
-//+kubebuilder:webhook:path=/validate-kubearchive-kubearchive-org-v1alpha1-sinkfilter,mutating=false,failurePolicy=fail,sideEffects=None,groups=kubearchive.kubearchive.org,resources=sinkfilter,verbs=create;update,versions=v1alpha1,name=vsinkfilter.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-kubearchive-org-v1alpha1-sinkfilter,mutating=false,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=sinkfilter,verbs=create;update,versions=v1alpha1,name=vsinkfilter.kb.io,admissionReviewVersions=v1
 
 type SinkFilterCustomValidator struct {
 	sinkFilterResourceName string

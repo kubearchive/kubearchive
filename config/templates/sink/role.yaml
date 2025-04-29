@@ -13,7 +13,7 @@ metadata:
     app.kubernetes.io/version: "${NEXT_VERSION}"
 rules:
   - apiGroups:
-      - kubearchive.kubearchive.org
+      - kubearchive.org
     resources:
       - sinkfilters
     verbs:

@@ -27,7 +27,7 @@ func SetupCKACWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-kubearchive-kubearchive-org-v1alpha1-clusterkubearchiveconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfig,verbs=create;update,versions=v1alpha1,name=mclusterkubearchiveconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-kubearchive-org-v1alpha1-clusterkubearchiveconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=clusterkubearchiveconfig,verbs=create;update,versions=v1alpha1,name=mclusterkubearchiveconfig.kb.io,admissionReviewVersions=v1
 
 type ClusterKubeArchiveConfigCustomDefaulter struct{}
 
@@ -43,7 +43,7 @@ func (ckaccd *ClusterKubeArchiveConfigCustomDefaulter) Default(_ context.Context
 	return nil
 }
 
-//+kubebuilder:webhook:path=/validate-kubearchive-kubearchive-org-v1alpha1-clusterkubearchiveconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfig,verbs=create;update,versions=v1alpha1,name=vclusterkubearchiveconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-kubearchive-org-v1alpha1-clusterkubearchiveconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=clusterkubearchiveconfig,verbs=create;update,versions=v1alpha1,name=vclusterkubearchiveconfig.kb.io,admissionReviewVersions=v1
 
 type ClusterKubeArchiveConfigCustomValidator struct {
 	kubearchiveResourceName string

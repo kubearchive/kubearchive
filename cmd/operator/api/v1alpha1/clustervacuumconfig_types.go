@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var ClusterVacuumConfigGVR = schema.GroupVersionResource{Group: "kubearchive.kubearchive.org", Version: "v1alpha1", Resource: "clustervacuumconfigs"}
+var ClusterVacuumConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1alpha1", Resource: "clustervacuumconfigs"}
 
 type ClusterVacuumConfigNamespaceSpec struct {
 	NamespaceVacuumConfigSpec `json:",inline,omitempty"`

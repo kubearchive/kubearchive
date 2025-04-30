@@ -11,26 +11,28 @@ This works fine in many instances, but there are some glaring gaps.
 
 - Archive/delete after some interval
 +
-  For example, take this CEL expression specified for `deleteWhen`:
-+
+--
+For example, take this CEL expression specified for `deleteWhen`:
+ 
 [source,yaml]
 ----
   deleteWhen: timestamp(status.completionTime) < now() - duration("2h")
 ----
-+
-  This indicates that the operation should occur when the `completionTime`
+ 
+This indicates that the operation should occur when the `completionTime`
 of the resource is more than two hours old. However, there will be no event
 to trigger KubeArchive at that time.
+--
 
 - Missed archives/deletes
 +
-  There may be cases, such as KubeArchive downtime, where events are missed.
+There may be cases, such as KubeArchive downtime, where events are missed.
 In this case when KubeArchive restarts it has no idea that it has missed
 events.
 
 - Pre-KubeArchive installation resources
 +
-  Resources exist on the cluster before KubeArchive is installed and
+Resources exist on the cluster before KubeArchive is installed and
 functional. If those resources are not updated after KubeArchive is installed,
 they do not cause cloud events to be emitted that would cause KubeArchive to
 archive or delete them.

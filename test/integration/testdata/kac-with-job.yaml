@@ -8,14 +8,7 @@ metadata:
 spec:
   resources:
     - selector:
-        apiVersion: tekton.dev/v1
-        kind: PipelineRun
+        apiVersion: batch/v1
+        kind: Job
+      archiveWhen: "has(status.completionTime)"
       deleteWhen: timestamp(status.completionTime) < now() - duration("5m")
-    - selector:
-        apiVersion: tekton.dev/v1
-        kind: TaskRun
-      archiveOnDelete: "true"
-    - selector:
-        apiVersion: v1
-        kind: Pod
-      archiveOnDelete: "true"

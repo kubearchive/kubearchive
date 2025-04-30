@@ -1,0 +1,18 @@
+{
+  "test-txsnysit": {
+    "{batch/v1 Job}": [
+      {
+        "Name": "generate-log-ciqcgeqj",
+        "Message": "Event sent successfully",
+        "StatusCode": 202
+      }
+    ],
+    "{v1 Pod}": [
+      {
+        "Name": "generate-log-ciqcgeqj-tp94x",
+        "Message": "Event sent successfully",
+        "StatusCode": 202
+      }
+    ]
+  }
+}

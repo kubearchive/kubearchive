@@ -30,7 +30,7 @@ webhook:
   conversionReviewVersions:
   - v1
 EOF
-for CRD in `find ../../config/crds -name "*.yaml"`; do
+for CRD in `find ../../config/crds -name "kubearchive*.yaml"`; do
     yq -i '.metadata.annotations."cert-manager.io/inject-ca-from"="kubearchive/kubearchive-operator-certificate"' ${CRD}
     yq -i ".spec.conversion = load(\"${PATCH}\")" ${CRD}
 done

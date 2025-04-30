@@ -27,17 +27,7 @@ func TestLabels(t *testing.T) {
 	namespaceName, token := test.CreateTestNamespace(t, false)
 	port := test.PortForwardApiServer(t, clientset)
 
-	test.CreateKAC(t, namespaceName, map[string]any{
-		"resources": []map[string]any{
-			{
-				"selector": map[string]string{
-					"apiVersion": "v1",
-					"kind":       "Pod",
-				},
-				"archiveWhen": "status.phase == 'Succeeded'",
-			},
-		},
-	})
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

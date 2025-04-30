@@ -1,0 +1,20 @@
+{
+  "test-mrkqzwue": {
+    "{v1 Pod}": [
+      {
+        "Name": "generate-log-xqhfsuns-59gcr",
+        "Message": "Event sent successfully",
+        "StatusCode": 202
+      }
+    ]
+  },
+  "test-rpafspzz": {
+    "{batch/v1 Job}": [
+      {
+        "Name": "generate-log-sdbcendq",
+        "Message": "Event sent successfully",
+        "StatusCode": 202
+      }
+    ]
+  }
+}

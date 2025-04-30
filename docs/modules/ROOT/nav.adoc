@@ -21,7 +21,7 @@
 * Reference
 ** xref:reference/database.adoc[]
 ** xref:reference/api.adoc[]
-** xref:reference/vacuum:.adoc[]
+** xref:reference/vacuum:vacuum.adoc[Vacuums]
 
 * Integrations
 ** xref:integrations/database.adoc[Database Integrations]

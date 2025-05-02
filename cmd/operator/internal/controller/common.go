@@ -37,14 +37,10 @@ const (
 	resourceFinalizerName     = "kubearchive.org/finalizer"
 )
 
-var (
-	a13eName = constants.KubeArchiveNamespace + "-a13e"
-)
-
 func reconcileAllCommonResources(ctx context.Context, client client.Client, mapper meta.RESTMapper, namespace string, resources []kubearchivev1alpha1.KubeArchiveConfigResource) (*rbacv1.ClusterRole, error) {
 	log := log.FromContext(ctx)
 
-	log.Info("in ReconcileAllA13eCommonResources")
+	log.Info("in ReconcileAllCommonResources")
 
 	var err error
 	var sf *kubearchivev1alpha1.SinkFilter
@@ -53,7 +49,7 @@ func reconcileAllCommonResources(ctx context.Context, client client.Client, mapp
 	}
 	sfres := getSinkFilterResources(sf)
 
-	if _, err = reconcileServiceAccount(ctx, client, constants.KubeArchiveNamespace, a13eName); err != nil {
+	if _, err = reconcileServiceAccount(ctx, client, constants.KubeArchiveNamespace, constants.KubeArchiveApiServerSourceName); err != nil {
 		return nil, err
 	}
 
@@ -101,7 +97,7 @@ func desiredServiceAccount(namespace string, name string) *corev1.ServiceAccount
 }
 
 func reconcileA13eRole(ctx context.Context, client client.Client, mapper meta.RESTMapper, resources []sourcesv1.APIVersionKindSelector) (*rbacv1.ClusterRole, error) {
-	return reconcileClusterRole(ctx, client, a13eName, createPolicyRules(ctx, mapper, resources, []string{"get", "list", "watch"}))
+	return reconcileClusterRole(ctx, client, constants.KubeArchiveApiServerSourceName, createPolicyRules(ctx, mapper, resources, []string{"get", "list", "watch"}))
 }
 
 func reconcileClusterRole(ctx context.Context, client client.Client, roleName string, rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
@@ -185,7 +181,7 @@ func reconcileA13e(ctx context.Context, client client.Client, resources []source
 	desired := desiredA13e(resources)
 
 	existing := &sourcesv1.ApiServerSource{}
-	err := client.Get(ctx, types.NamespacedName{Name: a13eName, Namespace: constants.KubeArchiveNamespace}, existing)
+	err := client.Get(ctx, types.NamespacedName{Name: constants.KubeArchiveApiServerSourceName, Namespace: constants.KubeArchiveNamespace}, existing)
 	if errors.IsNotFound(err) {
 		err = client.Create(ctx, desired)
 		if err != nil {
@@ -219,12 +215,12 @@ func desiredA13e(resources []sourcesv1.APIVersionKindSelector) *sourcesv1.ApiSer
 			APIVersion: "sources.knative.dev/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      a13eName,
+			Name:      constants.KubeArchiveApiServerSourceName,
 			Namespace: constants.KubeArchiveNamespace,
 		},
 		Spec: sourcesv1.ApiServerSourceSpec{
 			EventMode:          "Resource",
-			ServiceAccountName: a13eName,
+			ServiceAccountName: constants.KubeArchiveApiServerSourceName,
 			Resources:          resources,
 			SourceSpec: duckv1.SourceSpec{
 				Sink: duckv1.Destination{

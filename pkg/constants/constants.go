@@ -18,12 +18,13 @@ const (
 
 var (
 	// These get set in init() and should be treated as const
-	KubeArchiveNamespace         string
-	KubeArchiveBrokerName        string
-	KubeArchiveSinkName          string
-	KubeArchiveVacuumName        string
-	KubeArchiveVacuumBroker      string
-	KubeArchiveClusterVacuumName string
+	KubeArchiveNamespace           string
+	KubeArchiveBrokerName          string
+	KubeArchiveSinkName            string
+	KubeArchiveVacuumName          string
+	KubeArchiveVacuumBroker        string
+	KubeArchiveClusterVacuumName   string
+	KubeArchiveApiServerSourceName string
 )
 
 func init() {
@@ -36,4 +37,5 @@ func init() {
 	KubeArchiveVacuumName = KubeArchiveNamespace + "-vacuum"
 	KubeArchiveVacuumBroker = KubeArchiveVacuumName + "-broker"
 	KubeArchiveClusterVacuumName = KubeArchiveNamespace + "-cluster-vacuum"
+	KubeArchiveApiServerSourceName = KubeArchiveNamespace + "-a13e"
 }

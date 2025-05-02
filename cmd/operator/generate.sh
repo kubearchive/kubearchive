@@ -3,13 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-CONTROLLER_TOOLS_VERSION="v0.14.0"
 LOCALBIN=${SCRIPT_DIR}/bin
 
 mkdir -p ${LOCALBIN}
 
-test -s ${LOCALBIN}/controller-gen && ${LOCALBIN}/controller-gen --version | grep -q ${CONTROLLER_TOOLS_VERSION} || \
-    GOBIN=${LOCALBIN} go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_TOOLS_VERSION}
+test -s ${LOCALBIN}/controller-gen || GOBIN=${LOCALBIN} go install sigs.k8s.io/controller-tools/cmd/controller-gen@latest
 test -s ${LOCALBIN}/setup-envtest || GOBIN=${LOCALBIN} go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
 cd ${SCRIPT_DIR}

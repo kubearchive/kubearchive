@@ -46,7 +46,7 @@ func TestKACs(t *testing.T) {
 				// Delete any created API server source created.
 				_, dynaclient := test.GetKubernetesClient(t)
 				gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
-				_ = dynaclient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Delete(context.Background(), test.A13eName, metav1.DeleteOptions{})
+				_ = dynaclient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Delete(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.DeleteOptions{})
 			})
 			test.CreateKAC(t, values.kac, namespace)
 			checkResourcesAfterApply(t, namespace, name, values.applyNS)
@@ -63,7 +63,7 @@ func checkResourcesAfterApply(t testing.TB, namespace string, testName string, a
 
 	err := retry.Do(func() error {
 		gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
-		_, err := dynaclient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
+		_, err := dynaclient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -77,15 +77,15 @@ func checkResourcesAfterApply(t testing.TB, namespace string, testName string, a
 		} else if len(sf.Spec.Namespaces) != applyNS {
 			return fmt.Errorf("Found %d namespaces in SinkFilter, expected %d", len(sf.Spec.Namespaces), applyNS)
 		}
-		_, err = clientset.CoreV1().ServiceAccounts(constants.KubeArchiveNamespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
+		_, err = clientset.CoreV1().ServiceAccounts(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		_, err = clientset.RbacV1().ClusterRoles().Get(context.Background(), test.A13eName, metav1.GetOptions{})
+		_, err = clientset.RbacV1().ClusterRoles().Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		_, err = clientset.RbacV1().RoleBindings(namespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
+		_, err = clientset.RbacV1().RoleBindings(namespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -138,7 +138,7 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, testName string, 
 
 	err := retry.Do(func() error {
 		gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
-		_, err := dynaclient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
+		_, err := dynaclient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -152,17 +152,17 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, testName string, 
 		} else if len(sf.Spec.Namespaces) != deleteNS {
 			return fmt.Errorf("Found %d namespaces in SinkFilter, expected %d", len(sf.Spec.Namespaces), deleteNS)
 		}
-		_, err = clientset.CoreV1().ServiceAccounts(constants.KubeArchiveNamespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
+		_, err = clientset.CoreV1().ServiceAccounts(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		_, err = clientset.RbacV1().ClusterRoles().Get(context.Background(), test.A13eName, metav1.GetOptions{})
+		_, err = clientset.RbacV1().ClusterRoles().Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-		_, err = clientset.RbacV1().RoleBindings(namespace).Get(context.Background(), test.A13eName, metav1.GetOptions{})
+		_, err = clientset.RbacV1().RoleBindings(namespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
 		if !errs.IsNotFound(err) {
-			return errors.New("Unexpectedly found Rolebinding " + test.A13eName + " in namespace " + namespace + ".")
+			return errors.New("Unexpectedly found Rolebinding " + constants.KubeArchiveApiServerSourceName + " in namespace " + namespace + ".")
 		}
 		_, err = clientset.RbacV1().Roles(namespace).Get(context.Background(), constants.KubeArchiveSinkName, metav1.GetOptions{})
 		if !errs.IsNotFound(err) {

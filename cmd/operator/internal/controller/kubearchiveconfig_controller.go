@@ -565,8 +565,11 @@ func (r *KubeArchiveConfigReconciler) reconcileKubeArchiveClusterConfigReadClust
 
 	log.Info("in reconcileKubeArchiveClusterConfigReadClusterRoleBinding")
 
-	subject := newSubject(kaconfig.Namespace, constants.KubeArchiveVacuumName)
-	_, err := r.reconcileClusterRoleBinding(ctx, constants.ClusterKubeArchiveConfigClusterRoleBindingName, "ClusterRole", add, subject)
+	subjects := []rbacv1.Subject{newSubject(kaconfig.Namespace, constants.KubeArchiveVacuumName)}
+	if add {
+		subjects = append(subjects, newSubject(constants.KubeArchiveNamespace, constants.KubeArchiveClusterVacuumName))
+	}
+	_, err := r.reconcileClusterRoleBinding(ctx, constants.ClusterKubeArchiveConfigClusterRoleBindingName, "ClusterRole", add, subjects...)
 	if err != nil {
 		return err
 	}
@@ -596,8 +599,7 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumBrokerRoleBinding(ctx conte
 
 	log.Info("in reconcileVacuumBrokerRoleBinding")
 
-	subjects := []rbacv1.Subject{}
-	subjects = append(subjects, newSubject(kaconfig.Namespace, constants.KubeArchiveVacuumName))
+	subjects := []rbacv1.Subject{newSubject(kaconfig.Namespace, constants.KubeArchiveVacuumName)}
 	if add {
 		subjects = append(subjects, newSubject(constants.KubeArchiveNamespace, constants.KubeArchiveClusterVacuumName))
 	}

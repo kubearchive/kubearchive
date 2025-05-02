@@ -10,7 +10,7 @@ Only one `ClusterKubeArchiveConfig` resource is allowed, and it must be named
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: ClusterKubeArchiveConfig
 metadata:
   name: kubearchive
@@ -38,7 +38,7 @@ the previous section:
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive
@@ -59,7 +59,7 @@ global `ClusterKubeArchiveConfig` in the previous section:
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive

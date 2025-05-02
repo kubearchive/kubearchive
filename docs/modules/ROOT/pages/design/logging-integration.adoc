@@ -32,7 +32,7 @@ Here's a sample `KubeArchiveConfig` as an example:
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive
@@ -71,7 +71,7 @@ Here's another sample `KubeArchiveConfig` for `PipelineRuns`:
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive

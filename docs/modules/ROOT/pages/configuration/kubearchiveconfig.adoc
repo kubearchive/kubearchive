@@ -5,7 +5,7 @@ a `KubeArchiveConfig` custom resource similar to the following:
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive

@@ -35,9 +35,9 @@ type KubeArchiveConfigReconciler struct {
 	Mapper meta.RESTMapper
 }
 
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clustervacuums;kubearchiveconfigs;namespacevacuums;sinkfilters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=kubearchive.org,resources=clustervacuums;kubearchiveconfigs;namespacevacuums;sinkfilters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=kubearchive.org,resources=kubearchiveconfigs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=kubearchive.org,resources=kubearchiveconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings;clusterroles;roles;rolebindings,verbs=bind;create;delete;escalate;get;list;update;watch
 //+kubebuilder:rbac:groups=sources.knative.dev,resources=apiserversources,verbs=create;delete;get;list;update;watch
@@ -499,11 +499,11 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, k
 
 	resources := []sourcesv1.APIVersionKindSelector{
 		{
-			APIVersion: "kubearchive.kubearchive.org/v1alpha1",
+			APIVersion: "kubearchive.org/v1alpha1",
 			Kind:       "KubeArchiveConfig",
 		},
 		{
-			APIVersion: "kubearchive.kubearchive.org/v1alpha1",
+			APIVersion: "kubearchive.org/v1alpha1",
 			Kind:       "NamespaceVacuumConfig",
 		},
 	}

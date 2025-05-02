@@ -31,7 +31,7 @@ rules:
   - get
   - list
 - apiGroups:
-  - kubearchive.kubearchive.org
+  - kubearchive.org
   resources:
   - sinkfilters
   - clustervacuumconfigs
@@ -69,7 +69,7 @@ metadata:
     app.kubernetes.io/version: "${NEXT_VERSION}"
 rules:
 - apiGroups:
-  - kubearchive.kubearchive.org
+  - kubearchive.org
   resources:
   - clusterkubearchiveconfigs
   verbs:

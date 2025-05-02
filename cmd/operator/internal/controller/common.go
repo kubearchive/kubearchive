@@ -210,7 +210,7 @@ func reconcileA13e(ctx context.Context, client client.Client, resources []source
 func desiredA13e(resources []sourcesv1.APIVersionKindSelector) *sourcesv1.ApiServerSource {
 	if len(resources) == 0 {
 		// Make sure there's at least one entry to the ApiServerSource starts.
-		resources = append(resources, sourcesv1.APIVersionKindSelector{Kind: "ClusterKubeArchiveConfig", APIVersion: "kubearchive.kubearchive.org/v1alpha1"})
+		resources = append(resources, sourcesv1.APIVersionKindSelector{Kind: "ClusterKubeArchiveConfig", APIVersion: "kubearchive.org/v1alpha1"})
 	}
 
 	source := &sourcesv1.ApiServerSource{

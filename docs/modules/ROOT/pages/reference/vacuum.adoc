@@ -89,7 +89,7 @@ in all namespaces configured for KubeArchive.
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: ClusterVacuumConfig
 metadata:
   name: cluster-config
@@ -105,7 +105,7 @@ specified namespaces.
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: ClusterVacuumConfig
 metadata:
   name: cluster-config
@@ -124,7 +124,7 @@ namespaces, but only `Job` resources in a third..
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: ClusterVacuumConfig
 metadata:
   name: cluster-config
@@ -147,7 +147,7 @@ and `Pod` resources in namespace "namespace-2".
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: ClusterVacuumConfig
 metadata:
   name: cluster-config
@@ -261,7 +261,7 @@ namespace defined in the `ClusterKubeArchiveConfig` and the local
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: NamespaceVacuumConfig
 metadata:
   name: name
@@ -277,7 +277,7 @@ the namespace.
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: NamespaceVacuumConfig
 metadata:
   name: name

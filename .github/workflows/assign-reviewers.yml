@@ -10,8 +10,6 @@ on:
       - labeled
 
 jobs:
-  setup:
-    uses: ./.github/workflows/log_run_details.yml
   assign_and_unassign:
     permissions:
       pull-requests: write

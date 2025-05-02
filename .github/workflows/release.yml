@@ -9,8 +9,6 @@ on:
     - cron: "25 09 1,15 * *"
 
 jobs:
-  setup:
-    uses: ./.github/workflows/log_run_details.yml
   release:
     # Run manually or (scheduled and upstream repository), so don't allow for scheduled on forks
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'schedule' && github.repository == 'kubearchive/kubearchive')

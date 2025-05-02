@@ -7,8 +7,6 @@ on:
   pull_request:
     branches: [main]
 jobs:
-  setup:
-    uses: ./.github/workflows/log_run_details.yml
   build:
     runs-on: ubuntu-latest
     steps:

@@ -11,8 +11,6 @@ on:
       - unlabeled
 
 jobs:
-  setup:
-    uses: ./.github/workflows/log_run_details.yml
   check-labels:
     permissions:
       pull-requests: read

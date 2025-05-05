@@ -161,10 +161,23 @@ func (r *KubeArchiveConfigReconciler) SetupKubeArchiveConfigWithManager(mgr ctrl
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.Role, error) {
+	log := log.FromContext(ctx)
+
 	resources := make([]sourcesv1.APIVersionKindSelector, 0)
 	for _, kar := range kaconfig.Spec.Resources {
 		resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
 		resources = append(resources, resource)
+	}
+
+	ckac := &kubearchivev1alpha1.ClusterKubeArchiveConfig{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: constants.KubeArchiveConfigResourceName}, ckac)
+	if err == nil {
+		for _, kar := range ckac.Spec.Resources {
+			resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
+			resources = append(resources, resource)
+		}
+	} else if !errors.IsNotFound(err) {
+		log.Error(err, "Unable to get ClusterKubeArchiveConfg when reconciling sink role ")
 	}
 
 	role, err := r.reconcileRole(ctx, kaconfig, kaconfig.Namespace, constants.KubeArchiveSinkName, createPolicyRules(ctx, r.Mapper, resources, []string{"delete"}))

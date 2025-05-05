@@ -9,8 +9,6 @@ on:
       - edited
 
 jobs:
-  setup:
-    uses: ./.github/workflows/log_run_details.yml
   copy-labels:
     permissions:
       issues: read

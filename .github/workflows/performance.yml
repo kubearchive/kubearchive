@@ -11,8 +11,6 @@ permissions:
   contents: read
   pull-requests: read
 jobs:
-  setup:
-    uses: ./.github/workflows/log_run_details.yml
   integration:
     name: KubeArchive Performance Tests
     runs-on: ubuntu-latest

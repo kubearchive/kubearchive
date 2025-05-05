@@ -1,0 +1,341 @@
+= KubeArchive Vacuums
+
+== Use Cases
+KubeArchive relies on updates to resources to work. An ApiServerSource
+instance is watching for changes to particular resources, and when those
+changes occur it sends cloud events to the KubeArchive sink. Those cloud
+events are then processed by the sink, and if the criteria for archival
+and deletion are met, then those operations are performed.
+
+This works fine in many instances, but there are some glaring gaps.
+
+- Archive/delete after some interval
++
+--
+For example, take this CEL expression specified for `deleteWhen`:
+ 
+[source,yaml]
+----
+  deleteWhen: timestamp(status.completionTime) < now() - duration("2h")
+----
+ 
+This indicates that the operation should occur when the `completionTime`
+of the resource is more than two hours old. However, there will be no event
+to trigger KubeArchive at that time.
+--
+
+- Missed archives/deletes
++
+There may be cases, such as KubeArchive downtime, where events are missed.
+In this case when KubeArchive restarts it has no idea that it has missed
+events.
+
+- Pre-KubeArchive installation resources
++
+Resources exist on the cluster before KubeArchive is installed and
+functional. If those resources are not updated after KubeArchive is installed,
+they do not cause cloud events to be emitted that would cause KubeArchive to
+archive or delete them.
+
+== The Vacuums
+
+The solution to these problems is to utilize KubeArchive vacuums.
+This can be done at the cluster level (by an KubeArchive admin)
+or at the namespace level (by a namespace user).
+
+Vacuums can be run on a schedule using a Kubernetes `CronJob` or
+as a single instance using a `Job`.
+
+=== Cluster Vacuum
+
+The cluster vacuum is used to vacuum resources cluster-wide. A cluster 
+vacuum job must be run from the "kubearchive" namespace. A cluster
+vacuum job allows the KubeArchive admin to control and vacuum all
+namespaces configured for KubeArchive.
+
+==== Cluster Vacuum Configuration
+
+The cluster vacuum can vacuum any or all namespaces that have
+been configured for KubeArchive. For each namespace, any or
+all resources defined in the `ClusterKubeArchiveConfig` and the
+namespace `KubeArchiveConfig` can be vacuumed. The `ClusterVacuumConfig`
+defines a list of namespaces, each of which may specify specific
+resources, to be vacuumed.
+
+An empty list of namespaces in the `ClusterVacuumConfig` indicates that
+all namespaces configured for KubeArchive should be vacuumed.
+
+A list of namespaces in the `ClusterVacuumConfig` indicates that only
+those namespaces should be vacuumed.
+
+A namespace with no resources specified indicates that all resources
+defined in the `ClusterKubeArchiveConfig` and the namespace `KubeArchiveConfig`
+should be archived.
+
+A namespace with specific resources defined indicates that only those
+resources in the namespace should be vacuumed.
+
+The special namespace "___all-namespaces___" indicates that all namespaces
+should be processed. As a namespace, "___all-namespaces___" may also 
+specify a list of resources. If "___all-namespaces___" is specified,
+then all namespaces *not* listed in the `ClusterVacuumConfig` are 
+vacuumed according to the settings for "___all-namespaces___" and
+all listed namespaces are be vacuumed as configured.
+
+The following `ClusterVacuumConfig` vacuums all resources
+in all namespaces configured for KubeArchive.
+
+.Vacuum all configured resources for all namespaces
+[source,yaml]
+----
+---
+apiVersion: kubearchive.org/v1alpha1
+kind: ClusterVacuumConfig
+metadata:
+  name: cluster-config
+  namespace: kubearchive
+spec:
+  namespaces: {}
+----
+
+The following shows how to vacuum all resources in the three
+specified namespaces.
+
+.Vacuum all resources in three namespaces
+[source,yaml]
+----
+---
+apiVersion: kubearchive.org/v1alpha1
+kind: ClusterVacuumConfig
+metadata:
+  name: cluster-config
+  namespace: kubearchive
+spec:
+  namespaces:
+    namespace-1: {}
+    namespace-2: {}
+    namespace-3: {}
+----
+
+The following shows how to vacuum all resources in two
+namespaces, but only `Job` resources in a third..
+
+.Vacuum some resources in three namespaces
+[source,yaml]
+----
+---
+apiVersion: kubearchive.org/v1alpha1
+kind: ClusterVacuumConfig
+metadata:
+  name: cluster-config
+  namespace: kubearchive
+spec:
+  namespaces:
+    namespace-1: {}
+    namespace-2: {}
+    namespace-3:
+      resources:
+        - apiVersion: batch/v1
+          kind: Job
+----
+
+The following shows how to vacuum all `Job` resources in
+all namespaces not listed, all resources in namespace "namespace-1",
+and `Pod` resources in namespace "namespace-2".
+
+.Vacuum all namespaces with custom configuration for others
+[source,yaml]
+----
+---
+apiVersion: kubearchive.org/v1alpha1
+kind: ClusterVacuumConfig
+metadata:
+  name: cluster-config
+  namespace: kubearchive
+spec:
+  namespaces:
+    ___all-namespaces___:
+      resources:
+        - apiVersion: batch/v1
+          kind: Job
+    namespace-1: {}
+    namespace-2:
+      resources:
+        - apiVersion: v1
+          kind: Pod
+----
+
+==== Sample Cluster Vacuum Cronjob
+Following is a sample `Cronjob` that can be used to run a cluster vacuum.
+Kubearchive admins may create one or more `CronJobs` that run schedules
+suitable for their use cases. Each `CronJob` may use a different
+`ClusterVacuumConfig` that specifies which namespaces and which
+resources in those namespaces are to be vacuumed.
+
+Alternatively, a `Job` may be used as well.
+
+The following fields in the `Cronjob` may need to be modified.
+
+- Resource name
+- The schedule
+- The image (may need to point to a specific KubeArchive release)
+- The config name, the name of `ClusterVacuumConfig` in the "kubearchive"
+namespace
+
+[NOTE]
+====
+The cluster vacuum job must be run from the "kubearchive" namespace.
+
+The service account used to run the job should be the
+`kubearchive-cluster-vacuum` service account. This service account is
+created by the KubeArchive operator, along with the
+`kubearchive-cluster-vacuum` `Role` and `RoleBinding` to give the cluster
+vacuum the required permissions.
+
+None of these resources should be modified.
+====
+
+[NOTE]
+====
+There is a sample cluster vacuum `CronJob` named "cluster-vacuum" created
+by the KubeArchive installation which may be used as a template for other
+`CronJobs`. This job is created with `suspend: true` so that it does not run.
+====
+
+[source,yaml]
+----
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cluster-vacuum
+  namespace: kubearchive
+spec:
+  schedule: "* */3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccount: kubearchive-cluster-vacuum
+          containers:
+            - name: vacuum
+              image: quay.io/kubearchive/vacuum:latest
+              command: [ "/ko-app/vacuum" ]
+              args:
+                - "--type"
+                - "cluster"
+                - "--config"
+                - "<cluster-config-name>"
+              env:
+                - name: KUBEARCHIVE_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                     fieldPath: metadata.namespace
+          restartPolicy: Never
+  suspend: false
+----
+
+=== Namespace Vacuum
+
+The namespace vacuum is used to vacuum resources in a specific namespace. The
+resources eligible to be vacuumed are defined in the `ClusterKubeArchiveConfig`
+and the local `KubeArchiveConfig`. Exactly which resources are vacuumed
+are determined by the `NamespaceVacuumConfig` custom resource that is
+passed to the vacuum job.
+
+==== Namespace Vacuum Configuration
+
+The namespace vacuum can process all resources in the namespace defined
+in the `ClusterKubeArchiveConfig` and the local `KubeArchiveConfig`. Which
+resources are actually vacuumed are determined by the `NamespaceVacuumConfig`
+custom resource. The `NamespaceVacuumConfig` lists the resources that 
+should be vacuumed by API version and kind. An empty list of resources
+in the`NamespaceVacuumConfig` indicates that all resources specified
+in both the `ClusterKubeArchiveConfig` and the local `KubeArchiveConfig`
+should be vacuumed.
+
+The following `NamespaceVacuumConfig` vacuums all resources in the
+namespace defined in the `ClusterKubeArchiveConfig` and the local
+`KubeArchiveConfig`.
+
+.Vacuum all configured resources
+[source,yaml]
+----
+---
+apiVersion: kubearchive.org/v1alpha1
+kind: NamespaceVacuumConfig
+metadata:
+  name: name
+  namespace: namespace
+spec:
+    resources: {}
+----
+
+This `NamespaceVacuumConfig` vacuums only `Job` and `Pod` resources in
+the namespace.
+
+.Vacuum specific resources
+[source,yaml]
+----
+---
+apiVersion: kubearchive.org/v1alpha1
+kind: NamespaceVacuumConfig
+metadata:
+  name: name
+  namespace: namespace
+spec:
+    resources:
+     - apiVersion: batch/v1
+       kind: Job
+     - apiVersion: v1
+       kind: Pod
+----
+
+==== Sample Namespace Vacuum Cronjob
+Following is sample Cronjob that can be used to run a namespace vacuum.
+The following fields in the `Cronjob` may need to be modified.
+
+- Resource name and namespace
+- The schedule
+- The image (may need to point to a specific KubeArchive release)
+- The config name, the name of `NamespaceVacuumConfig` in the namespace to
+be vacuumed
+
+[NOTE]
+====
+The service account used to run the job should be the `kubearchive-vacuum`
+service account. This service account is created by the KubeArchive operator,
+along with the `kubearchive-vacuum` `Role` and `RoleBinding` to give the namespace
+vacuum the required permissions.
+
+None of these resources should be modified.
+====
+
+[source,yaml]
+----
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: namespace-vacuum
+  namespace: namespace
+spec:
+  schedule: "* */3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccount: kubearchive-vacuum
+          containers:
+            - name: vacuum
+              image: quay.io/kubearchive/vacuum:latest
+              command: [ "/ko-app/vacuum" ]
+              args:
+                - "--config"
+                - "<namespace-config-name>"
+              env:
+                - name: NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                     fieldPath: metadata.namespace
+          restartPolicy: Never
+  suspend: false
+----

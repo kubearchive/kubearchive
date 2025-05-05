@@ -12,7 +12,7 @@ import (
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
-var KubeArchiveConfigGVR = schema.GroupVersionResource{Group: "kubearchive.kubearchive.org", Version: "v1alpha1", Resource: "kubearchiveconfigs"}
+var KubeArchiveConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1alpha1", Resource: "kubearchiveconfigs"}
 
 type KubeArchiveConfigResource struct {
 	Selector        sourcesv1.APIVersionKindSelector `json:"selector,omitempty" yaml:"selector,omitempty"`

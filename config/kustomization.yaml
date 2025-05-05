@@ -4,11 +4,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - crds/kubearchive.kubearchive.org_clusterkubearchiveconfigs.yaml
-  - crds/kubearchive.kubearchive.org_clustervacuumconfigs.yaml
-  - crds/kubearchive.kubearchive.org_kubearchiveconfigs.yaml
-  - crds/kubearchive.kubearchive.org_namespacevacuumconfigs.yaml
-  - crds/kubearchive.kubearchive.org_sinkfilters.yaml
+  - crds/kubearchive.org_clusterkubearchiveconfigs.yaml
+  - crds/kubearchive.org_clustervacuumconfigs.yaml
+  - crds/kubearchive.org_kubearchiveconfigs.yaml
+  - crds/kubearchive.org_namespacevacuumconfigs.yaml
+  - crds/kubearchive.org_sinkfilters.yaml
   - templates/api_server/api_server.yaml
   - templates/api_server/certificates.yaml
   - templates/api_server/role.yaml
@@ -19,7 +19,6 @@ resources:
   - templates/logging/configmap.yaml
   - templates/logging/secret.yaml
   - templates/operator/certificates.yaml
-  - templates/operator/cluster_role.yaml
   - templates/operator/kubearchiveconfig_editor_role.yaml
   - templates/operator/kubearchiveconfig_viewer_role.yaml
   - templates/operator/leader_election_role.yaml
@@ -29,6 +28,7 @@ resources:
   - templates/operator/role_binding.yaml
   - templates/operator/service.yaml
   - templates/operator/service_account.yaml
+  - templates/operator/vacuum.yaml
   - templates/operator/webhooks.yaml
   - templates/sink/role.yaml
   - templates/sink/role_binding.yaml

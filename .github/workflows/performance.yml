@@ -6,13 +6,11 @@ run-name: Performance Tests
 on:
   workflow_dispatch:
   schedule:
-    - cron: "00 03 * * *" # 3 AM UTC
+    - cron: "00 03 * * *"  # 3 AM UTC
 permissions:
   contents: read
   pull-requests: read
 jobs:
-  setup:
-    uses: ./.github/workflows/log_run_details.yml
   integration:
     name: KubeArchive Performance Tests
     runs-on: ubuntu-latest

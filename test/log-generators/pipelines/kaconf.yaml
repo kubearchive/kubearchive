@@ -1,7 +1,7 @@
 # Copyright KubeArchive Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive
@@ -10,7 +10,7 @@ spec:
     - selector:
         apiVersion: tekton.dev/v1
         kind: PipelineRun
-      deleteWhen: has(status.completionTime)
+      deleteWhen: timestamp(status.completionTime) < now() - duration("5m")
     - selector:
         apiVersion: tekton.dev/v1
         kind: TaskRun

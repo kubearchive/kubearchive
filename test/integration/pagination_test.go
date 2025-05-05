@@ -26,19 +26,7 @@ func TestPagination(t *testing.T) {
 	clientset, _ := test.GetKubernetesClient(t)
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
-	resources := map[string]any{
-		"resources": []map[string]any{
-			{
-				"selector": map[string]string{
-					"apiVersion": "v1",
-					"kind":       "Pod",
-				},
-				"deleteWhen": "status.phase == 'Succeeded'",
-			},
-		},
-	}
-
-	test.CreateKAC(t, namespaceName, resources)
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{

@@ -11,8 +11,6 @@ on:
     - cron: "15 * * * *"  # Run hourly at 15 minutes past the hour
 
 jobs:
-  setup:
-    uses: ./.github/workflows/log_run_details.yml
   renovate:
     if: github.repository == 'kubearchive/kubearchive'  # Don't run renovate on forks
     runs-on: ubuntu-latest
@@ -28,7 +26,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Renovate
-        uses: renovatebot/github-action@v41.0.22
+        uses: renovatebot/github-action@v42.0.1
         with:
           token: '${{ steps.get_token.outputs.token }}'
         env:

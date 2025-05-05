@@ -13,7 +13,7 @@ metadata:
     app.kubernetes.io/version: "${NEXT_VERSION}"
 rules:
   - apiGroups:
-      - kubearchive.kubearchive.org
+      - kubearchive.org
     resources:
       - kubearchiveconfigs
     verbs:
@@ -25,7 +25,7 @@ rules:
       - update
       - watch
   - apiGroups:
-      - kubearchive.kubearchive.org
+      - kubearchive.org
     resources:
       - kubearchiveconfigs/status
     verbs:

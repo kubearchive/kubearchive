@@ -58,27 +58,7 @@ func TestNormalOperation(t *testing.T) {
 	clientset, _ := test.GetKubernetesClient(t)
 	port := test.PortForwardApiServer(t, clientset)
 	namespaceName, token := test.CreateTestNamespace(t, false)
-
-	resources := map[string]any{
-		"resources": []map[string]any{
-			{
-				"selector": map[string]string{
-					"apiVersion": "batch/v1",
-					"kind":       "Job",
-				},
-				"archiveWhen": "has(status.completionTime)",
-			},
-			{
-				"selector": map[string]string{
-					"apiVersion": "v1",
-					"kind":       "Pod",
-				},
-				"deleteWhen": "status.phase == 'Succeeded'",
-			},
-		},
-	}
-
-	test.CreateKAC(t, namespaceName, resources)
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 	test.RunLogGenerator(t, namespaceName)
 
 	// Retrieve the objects from the DB using the API.

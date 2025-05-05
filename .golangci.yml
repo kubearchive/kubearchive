@@ -18,11 +18,11 @@ linters:
     - wastedassign
   settings:
     staticcheck:
-      checks: # https://staticcheck.dev/docs/checks
+      checks:  # https://staticcheck.dev/docs/checks
         - all
-        - -ST1000 # Incorrect or missing package comment
-        - -ST1003 # Poorly chosen identifier
-        - -QF1003 # use switch instead of if/ifelse/else
+        - -ST1000  # Incorrect or missing package comment
+        - -ST1003  # Poorly chosen identifier
+        - -QF1003  # use switch instead of if/ifelse/else
     govet:
       enable:
         - loopclosure

@@ -11,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var ClusterKubeArchiveConfigGVR = schema.GroupVersionResource{Group: "kubearchive.kubearchive.org", Version: "v1alpha1", Resource: "clusterkubearchiveconfigs"}
+var ClusterKubeArchiveConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1alpha1", Resource: "clusterkubearchiveconfigs"}
 
 // ClusterKubeArchiveConfigSpec defines the desired state of ClusterKubeArchiveConfig
 type ClusterKubeArchiveConfigSpec KubeArchiveConfigSpec

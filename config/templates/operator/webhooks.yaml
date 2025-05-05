@@ -19,12 +19,12 @@ webhooks:
       service:
         name: kubearchive-operator-webhooks
         namespace: kubearchive
-        path: /mutate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
+        path: /mutate-kubearchive-org-v1alpha1-kubearchiveconfig
     failurePolicy: Fail
     name: mkubearchiveconfig.kb.io
     rules:
       - apiGroups:
-          - kubearchive.kubearchive.org
+          - kubearchive.org
         apiVersions:
           - v1alpha1
         operations:
@@ -39,12 +39,12 @@ webhooks:
       service:
         name: kubearchive-operator-webhooks
         namespace: kubearchive
-        path: /mutate-kubearchive-kubearchive-org-v1alpha1-clusterkubearchiveconfig
+        path: /mutate-kubearchive-org-v1alpha1-clusterkubearchiveconfig
     failurePolicy: Fail
     name: mclusterkubearchiveconfig.kb.io
     rules:
       - apiGroups:
-          - kubearchive.kubearchive.org
+          - kubearchive.org
         apiVersions:
           - v1alpha1
         operations:
@@ -59,12 +59,12 @@ webhooks:
       service:
         name: kubearchive-operator-webhooks
         namespace: kubearchive
-        path: /mutate-kubearchive-kubearchive-org-v1alpha1-sinkfilter
+        path: /mutate-kubearchive-org-v1alpha1-sinkfilter
     failurePolicy: Fail
     name: msinkfilter.kb.io
     rules:
       - apiGroups:
-          - kubearchive.kubearchive.org
+          - kubearchive.org
         apiVersions:
           - v1alpha1
         operations:
@@ -79,12 +79,12 @@ webhooks:
       service:
         name: kubearchive-operator-webhooks
         namespace: kubearchive
-        path: /mutate-kubearchive-kubearchive-org-v1alpha1-namespacevacuumconfig
+        path: /mutate-kubearchive-org-v1alpha1-namespacevacuumconfig
     failurePolicy: Fail
     name: mnamespacevacuumconfig.kb.io
     rules:
       - apiGroups:
-          - kubearchive.kubearchive.org
+          - kubearchive.org
         apiVersions:
           - v1alpha1
         operations:
@@ -99,12 +99,12 @@ webhooks:
       service:
         name: kubearchive-operator-webhooks
         namespace: kubearchive
-        path: /mutate-kubearchive-kubearchive-org-v1alpha1-clustervacuumconfig
+        path: /mutate-kubearchive-org-v1alpha1-clustervacuumconfig
     failurePolicy: Fail
     name: mclustervacuumconfig.kb.io
     rules:
       - apiGroups:
-          - kubearchive.kubearchive.org
+          - kubearchive.org
         apiVersions:
           - v1alpha1
         operations:
@@ -132,12 +132,12 @@ webhooks:
       service:
         name: kubearchive-operator-webhooks
         namespace: kubearchive
-        path: /validate-kubearchive-kubearchive-org-v1alpha1-kubearchiveconfig
+        path: /validate-kubearchive-org-v1alpha1-kubearchiveconfig
     failurePolicy: Fail
     name: vkubearchiveconfig.kb.io
     rules:
       - apiGroups:
-          - kubearchive.kubearchive.org
+          - kubearchive.org
         apiVersions:
           - v1alpha1
         operations:
@@ -152,12 +152,12 @@ webhooks:
       service:
         name: kubearchive-operator-webhooks
         namespace: kubearchive
-        path: /validate-kubearchive-kubearchive-org-v1alpha1-clusterkubearchiveconfig
+        path: /validate-kubearchive-org-v1alpha1-clusterkubearchiveconfig
     failurePolicy: Fail
     name: vclusterkubearchiveconfig.kb.io
     rules:
       - apiGroups:
-          - kubearchive.kubearchive.org
+          - kubearchive.org
         apiVersions:
           - v1alpha1
         operations:
@@ -172,12 +172,12 @@ webhooks:
       service:
         name: kubearchive-operator-webhooks
         namespace: kubearchive
-        path: /validate-kubearchive-kubearchive-org-v1alpha1-sinkfilter
+        path: /validate-kubearchive-org-v1alpha1-sinkfilter
     failurePolicy: Fail
     name: vsinkfilter.kb.io
     rules:
       - apiGroups:
-          - kubearchive.kubearchive.org
+          - kubearchive.org
         apiVersions:
           - v1alpha1
         operations:
@@ -192,12 +192,12 @@ webhooks:
       service:
         name: kubearchive-operator-webhooks
         namespace: kubearchive
-        path: /validate-kubearchive-kubearchive-org-v1alpha1-namespacevacuumconfig
+        path: /validate-kubearchive-org-v1alpha1-namespacevacuumconfig
     failurePolicy: Fail
     name: vnamespacevacuumconfig.kb.io
     rules:
       - apiGroups:
-          - kubearchive.kubearchive.org
+          - kubearchive.org
         apiVersions:
           - v1alpha1
         operations:
@@ -212,12 +212,12 @@ webhooks:
       service:
         name: kubearchive-operator-webhooks
         namespace: kubearchive
-        path: /validate-kubearchive-kubearchive-org-v1alpha1-clustervacuumconfig
+        path: /validate-kubearchive-org-v1alpha1-clustervacuumconfig
     failurePolicy: Fail
     name: vclustervacuumconfig.kb.io
     rules:
       - apiGroups:
-          - kubearchive.kubearchive.org
+          - kubearchive.org
         apiVersions:
           - v1alpha1
         operations:

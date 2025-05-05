@@ -29,9 +29,9 @@ type ClusterKubeArchiveConfigReconciler struct {
 	Mapper meta.RESTMapper
 }
 
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfigs;clustervacuums;namespacevacuums;sinkfilters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfigs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clusterkubearchiveconfigs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=kubearchive.org,resources=clusterkubearchiveconfigs;clustervacuums;namespacevacuums;sinkfilters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=kubearchive.org,resources=clusterkubearchiveconfigs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=kubearchive.org,resources=clusterkubearchiveconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings;clusterroles;roles;rolebindings,verbs=bind;create;delete;escalate;get;list;update;watch
 //+kubebuilder:rbac:groups=sources.knative.dev,resources=apiserversources,verbs=create;delete;get;list;update;watch

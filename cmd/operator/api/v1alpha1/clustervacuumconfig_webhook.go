@@ -27,7 +27,7 @@ func SetupClusterVacuumConfigWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-kubearchive-kubearchive-org-v1alpha1-clustervacuumconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=kubearchive.kubearchive.org,resources=clustervacuumconfig,verbs=create;update,versions=v1alpha1,name=mclustervacuumconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-kubearchive-org-v1alpha1-clustervacuumconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=clustervacuumconfig,verbs=create;update,versions=v1alpha1,name=mclustervacuumconfig.kb.io,admissionReviewVersions=v1
 
 type ClusterVacuumConfigCustomDefaulter struct{}
 
@@ -43,7 +43,7 @@ func (cvcd *ClusterVacuumConfigCustomDefaulter) Default(_ context.Context, obj r
 	return nil
 }
 
-//+kubebuilder:webhook:path=/validate-kubearchive-kubearchive-org-v1alpha1-clustervacuumconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=kubearchive.kubearchive.org,resources=clustervacuumconfig,verbs=create;update,versions=v1alpha1,name=vclustervacuumconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-kubearchive-org-v1alpha1-clustervacuumconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=clustervacuumconfig,verbs=create;update,versions=v1alpha1,name=vclustervacuumconfig.kb.io,admissionReviewVersions=v1
 
 type ClusterVacuumConfigCustomValidator struct {
 }
@@ -90,10 +90,12 @@ func (cvcv *ClusterVacuumConfigCustomValidator) validateClusterVacuumConfig(cv *
 			cv.Namespace, constants.KubeArchiveNamespace))
 	}
 
-	for _, ns := range cv.Spec.Namespaces {
-		err := validateResources(dynaClient, ns.Name, ns.Resources)
-		if err != nil {
-			errList = append(errList, err)
+	for ns, value := range cv.Spec.Namespaces {
+		if ns != constants.ClusterVacuumAllNamespaces {
+			err := validateResources(dynaClient, ns, value.Resources)
+			if err != nil {
+				errList = append(errList, err)
+			}
 		}
 	}
 

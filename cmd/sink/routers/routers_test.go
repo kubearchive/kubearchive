@@ -707,7 +707,7 @@ func TestReadyz(t *testing.T) {
 	sf := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "SinkFilter",
-			"apiVersion": "kubearchive.kubearchive.org/v1alpha1",
+			"apiVersion": "kubearchive.org/v1alpha1",
 			"metadata": map[string]interface{}{
 				"name":      constants.SinkFilterResourceName,
 				"namespace": constants.KubeArchiveNamespace,

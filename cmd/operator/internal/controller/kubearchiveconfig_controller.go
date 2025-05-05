@@ -21,6 +21,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
@@ -34,9 +35,9 @@ type KubeArchiveConfigReconciler struct {
 	Mapper meta.RESTMapper
 }
 
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=clustervacuums;kubearchiveconfigs;namespacevacuums;sinkfilters,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=kubearchive.kubearchive.org,resources=kubearchiveconfigs/finalizers,verbs=update
+//+kubebuilder:rbac:groups=kubearchive.org,resources=clustervacuums;kubearchiveconfigs;namespacevacuums;sinkfilters,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=kubearchive.org,resources=kubearchiveconfigs/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=kubearchive.org,resources=kubearchiveconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings;clusterroles;roles;rolebindings,verbs=bind;create;delete;escalate;get;list;update;watch
 //+kubebuilder:rbac:groups=sources.knative.dev,resources=apiserversources,verbs=create;delete;get;list;update;watch
@@ -137,6 +138,25 @@ func (r *KubeArchiveConfigReconciler) SetupKubeArchiveConfigWithManager(mgr ctrl
 		For(&kubearchivev1alpha1.KubeArchiveConfig{}).
 		//Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
+		Watches(&kubearchivev1alpha1.ClusterKubeArchiveConfig{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, cm client.Object) []ctrl.Request {
+			crList := &kubearchivev1alpha1.KubeArchiveConfigList{}
+			if err := mgr.GetClient().List(ctx, crList); err != nil {
+				mgr.GetLogger().Error(err, "while listing ExampleCRDWithConfigMapRefs")
+				return nil
+			}
+
+			reqs := make([]ctrl.Request, 0, len(crList.Items))
+			for _, item := range crList.Items {
+				reqs = append(reqs, ctrl.Request{
+					NamespacedName: types.NamespacedName{
+						Namespace: item.GetNamespace(),
+						Name:      item.GetName(),
+					},
+				})
+			}
+
+			return reqs
+		})).
 		Complete(r)
 }
 
@@ -406,10 +426,6 @@ func (r *KubeArchiveConfigReconciler) removeNamespaceLabel(ctx context.Context, 
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileVacuumResources(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) error {
-	if _, err := r.reconcileClusterVacuumServiceAccount(ctx); err != nil {
-		return err
-	}
-
 	if _, err := r.reconcileVacuumServiceAccount(ctx, kaconfig); err != nil {
 		return err
 	}
@@ -449,18 +465,6 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumServiceAccount(ctx context.
 	return sa, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileClusterVacuumServiceAccount(ctx context.Context) (*corev1.ServiceAccount, error) {
-	log := log.FromContext(ctx)
-
-	log.Info("in reconcileClusterVacuumServiceAccount")
-
-	sa, err := r.reconcileServiceAccount(ctx, nil, constants.KubeArchiveNamespace, constants.KubeArchiveClusterVacuumName)
-	if err != nil {
-		return nil, err
-	}
-	return sa, nil
-}
-
 func (r *KubeArchiveConfigReconciler) reconcileServiceAccount(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, namespace string, name string) (*corev1.ServiceAccount, error) {
 	log := log.FromContext(ctx)
 
@@ -493,10 +497,33 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, k
 
 	log.Info("in reconcileVacuumRole")
 
-	resources := make([]sourcesv1.APIVersionKindSelector, 0)
+	resources := []sourcesv1.APIVersionKindSelector{
+		{
+			APIVersion: "kubearchive.org/v1alpha1",
+			Kind:       "KubeArchiveConfig",
+		},
+		{
+			APIVersion: "kubearchive.org/v1alpha1",
+			Kind:       "NamespaceVacuumConfig",
+		},
+	}
+
 	for _, kar := range kaconfig.Spec.Resources {
 		resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
 		resources = append(resources, resource)
+	}
+
+	ckac := &kubearchivev1alpha1.ClusterKubeArchiveConfig{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: constants.KubeArchiveConfigResourceName}, ckac)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return nil, err
+		}
+	} else {
+		for _, kar := range ckac.Spec.Resources {
+			resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
+			resources = append(resources, resource)
+		}
 	}
 
 	role, err := r.reconcileRole(ctx, kaconfig, kaconfig.Namespace, constants.KubeArchiveVacuumName, createPolicyRules(ctx, r.Mapper, resources, []string{"get", "list"}))
@@ -525,12 +552,8 @@ func (r *KubeArchiveConfigReconciler) reconcileKubeArchiveClusterConfigReadClust
 
 	log.Info("in reconcileKubeArchiveClusterConfigReadClusterRoleBinding")
 
-	subjects := []rbacv1.Subject{}
-	subjects = append(subjects, newSubject(kaconfig.Namespace, constants.KubeArchiveVacuumName))
-	if add {
-		subjects = append(subjects, newSubject(constants.KubeArchiveNamespace, constants.KubeArchiveClusterVacuumName))
-	}
-	_, err := r.reconcileClusterRoleBinding(ctx, constants.ClusterKubeArchiveConfigClusterRoleBindingName, "ClusterRole", add, subjects...)
+	subject := newSubject(kaconfig.Namespace, constants.KubeArchiveVacuumName)
+	_, err := r.reconcileClusterRoleBinding(ctx, constants.ClusterKubeArchiveConfigClusterRoleBindingName, "ClusterRole", add, subject)
 	if err != nil {
 		return err
 	}

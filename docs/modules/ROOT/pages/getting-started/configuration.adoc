@@ -16,7 +16,7 @@ and `kubearchive` is the only name allowed. KubeArchiveConfigs have this general
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive
@@ -37,7 +37,7 @@ requires a `selector`:
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive
@@ -76,7 +76,7 @@ example configures KubeArchive to archive pods when they match the
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive
@@ -146,7 +146,7 @@ pods when they match `status.phase == "Succeeded"`:
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive
@@ -206,7 +206,7 @@ do not get archived.
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1alpha1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive

@@ -1,0 +1,21 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: kubearchive.org/v1alpha1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+spec:
+  resources:
+    - selector:
+        apiVersion: batch/v1
+        kind: Job
+      archiveWhen: "has(status.completionTime)"
+    - selector:
+        apiVersion: v1
+        kind: Pod
+      archiveWhen: "true"
+    - selector:
+        apiVersion: v1
+        kind: Service
+      archiveWhen: "true"

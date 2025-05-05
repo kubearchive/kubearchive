@@ -13,6 +13,7 @@ const (
 	KubeArchiveNamespaceEnvVar                     = "KUBEARCHIVE_NAMESPACE"
 	SinkFilterResourceName                         = "sink-filters"
 	SinkFilterGlobalNamespace                      = "___global___"
+	ClusterVacuumAllNamespaces                     = "___all-namespaces___"
 )
 
 var (

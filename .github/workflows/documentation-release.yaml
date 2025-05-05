@@ -26,8 +26,6 @@ permissions:
   id-token: write
 
 jobs:
-  setup:
-    uses: ./.github/workflows/log_run_details.yml
   build:
     runs-on: ubuntu-latest
     environment:

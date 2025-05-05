@@ -27,9 +27,9 @@ import (
 )
 
 type SinkCloudEventPublisherResult struct {
-	Name    string
-	Message string
-	Result  error
+	Name       string
+	Message    string
+	StatusCode int
 }
 
 type SinkCloudEventPublisher struct {
@@ -124,14 +124,21 @@ func (scep *SinkCloudEventPublisher) SendByAPIVersionKind(ctx context.Context, n
 
 		result := SinkCloudEventPublisherResult{Name: name, Message: "No event sent"}
 		if shouldSend(avk, scep.globalResources, localResources) {
-			result.Result = scep.send(ctx, item.Object)
-			if result.Result != nil {
-				result.Message = "Event send failed"
-			} else {
+			sendResult := scep.send(ctx, item.Object)
+			if ce.IsACK(sendResult) {
 				result.Message = "Event sent successfully"
+			} else {
+				result.Message = "Event send failed"
 			}
+			var httpResult *cehttp.Result
+			result.StatusCode = 0
+			if ce.ResultAs(sendResult, &httpResult) {
+				result.StatusCode = httpResult.StatusCode
+			}
+			slog.Info(result.Message, "apiversion", avk.APIVersion, "kind", avk.Kind, "namespace", namespace, "name", name, "code", result.StatusCode)
+		} else {
+			slog.Info(result.Message, "apiversion", avk.APIVersion, "kind", avk.Kind, "namespace", namespace, "name", name)
 		}
-		slog.Info(result.Message, "apiversion", avk.APIVersion, "kind", avk.Kind, "namespace", namespace, "name", name, "result", result.Result)
 		results = append(results, result)
 	}
 

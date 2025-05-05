@@ -1,0 +1,9 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: kubearchive.org/v1alpha1
+kind: ClusterVacuumConfig
+metadata:
+  namespace: kubearchive
+spec:
+  namespaces: {}

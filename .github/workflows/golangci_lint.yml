@@ -18,8 +18,6 @@ permissions:
   pull-requests: read
   checks: write
 jobs:
-  setup:
-    uses: ./.github/workflows/log_run_details.yml
   golangci:
     # See https://github.com/golangci/golangci-lint-action
     name: GolangCI Lint
@@ -36,7 +34,7 @@ jobs:
       - name: Generate operator code
         run: cmd/operator/generate.sh
       - name: Lint testing Go code
-        uses: golangci/golangci-lint-action@v7
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           # When is scheduled, show all issues

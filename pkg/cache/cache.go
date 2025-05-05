@@ -3,6 +3,7 @@
 package cache
 
 import (
+	"crypto/sha256"
 	"sync"
 	"time"
 )
@@ -13,21 +14,25 @@ type cacheEntry struct {
 }
 
 type Cache struct {
-	items map[string]cacheEntry
+	items map[[32]byte]cacheEntry
 	mutex sync.RWMutex
 }
 
 func (c *Cache) Set(key string, value any, duration time.Duration) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.items[key] = cacheEntry{value: value, expiration: time.Now().Add(duration).Unix()}
+
+	hashedKey := sha256.Sum256([]byte(key))
+	c.items[hashedKey] = cacheEntry{value: value, expiration: time.Now().Add(duration).Unix()}
 }
 
 func (c *Cache) Get(key string) any {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	entry, ok := c.items[key]
+	hashedKey := sha256.Sum256([]byte(key))
+
+	entry, ok := c.items[hashedKey]
 	if !ok || time.Now().Unix() > entry.expiration {
 		return nil
 	}
@@ -37,6 +42,6 @@ func (c *Cache) Get(key string) any {
 
 func New() *Cache {
 	return &Cache{
-		items: make(map[string]cacheEntry),
+		items: make(map[[32]byte]cacheEntry),
 	}
 }

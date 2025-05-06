@@ -1,72 +1,86 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package v1alpha1
+package v1
 
 import (
 	"context"
 	"testing"
 
+	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestClusterKubeArchiveConfigCustomDefaulter(t *testing.T) {
-	defaulter := ClusterKubeArchiveConfigCustomDefaulter{}
-	kac := &ClusterKubeArchiveConfig{}
-	err := defaulter.Default(context.Background(), kac)
+func TestSinkFilterCustomDefaulter(t *testing.T) {
+	defaulter := SinkFilterCustomDefaulter{}
+	sf := &SinkFilter{}
+	err := defaulter.Default(context.Background(), sf)
 	assert.NoError(t, err)
-	assert.Equal(t, ClusterKubeArchiveConfigSpec{Resources: nil}, kac.Spec)
+	assert.Equal(t, SinkFilterSpec{Namespaces: nil}, sf.Spec)
 }
 
-func TestClusterKubeArchiveConfigValidateName(t *testing.T) {
-	k9eResourceName := "kubearchive"
+func TestSinkFilterValidateName(t *testing.T) {
 	tests := []struct {
 		name      string
-		kacName   string
+		sfName    string
+		nsName    string
 		validated bool
 	}{
 		{
 			name:      "Valid name",
-			kacName:   k9eResourceName,
+			sfName:    constants.SinkFilterResourceName,
+			nsName:    constants.KubeArchiveNamespace,
 			validated: true,
 		},
 		{
 			name:      "Invalid name",
-			kacName:   "otherName",
+			sfName:    "otherName",
+			nsName:    constants.KubeArchiveNamespace,
+			validated: false,
+		},
+		{
+			name:      "Valid namespace",
+			sfName:    constants.SinkFilterResourceName,
+			nsName:    constants.KubeArchiveNamespace,
+			validated: true,
+		},
+		{
+			name:      "Invalid namespace",
+			sfName:    constants.SinkFilterResourceName,
+			nsName:    "otherName",
 			validated: false,
 		},
 	}
-	validator := ClusterKubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
+	validator := SinkFilterCustomValidator{sinkFilterResourceName: constants.SinkFilterResourceName}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create resource
-			kac := &ClusterKubeArchiveConfig{ObjectMeta: metav1.ObjectMeta{Name: test.kacName}}
-			warns, err := validator.ValidateCreate(context.Background(), kac)
+			sf := &SinkFilter{ObjectMeta: metav1.ObjectMeta{Name: test.sfName, Namespace: test.nsName}}
+			warns, err := validator.ValidateCreate(context.Background(), sf)
 			assert.Nil(t, warns)
 			if test.validated {
 				assert.NoError(t, err)
 			} else {
-				assert.Errorf(t, err, "invalid resource name %s", test.kacName)
+				assert.Errorf(t, err, "invalid resource name %s", test.sfName)
 			}
 			// Update resource
-			warns, err = validator.ValidateUpdate(context.Background(), &ClusterKubeArchiveConfig{}, kac)
+			warns, err = validator.ValidateUpdate(context.Background(), &SinkFilter{}, sf)
 			assert.Nil(t, warns)
 			if test.validated {
 				assert.NoError(t, err)
 			} else {
-				assert.Errorf(t, err, "invalid resource name %s", test.kacName)
+				assert.Errorf(t, err, "invalid resource name %s", test.sfName)
 			}
 			// Delete resource
-			warns, err = validator.ValidateDelete(context.Background(), kac)
+			warns, err = validator.ValidateDelete(context.Background(), sf)
 			assert.Nil(t, warns)
 			assert.NoError(t, err)
 		})
 	}
 }
 
-func TestClusterKubeArchiveConfigValidateCELExpression(t *testing.T) {
-	k9eResourceName := "kubearchive"
+func TestSinkFilterValidateCELExpression(t *testing.T) {
 	invalid := "status.state *^ Completed'"
 	valid := "status.state == 'Completed'"
 	tests := []struct {
@@ -112,22 +126,24 @@ func TestClusterKubeArchiveConfigValidateCELExpression(t *testing.T) {
 			validated:       true,
 		},
 	}
-	validator := ClusterKubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
+	validator := SinkFilterCustomValidator{sinkFilterResourceName: constants.SinkFilterResourceName}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create resource
-			kac := &ClusterKubeArchiveConfig{
-				ObjectMeta: metav1.ObjectMeta{Name: k9eResourceName},
-				Spec: ClusterKubeArchiveConfigSpec{
-					Resources: []KubeArchiveConfigResource{
-						{
-							ArchiveWhen:     test.archiveWhen,
-							DeleteWhen:      test.deleteWhen,
-							ArchiveOnDelete: test.archiveOnDelete,
-						},
+			sf := &SinkFilter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      constants.SinkFilterResourceName,
+					Namespace: constants.KubeArchiveNamespace,
+				},
+				Spec: SinkFilterSpec{
+					Namespaces: map[string][]KubeArchiveConfigResource{"foo": {{
+						ArchiveWhen:     test.archiveWhen,
+						DeleteWhen:      test.deleteWhen,
+						ArchiveOnDelete: test.archiveOnDelete,
+					}},
 					}},
 			}
-			warns, err := validator.ValidateCreate(context.Background(), kac)
+			warns, err := validator.ValidateCreate(context.Background(), sf)
 			assert.Nil(t, warns)
 			if test.validated {
 				assert.NoError(t, err)
@@ -135,7 +151,7 @@ func TestClusterKubeArchiveConfigValidateCELExpression(t *testing.T) {
 				assert.Contains(t, err.Error(), "Syntax error")
 			}
 			// Update resource
-			warns, err = validator.ValidateUpdate(context.Background(), &ClusterKubeArchiveConfig{}, kac)
+			warns, err = validator.ValidateUpdate(context.Background(), &SinkFilter{}, sf)
 			assert.Nil(t, warns)
 			if test.validated {
 				assert.NoError(t, err)
@@ -143,7 +159,7 @@ func TestClusterKubeArchiveConfigValidateCELExpression(t *testing.T) {
 				assert.Contains(t, err.Error(), "Syntax error")
 			}
 			// Delete resource
-			warns, err = validator.ValidateDelete(context.Background(), kac)
+			warns, err = validator.ValidateDelete(context.Background(), sf)
 			assert.Nil(t, warns)
 			assert.NoError(t, err)
 		})

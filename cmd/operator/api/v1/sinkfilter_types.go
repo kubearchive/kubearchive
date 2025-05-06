@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package v1alpha1
+package v1
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var SinkFilterGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1alpha1", Resource: "sinkfilters"}
+var SinkFilterGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1", Resource: "sinkfilters"}
 
 // SinkFilterSpec defines the desired state of SinkFilter resource
 type SinkFilterSpec struct {

@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
@@ -45,7 +45,7 @@ func newMockWatcher(t testing.TB, ch <-chan watch.Event) func(metav1.ListOptions
 func TestHandleUpdates(t *testing.T) {
 	unstruct := &unstructured.Unstructured{
 		Object: map[string]interface{}{
-			"apiVersion": "kubearchive.org/v1alpha1",
+			"apiVersion": "kubearchive.org/v1",
 			"kind":       "SinkFilter",
 			"metadata": map[string]interface{}{
 				"namespace": constants.KubeArchiveNamespace,
@@ -151,7 +151,7 @@ func TestHandleUpdates(t *testing.T) {
 			sf := kubearchiveapi.SinkFilter{
 				TypeMeta: metav1.TypeMeta{
 					Kind:       "SinkFilter",
-					APIVersion: "kubearchive.org/v1alpha1",
+					APIVersion: "kubearchive.org/v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            constants.SinkFilterResourceName,

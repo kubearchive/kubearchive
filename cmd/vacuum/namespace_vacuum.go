@@ -11,7 +11,7 @@ import (
 	"log/slog"
 	"os"
 
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	publisher "github.com/kubearchive/kubearchive/pkg/cloudevents"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

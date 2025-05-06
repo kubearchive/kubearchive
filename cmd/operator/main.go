@@ -31,7 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/go-logr/logr"
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/cmd/operator/internal/controller"
 	"github.com/kubearchive/kubearchive/pkg/logging"
 	"github.com/kubearchive/kubearchive/pkg/observability"
@@ -55,7 +55,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(kubearchiveapi.AddToScheme(scheme))
+	utilruntime.Must(kubearchivev1.AddToScheme(scheme))
 	utilruntime.Must(sourcesv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
@@ -121,10 +121,10 @@ func main() {
 				Namespaces: make(map[string]crcache.Config),
 				Label:      k8slabels.Everything(),
 			},
-			&kubearchiveapi.ClusterKubeArchiveConfig{}: {
+			&kubearchivev1.ClusterKubeArchiveConfig{}: {
 				Label: k8slabels.Everything(),
 			},
-			&kubearchiveapi.KubeArchiveConfig{}: {
+			&kubearchivev1.KubeArchiveConfig{}: {
 				Namespaces: make(map[string]crcache.Config),
 				Label:      k8slabels.Everything(),
 			},
@@ -199,23 +199,23 @@ func main() {
 	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err = kubearchiveapi.SetupCKACWebhookWithManager(mgr); err != nil {
+		if err = kubearchivev1.SetupCKACWebhookWithManager(mgr); err != nil {
 			slog.Error("unable to create webhook", "webhook", "ClusterKubeArchiveConfig", "err", err)
 			os.Exit(1)
 		}
-		if err = kubearchiveapi.SetupKACWebhookWithManager(mgr); err != nil {
+		if err = kubearchivev1.SetupKACWebhookWithManager(mgr); err != nil {
 			slog.Error("unable to create webhook", "webhook", "KubeArchiveConfig", "err", err)
 			os.Exit(1)
 		}
-		if err = kubearchiveapi.SetupSinkFilterWebhookWithManager(mgr); err != nil {
+		if err = kubearchivev1.SetupSinkFilterWebhookWithManager(mgr); err != nil {
 			slog.Error("unable to create webhook", "webhook", "SinkFilter", "err", err)
 			os.Exit(1)
 		}
-		if err = kubearchiveapi.SetupNamespaceVacuumConfigWebhookWithManager(mgr); err != nil {
+		if err = kubearchivev1.SetupNamespaceVacuumConfigWebhookWithManager(mgr); err != nil {
 			slog.Error("unable to create webhook", "webhook", "NamespaceVacuumConfig", "err", err)
 			os.Exit(1)
 		}
-		if err = kubearchiveapi.SetupClusterVacuumConfigWebhookWithManager(mgr); err != nil {
+		if err = kubearchivev1.SetupClusterVacuumConfigWebhookWithManager(mgr); err != nil {
 			slog.Error("unable to create webhook", "webhook", "ClusterVacuumConfig", "err", err)
 			os.Exit(1)
 		}

@@ -28,7 +28,7 @@ down to and including the `Pods`, are archived.
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive
@@ -65,7 +65,7 @@ the existence of the log.
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive

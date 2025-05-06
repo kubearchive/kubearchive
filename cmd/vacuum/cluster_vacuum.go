@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	publisher "github.com/kubearchive/kubearchive/pkg/cloudevents"
 	"github.com/kubearchive/kubearchive/pkg/constants"

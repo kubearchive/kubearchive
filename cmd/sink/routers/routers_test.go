@@ -13,7 +13,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/cmd/sink/filters"
 	fakeFilters "github.com/kubearchive/kubearchive/cmd/sink/filters/fake"
 	"github.com/kubearchive/kubearchive/cmd/sink/logs"
@@ -707,7 +707,7 @@ func TestReadyz(t *testing.T) {
 	sf := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind":       "SinkFilter",
-			"apiVersion": "kubearchive.org/v1alpha1",
+			"apiVersion": "kubearchive.org/v1",
 			"metadata": map[string]interface{}{
 				"name":      constants.SinkFilterResourceName,
 				"namespace": constants.KubeArchiveNamespace,

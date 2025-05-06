@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"testing"
 
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/test"
 	"github.com/stretchr/testify/assert"
 	batchv1 "k8s.io/api/batch/v1"

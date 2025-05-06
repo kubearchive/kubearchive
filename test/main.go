@@ -24,7 +24,7 @@ import (
 
 	"github.com/avast/retry-go/v4"
 
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	"gopkg.in/yaml.v3"
 

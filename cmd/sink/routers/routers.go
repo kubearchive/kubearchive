@@ -16,7 +16,7 @@ import (
 	ceClient "github.com/cloudevents/sdk-go/v2/client"
 	"github.com/cloudevents/sdk-go/v2/protocol"
 	"github.com/gin-gonic/gin"
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/cmd/sink/filters"
 	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	"github.com/kubearchive/kubearchive/cmd/sink/logs"

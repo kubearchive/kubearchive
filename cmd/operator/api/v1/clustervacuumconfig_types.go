@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package v1alpha1
+package v1
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var ClusterVacuumConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1alpha1", Resource: "clustervacuumconfigs"}
+var ClusterVacuumConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1", Resource: "clustervacuumconfigs"}
 
 type ClusterVacuumConfigNamespaceSpec struct {
 	NamespaceVacuumConfigSpec `json:",inline,omitempty"`

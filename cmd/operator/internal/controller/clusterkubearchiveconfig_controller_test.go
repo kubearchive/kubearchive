@@ -14,7 +14,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -50,7 +50,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 			Verbs:     []string{"get", "list", "watch"},
 		}
 
-		jobResource := kubearchivev1alpha1.KubeArchiveConfigResource{
+		jobResource := kubearchivev1.KubeArchiveConfigResource{
 			ArchiveWhen: "status.state != 'Completed'",
 			DeleteWhen:  "status.state == 'Completed'",
 			Selector: sourcesv1.APIVersionKindSelector{
@@ -58,23 +58,23 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 				Kind:       "Job",
 			},
 		}
-		podResource := kubearchivev1alpha1.KubeArchiveConfigResource{
+		podResource := kubearchivev1.KubeArchiveConfigResource{
 			ArchiveOnDelete: "true",
 			Selector: sourcesv1.APIVersionKindSelector{
 				APIVersion: "v1",
 				Kind:       "Pod",
 			},
 		}
-		ckac := &kubearchivev1alpha1.ClusterKubeArchiveConfig{
+		ckac := &kubearchivev1.ClusterKubeArchiveConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: constants.KubeArchiveConfigResourceName,
 			},
-			Spec: kubearchivev1alpha1.ClusterKubeArchiveConfigSpec{
-				Resources: []kubearchivev1alpha1.KubeArchiveConfigResource{jobResource},
+			Spec: kubearchivev1.ClusterKubeArchiveConfigSpec{
+				Resources: []kubearchivev1.KubeArchiveConfigResource{jobResource},
 			},
 		}
 
-		kubearchiveconfig := &kubearchivev1alpha1.ClusterKubeArchiveConfig{}
+		kubearchiveconfig := &kubearchivev1.ClusterKubeArchiveConfig{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind ClusterKubeArchiveConfig")
@@ -96,7 +96,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 					Expect(k8sClient.Update(ctx, ckac)).To(Succeed())
 				} else if op == "update-remove-resource" {
 					Expect(k8sClient.Get(ctx, clusterKACName, ckac)).To(Succeed())
-					ckac.Spec.Resources = []kubearchivev1alpha1.KubeArchiveConfigResource{jobResource}
+					ckac.Spec.Resources = []kubearchivev1.KubeArchiveConfigResource{jobResource}
 					Expect(k8sClient.Update(ctx, ckac)).To(Succeed())
 				} else if op == "delete" {
 					Expect(k8sClient.Delete(ctx, ckac)).To(Succeed())
@@ -113,7 +113,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// Check that SinkFilters exists and has the namespace in it.
-				sf := &kubearchivev1alpha1.SinkFilter{}
+				sf := &kubearchivev1.SinkFilter{}
 				err = k8sClient.Get(ctx, installSFName, sf)
 				Expect(err).NotTo(HaveOccurred())
 				if op == "delete" {

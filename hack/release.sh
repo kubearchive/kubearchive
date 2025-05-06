@@ -65,7 +65,6 @@ gh release create "${NEXT_VERSION}" \
     --notes-file ./release-notes.md \
     --title "Release ${NEXT_VERSION}" \
     --repo ${RELEASE_REPOSITORY} \
-    kubearchive.yaml \
-    integrations/database/postgresql/kubearchive.sql
+    kubearchive.yaml
 rm ./release-notes.md
 rm ./kubearchive.yaml

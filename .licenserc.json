@@ -2,5 +2,5 @@
   "**/*.go": "// Copyright KubeArchive Authors\n// SPDX-License-Identifier: Apache-2.0",
   "**/*.{yaml,yml}": "# Copyright KubeArchive Authors\n# SPDX-License-Identifier: Apache-2.0",
   "**/*.sh": "#!/bin/bash\n# Copyright KubeArchive Authors\n# SPDX-License-Identifier: Apache-2.0",
-  "ignore": ["docs/node_modules/", "config/crds"]
+  "ignore": ["docs/node_modules/", "config/crds", "cmd/operator/internal/controller/testdata/crds"]
 }

@@ -51,7 +51,6 @@ import (
 const (
 	letterBytes   = "abcdefghijklmnopqrstuvwxyz"
 	randSuffixLen = 8
-	A13eName      = constants.KubeArchiveConfigResourceName + "-a13e"
 )
 
 var namespaceIndex = 1
@@ -452,7 +451,7 @@ func createAKAC(t testing.TB, filename string, namespace string, resources strin
 		// If we have resources, make sure ApiServerSource is created and there are sink filters before returning.
 		a13eGvr := sourcesv1.SchemeGroupVersion.WithResource("apiserversources")
 		err := retry.Do(func() error {
-			_, retryErr := dynamicClient.Resource(a13eGvr).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), "kubearchive-a13e", metav1.GetOptions{})
+			_, retryErr := dynamicClient.Resource(a13eGvr).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
 			return retryErr
 		}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
 		if err != nil {

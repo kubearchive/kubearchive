@@ -29,42 +29,14 @@ func getServer() *httptest.Server {
 	}))
 }
 
-func TestSetLoggingCredentialsSuccess(t *testing.T) {
+func TestSetLoggingHeadersSuccess(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	SetLoggingCredentials(map[string]string{userKey: "user", passwordKey: "pwd"}, nil)(c)
-	assert.Equal(t, c.GetString(userKey), "user")
-	assert.Equal(t, c.GetString(passwordKey), "pwd")
-}
-
-func TestSetLoggingCredentialsError(t *testing.T) {
-	tests := []struct {
-		name            string
-		loggingCreds    map[string]string
-		loggingCredsErr error
-	}{
-		{
-			name:            "empty credentials",
-			loggingCreds:    map[string]string{},
-			loggingCredsErr: fmt.Errorf("logging secret is empty"),
-		},
-		{
-			name:            "no user",
-			loggingCreds:    map[string]string{passwordKey: "pwd"},
-			loggingCredsErr: nil,
-		},
-		{
-			name:            "no pwd",
-			loggingCreds:    map[string]string{userKey: "user"},
-			loggingCredsErr: nil,
-		},
-	}
-	for _, tt := range tests {
-		res := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(res)
-		SetLoggingCredentials(tt.loggingCreds, tt.loggingCredsErr)(c)
-		assert.Equal(t, http.StatusBadRequest, res.Code)
-		assert.Contains(t, res.Body.String(), "logging secret user or password unset")
-	}
+	t.Setenv("KUBEARCHIVE_LOGGING_DIR", "./testdata/headers")
+	SetLoggingHeaders()(c)
+	assert.Equal(t, c.GetStringMapString(loggingKey), map[string]string{
+		"Authorization": "Basic YWRtaW46cGFzc3dvcmQ=",
+		"X-Scope-OrgID": "tenant-id",
+	})
 }
 
 func TestLogRetrievalSuccess(t *testing.T) {
@@ -74,8 +46,7 @@ func TestLogRetrievalSuccess(t *testing.T) {
 
 	server := getServer()
 	defer server.Close()
-	c.Set(userKey, "user")
-	c.Set(passwordKey, "password")
+
 	c.Set("logURL", server.URL)
 	c.Set("jsonPath", "$.message")
 
@@ -97,36 +68,15 @@ func TestLogRetrievalError(t *testing.T) {
 		errStr        string
 	}{
 		{
-			name:          "Empty kubearchive-logging secret",
-			contextValues: map[string]string{"logURL": "http://example.com"},
-			jsonPath:      "",
-			expectedCode:  http.StatusInternalServerError,
-			errStr:        "Logging credentials are unset",
-		},
-		{
-			name:          "No user in kubearchive-logging secret",
-			contextValues: map[string]string{passwordKey: "pwd", "logURL": "http://example.com"},
-			jsonPath:      "",
-			expectedCode:  http.StatusInternalServerError,
-			errStr:        "Logging credentials are unset",
-		},
-		{
-			name:          "No password in kubearchive-logging secret",
-			contextValues: map[string]string{userKey: "user", "logURL": "http://example.com"},
-			jsonPath:      "",
-			expectedCode:  http.StatusInternalServerError,
-			errStr:        "Logging credentials are unset",
-		},
-		{
 			name:          "No URL set",
-			contextValues: map[string]string{userKey: "user", passwordKey: "pwd"},
+			contextValues: map[string]string{},
 			jsonPath:      "",
 			expectedCode:  http.StatusNotFound,
 			errStr:        "no log URL found",
 		},
 		{
 			name:          "Invalid JsonPath",
-			contextValues: map[string]string{userKey: "user", passwordKey: "pwd", "logURL": "http://example.com"},
+			contextValues: map[string]string{"logURL": "http://example.com"},
 			jsonPath:      ".", // should start with $.
 			expectedCode:  http.StatusInternalServerError,
 			errStr:        "invalid jsonPath",

@@ -1,0 +1,12 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: Logging
+metadata:
+  name: kubearchive-loki
+spec:
+  fluentd:
+    disablePvc: true
+  fluentbit: {}
+  controlNamespace: grafana-loki

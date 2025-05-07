@@ -47,6 +47,12 @@ func TestGenerateLogURLs(t *testing.T) {
 			data:     "testdata/test2-data.json",
 			expected: "testdata/es-test2-urls.json",
 		},
+		{
+			name:     "loki test generate log URLs multiple containers",
+			cm:       "testdata/loki-cm.json",
+			data:     "testdata/test3-data.json",
+			expected: "testdata/loki-test3-urls.json",
+		},
 	}
 
 	for _, tc := range testCases {

@@ -42,6 +42,7 @@ func init() {
 				),
 			),
 		),
+		cel.OptionalTypes(),
 	)
 	if err != nil {
 		panic(fmt.Sprintf("Error creating CEL environment: %s", err.Error()))

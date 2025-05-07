@@ -1,0 +1,27 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: ClusterOutput
+metadata:
+  name: loki-output
+spec:
+  loki:
+    url: http://loki.grafana-loki.svc.cluster.local:3100
+    configure_kubernetes_labels: true
+    tenant: "my-tenant-id"
+    password:
+      valueFrom:
+        secretKeyRef:
+          name: loki-basic-auth
+          key: password
+    username:
+      valueFrom:
+        secretKeyRef:
+          name: loki-basic-auth
+          key: username
+    buffer:
+      type: memory
+      timekey: 1m
+      timekey_wait: 30s
+      timekey_use_utc: true

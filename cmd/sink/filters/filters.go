@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/google/cel-go/cel"
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	ocel "github.com/kubearchive/kubearchive/pkg/cel"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

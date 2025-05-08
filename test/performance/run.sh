@@ -11,7 +11,7 @@ bash integrations/observability/grafana/install.sh
 
 kubectl apply -f - <<EOF
 ---
-apiVersion: kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1
 kind: KubeArchiveConfig
 metadata:
   name: kubearchive

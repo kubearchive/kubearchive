@@ -14,7 +14,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -139,7 +139,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 			Verbs:     []string{"get", "list"},
 		}
 
-		jobResource := kubearchivev1alpha1.KubeArchiveConfigResource{
+		jobResource := kubearchivev1.KubeArchiveConfigResource{
 			ArchiveWhen: "status.state != 'Completed'",
 			DeleteWhen:  "status.state == 'Completed'",
 			Selector: sourcesv1.APIVersionKindSelector{
@@ -147,28 +147,28 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 				Kind:       "Job",
 			},
 		}
-		podResource := kubearchivev1alpha1.KubeArchiveConfigResource{
+		podResource := kubearchivev1.KubeArchiveConfigResource{
 			ArchiveOnDelete: "true",
 			Selector: sourcesv1.APIVersionKindSelector{
 				APIVersion: "v1",
 				Kind:       "Pod",
 			},
 		}
-		kac := &kubearchivev1alpha1.KubeArchiveConfig{
+		kac := &kubearchivev1.KubeArchiveConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      constants.KubeArchiveConfigResourceName,
 				Namespace: namespaceName,
 			},
-			Spec: kubearchivev1alpha1.KubeArchiveConfigSpec{
-				Resources: []kubearchivev1alpha1.KubeArchiveConfigResource{jobResource},
+			Spec: kubearchivev1.KubeArchiveConfigSpec{
+				Resources: []kubearchivev1.KubeArchiveConfigResource{jobResource},
 			},
 		}
-		ckac := &kubearchivev1alpha1.ClusterKubeArchiveConfig{
+		ckac := &kubearchivev1.ClusterKubeArchiveConfig{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: constants.KubeArchiveConfigResourceName,
 			},
-			Spec: kubearchivev1alpha1.ClusterKubeArchiveConfigSpec{
-				Resources: []kubearchivev1alpha1.KubeArchiveConfigResource{podResource},
+			Spec: kubearchivev1.ClusterKubeArchiveConfigSpec{
+				Resources: []kubearchivev1.KubeArchiveConfigResource{podResource},
 			},
 		}
 		ns := &corev1.Namespace{
@@ -177,7 +177,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 			},
 		}
 
-		kubearchiveconfig := &kubearchivev1alpha1.KubeArchiveConfig{}
+		kubearchiveconfig := &kubearchivev1.KubeArchiveConfig{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind KubeArchiveConfig")
@@ -201,7 +201,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 					Expect(k8sClient.Update(ctx, kac)).To(Succeed())
 				} else if op == "update-remove-resource" {
 					Expect(k8sClient.Get(ctx, localKACName, kac)).To(Succeed())
-					kac.Spec.Resources = []kubearchivev1alpha1.KubeArchiveConfigResource{jobResource}
+					kac.Spec.Resources = []kubearchivev1.KubeArchiveConfigResource{jobResource}
 					Expect(k8sClient.Update(ctx, kac)).To(Succeed())
 				} else if op == "ckac-add-resource" {
 					Expect(k8sClient.Create(ctx, ckac)).To(Succeed())
@@ -222,7 +222,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 				Expect(err).NotTo(HaveOccurred())
 
 				// Check that SinkFilters exists and has the namespace in it.
-				sf := &kubearchivev1alpha1.SinkFilter{}
+				sf := &kubearchivev1.SinkFilter{}
 				err = k8sClient.Get(ctx, installSFName, sf)
 				Expect(err).NotTo(HaveOccurred())
 				if op == "delete" {

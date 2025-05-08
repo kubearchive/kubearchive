@@ -42,4 +42,4 @@ ${LOCALBIN}/controller-gen rbac:roleName="kubearchive-operator" \
 
 echo "Generating deep copy code."
 # Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-${LOCALBIN}/controller-gen object:headerFile="hack/copyright.txt" paths="./..." output:dir=api/v1alpha1
+${LOCALBIN}/controller-gen object:headerFile="hack/copyright.txt" paths="./..." output:dir=api/v1

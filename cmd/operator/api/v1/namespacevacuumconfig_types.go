@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package v1alpha1
+package v1
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
-var NamespaceVacuumConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1alpha1", Resource: "namespacevacuumconfigs"}
+var NamespaceVacuumConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1", Resource: "namespacevacuumconfigs"}
 
 // VacuumListSpec defines the desired state of VacuumList resource
 type NamespaceVacuumConfigSpec struct {

@@ -18,7 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 )
 
@@ -42,7 +42,7 @@ func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req 
 
 	log.Info("Reconciling ClusterKubeArchiveConfig")
 
-	ckaconfig := &kubearchivev1alpha1.ClusterKubeArchiveConfig{}
+	ckaconfig := &kubearchivev1.ClusterKubeArchiveConfig{}
 	if err := r.Client.Get(ctx, req.NamespacedName, ckaconfig); err != nil {
 		// Ignore not-found errors, since they can't be fixed by an immediate requeue (we need
 		// to wait for a new notification), and we can get them on deleted requests.
@@ -89,7 +89,7 @@ func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterKubeArchiveConfigReconciler) SetupClusterKubeArchiveConfigWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&kubearchivev1alpha1.ClusterKubeArchiveConfig{}).
+		For(&kubearchivev1.ClusterKubeArchiveConfig{}).
 		//Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
 		Complete(r)

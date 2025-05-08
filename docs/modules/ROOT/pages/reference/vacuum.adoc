@@ -13,12 +13,12 @@ This works fine in many instances, but there are some glaring gaps.
 +
 --
 For example, take this CEL expression specified for `deleteWhen`:
- 
+
 [source,yaml]
 ----
   deleteWhen: timestamp(status.completionTime) < now() - duration("2h")
 ----
- 
+
 This indicates that the operation should occur when the `completionTime`
 of the resource is more than two hours old. However, there will be no event
 to trigger KubeArchive at that time.
@@ -48,7 +48,7 @@ as a single instance using a `Job`.
 
 === Cluster Vacuum
 
-The cluster vacuum is used to vacuum resources cluster-wide. A cluster 
+The cluster vacuum is used to vacuum resources cluster-wide. A cluster
 vacuum job must be run from the "kubearchive" namespace. A cluster
 vacuum job allows the KubeArchive admin to control and vacuum all
 namespaces configured for KubeArchive.
@@ -76,9 +76,9 @@ A namespace with specific resources defined indicates that only those
 resources in the namespace should be vacuumed.
 
 The special namespace "___all-namespaces___" indicates that all namespaces
-should be processed. As a namespace, "___all-namespaces___" may also 
+should be processed. As a namespace, "___all-namespaces___" may also
 specify a list of resources. If "___all-namespaces___" is specified,
-then all namespaces *not* listed in the `ClusterVacuumConfig` are 
+then all namespaces *not* listed in the `ClusterVacuumConfig` are
 vacuumed according to the settings for "___all-namespaces___" and
 all listed namespaces are be vacuumed as configured.
 
@@ -89,7 +89,7 @@ in all namespaces configured for KubeArchive.
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1
 kind: ClusterVacuumConfig
 metadata:
   name: cluster-config
@@ -105,7 +105,7 @@ specified namespaces.
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1
 kind: ClusterVacuumConfig
 metadata:
   name: cluster-config
@@ -124,7 +124,7 @@ namespaces, but only `Job` resources in a third..
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1
 kind: ClusterVacuumConfig
 metadata:
   name: cluster-config
@@ -147,7 +147,7 @@ and `Pod` resources in namespace "namespace-2".
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1
 kind: ClusterVacuumConfig
 metadata:
   name: cluster-config
@@ -247,7 +247,7 @@ passed to the vacuum job.
 The namespace vacuum can process all resources in the namespace defined
 in the `ClusterKubeArchiveConfig` and the local `KubeArchiveConfig`. Which
 resources are actually vacuumed are determined by the `NamespaceVacuumConfig`
-custom resource. The `NamespaceVacuumConfig` lists the resources that 
+custom resource. The `NamespaceVacuumConfig` lists the resources that
 should be vacuumed by API version and kind. An empty list of resources
 in the`NamespaceVacuumConfig` indicates that all resources specified
 in both the `ClusterKubeArchiveConfig` and the local `KubeArchiveConfig`
@@ -261,7 +261,7 @@ namespace defined in the `ClusterKubeArchiveConfig` and the local
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1
 kind: NamespaceVacuumConfig
 metadata:
   name: name
@@ -277,7 +277,7 @@ the namespace.
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.org/v1alpha1
+apiVersion: kubearchive.org/v1
 kind: NamespaceVacuumConfig
 metadata:
   name: name

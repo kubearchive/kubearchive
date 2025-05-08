@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/kubearchive/kubearchive/test"
 	errs "k8s.io/apimachinery/pkg/api/errors"

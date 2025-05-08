@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 )
 
@@ -48,7 +48,7 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	log.Info("Reconciling KubeArchiveConfig")
 
-	kaconfig := &kubearchivev1alpha1.KubeArchiveConfig{}
+	kaconfig := &kubearchivev1.KubeArchiveConfig{}
 	if err := r.Client.Get(ctx, req.NamespacedName, kaconfig); err != nil {
 		// Ignore not-found errors, since they can't be fixed by an immediate requeue (we need
 		// to wait for a new notification), and we can get them on deleted requests.
@@ -135,11 +135,11 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 // SetupWithManager sets up the controller with the Manager.
 func (r *KubeArchiveConfigReconciler) SetupKubeArchiveConfigWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&kubearchivev1alpha1.KubeArchiveConfig{}).
+		For(&kubearchivev1.KubeArchiveConfig{}).
 		//Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
-		Watches(&kubearchivev1alpha1.ClusterKubeArchiveConfig{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, cm client.Object) []ctrl.Request {
-			crList := &kubearchivev1alpha1.KubeArchiveConfigList{}
+		Watches(&kubearchivev1.ClusterKubeArchiveConfig{}, handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, cm client.Object) []ctrl.Request {
+			crList := &kubearchivev1.KubeArchiveConfigList{}
 			if err := mgr.GetClient().List(ctx, crList); err != nil {
 				mgr.GetLogger().Error(err, "while listing ExampleCRDWithConfigMapRefs")
 				return nil
@@ -160,7 +160,7 @@ func (r *KubeArchiveConfigReconciler) SetupKubeArchiveConfigWithManager(mgr ctrl
 		Complete(r)
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.Role, error) {
+func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) (*rbacv1.Role, error) {
 	log := log.FromContext(ctx)
 
 	resources := make([]sourcesv1.APIVersionKindSelector, 0)
@@ -169,7 +169,7 @@ func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kac
 		resources = append(resources, resource)
 	}
 
-	ckac := &kubearchivev1alpha1.ClusterKubeArchiveConfig{}
+	ckac := &kubearchivev1.ClusterKubeArchiveConfig{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: constants.KubeArchiveConfigResourceName}, ckac)
 	if err == nil {
 		for _, kar := range ckac.Spec.Resources {
@@ -187,7 +187,7 @@ func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kac
 	return role, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, namespace string, name string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {
+func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, namespace string, name string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileRole " + name)
@@ -232,7 +232,7 @@ func (r *KubeArchiveConfigReconciler) desiredRole(namespace string, name string,
 	return role
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileA13eRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, role *rbacv1.ClusterRole) (*rbacv1.RoleBinding, error) {
+func (r *KubeArchiveConfigReconciler) reconcileA13eRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, role *rbacv1.ClusterRole) (*rbacv1.RoleBinding, error) {
 	subject := newSubject(constants.KubeArchiveNamespace, role.Name)
 	binding, err := r.reconcileRoleBinding(ctx, kaconfig, kaconfig.Namespace, role.Name, "ClusterRole", true, subject)
 	if err != nil {
@@ -241,7 +241,7 @@ func (r *KubeArchiveConfigReconciler) reconcileA13eRoleBinding(ctx context.Conte
 	return binding, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileSinkRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, role *rbacv1.Role) (*rbacv1.RoleBinding, error) {
+func (r *KubeArchiveConfigReconciler) reconcileSinkRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, role *rbacv1.Role) (*rbacv1.RoleBinding, error) {
 	subject := newSubject(constants.KubeArchiveNamespace, role.Name)
 	binding, err := r.reconcileRoleBinding(ctx, kaconfig, kaconfig.Namespace, role.Name, "Role", true, subject)
 	if err != nil {
@@ -250,7 +250,7 @@ func (r *KubeArchiveConfigReconciler) reconcileSinkRoleBinding(ctx context.Conte
 	return binding, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, namespace string, name string, kind string, add bool, subjects ...rbacv1.Subject) (*rbacv1.RoleBinding, error) {
+func (r *KubeArchiveConfigReconciler) reconcileRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, namespace string, name string, kind string, add bool, subjects ...rbacv1.Subject) (*rbacv1.RoleBinding, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileRoleBinding " + name)
@@ -393,7 +393,7 @@ func newSubject(namespace string, name string) rbacv1.Subject {
 	}
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileNamespace(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.Namespace, error) {
+func (r *KubeArchiveConfigReconciler) reconcileNamespace(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) (*corev1.Namespace, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileNamespace")
@@ -415,7 +415,7 @@ func (r *KubeArchiveConfigReconciler) reconcileNamespace(ctx context.Context, ka
 	return ns, nil
 }
 
-func (r *KubeArchiveConfigReconciler) removeNamespaceLabel(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) error {
+func (r *KubeArchiveConfigReconciler) removeNamespaceLabel(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) error {
 	log := log.FromContext(ctx)
 
 	log.Info("in removeNamespaceLabel")
@@ -438,7 +438,7 @@ func (r *KubeArchiveConfigReconciler) removeNamespaceLabel(ctx context.Context, 
 	return nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileVacuumResources(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) error {
+func (r *KubeArchiveConfigReconciler) reconcileVacuumResources(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) error {
 	if _, err := r.reconcileVacuumServiceAccount(ctx, kaconfig); err != nil {
 		return err
 	}
@@ -466,7 +466,7 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumResources(ctx context.Conte
 	return nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileVacuumServiceAccount(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*corev1.ServiceAccount, error) {
+func (r *KubeArchiveConfigReconciler) reconcileVacuumServiceAccount(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) (*corev1.ServiceAccount, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileVacuumServiceAccount")
@@ -478,7 +478,7 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumServiceAccount(ctx context.
 	return sa, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileServiceAccount(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, namespace string, name string) (*corev1.ServiceAccount, error) {
+func (r *KubeArchiveConfigReconciler) reconcileServiceAccount(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, namespace string, name string) (*corev1.ServiceAccount, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileServiceAccount")
@@ -505,18 +505,18 @@ func (r *KubeArchiveConfigReconciler) reconcileServiceAccount(ctx context.Contex
 	return sa, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig) (*rbacv1.Role, error) {
+func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) (*rbacv1.Role, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileVacuumRole")
 
 	resources := []sourcesv1.APIVersionKindSelector{
 		{
-			APIVersion: "kubearchive.org/v1alpha1",
+			APIVersion: "kubearchive.org/v1",
 			Kind:       "KubeArchiveConfig",
 		},
 		{
-			APIVersion: "kubearchive.org/v1alpha1",
+			APIVersion: "kubearchive.org/v1",
 			Kind:       "NamespaceVacuumConfig",
 		},
 	}
@@ -526,7 +526,7 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, k
 		resources = append(resources, resource)
 	}
 
-	ckac := &kubearchivev1alpha1.ClusterKubeArchiveConfig{}
+	ckac := &kubearchivev1.ClusterKubeArchiveConfig{}
 	err := r.Client.Get(ctx, types.NamespacedName{Name: constants.KubeArchiveConfigResourceName}, ckac)
 	if err != nil {
 		if !errors.IsNotFound(err) {
@@ -546,7 +546,7 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, k
 	return role, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileVacuumRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, role *rbacv1.Role) (*rbacv1.RoleBinding, error) {
+func (r *KubeArchiveConfigReconciler) reconcileVacuumRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, role *rbacv1.Role) (*rbacv1.RoleBinding, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileVacuumRoleBinding")
@@ -560,7 +560,7 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRoleBinding(ctx context.Con
 	return binding, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileKubeArchiveClusterConfigReadClusterRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, add bool) error {
+func (r *KubeArchiveConfigReconciler) reconcileKubeArchiveClusterConfigReadClusterRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, add bool) error {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileKubeArchiveClusterConfigReadClusterRoleBinding")
@@ -594,7 +594,7 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumBrokerRole(ctx context.Cont
 	return role, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileVacuumBrokerRoleBinding(ctx context.Context, kaconfig *kubearchivev1alpha1.KubeArchiveConfig, add bool) error {
+func (r *KubeArchiveConfigReconciler) reconcileVacuumBrokerRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, add bool) error {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileVacuumBrokerRoleBinding")

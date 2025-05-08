@@ -13,7 +13,7 @@ import (
 	ce "github.com/cloudevents/sdk-go/v2"
 	"github.com/cloudevents/sdk-go/v2/client"
 	cehttp "github.com/cloudevents/sdk-go/v2/protocol/http"
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

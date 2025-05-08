@@ -8,11 +8,8 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"sort"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -27,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	kubearchivev1alpha1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1alpha1"
+	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 )
 
@@ -37,13 +34,13 @@ const (
 	resourceFinalizerName     = "kubearchive.org/finalizer"
 )
 
-func reconcileAllCommonResources(ctx context.Context, client client.Client, mapper meta.RESTMapper, namespace string, resources []kubearchivev1alpha1.KubeArchiveConfigResource) (*rbacv1.ClusterRole, error) {
+func reconcileAllCommonResources(ctx context.Context, client client.Client, mapper meta.RESTMapper, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) (*rbacv1.ClusterRole, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in ReconcileAllCommonResources")
 
 	var err error
-	var sf *kubearchivev1alpha1.SinkFilter
+	var sf *kubearchivev1.SinkFilter
 	if sf, err = reconcileSinkFilter(ctx, client, namespace, resources); err != nil {
 		return nil, err
 	}
@@ -206,7 +203,7 @@ func reconcileA13e(ctx context.Context, client client.Client, resources []source
 func desiredA13e(resources []sourcesv1.APIVersionKindSelector) *sourcesv1.ApiServerSource {
 	if len(resources) == 0 {
 		// Make sure there's at least one entry to the ApiServerSource starts.
-		resources = append(resources, sourcesv1.APIVersionKindSelector{Kind: "ClusterKubeArchiveConfig", APIVersion: "kubearchive.org/v1alpha1"})
+		resources = append(resources, sourcesv1.APIVersionKindSelector{Kind: "ClusterKubeArchiveConfig", APIVersion: "kubearchive.org/v1"})
 	}
 
 	source := &sourcesv1.ApiServerSource{
@@ -241,7 +238,7 @@ func desiredA13e(resources []sourcesv1.APIVersionKindSelector) *sourcesv1.ApiSer
 	return source
 }
 
-func getSinkFilterResources(sf *kubearchivev1alpha1.SinkFilter) []sourcesv1.APIVersionKindSelector {
+func getSinkFilterResources(sf *kubearchivev1.SinkFilter) []sourcesv1.APIVersionKindSelector {
 	resourceMap := map[string]sourcesv1.APIVersionKindSelector{}
 	resourceKeys := make([]string, 0)
 	for _, resources := range sf.Spec.Namespaces {
@@ -263,12 +260,12 @@ func getSinkFilterResources(sf *kubearchivev1alpha1.SinkFilter) []sourcesv1.APIV
 	return resources
 }
 
-func reconcileSinkFilter(ctx context.Context, client client.Client, namespace string, resources []kubearchivev1alpha1.KubeArchiveConfigResource) (*kubearchivev1alpha1.SinkFilter, error) {
+func reconcileSinkFilter(ctx context.Context, client client.Client, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) (*kubearchivev1.SinkFilter, error) {
 	log := log.FromContext(ctx)
 
 	log.Info("in reconcileSinkFilter")
 
-	sf := &kubearchivev1alpha1.SinkFilter{}
+	sf := &kubearchivev1.SinkFilter{}
 	err := client.Get(ctx, types.NamespacedName{Name: constants.SinkFilterResourceName, Namespace: constants.KubeArchiveNamespace}, sf)
 	if errors.IsNotFound(err) {
 		sf = desiredSinkFilter(ctx, nil, namespace, resources)
@@ -292,25 +289,25 @@ func reconcileSinkFilter(ctx context.Context, client client.Client, namespace st
 	return sf, nil
 }
 
-func desiredSinkFilter(ctx context.Context, sf *kubearchivev1alpha1.SinkFilter, namespace string, resources []kubearchivev1alpha1.KubeArchiveConfigResource) *kubearchivev1alpha1.SinkFilter {
+func desiredSinkFilter(ctx context.Context, sf *kubearchivev1.SinkFilter, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) *kubearchivev1.SinkFilter {
 	log := log.FromContext(ctx)
 
 	log.Info("in desiredSinkFilter")
 
 	if sf == nil {
-		sf = &kubearchivev1alpha1.SinkFilter{
+		sf = &kubearchivev1.SinkFilter{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      constants.SinkFilterResourceName,
 				Namespace: constants.KubeArchiveNamespace,
 			},
-			Spec: kubearchivev1alpha1.SinkFilterSpec{
-				Namespaces: map[string][]kubearchivev1alpha1.KubeArchiveConfigResource{},
+			Spec: kubearchivev1.SinkFilterSpec{
+				Namespaces: map[string][]kubearchivev1.KubeArchiveConfigResource{},
 			},
 		}
 	}
 
 	if sf.Spec.Namespaces == nil {
-		sf.Spec.Namespaces = make(map[string][]kubearchivev1alpha1.KubeArchiveConfigResource)
+		sf.Spec.Namespaces = make(map[string][]kubearchivev1.KubeArchiveConfigResource)
 	}
 
 	if resources != nil {
@@ -322,23 +319,4 @@ func desiredSinkFilter(ctx context.Context, sf *kubearchivev1alpha1.SinkFilter, 
 	// Note that the owner reference is NOT set on the SinkFilter resource.  It should not be deleted when
 	// the KubeArchiveConfig object is deleted.
 	return sf
-}
-
-func convertToYamlString(resources []kubearchivev1alpha1.KubeArchiveConfigResource) (string, error) {
-	jsonBytes, err := json.Marshal(resources)
-	if err != nil {
-		return "", err
-	}
-
-	var data interface{}
-	err = json.Unmarshal(jsonBytes, &data)
-	if err != nil {
-		return "", err
-	}
-
-	yamlBytes, err := yaml.Marshal(data)
-	if err != nil {
-		return "", err
-	}
-	return string(yamlBytes), nil
 }

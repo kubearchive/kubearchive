@@ -1,7 +1,7 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package v1alpha1
+package v1
 
 import (
 	"context"
@@ -27,7 +27,7 @@ func SetupKACWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-kubearchive-org-v1alpha1-kubearchiveconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=kubearchiveconfigs,verbs=create;update,versions=v1alpha1,name=mkubearchiveconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/mutate-kubearchive-org-v1-kubearchiveconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=kubearchiveconfigs,verbs=create;update,versions=v1,name=mkubearchiveconfig.kb.io,admissionReviewVersions=v1
 
 type KubeArchiveConfigCustomDefaulter struct{}
 
@@ -43,7 +43,7 @@ func (kaccd *KubeArchiveConfigCustomDefaulter) Default(_ context.Context, obj ru
 	return nil
 }
 
-//+kubebuilder:webhook:path=/validate-kubearchive-org-v1alpha1-kubearchiveconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=kubearchiveconfigs,verbs=create;update,versions=v1alpha1,name=vkubearchiveconfig.kb.io,admissionReviewVersions=v1
+//+kubebuilder:webhook:path=/validate-kubearchive-org-v1-kubearchiveconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=kubearchiveconfigs,verbs=create;update,versions=v1,name=vkubearchiveconfig.kb.io,admissionReviewVersions=v1
 
 type KubeArchiveConfigCustomValidator struct {
 	kubearchiveResourceName string

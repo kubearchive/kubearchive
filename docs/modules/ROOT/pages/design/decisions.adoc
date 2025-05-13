@@ -372,3 +372,26 @@ Reviewers: Hector Martinez, Greg Allen, Sam Koved, Andrea Fernandez, Marta Anon
 KubeArchive offers a series of SQL patches to migrate the database schema from one version
 to the next. Additionally KubeArchive offers a single SQL file that should be used in new
 installations. The implementation will be decided after inspection of the different tools available.
+
+== CEL expressions are combined using logic within Go
+Date: 2025-04-14
+
+Status: Accepted
+
+Reviewers: Hector Martinez, Greg Allen, Sam Koved, Marta Anon, Andrea Fernandez
+
+KubeArchive uses CEL expressions to decide if it archives/deletes a resource or not. The implementation
+merged the global and local at a CEL expression level (concatenating their strings with `||`). This
+causes local expressions, otherwise empty, to be compiled and stored. In a scenario where rules are mainly
+controlled using the global configuration, KubeArchive is compiling and storing `n * 3 + 3` CEL expressions,
+where `n` is the number of namespaces being used and `+ 3` are the three CEL expressions for the global configuration.
+
+A better approach is to store the global and local expressions independently and then join their results
+directly in Go, instead of combining strings and then compiling the result. With this approach the number
+of CEL expressions compiled is the same given that all namespaces define their own rules, but it is greatly
+reduced in the case that the general rules are controlled globally.
+
+Based on memory consumption, and given that the complexity of the better approach is similar, we decided
+to store independently global and local rules, and then joining their results on code.
+
+See [#986](https://github.com/kubearchive/kubearchive/issues/986) for details.

@@ -48,6 +48,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 	selector, parserErr := labels.Parse(context.Query("labelSelector"))
 	if parserErr != nil {
 		abort.Abort(context, parserErr, http.StatusBadRequest)
+		return
 	}
 	reqs, _ := selector.Requirements()
 	labelFilters, labelFiltersErr := labelFilter.NewLabelFilters(reqs)

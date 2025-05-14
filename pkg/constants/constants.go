@@ -12,19 +12,19 @@ const (
 	KubeArchiveConfigResourceName                  = "kubearchive"
 	KubeArchiveNamespaceEnvVar                     = "KUBEARCHIVE_NAMESPACE"
 	SinkFilterResourceName                         = "sink-filters"
+	KubeArchiveSinkName                            = "kubearchive-sink"
+	KubeArchiveApiServerSourceName                 = "kubearchive-a13e"
 	SinkFilterGlobalNamespace                      = "___global___"
 	ClusterVacuumAllNamespaces                     = "___all-namespaces___"
+	KubeArchiveBrokerName                          = "kubearchive-broker"
+	KubeArchiveVacuumName                          = "kubearchive-vacuum"
+	KubeArchiveVacuumBroker                        = "kubearchive-broker"
+	KubeArchiveClusterVacuumName                   = "kubearchive-cluster-vacuum"
 )
 
 var (
 	// These get set in init() and should be treated as const
-	KubeArchiveNamespace           string
-	KubeArchiveBrokerName          string
-	KubeArchiveSinkName            string
-	KubeArchiveVacuumName          string
-	KubeArchiveVacuumBroker        string
-	KubeArchiveClusterVacuumName   string
-	KubeArchiveApiServerSourceName string
+	KubeArchiveNamespace string
 )
 
 func init() {
@@ -32,10 +32,4 @@ func init() {
 	if KubeArchiveNamespace == "" {
 		KubeArchiveNamespace = "kubearchive" // Not set for testing!
 	}
-	KubeArchiveBrokerName = KubeArchiveNamespace + "-broker"
-	KubeArchiveSinkName = KubeArchiveNamespace + "-sink"
-	KubeArchiveVacuumName = KubeArchiveNamespace + "-vacuum"
-	KubeArchiveVacuumBroker = KubeArchiveVacuumName + "-broker"
-	KubeArchiveClusterVacuumName = KubeArchiveNamespace + "-cluster-vacuum"
-	KubeArchiveApiServerSourceName = KubeArchiveNamespace + "-a13e"
 }

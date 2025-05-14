@@ -44,7 +44,7 @@ require (
 	k8s.io/client-go v0.33.0
 	k8s.io/klog/v2 v2.130.1
 	knative.dev/eventing v0.45.1
-	knative.dev/pkg v0.0.0-20250513222746-1c0e799b8740
+	knative.dev/pkg v0.0.0-20250514120547-19a13830745a
 	sigs.k8s.io/controller-runtime v0.20.4
 )
 

@@ -15,8 +15,9 @@ KubeArchive exposes the following custom metrics:
 Tracks the total number of Cloud Events (resource updates) received aggregated by `resource_type`,
 `event_type` and `result`.
 
-* `result`: one of `insert`, `update`, `none`, `error` or `no_match`. `none` is returned when the
-Cloud Event contains data older than the one already persisted (out of order).
+* `result`: one of `insert`, `update`, `none`, `error`, `no_match` or `no_conf`. `none` is returned when the
+Cloud Event contains data older than the one already persisted (out of order), `no_conf` is returned when the
+a resource is received but it is not configured.
 * `resource_type`: a combination of the resource `apiVersion` and `kind`. For example `apps/v1/Deployment`,
 `v1/Pods` or `tekton.dev/v1/PipelineRun`.
 * `event_type`: one of `dev.knative.apiserver.resource.new`, `dev.knative.apiserver.resource.update`

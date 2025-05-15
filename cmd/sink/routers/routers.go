@@ -174,8 +174,23 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 
 	CEMetricAttrs["resource_type"] = fmt.Sprintf("%s/%s", k8sObj.GetAPIVersion(), k8sObj.GetKind())
 
+	if !c.Filters.IsConfigured(ctx, k8sObj) {
+		CEMetricAttrs["result"] = string(observability.CEResultNoConfiguration)
+		slog.Warn(
+			"Resource update received, resource is not configured",
+			"event-id", event.ID(),
+			"event-type", event.Type(),
+			"id", k8sObj.GetUID(),
+			"kind", k8sObj.GetKind(),
+			"apiVersion", k8sObj.GetAPIVersion(),
+			"namespace", k8sObj.GetNamespace(),
+			"name", k8sObj.GetName())
+		return NewCEResult(http.StatusAccepted)
+	}
+
 	// If message is of type delete we end early
 	if strings.HasSuffix(event.Type(), ".delete") {
+		logMsg := "Resource deletion received, resource archived"
 		if c.Filters.MustArchiveOnDelete(ctx, k8sObj) {
 			result, writeErr := c.writeResource(ctx, k8sObj, event)
 			if writeErr != nil {
@@ -185,10 +200,11 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
 		} else {
 			CEMetricAttrs["result"] = string(observability.CEResultNoMatch)
+			logMsg = "Resource deletion received, resource did not match for archive on deletion"
 		}
 
 		slog.Info(
-			"Resource was deleted, no action is needed",
+			logMsg,
 			"event-id", event.ID(),
 			"event-type", event.Type(),
 			"id", k8sObj.GetUID(),
@@ -202,7 +218,7 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 	// If resource does not match archival, we exit early
 	if !c.Filters.MustArchive(ctx, k8sObj) {
 		slog.Info(
-			"Resource was updated, no action is needed",
+			"Resource update received, no archive needed",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
 			"id", k8sObj.GetUID(),

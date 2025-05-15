@@ -339,3 +339,97 @@ func TestChangeGlobalFilters(t *testing.T) {
 	}
 
 }
+
+func TestIsConfigured(t *testing.T) {
+	filters := NewFilters(nil)
+	fh, err := os.Open("testdata/sf.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { fh.Close() })
+
+	fileBytes, err := io.ReadAll(fh)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var unstructuredData map[string]interface{}
+	err = yaml.Unmarshal(fileBytes, &unstructuredData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	obj := &unstructured.Unstructured{Object: unstructuredData}
+	bytes, err := obj.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sf := &kubearchiveapi.SinkFilter{}
+
+	if err = json.Unmarshal(bytes, sf); err != nil {
+		t.Fatal(err)
+	}
+
+	err = filters.changeFilters(sf.Spec.Namespaces)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name         string
+		resource     unstructured.Unstructured
+		isConfigured bool
+	}{
+		{
+			name: "pod is configured",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			isConfigured: true,
+		},
+		{
+			name: "cronjob is configured",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "batch/v1",
+					"kind":       "CronJob",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			isConfigured: true,
+		},
+		{
+			name: "Deployment is not configured",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			isConfigured: false,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			isConfigured := filters.IsConfigured(context.Background(), &testCase.resource)
+
+			assert.Equal(t, testCase.isConfigured, isConfigured)
+		})
+	}
+}

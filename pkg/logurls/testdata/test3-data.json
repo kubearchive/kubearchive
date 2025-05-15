@@ -1,0 +1,295 @@
+{
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+        "creationTimestamp": "2025-05-09T12:17:00Z",
+        "generateName": "generate-log-1-29113217-",
+        "labels": {
+            "batch.kubernetes.io/controller-uid": "5a6a77c2-15ce-4f33-a6b8-ff2aa8c070b6",
+            "batch.kubernetes.io/job-name": "generate-log-1-29113217",
+            "controller-uid": "5a6a77c2-15ce-4f33-a6b8-ff2aa8c070b6",
+            "job-name": "generate-log-1-29113217"
+        },
+        "name": "generate-log-1-29113217-l4bcc",
+        "namespace": "test",
+        "ownerReferences": [
+            {
+                "apiVersion": "batch/v1",
+                "blockOwnerDeletion": true,
+                "controller": true,
+                "kind": "Job",
+                "name": "generate-log-1-29113217",
+                "uid": "5a6a77c2-15ce-4f33-a6b8-ff2aa8c070b6"
+            }
+        ],
+        "resourceVersion": "73132",
+        "uid": "139fd9d3-f562-4e5a-98e9-b7762b13d3d3"
+    },
+    "spec": {
+        "containers": [
+            {
+                "args": [
+                    "-n",
+                    "1024",
+                    "-d",
+                    "20ms"
+                ],
+                "image": "quay.io/kubearchive/mingrammer/flog",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "generate1",
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-lmkml",
+                        "readOnly": true
+                    }
+                ]
+            },
+            {
+                "args": [
+                    "-n",
+                    "512",
+                    "-d",
+                    "20ms"
+                ],
+                "image": "quay.io/kubearchive/mingrammer/flog",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "generate2",
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-lmkml",
+                        "readOnly": true
+                    }
+                ]
+            },
+            {
+                "args": [
+                    "-n",
+                    "256",
+                    "-d",
+                    "20ms"
+                ],
+                "image": "quay.io/kubearchive/mingrammer/flog",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "generate3",
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-lmkml",
+                        "readOnly": true
+                    }
+                ]
+            }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "enableServiceLinks": true,
+        "nodeName": "k9e-control-plane",
+        "preemptionPolicy": "PreemptLowerPriority",
+        "priority": 0,
+        "restartPolicy": "OnFailure",
+        "schedulerName": "default-scheduler",
+        "securityContext": {},
+        "serviceAccount": "default",
+        "serviceAccountName": "default",
+        "terminationGracePeriodSeconds": 30,
+        "tolerations": [
+            {
+                "effect": "NoExecute",
+                "key": "node.kubernetes.io/not-ready",
+                "operator": "Exists",
+                "tolerationSeconds": 300
+            },
+            {
+                "effect": "NoExecute",
+                "key": "node.kubernetes.io/unreachable",
+                "operator": "Exists",
+                "tolerationSeconds": 300
+            }
+        ],
+        "volumes": [
+            {
+                "name": "kube-api-access-lmkml",
+                "projected": {
+                    "defaultMode": 420,
+                    "sources": [
+                        {
+                            "serviceAccountToken": {
+                                "expirationSeconds": 3607,
+                                "path": "token"
+                            }
+                        },
+                        {
+                            "configMap": {
+                                "items": [
+                                    {
+                                        "key": "ca.crt",
+                                        "path": "ca.crt"
+                                    }
+                                ],
+                                "name": "kube-root-ca.crt"
+                            }
+                        },
+                        {
+                            "downwardAPI": {
+                                "items": [
+                                    {
+                                        "fieldRef": {
+                                            "apiVersion": "v1",
+                                            "fieldPath": "metadata.namespace"
+                                        },
+                                        "path": "namespace"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "status": {
+        "conditions": [
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2025-05-09T12:17:23Z",
+                "status": "False",
+                "type": "PodReadyToStartContainers"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2025-05-09T12:17:00Z",
+                "reason": "PodCompleted",
+                "status": "True",
+                "type": "Initialized"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2025-05-09T12:17:07Z",
+                "reason": "PodCompleted",
+                "status": "False",
+                "type": "Ready"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2025-05-09T12:17:07Z",
+                "reason": "PodCompleted",
+                "status": "False",
+                "type": "ContainersReady"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2025-05-09T12:17:00Z",
+                "status": "True",
+                "type": "PodScheduled"
+            }
+        ],
+        "containerStatuses": [
+            {
+                "containerID": "containerd://1d09357541c3f0528265460fdcee282bc756acf1f6bdc4e5d75293dfb93126f0",
+                "image": "quay.io/kubearchive/mingrammer/flog:latest",
+                "imageID": "quay.io/kubearchive/mingrammer/flog@sha256:44180f8610fab7d4c29ff233a79e19cf28bd425c1737aa59c72c1f66613fdf41",
+                "lastState": {},
+                "name": "generate1",
+                "ready": false,
+                "restartCount": 0,
+                "started": false,
+                "state": {
+                    "terminated": {
+                        "containerID": "containerd://1d09357541c3f0528265460fdcee282bc756acf1f6bdc4e5d75293dfb93126f0",
+                        "exitCode": 0,
+                        "finishedAt": "2025-05-09T12:17:21Z",
+                        "reason": "Completed",
+                        "startedAt": "2025-05-09T12:17:01Z"
+                    }
+                },
+                "volumeMounts": [
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-lmkml",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    }
+                ]
+            },
+            {
+                "containerID": "containerd://eaf0559c353ae98c3566089bf3208a87d6ce78b13d54b2a3b540ee3c77a67501",
+                "image": "quay.io/kubearchive/mingrammer/flog:latest",
+                "imageID": "quay.io/kubearchive/mingrammer/flog@sha256:44180f8610fab7d4c29ff233a79e19cf28bd425c1737aa59c72c1f66613fdf41",
+                "lastState": {},
+                "name": "generate2",
+                "ready": false,
+                "restartCount": 0,
+                "started": false,
+                "state": {
+                    "terminated": {
+                        "containerID": "containerd://eaf0559c353ae98c3566089bf3208a87d6ce78b13d54b2a3b540ee3c77a67501",
+                        "exitCode": 0,
+                        "finishedAt": "2025-05-09T12:17:11Z",
+                        "reason": "Completed",
+                        "startedAt": "2025-05-09T12:17:01Z"
+                    }
+                },
+                "volumeMounts": [
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-lmkml",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    }
+                ]
+            },
+            {
+                "containerID": "containerd://a639c3d0245b959f068d65933840d19aa0fdf0091ecb244044702bc3f130cf06",
+                "image": "quay.io/kubearchive/mingrammer/flog:latest",
+                "imageID": "quay.io/kubearchive/mingrammer/flog@sha256:44180f8610fab7d4c29ff233a79e19cf28bd425c1737aa59c72c1f66613fdf41",
+                "lastState": {},
+                "name": "generate3",
+                "ready": false,
+                "restartCount": 0,
+                "started": false,
+                "state": {
+                    "terminated": {
+                        "containerID": "containerd://a639c3d0245b959f068d65933840d19aa0fdf0091ecb244044702bc3f130cf06",
+                        "exitCode": 0,
+                        "finishedAt": "2025-05-09T12:17:06Z",
+                        "reason": "Completed",
+                        "startedAt": "2025-05-09T12:17:01Z"
+                    }
+                },
+                "volumeMounts": [
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-lmkml",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    }
+                ]
+            }
+        ],
+        "hostIP": "10.89.0.4",
+        "hostIPs": [
+            {
+                "ip": "10.89.0.4"
+            }
+        ],
+        "phase": "Succeeded",
+        "podIP": "10.244.0.106",
+        "podIPs": [
+            {
+                "ip": "10.244.0.106"
+            }
+        ],
+        "qosClass": "BestEffort",
+        "startTime": "2025-05-09T12:17:00Z"
+    }
+}

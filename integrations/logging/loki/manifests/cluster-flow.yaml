@@ -1,0 +1,23 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: logging.banzaicloud.io/v1beta1
+kind: ClusterFlow
+metadata:
+  name: loki-flow
+spec:
+  filters:
+    - tag_normaliser: {}
+  match:
+    - exclude:
+        namespaces:
+          - cert-manager
+          - knative-eventing
+          - kube-node-lease
+          - kube-public
+          - kube-system
+          - kubearchive
+          - grafana-loki
+    - select: {}
+  globalOutputRefs:
+    - loki-output

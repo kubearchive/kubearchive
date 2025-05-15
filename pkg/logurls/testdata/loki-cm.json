@@ -1,0 +1,7 @@
+{
+  "POD_ID": "cel:metadata.uid",
+  "CONTAINER_NAME": "cel:spec.containers.map(m, m.name)",
+  "START": "cel:status.?startTime == optional.none() ? int(now()-duration('1h'))*1000000000: status.startTime",
+  "END": "cel:status.?startTime == optional.none() ? int(now()+duration('1h'))*1000000000: int(timestamp(status.startTime)+duration('24h'))*1000000000",
+  "LOG_URL": "http://loki.grafana-loki.svc.cluster.local:3100/loki/api/v1/query_range?query%3D%7Bpod%3D%22{POD_ID}%22%2C%20container%3D%22{CONTAINER_NAME}%22%7D%20%7C%20json%20%7C%20line_format%20%22%7B%7B.message%7D%7D%22&start%3D{START}&end%3D{END}"
+}

@@ -14,11 +14,12 @@ var CloudEvents metric.Int64UpDownCounter
 type CEResult string
 
 const (
-	CEResultInsert  CEResult = "insert"
-	CEResultUpdate  CEResult = "update"
-	CEResultNone    CEResult = "none"
-	CEResultError   CEResult = "error"
-	CEResultNoMatch CEResult = "no_match"
+	CEResultInsert          CEResult = "insert"
+	CEResultUpdate          CEResult = "update"
+	CEResultNone            CEResult = "none"
+	CEResultError           CEResult = "error"
+	CEResultNoMatch         CEResult = "no_match"
+	CEResultNoConfiguration CEResult = "no_conf"
 )
 
 func NewCEResultFromWriteResourceResult(result interfaces.WriteResourceResult) CEResult {

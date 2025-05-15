@@ -51,3 +51,7 @@ func (f *Filters) MustArchiveOnDelete(ctx context.Context, obj *unstructured.Uns
 	}
 	return false
 }
+
+func (f *Filters) IsConfigured(ctx context.Context, obj *unstructured.Unstructured) bool {
+	return f.MustArchiveOnDelete(ctx, obj) || f.MustArchive(ctx, obj) || f.MustDelete(ctx, obj)
+}

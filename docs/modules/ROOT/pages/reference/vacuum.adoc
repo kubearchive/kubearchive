@@ -267,7 +267,7 @@ metadata:
   name: name
   namespace: namespace
 spec:
-    resources: {}
+    resources: []
 ----
 
 This `NamespaceVacuumConfig` vacuums only `Job` and `Pod` resources in

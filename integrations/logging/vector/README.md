@@ -8,7 +8,7 @@ run the following command:
 integrations/logging/vector/install.sh
 ```
 
-This will install and configure [Vector by Datadog]() configured to collect and
+This will install and configure [Vector by Datadog](https://vector.dev/docs/about/vector/) configured to collect and
 send Kubernetes and Tekton logs to Loki and eventually S3.
 
 You can check Vector logs to make sure if it is up and running:

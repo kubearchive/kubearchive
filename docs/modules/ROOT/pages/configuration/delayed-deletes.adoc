@@ -1,0 +1,140 @@
+= Delayed Deletes
+
+This document describes how to configure KubeArchive when resources need
+to be deleted after a certain time.
+
+KubeArchive features vacuums that rescan namespaces for stale or missed
+resources. Vacuums in combination with filters that include time expressions
+allow users to delay the deletion of resources. More information about Vacuums
+xref:/reference/vacuum.adoc[here].
+
+This feature is useful for resources that are monitored or modified by other
+systems without any flag on the resource itself that can be used by KubeArchive.
+For example metadata collection systems or build signature systems.
+
+== KubeArchiveConfig
+The following `KubeArchiveConfig` resource configures KubeArchive to delete
+`Pod` ten seconds after they started if their `status.phase` is `Succeeded`:
+
+[source,yaml]
+----
+apiVersion: kubearchive.org/v1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+spec:
+  resources:
+    - selector:
+        apiVersion: v1
+        kind: Pod
+      deleteWhen: status.phase == "Succeeded" && timestamp(status.startTime) < now() - duration("10s")
+----
+
+Given a `Pod` that just prints `Hello`, when the latest update for it is received
+by KubeArchive it is likely that the condition for deletion does not yet evaluate
+to true.
+
+== Vacuum
+Create the following `NamespaceVacuumConfig` to configure the vacuum to scan all
+resources configured for the namespace:
+
+[source,yaml]
+----
+apiVersion: kubearchive.org/v1
+kind: NamespaceVacuumConfig
+metadata:
+  name: all
+spec:
+    resources: []
+----
+
+This won't trigger anything by itself, you need something that runs the actual vacuum
+process.
+
+== CronJob
+The following `CronJob` executes the vacuum process for the vacuum configuration
+created in the previous section:
+
+[source,yaml]
+----
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: all-vacuum
+spec:
+  schedule: "* * * * *"  # Execute each minute
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccount: kubearchive-vacuum
+          containers:
+            - name: vacuum
+              image: quay.io/kubearchive/vacuum:<your KubeArchive version>
+              command: [ "/ko-app/vacuum" ]
+              args:
+                - --config
+                - all  # name of the NamespaceVacuumConfig
+              env:
+                - name: NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                     fieldPath: metadata.namespace
+          restartPolicy: Never
+----
+
+Each time this `CronJob` executes KubeArchive receives the resources
+configured in the `NamespaceVacuumConfig` (in this case all resources
+in the `KubeArchiveConfig`) so they are processed again.
+
+== Configuring Cluster-wide Delayed Deletes
+To configure a single vacuum to scan all the namespaces for all the
+resources use a `ClusterVacuumConfig` within the installation
+namespace of KubeArchive (by default `kubearchive`):
+
+[source,yaml]
+----
+apiVersion: kubearchive.org/v1
+kind: ClusterVacuumConfig
+metadata:
+  name: vacuum-config-all
+  namespace: kubearchive
+spec:
+  namespaces: {}
+----
+
+And then create a `CronJob` in the same namespace:
+
+[source,yaml]
+----
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vacuum-all
+  namespace: kubearchive
+spec:
+  schedule: "* */1 * * *"  # Execute the first minute of each hour
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccount: kubearchive-cluster-vacuum
+          containers:
+            - name: vacuum
+              image: quay.io/kubearchive/vacuum:<your KubeArchive version>
+              command: [ "/ko-app/vacuum" ]
+              args:
+                - --type
+                - cluster
+                - --config
+                - vacuum-config-all  # name of the ClusterVacuumConfig
+              env:
+                - name: KUBEARCHIVE_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                     fieldPath: metadata.namespace
+          restartPolicy: Never
+----
+
+Read more information about vacuums
+xref:/reference/vacuum.adoc[here].

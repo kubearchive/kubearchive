@@ -12,7 +12,7 @@ require (
 	github.com/avast/retry-go/v4 v4.6.1
 	github.com/cloudevents/sdk-go/observability/opentelemetry/v2 v2.15.2
 	github.com/cloudevents/sdk-go/v2 v2.16.0
-	github.com/gin-gonic/gin v1.10.0
+	github.com/gin-gonic/gin v1.10.1
 	github.com/go-logr/logr v1.4.2
 	github.com/go-sql-driver/mysql v1.9.2
 	github.com/google/cel-go v0.25.0

@@ -13,7 +13,7 @@ bash integrations/database/postgresql/install.sh
 # renovate: datasource=github-releases depName=cert-manager packageName=cert-manager/cert-manager
 export CERT_MANAGER_VERSION=v1.17.2
 # renovate: datasource=github-releases depName=knative-eventing packageName=knative/eventing
-export KNATIVE_EVENTING_VERSION=v1.17.4
+export KNATIVE_EVENTING_VERSION=v1.18.1
 
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml
 kubectl apply -f https://github.com/knative/eventing/releases/download/knative-${KNATIVE_EVENTING_VERSION}/eventing.yaml

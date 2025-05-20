@@ -27,6 +27,7 @@ type Interface interface {
 	MustArchive(context.Context, *unstructured.Unstructured) bool
 	MustDelete(context.Context, *unstructured.Unstructured) bool
 	MustArchiveOnDelete(context.Context, *unstructured.Unstructured) bool
+	IsConfigured(context.Context, *unstructured.Unstructured) bool
 }
 
 type Filters struct {
@@ -227,4 +228,20 @@ func (f *Filters) MustArchiveOnDelete(ctx context.Context, obj *unstructured.Uns
 	ngvk = GlobalNGVKFromObject(obj)
 	program, exists = f.archiveOnDelete[ngvk]
 	return exists && ocel.ExecuteBooleanCEL(ctx, program, obj)
+}
+
+func (f *Filters) IsConfigured(ctx context.Context, obj *unstructured.Unstructured) bool {
+	ngvk := NamespaceGVKFromObject(obj)
+	_, namespaceArchiveOnDeleteExists := f.archiveOnDelete[ngvk]
+	_, namespaceArchiveWhenExists := f.archive[ngvk]
+	_, namespaceDeleteExists := f.delete[ngvk]
+
+	ngvk = GlobalNGVKFromObject(obj)
+	_, globalArchiveOnDeleteExists := f.archiveOnDelete[ngvk]
+	_, globalArchiveWhenExists := f.archive[ngvk]
+	_, globalDeleteExists := f.delete[ngvk]
+
+	isNamespaceConfigured := namespaceArchiveOnDeleteExists || namespaceArchiveWhenExists || namespaceDeleteExists
+	isGlobalConfigured := globalArchiveOnDeleteExists || globalArchiveWhenExists || globalDeleteExists
+	return isNamespaceConfigured || isGlobalConfigured
 }

@@ -90,19 +90,17 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 
 	observability.SetupPprof(router)
 
-	creds, credsErr := logging.GetKubeArchiveLoggingCredentials()
-
 	apisGroup.GET("/:group/:version/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name/log",
-		logging.SetLoggingCredentials(creds, credsErr), controller.GetLogURL, logging.LogRetrieval())
+		logging.SetLoggingHeaders(), controller.GetLogURL, logging.LogRetrieval())
 
 	apiGroup.GET("/:version/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name/log",
-		logging.SetLoggingCredentials(creds, credsErr), controller.GetLogURL, logging.LogRetrieval())
+		logging.SetLoggingHeaders(), controller.GetLogURL, logging.LogRetrieval())
 
 	return &Server{
 		router:    router,

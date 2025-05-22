@@ -142,8 +142,8 @@ applied by the API Server to the output of the response body.
 
 === Secret
 
-The credentials to authorize the access to the logging backend API are stored in a `Secret`
-named `kubearhive-logging` with the mandatory keys `USER` and `PASSWORD`:
+The headers that are needed for querying the logging API should be included in a `kubearchive-logging` `Secret`.
+For example, a basic authentication with the user `user` and password `password will be as follows:
 
 .Example of kubearchive-logging Secret
 [source, yaml]
@@ -155,12 +155,11 @@ metadata:
   name: kubearchive-logging
   namespace: kubearchive
 type: Opaque
-stringData: <1>
-  USER: user
-  PASSWORD: password # notsecret
+stringData:
+  Authorization: "Basic YWRtaW46cGFzc3dvcmQ=" # <1>
 ----
 
-<1> The user and password used for HTTP Basic Access Authentication
+<1> The token is `user:password` in base64 encoding.
 
 == Supported Logging Systems
 
@@ -168,7 +167,7 @@ KubeArchive currently integrates with both Splunk and Elasticsearch
 
 === Elasticsearch
 
-.Example of kubearchive-logging ConfigMap fot ElasticSearch integration
+.Example of kubearchive-logging ConfigMap for ElasticSearch integration
 [source,yaml]
 ----
 ---

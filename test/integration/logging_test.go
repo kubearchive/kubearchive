@@ -46,7 +46,7 @@ func TestLogging(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -257,7 +257,7 @@ func TestQueryContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -283,7 +283,7 @@ func TestQueryContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

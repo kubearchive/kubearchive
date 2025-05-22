@@ -6,7 +6,6 @@ package logging
 import (
 	"bufio"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -23,55 +22,43 @@ import (
 )
 
 const (
-	userKey     string = "USER"
-	passwordKey string = "PASSWORD"
+	loggingKey string = "headers"
 )
 
-// GetKubeArchiveLoggingCredentials retrieves the kubearchive-logging secret data and
-// an error if there isn't available
-func GetKubeArchiveLoggingCredentials() (map[string]string, error) {
+// getKubeArchiveLoggingHeaders retrieves the kubearchive-logging secret data if it's available
+func getKubeArchiveLoggingHeaders() map[string]string {
 	loggingDir, exists := os.LookupEnv(files.LoggingDirEnvVar)
-	errMsg := fmt.Sprintf("environment variable not set: %s", files.LoggingDirEnvVar)
 	if !exists {
-		return nil, errors.New(errMsg)
+		errMsg := fmt.Sprintf("environment variable not set: %s", files.LoggingDirEnvVar)
+		slog.Warn(errMsg)
+		return nil
 	}
-	slog.Warn(errMsg)
 	configFiles, err := files.FilesInDir(loggingDir)
 	if err != nil {
-		errMsg = fmt.Sprintf("could not read logging credentials: %s", err.Error())
+		errMsg := fmt.Sprintf("could not read kubearchive-logging secret files: %s", err.Error())
 		slog.Warn(errMsg)
-		return nil, errors.New(errMsg)
+		return nil
 	}
 	if len(configFiles) == 0 {
-		errMsg = "logging configuration not specified"
+		errMsg := "logging configuration not specified"
 		slog.Warn(errMsg)
-		return nil, errors.New(errMsg)
+		return nil
 	}
 
 	loggingConf, err := files.LoggingConfigFromFiles(configFiles)
 	if err != nil {
-		return nil, fmt.Errorf("could not get value for logging credentials: %w", err)
+		errMsg := fmt.Sprintf("could not read kubearchive-logging secret files: %s", err.Error())
+		slog.Warn(errMsg)
+		return nil
 	}
-	return loggingConf, nil
+	return loggingConf
 }
 
-// SetLoggingCredentials sets the user and password for accessing logging backend in the request context
-func SetLoggingCredentials(loggingCreds map[string]string, loggingCredsErr error) gin.HandlerFunc {
-	user := loggingCreds[userKey]
-	password := loggingCreds[passwordKey]
-	if user == "" || password == "" {
-		err := fmt.Errorf(
-			"logging secret user or password unset")
-		if loggingCredsErr != nil {
-			err = fmt.Errorf("%w: %w", err, loggingCredsErr)
-		}
-		return func(c *gin.Context) {
-			abort.Abort(c, err, http.StatusBadRequest)
-		}
-	}
+// SetLoggingHeaders sets the headers to be sent to the logging backend
+func SetLoggingHeaders() gin.HandlerFunc {
+	loggingHeaders := getKubeArchiveLoggingHeaders()
 	return func(c *gin.Context) {
-		c.Set(userKey, user)
-		c.Set(passwordKey, password)
+		c.Set(loggingKey, loggingHeaders)
 	}
 }
 
@@ -86,14 +73,8 @@ func LogRetrieval() gin.HandlerFunc {
 		Timeout: 60 * time.Second,
 	}
 	return func(c *gin.Context) {
-		user := c.GetString(userKey)
-		password := c.GetString(passwordKey)
-		if user == "" || password == "" {
-			loggingCredsErr := fmt.Errorf(
-				"unexpected error. Logging credentials are unset")
-			abort.Abort(c, loggingCredsErr, http.StatusInternalServerError)
-			return
-		}
+
+		headers := c.GetStringMapString(loggingKey)
 		logUrl := c.GetString("logURL")
 		jsonPath := c.GetString("jsonPath")
 
@@ -121,7 +102,9 @@ func LogRetrieval() gin.HandlerFunc {
 			return
 		}
 
-		request.SetBasicAuth(user, password)
+		for key, value := range headers {
+			request.Header.Set(key, value)
+		}
 
 		response, errReq := client.Do(request)
 		if errReq != nil {
@@ -135,8 +118,13 @@ func LogRetrieval() gin.HandlerFunc {
 		var readErr error
 		var logsReturned bool
 		var line []byte
+
 		for readErr != io.EOF {
 			line, readErr = reader.ReadBytes('\n')
+			if response.StatusCode != http.StatusOK {
+				abort.Abort(c, fmt.Errorf("error response: %d - %s", response.StatusCode, line), response.StatusCode)
+				return
+			}
 			if readErr != nil && readErr != io.EOF {
 				abort.Abort(c, readErr, http.StatusInternalServerError)
 				return

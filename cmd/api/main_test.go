@@ -67,13 +67,13 @@ func TestMiddlewareConfigured(t *testing.T) {
 			name: "Logs APIs group",
 			path: "/apis/apps/v1/namespaces/ns/deployments/my-deploy/log",
 			expectedMiddleware: []string{"otelgin.Middleware", "Authentication", "RBACAuthorization", "GetAPIResource",
-				"SetLoggingCredentials", "LogRetrieval"},
+				"SetLoggingHeaders", "LogRetrieval"},
 		},
 		{
 			name: "Logs API group",
 			path: "/api/v1/namespaces/ns/pods/my-pod/log",
 			expectedMiddleware: []string{"otelgin.Middleware", "Authentication", "RBACAuthorization", "GetAPIResource",
-				"SetLoggingCredentials", "LogRetrieval"},
+				"SetLoggingHeaders", "LogRetrieval"},
 		},
 	}
 

@@ -9,6 +9,7 @@
 ** xref:configuration/delayed-deletes.adoc[]
 ** xref:configuration/cache-expiration-time.adoc[Cache Expiration Time]
 ** xref:configuration/observability.adoc[Observability]
+** xref:configuration/impersonation.adoc[]
 ** xref:configuration/kubearchive-logs.adoc[]
 ** xref:configuration/pprof.adoc[]
 ** xref:configuration/upgrading.adoc[]

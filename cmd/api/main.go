@@ -79,6 +79,8 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	for _, group := range groups {
 		group.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews(), cache,
 			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
+		group.Use(auth.Impersonation(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache,
+			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 		group.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache,
 			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 		group.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient(), cache))

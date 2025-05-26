@@ -33,11 +33,11 @@ spec:
         - name: CACHE_EXPIRATION_UNAUTHORIZED
           value: 5m
 ----
-
++
 [WARNING]
 ====
-If the values are not set or they are not parseable by
-link:https://pkg.go.dev/time#ParseDuration[time.ParseDuration]
+If the values are not set, or they are not parseable by
+link:https://pkg.go.dev/time#ParseDuration[time.ParseDuration],
 the Deployment fails and does not start.
 ====
 
@@ -51,7 +51,7 @@ kubectl patch -n kubearchive deployment kubearchive-api-server --patch-file path
 [IMPORTANT]
 .Expiring the cache
 ====
-To expire the current cache restart the `kubearchive-api-server` deployment with
+To expire the current cache, restart the `kubearchive-api-server` deployment with
 the command
 [command]`kubectl rollout -n kubearchive restart deployment kubearchive-api-server`.
 ====

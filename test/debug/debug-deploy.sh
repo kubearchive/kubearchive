@@ -18,19 +18,12 @@ fi
 
 BUILT_IMAGE=$(ko build github.com/kubearchive/kubearchive/cmd/${COMPONENT%%-*} --debug)
 
-YAML=$(mktemp --suffix=.yaml -t kubearchive-XXX)
-cat ${SCRIPT_DIR}/patch-${COMPONENT}.yaml | envsubst > ${YAML}
-
 # Pause the deployment updates
 kubectl -n kubearchive rollout pause deployment kubearchive-${COMPONENT}
 
 # Set the new image
 kubectl -n kubearchive set image deployment kubearchive-${COMPONENT} ${CONTAINER}=${BUILT_IMAGE}
 # Add -- as the first argument
-kubectl -n kubearchive get deployment kubearchive-${COMPONENT} -o json | \
-jq '.spec.template.spec.containers |= map(select(."name"=="'${CONTAINER}'") .args |= ["--"] + .)' | \
-kubectl apply -f -
-# Remove the probes, the resource limits and the security context
 kubectl -n kubearchive get deployment kubearchive-${COMPONENT} -o json | \
 jq 'del(.spec.template.spec.containers[] | select(."name"=="'${CONTAINER}'") | .livenessProbe, .readinessProbe, .resources, .securityContext)' | \
 kubectl apply -f -

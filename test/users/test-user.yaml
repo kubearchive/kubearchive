@@ -18,3 +18,38 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: view
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: impersonator
+  namespace: test
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: impersonator
+  namespace: test
+rules:
+  - apiGroups:
+      - ""
+    verbs:
+      - impersonate
+    resources:
+      - serviceaccounts
+    resourceNames:
+      - system:serviceaccount:test:default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: impersonator
+  namespace: test
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: impersonator
+subjects:
+  - kind: ServiceAccount
+    name: impersonator
+    namespace: test

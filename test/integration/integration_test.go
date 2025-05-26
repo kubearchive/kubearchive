@@ -64,7 +64,7 @@ func TestNormalOperation(t *testing.T) {
 	// Retrieve the objects from the DB using the API.
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs", port, namespaceName)
 	retryErr := retry.Do(func() error {
-		list, getUrlErr := test.GetUrl(t, token.Status.Token, url)
+		list, getUrlErr := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
 			return getUrlErr
 		}

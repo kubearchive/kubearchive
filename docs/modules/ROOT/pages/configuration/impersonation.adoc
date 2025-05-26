@@ -1,0 +1,18 @@
+= Impersonation
+
+The KubeArchive API allows to make calls on behalf of other users using the Kubernetes
+impersonation system.
+Follow the instructions on how to use
+link:https://kubernetes.io/docs/reference/access-authn-authz/authentication/#user-impersonation[Kubernetes Impersonation feature]
+and use the same headers to call the KubeArchive API.
+
+== Configuring Impersonation
+
+Impersonation is disabled by default.
+To enable it add the following environment variable to the Kubernetes API component:
+
+[source,bash]
+----
+kubectl set -n kubearchive env deployment kubearchive-api-server AUTH_IMPERSONATE=true
+----
+The API deployment will roll out automatically after changing its environment.

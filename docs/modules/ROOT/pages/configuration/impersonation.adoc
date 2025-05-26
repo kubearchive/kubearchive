@@ -1,0 +1,40 @@
+= Impersonation
+
+KubeArchive API allows impersonated calls.
+It supports the same
+link:https://kubernetes.io/docs/reference/access-authn-authz/authentication/#user-impersonation[impersonation headers]
+supported by Kubernetes.
+
+## Configuring Impersonation
+
+Impersonation is disabled by default.
+To enable it add the following environment variable to the Kubernetes API component:
+
+* `AUTH_IMPERSONATE`: if `true` impersonation headers are supported.
+
+To modify this value, perform the following steps:
+
+. Edit or patch the `kubearchive-api-server` Deployment present on the `kubearchive` namespace.
++
+[source, yaml]
+----
+---
+apiVersion: v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+      - name: kubearchive-api-server
+        env:
+        - name: AUTH_IMPERSONATE
+          value: true
+----
+
+. Save the patch somewhere in the disk and apply it:
++
+[source,bash]
+----
+kubectl patch -n kubearchive deployment kubearchive-api-server --patch-file path/to/patch.yaml
+----
+

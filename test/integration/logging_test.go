@@ -325,7 +325,7 @@ func TestLogsWithResourceThatHasNoPods(t *testing.T) {
 	retryErr := retry.Do(func() error {
 		t.Log("testing that the service is properly archived...")
 		url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/services", port, namespaceName)
-		list, err := test.GetUrl(t, token.Status.Token, url)
+		list, err := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if err != nil {
 			return err
 		}

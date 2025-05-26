@@ -27,7 +27,7 @@ type fakeTokenReview struct {
 	tr            *apiAuthnv1.TokenReview
 }
 
-func (c *fakeTokenReview) Create(ctx context.Context, tokenReview *apiAuthnv1.TokenReview, opts metav1.CreateOptions) (*apiAuthnv1.TokenReview, error) {
+func (c *fakeTokenReview) Create(_ context.Context, tokenReview *apiAuthnv1.TokenReview, _ metav1.CreateOptions) (*apiAuthnv1.TokenReview, error) {
 	tokenReview.Status.Authenticated = c.authenticated
 	if c.authenticated {
 		tokenReview.Status.User = fakeUserInfo
@@ -63,17 +63,20 @@ func TestInvalidAuthHeader(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cache := cache.New()
+			cacheStorage := cache.New()
 			ftr := &fakeTokenReview{authenticated: false}
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
 			c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 			c.Request.Header = tc.header
 
-			Authentication(ftr, cache, cacheExpirationDuration, cacheExpirationDuration)(c)
+			Authentication(ftr, cacheStorage, cacheExpirationDuration, cacheExpirationDuration)(c)
 
 			assert.Equal(t, http.StatusBadRequest, res.Code)
-			assert.Equal(t, nil, cache.Get("fakeusername"), "Cache shouldn't be populated at this point in the code.")
+			assert.Equal(t, nil, cacheStorage.Get("fakeusername"), "Cache shouldn't be populated at this point in the code.")
+
+			_, usrExists := c.Get("user")
+			assert.False(t, usrExists, "user should not be set")
 		})
 	}
 }
@@ -101,22 +104,26 @@ func TestAuthentication(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			cache := cache.New()
+			cacheStorage := cache.New()
 			ftr := &fakeTokenReview{authenticated: tc.authenticated}
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
 			c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 			c.Request.Header.Add("Authorization", "Bearer faketoken")
 
-			Authentication(ftr, cache, cacheExpirationDuration, cacheExpirationDuration)(c)
+			Authentication(ftr, cacheStorage, cacheExpirationDuration, cacheExpirationDuration)(c)
 
 			assert.Equal(t, tc.expected, res.Code)
 			assert.Equal(t, tc.authenticated, ftr.authenticated)
 			assert.Equal(t, tc.user, ftr.tr.Status.User)
+			usr, exists := c.Get("user")
+			assert.Equal(t, tc.authenticated, exists)
 			if tc.authenticated {
-				assert.Equal(t, tc.user, cache.Get("faketoken"), "Cache should be populated with user data when authorized.")
+				assert.Equal(t, newDefaultInfoFromAuthN(tc.user), cacheStorage.Get("faketoken"), "Cache should be populated with user data when authorized.")
+				assert.Equal(t, usr, newDefaultInfoFromAuthN(ftr.tr.Status.User))
 			} else {
-				assert.Equal(t, false, cache.Get("faketoken"), "Cache should be populated with 'false' when unauthorized.")
+				assert.Equal(t, false, cacheStorage.Get("faketoken"), "Cache should be populated with 'false' when unauthorized.")
+				assert.Empty(t, usr)
 			}
 		})
 	}
@@ -143,20 +150,20 @@ func TestAuthenticationCache(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ftr := &fakeTokenReview{authenticated: tc.authenticated}
-			cache := cache.New()
+			cacheStorage := cache.New()
 			if tc.authenticated {
-				cache.Set("faketoken", fakeUserInfo, cacheExpirationDuration)
+				cacheStorage.Set("faketoken", fakeUserInfo, cacheExpirationDuration)
 			} else {
-				cache.Set("faketoken", false, cacheExpirationDuration)
+				cacheStorage.Set("faketoken", false, cacheExpirationDuration)
 			}
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
 			c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 			c.Request.Header.Add("Authorization", "Bearer faketoken")
 
-			Authentication(ftr, cache, cacheExpirationDuration, cacheExpirationDuration)(c)
+			Authentication(ftr, cacheStorage, cacheExpirationDuration, cacheExpirationDuration)(c)
 
-			value := cache.Get("faketoken")
+			value := cacheStorage.Get("faketoken")
 			assert.Equal(t, tc.expected, value)
 		})
 	}
@@ -183,18 +190,18 @@ func TestDifferentAuthenticationExpirations(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ftr := &fakeTokenReview{authenticated: tc.authenticated}
-			cache := cache.New()
+			cacheStorage := cache.New()
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
 			c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 			c.Request.Header.Add("Authorization", "Bearer faketoken")
 
-			Authentication(ftr, cache, 10*time.Minute, -10*time.Minute)(c)
+			Authentication(ftr, cacheStorage, 10*time.Minute, -10*time.Minute)(c)
 
-			if tc.authenticated {
-				assert.Equal(t, tc.expected, cache.Get("faketoken"), "Authentication should be cached.")
+			if expectedUser, ok := tc.expected.(apiAuthnv1.UserInfo); ok {
+				assert.Equal(t, newDefaultInfoFromAuthN(expectedUser), cacheStorage.Get("faketoken"), "Authentication should be cached.")
 			} else {
-				assert.Equal(t, tc.expected, cache.Get("faketoken"), "Cache should be 'nil' because of negative expiration time.")
+				assert.Equal(t, tc.expected, cacheStorage.Get("faketoken"), "Cache should be 'nil' because of negative expiration time.")
 			}
 		})
 	}

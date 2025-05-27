@@ -68,6 +68,7 @@ cd ${SCRIPT_DIR}
 
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add grafana https://grafana.github.io/helm-charts
+helm repo add vector https://helm.vector.dev
 helm repo update
 
 # Deploy MinIO for S3 bucket like storage
@@ -98,9 +99,6 @@ fi
 
 if [ "${VECTOR}" == "True" ]; then
   #Deploy Vector
-  helm repo add vector https://helm.vector.dev
-  helm repo update
-
   helm upgrade kubearchive-vector vector/vector --install --create-namespace --namespace ${NAMESPACE} --values values.vector.yaml
   kubectl rollout restart --namespace ${NAMESPACE} daemonset/kubearchive-vector
   kubectl rollout status daemonset --namespace ${NAMESPACE} --timeout=90s

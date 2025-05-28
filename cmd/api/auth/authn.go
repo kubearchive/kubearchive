@@ -10,14 +10,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/pkg/abort"
 	"github.com/kubearchive/kubearchive/pkg/cache"
-
-	"github.com/gin-gonic/gin"
 	apiAuthnv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/user"
 	clientAuthnv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 )
+
+func newDefaultInfoFromAuthN(info apiAuthnv1.UserInfo) user.Info {
+	extra := make(map[string][]string)
+	for k, v := range info.Extra {
+		extra[k] = v // Explicit conversion
+	}
+	return &user.DefaultInfo{
+		Name:   info.Username,
+		UID:    info.UID,
+		Groups: info.Groups,
+		Extra:  extra,
+	}
+}
 
 func extractBearerToken(header string) (string, error) {
 	if header == "" {
@@ -68,8 +81,9 @@ func Authentication(tri clientAuthnv1.TokenReviewInterface, cache *cache.Cache, 
 			return
 		}
 
-		cache.Set(token, tr.Status.User, cacheExpirationAuthorized)
+		userInfo = newDefaultInfoFromAuthN(tr.Status.User)
+		cache.Set(token, userInfo, cacheExpirationAuthorized)
 
-		c.Set("user", tr.Status.User)
+		c.Set("user", userInfo)
 	}
 }

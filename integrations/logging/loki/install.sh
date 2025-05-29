@@ -36,7 +36,7 @@ UNKNOWN=${UNKNOWN:-"False"}
 NAMESPACE=${NAMESPACE:-"grafana-loki"}
 LOKI_PWD=${LOKI_PWD:-"password"}
 GRAFANA=${GRAFANA:-"False"}
-VECTOR=${GRAFANA:-"False"}
+VECTOR=${VECTOR:-"False"}
 
 # Help and usage
 if [ "${HELP}" == "True" ] || [ "${UNKNOWN}" == "True" ]; then

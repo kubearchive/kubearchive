@@ -94,7 +94,6 @@ customConfig:
     loki:
       type: loki
       inputs: ["remap_app_logs"]
-      endpoint: "http://loki.${NAMESPACE}.svc.cluster.local:3100"
       encoding: 
         codec: "raw_message"
       labels:

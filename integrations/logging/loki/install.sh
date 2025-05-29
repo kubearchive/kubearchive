@@ -105,6 +105,7 @@ if [ "${VECTOR}" == "True" ]; then
 else
   helm upgrade --install --wait --create-namespace \
       --namespace ${NAMESPACE} \
+      --set "customConfig.sinks.loki.endpoint=http://loki.${NAMESPACE}.svc.cluster.local:3100"
       logging-operator oci://ghcr.io/kube-logging/helm-charts/logging-operator
   kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=180s
 

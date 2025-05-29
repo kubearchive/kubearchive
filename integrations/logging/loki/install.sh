@@ -99,13 +99,15 @@ fi
 
 if [ "${VECTOR}" == "True" ]; then
   #Deploy Vector
-  helm upgrade kubearchive-vector vector/vector --install --create-namespace --namespace ${NAMESPACE} --values values.vector.yaml
+  helm upgrade kubearchive-vector vector/vector --install \
+    --create-namespace --namespace ${NAMESPACE} \
+    --set "customConfig.sinks.loki.endpoint=http://loki.${NAMESPACE}.svc.cluster.local:3100" \
+    --values values.vector.yaml
   kubectl rollout restart --namespace ${NAMESPACE} daemonset/kubearchive-vector
   kubectl rollout status daemonset --namespace ${NAMESPACE} --timeout=90s
 else
   helm upgrade --install --wait --create-namespace \
       --namespace ${NAMESPACE} \
-      --set "customConfig.sinks.loki.endpoint=http://loki.${NAMESPACE}.svc.cluster.local:3100"
       logging-operator oci://ghcr.io/kube-logging/helm-charts/logging-operator
   kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=180s
 

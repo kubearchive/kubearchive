@@ -17,6 +17,9 @@ case $i in
     --grafana)
     GRAFANA=True
     ;;
+    --vector)
+    VECTOR=True
+    ;;
     --help)
     HELP=True
     ;;
@@ -33,6 +36,7 @@ UNKNOWN=${UNKNOWN:-"False"}
 NAMESPACE=${NAMESPACE:-"grafana-loki"}
 LOKI_PWD=${LOKI_PWD:-"password"}
 GRAFANA=${GRAFANA:-"False"}
+VECTOR=${VECTOR:-"False"}
 
 # Help and usage
 if [ "${HELP}" == "True" ] || [ "${UNKNOWN}" == "True" ]; then
@@ -47,6 +51,10 @@ if [ "${HELP}" == "True" ] || [ "${UNKNOWN}" == "True" ]; then
     --grafana      If enabled Grafana UI is deployed along loki.
                    Default value is ${GRAFANA}
 
+    --vector       If enabled, Vector will be deployed as a 
+                   log collector for loki. By default, log-forwarder 
+                   operator will be used instead of Vector. 
+
     "
     if [ "${UNKNOWN}" == "True" ]; then
       exit 1;
@@ -60,6 +68,7 @@ cd ${SCRIPT_DIR}
 
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add grafana https://grafana.github.io/helm-charts
+helm repo add vector https://helm.vector.dev
 helm repo update
 
 # Deploy MinIO for S3 bucket like storage
@@ -88,16 +97,29 @@ if [ "${GRAFANA}" == "True" ]; then
   helm upgrade --install --create-namespace --namespace ${NAMESPACE} --values values.grafana.yaml grafana grafana/grafana
 fi
 
-helm upgrade --install --wait --create-namespace \
-    --namespace ${NAMESPACE} \
-    logging-operator oci://ghcr.io/kube-logging/helm-charts/logging-operator
-kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=180s
+if [ "${VECTOR}" == "True" ]; then
 
-# Deploy the log-forwarder
-kubectl -n ${NAMESPACE} apply -f ./manifests
+  LOKI_ENDPOINT="http://loki.${NAMESPACE}.svc.cluster.local:3100"
+  #Deploy Vector
+  helm upgrade kubearchive-vector vector/vector --install \
+    --create-namespace --namespace ${NAMESPACE} \
+    --set "customConfig.sinks.loki.endpoint=${LOKI_ENDPOINT}" \
+    --reuse-values \
+    --values values.vector.yaml
+  kubectl rollout restart --namespace ${NAMESPACE} daemonset/kubearchive-vector
+  kubectl rollout status daemonset --namespace ${NAMESPACE} --timeout=90s
+else
+  helm upgrade --install --wait --create-namespace \
+      --namespace ${NAMESPACE} \
+      logging-operator oci://ghcr.io/kube-logging/helm-charts/logging-operator
+  kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=180s
 
-kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=180s
-kubectl rollout status statefulset --namespace=${NAMESPACE} --timeout=180s
+  # Deploy the log-forwarder
+  kubectl -n ${NAMESPACE} apply -f ./manifests
+
+  kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=180s
+  kubectl rollout status statefulset --namespace=${NAMESPACE} --timeout=180s
+fi
 
 # If KubeArchive is installed, update the credentials and set the jsonpath
 KUBEARCHIVE_NS="kubearchive"

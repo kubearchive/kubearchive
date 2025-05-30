@@ -1,8 +1,17 @@
 ## Loki
 
-To set up your development environment to use Loki, run the following command:
+There are two options for loki log collectors, logging operator and 
+Vector observability pipeline.
+To set up your development environment to use Loki with logging operator,
+run the following command:
 ```bash
   /bin/bash integrations/logging/loki/install.sh --grafana
+```
+
+To set up your development environment to use Loki with Vector,
+run the following command:
+```bash
+  /bin/bash integrations/logging/loki/install.sh --grafana --vector
 ```
 
 This will install and configure:
@@ -11,6 +20,7 @@ This will install and configure:
 * [MinIO](https://min.io/) configured to store the 3 S3 bucket needed by Loki to store the logs
 * [Loki](https://grafana.com/docs/loki/latest/) configured to read from the S3 buckets
 * [Grafana](https://grafana.com/) to provide a UI to be able to explore the logs
+* [Vector](https://vector.dev/) configured to send kubernetes logs directly from the cluster to loki
 
 Run the log generators to create logs:
 ```bash

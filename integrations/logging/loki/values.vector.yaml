@@ -94,6 +94,7 @@ customConfig:
     loki:
       type: loki
       inputs: ["remap_app_logs"]
+      endpoint: "http://loki.grafana-loki.svc.cluster.local:3100"
       encoding: 
         codec: "raw_message"
       labels:
@@ -105,4 +106,3 @@ image:
   tag: 0.46.1-distroless-libc
   pullPolicy: IfNotPresent
   base: "debian"
-

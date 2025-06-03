@@ -5,6 +5,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/kubearchive/kubearchive/test/performance/pkg"
@@ -51,10 +53,11 @@ type Stats struct {
 }
 
 type Stat struct {
-	Min    float64
-	Max    float64
-	Median float64
-	Mean   float64
+	Min               float64
+	Max               float64
+	Median            float64
+	Mean              float64
+	RequestsPerSecond float64
 }
 
 const GITHUB_WORKFLOW_RUNS_ENDPOINT = "https://api.github.com/repos/kubearchive/kubearchive/actions/workflows/performance.yml/runs"
@@ -295,6 +298,98 @@ func main() {
 		fmt.Fprintf(fh, "%s,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f,%.0f\n", value.CreatedAt, value.Api.Max, value.Api.Min, value.Api.Mean, value.Api.Median, value.Sink.Max, value.Sink.Min, value.Sink.Mean, value.Sink.Median, value.Operator.Max, value.Operator.Min, value.Operator.Mean, value.Operator.Median)
 	}
 	fh.Close()
+
+	CreateReqStats := getLocustStats(wr, "create_stats.csv")
+	fh, err = os.Create(filepath.Join(DATA_DIR, "create-req.csv"))
+	if err != nil {
+		panic(fmt.Sprintf("error opening merged 'create-memory.csv': %s", err.Error()))
+	}
+	fmt.Fprintln(fh, "created.at,max,min,mean,median,req/s")
+	for _, value := range CreateReqStats {
+		fmt.Fprintf(fh, "%s,%.0f,%.0f,%.0f,%.0f,%.0f\n", value.CreatedAt, value.Sink.Max, value.Sink.Min, value.Sink.Mean, value.Sink.Median, value.Sink.RequestsPerSecond)
+	}
+	fh.Close()
+
+	GetReqStats := getLocustStats(wr, "get_stats.csv")
+	fh, err = os.Create(filepath.Join(DATA_DIR, "get-req.csv"))
+	if err != nil {
+		panic(fmt.Sprintf("error opening merged 'create-memory.csv': %s", err.Error()))
+	}
+	fmt.Fprintln(fh, "created.at,max,min,mean,median,req/s")
+	for _, value := range GetReqStats {
+		fmt.Fprintf(fh, "%s,%.0f,%.0f,%.0f,%.0f,%.0f\n", value.CreatedAt, value.Sink.Max, value.Sink.Min, value.Sink.Mean, value.Sink.Median, value.Sink.RequestsPerSecond)
+	}
+	fh.Close()
+}
+
+func getLocustStats(wr WorkflowRuns, path string) []Stats {
+	stats := []Stats{}
+	for _, run := range wr.WorkflowRuns {
+		if run.Event == "schedule" {
+			folder := filepath.Join(DATA_DIR, fmt.Sprintf("%d", run.Id))
+			filePath := filepath.Join(folder, path)
+
+			fh, err := os.Open(filePath)
+			if err != nil {
+				if errors.Is(err, fs.ErrNotExist) {
+					fmt.Printf("'%s' does not exist, continue...\n", filePath)
+					continue
+				}
+				panic(err)
+			}
+			defer fh.Close()
+
+			records := [][]string{}
+			csvReader := csv.NewReader(fh)
+			for {
+				record, err := csvReader.Read()
+				if err == io.EOF {
+					break
+				}
+				if err == csv.ErrFieldCount {
+					fmt.Println("line has the wrong number of fields")
+					continue
+				}
+
+				records = append(records, record)
+			}
+
+			header := records[0]
+			rawData := map[string]float64{}
+
+			// We are only interested in the second row, where the aggregated values are
+			record := records[2]
+			for ix, valueString := range record {
+				if ix == 0 || ix == 1 {
+					continue // First two columns are Type and Name
+				}
+
+				value, err := strconv.ParseFloat(valueString, 64)
+				if err != nil {
+					fmt.Printf("error converting '%s' to float64: %s\n", valueString, err)
+					panic(err)
+				}
+				rawData[header[ix]] = value
+			}
+
+			stat := Stats{
+				Id:        run.Id,
+				CreatedAt: run.CreatedAt,
+				HeadSha:   run.HeadSha,
+				Sink: Stat{
+					Min:               rawData["Min Response Time"],
+					Max:               rawData["Max Response Time"],
+					Median:            rawData["Median Response Time"],
+					Mean:              rawData["Mean Response Time"],
+					RequestsPerSecond: rawData["Requests/s"],
+				},
+			}
+
+			stats = append(stats, stat)
+		}
+
+	}
+	return stats
 }
 
 func getStats(wr WorkflowRuns, path, metricType string) []Stats {

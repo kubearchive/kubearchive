@@ -1,3 +1,5 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
 ---
 role: Agent
 customConfig:
@@ -95,7 +97,7 @@ customConfig:
       type: loki
       inputs: ["remap_app_logs"]
       endpoint: "http://loki.grafana-loki.svc.cluster.local:3100"
-      encoding: 
+      encoding:
         codec: "raw_message"
       labels:
           namespace: .kubernetes.namespace_name

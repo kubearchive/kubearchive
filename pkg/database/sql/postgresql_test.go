@@ -5,6 +5,7 @@ package sql
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"os"
 	"regexp"
@@ -25,7 +26,8 @@ func TestPostgreSQLWriteResource(t *testing.T) {
 			string
 			time.Time
 		}
-		err error
+		err  error
+		logs []models.LogTuple
 	}{
 		{
 			name: "insert objects successfully",
@@ -91,6 +93,25 @@ func TestPostgreSQLWriteResource(t *testing.T) {
 			},
 			err: errors.New("error writing to the database"),
 		},
+		{
+			name: "insert objects successfully with logs",
+			inserts: []struct {
+				string
+				time.Time
+			}{
+				{
+					"../testdata/pod-3-containers.json",
+					time.Now(),
+				},
+			},
+			logs: []models.LogTuple{
+				{
+					ContainerName: "hello",
+					Url:           "https://example.com/logs/hello",
+				},
+			},
+			err: nil,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -103,18 +124,19 @@ func TestPostgreSQLWriteResource(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				obj, err := models.UnstructuredFromByteSlice(data)
+				k8sObj, err := models.UnstructuredFromByteSlice(data)
 				if err != nil {
 					t.Fatal(err)
 				}
 
+				mock.ExpectBegin()
 				query, args := database.getInserter().ResourceInserter(
-					string(obj.GetUID()),
-					obj.GetAPIVersion(),
-					obj.GetKind(),
-					obj.GetName(),
-					obj.GetNamespace(),
-					obj.GetResourceVersion(),
+					string(k8sObj.GetUID()),
+					k8sObj.GetAPIVersion(),
+					k8sObj.GetKind(),
+					k8sObj.GetName(),
+					k8sObj.GetNamespace(),
+					k8sObj.GetResourceVersion(),
 					insert.Time,
 					sql.NullString{
 						Valid: false,
@@ -122,24 +144,43 @@ func TestPostgreSQLWriteResource(t *testing.T) {
 					data,
 				).BuildWithFlavor(database.getFlavor())
 
-				mock.ExpectBegin()
-				if test.err == nil {
+				if test.err != nil {
+					mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnError(test.err)
+				} else {
 					rows := sqlmock.NewRows([]string{"inserted"})
 					rows.AddRow(true)
 					mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
-					mock.ExpectCommit()
-				} else {
-					mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(args).WillReturnError(test.err)
-					mock.ExpectRollback()
 				}
 
-				inserted, dbErr := database.WriteResource(t.Context(), obj, data, insert.Time)
+				if k8sObj.GetKind() == "Pod" {
+					delBuilder := database.getDeleter().UrlDeleter()
+					delBuilder.Where(database.filter.UuidFilter(delBuilder.Cond, string(k8sObj.GetUID())))
+					query, args := delBuilder.BuildWithFlavor(database.flavor)
+					mock.ExpectExec(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnResult(driver.ResultNoRows)
+				}
+
+				if len(test.logs) >= 1 {
+					for _, log := range test.logs {
+						logQuery, logArgs := database.getInserter().UrlInserter(
+							string(k8sObj.GetUID()),
+							log.Url,
+							log.ContainerName,
+							"jsonPath",
+						).BuildWithFlavor(database.flavor)
+
+						mock.ExpectExec(regexp.QuoteMeta(logQuery)).WithArgs(sliceOfAny2sliceOfValue(logArgs)...).WillReturnResult(driver.ResultNoRows)
+					}
+				}
+
+				mock.ExpectCommit()
+
+				inserted, dbErr := database.WriteResource(t.Context(), k8sObj, data, insert.Time, "jsonPath", test.logs...)
 				if test.err == nil {
 					assert.Nil(t, dbErr)
 					assert.Equal(t, inserted, interfaces.WriteResourceResultInserted)
 				} else {
 					assert.NotNil(t, dbErr)
-					assert.NotEqual(t, inserted, interfaces.WriteResourceResultInserted)
+					assert.Equal(t, inserted, interfaces.WriteResourceResultError)
 				}
 			}
 		})

@@ -253,6 +253,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 func TestWriteUrls(t *testing.T) {
 	t.Parallel()
 	k8sObj := &unstructured.Unstructured{}
+	k8sObj.SetKind("Pod")
 	k8sObj.SetUID(types.UID("abc-123-xyz"))
 	newUrls := []models.LogTuple{
 		{Url: "https://github.com/kubearchive", ContainerName: "container-1"},
@@ -316,7 +317,7 @@ func TestWriteUrls(t *testing.T) {
 			jsonPath:       jsonPath,
 			newUrls:        newUrls,
 			expected:       testLogUrls,
-			error:          errors.New("cannot write log urls to the database when k8sObj is nil"),
+			error:          errors.New("kubernetes object was 'nil', something went wrong"),
 		},
 		{
 			name:           "WriteUrls fails when urlErr is not nil",
@@ -339,7 +340,7 @@ func TestWriteUrls(t *testing.T) {
 			} else {
 				db = NewFakeDatabase(testResources, tt.initialLogUrls, testJsonPath)
 			}
-			err := db.WriteUrls(context.Background(), tt.obj, tt.jsonPath, tt.newUrls...)
+			_, err := db.WriteResource(context.Background(), tt.obj, []byte(""), time.Now(), tt.jsonPath, tt.newUrls...)
 			if tt.urlErr != nil {
 				assert.Equal(t, tt.urlErr, err)
 			} else {
@@ -408,7 +409,7 @@ func TestWriteResources(t *testing.T) {
 			} else {
 				db = NewFakeDatabase([]*unstructured.Unstructured{}, []LogUrlRow{}, "$.")
 			}
-			_, err := db.WriteResource(context.Background(), tt.obj, tt.data, time.Now())
+			_, err := db.WriteResource(context.Background(), tt.obj, tt.data, time.Now(), "jsonPath", []models.LogTuple{}...)
 			if tt.err != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tt.err, err)

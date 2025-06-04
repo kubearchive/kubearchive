@@ -31,8 +31,9 @@ type DBReader interface {
 }
 
 type DBWriter interface {
-	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, lastUpdated time.Time) (WriteResourceResult, error)
-	WriteUrls(ctx context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error
+	// WriteResource writes the logs (when the resource is a Pod) and the resource into their respective tables
+	// The log entries related to the resource are deleted first to prevent duplicates
+	WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, lastUpdated time.Time, jsonPath string, logs ...models.LogTuple) (WriteResourceResult, error)
 	Ping(ctx context.Context) error
 	QueryDatabaseSchemaVersion(ctx context.Context) (string, error)
 	CloseDB() error

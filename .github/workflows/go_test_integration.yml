@@ -54,11 +54,15 @@ jobs:
         uses: ko-build/setup-ko@v0.9
       - name: Create KinD cluster
         run: kind create cluster
+      - name: Verify Helm repository
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo update
       - name: Install KubeArchive
         run: |
           export KO_DOCKER_REPO="kind.local"
           bash hack/quick-install.sh
-          bash integrations/logging/loki/install.sh --vector
+          bash integrations/logging/loki/install.sh --grafana --vector
       - name: Test Go code
         run: |
           bash test/integration/run.sh

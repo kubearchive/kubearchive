@@ -4,6 +4,7 @@
 name: golangci-lint
 run-name: Linting Tests (golangci-lint)
 on:
+  workflow_dispatch:
   schedule:
     # 9:25 UTC every 1st of month
     - cron: '25 09 1 * *'
@@ -41,10 +42,12 @@ jobs:
           only-new-issues: ${{ github.event_name != 'schedule' }}
       - name: Notify golangci-lint failed
         uses: jayqi/failed-build-issue-action@v1
-        if: failure() && github.event_name == 'schedule' && github.repository == 'kubearchive/kubearchive'
+        if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'kubearchive/kubearchive'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           title-template: GolangCI Linting found errors
+          label-name: kind/bug
+          always-create-new-issue: true
           body-template: |
             The scheduled workflow of GolangCI Lint found some problems. We run this scheduled
             against the whole codebase, so when a PR is submitted authors do not need to deal with

@@ -100,9 +100,9 @@ customConfig:
       encoding:
         codec: "raw_message"
       labels:
-          namespace: .kubernetes.namespace_name
-          pod: .kubernetes.pod_name
-          container: .kubernetes.container_name
+        namespace: .kubernetes.namespace_name
+        pod: .kubernetes.pod_name
+        container: .kubernetes.container_name
 image:
   repository: quay.io/kubearchive/vector
   tag: 0.46.1-distroless-libc

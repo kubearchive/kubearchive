@@ -9,7 +9,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -49,11 +48,12 @@ type LogUrlRow struct {
 }
 
 type fakeDatabase struct {
-	resources []*unstructured.Unstructured
-	logUrl    []LogUrlRow
-	jsonPath  string
-	err       error
-	urlErr    error
+	resources            []*unstructured.Unstructured
+	logUrl               []LogUrlRow
+	jsonPath             string
+	err                  error
+	urlErr               error
+	CurrentSchemaVersion string
 }
 
 func NewFakeDatabase(testResources []*unstructured.Unstructured, testLogs []LogUrlRow, jsonPath string) *fakeDatabase {
@@ -89,7 +89,7 @@ func (f *fakeDatabase) TestConnection(_ map[string]string) error {
 }
 
 func (f *fakeDatabase) QueryDatabaseSchemaVersion(ctx context.Context) (string, error) {
-	return database.CurrentDatabaseSchemaVersion, nil
+	return f.CurrentSchemaVersion, nil
 }
 
 func (f *fakeDatabase) queryResources(_ context.Context, kind, version, _, _ string, _ int) []*unstructured.Unstructured {

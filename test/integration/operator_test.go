@@ -49,14 +49,14 @@ func TestKACs(t *testing.T) {
 				_ = dynaclient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Delete(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.DeleteOptions{})
 			})
 			test.CreateKAC(t, values.kac, namespace)
-			checkResourcesAfterApply(t, namespace, name, values.applyNS)
+			checkResourcesAfterApply(t, namespace, values.applyNS)
 			test.DeleteKAC(t, namespace)
-			checkResourcesAfterDelete(t, namespace, name, values.deleteNS)
+			checkResourcesAfterDelete(t, namespace, values.deleteNS)
 		})
 	}
 }
 
-func checkResourcesAfterApply(t testing.TB, namespace string, testName string, applyNS int) {
+func checkResourcesAfterApply(t testing.TB, namespace string, applyNS int) {
 	t.Helper()
 
 	clientset, dynaclient := test.GetKubernetesClient(t)
@@ -131,7 +131,7 @@ func checkResourcesAfterApply(t testing.TB, namespace string, testName string, a
 	}
 }
 
-func checkResourcesAfterDelete(t testing.TB, namespace string, testName string, deleteNS int) {
+func checkResourcesAfterDelete(t testing.TB, namespace string, deleteNS int) {
 	t.Helper()
 
 	clientset, dynaclient := test.GetKubernetesClient(t)

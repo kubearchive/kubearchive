@@ -44,7 +44,7 @@ require (
 	k8s.io/client-go v0.33.1
 	k8s.io/klog/v2 v2.130.1
 	knative.dev/eventing v0.45.1
-	knative.dev/pkg v0.0.0-20250609210344-1da18b7d8460
+	knative.dev/pkg v0.0.0-20250610210745-4e27b2e68090
 	sigs.k8s.io/controller-runtime v0.21.0
 )
 
@@ -175,8 +175,8 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	k8s.io/apiextensions-apiserver v0.33.0 // indirect
-	k8s.io/apiserver v0.33.0 // indirect
+	k8s.io/apiextensions-apiserver v0.33.1 // indirect
+	k8s.io/apiserver v0.33.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/utils v0.0.0-20241210054802-24370beab758 // indirect
 	sigs.k8s.io/gateway-api v1.1.0 // indirect

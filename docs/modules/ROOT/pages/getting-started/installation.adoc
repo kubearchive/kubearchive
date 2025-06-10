@@ -13,7 +13,7 @@ This document explains how to install and configure KubeArchive in your Kubernet
 
 * A PostgreSQL instance (+v16.6) protected with TLS (can be self-signed, KubeArchive does not verify it)
 // renovate: datasource=github-releases depName=cert-manager packageName=cert-manager/cert-manager
-* CertManager is installed on the Kubernetes cluster (+v1.17.2)
+* CertManager is installed on the Kubernetes cluster (+v1.18.0)
 // renovate: datasource=github-releases depName=knative-eventing packageName=knative/eventing
 * Knative Eventing is installed on the Kubernetes cluster (+v1.17.4)
 

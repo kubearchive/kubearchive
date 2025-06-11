@@ -57,9 +57,9 @@ func TestGenerateLogURLs(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			cm := compileCELExpressions(loadMapJSON(tc.cm))
-			data := loadUnstructuredJSON(tc.data)
-			expected := loadExpectedJSON(tc.expected)
+			cm := compileCELExpressions(loadJSON[map[string]any](tc.cm))
+			data := loadJSON[*unstructured.Unstructured](tc.data)
+			expected := loadJSON[[]models.LogTuple](tc.expected)
 			result, _ := GenerateLogURLs(context.Background(), cm, data)
 			assert.Equal(t, expected, result, "Does not match")
 		})
@@ -77,48 +77,18 @@ func compileCELExpressions(cm map[string]interface{}) map[string]interface{} {
 	return result
 }
 
-func loadMapJSON(filename string) map[string]interface{} {
+func loadJSON[T any](filename string) T {
+	var result T
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil
+		return result
 	}
 	defer file.Close()
 	bytes, _ := io.ReadAll(file)
 
-	var result map[string]interface{}
 	if err := json.Unmarshal([]byte(bytes), &result); err != nil {
-		return nil
+		return result
 	}
 
-	return result
-}
-
-func loadUnstructuredJSON(filename string) *unstructured.Unstructured {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil
-	}
-	defer file.Close()
-	bytes, _ := io.ReadAll(file)
-
-	var result *unstructured.Unstructured
-	if err := json.Unmarshal([]byte(bytes), &result); err != nil {
-		return nil
-	}
-	return result
-}
-
-func loadExpectedJSON(filename string) []models.LogTuple {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil
-	}
-	defer file.Close()
-	bytes, _ := io.ReadAll(file)
-
-	var result []models.LogTuple
-	if err := json.Unmarshal([]byte(bytes), &result); err != nil {
-		return nil
-	}
 	return result
 }

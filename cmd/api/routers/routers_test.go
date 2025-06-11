@@ -139,57 +139,103 @@ func TestLabelSelectorQueryParameter(t *testing.T) {
 	}
 }
 
-func TestGetCoreResourcesLogURLs(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), true)
+func TestGetResourcesLogURLS(t *testing.T) {
+	tests := []struct {
+		name         string
+		api          string
+		isCore       bool
+		expectedCode int
+		expectedBody string
+	}{
+		{
+			name:         "my-pod",
+			api:          "/api/v1/namespaces/ns/pods/my-pod/log",
+			isCore:       true,
+			expectedCode: http.StatusOK,
+			expectedBody: fmt.Sprintf("\"%s-%s\"", testLogUrls[0].Url, testLogJsonPath),
+		},
+		{
+			name:         "my-cronjob",
+			api:          "/apis/batch/v1/namespaces/ns/cronjobs/my-cronjob/log",
+			isCore:       false,
+			expectedCode: http.StatusOK,
+			expectedBody: fmt.Sprintf("\"%s-%s\"", testLogUrls[0].Url, testLogJsonPath),
+		},
+	}
 
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespaces/ns/pods/my-pod/log", nil)
-	router.ServeHTTP(res, req)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), test.isCore)
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, test.api, nil)
+			router.ServeHTTP(res, req)
 
-	assert.Equal(t, http.StatusOK, res.Code)
-	assert.Equal(t, fmt.Sprintf("\"%s-%s\"", testLogUrls[0].Url, testLogJsonPath), res.Body.String())
-}
-
-func TestGetResourcesLogURLs(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), false)
-
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/apis/batch/v1/namespaces/ns/cronjobs/my-cronjob/log", nil)
-	router.ServeHTTP(res, req)
-
-	assert.Equal(t, http.StatusOK, res.Code)
-	assert.Equal(t, fmt.Sprintf("\"%s-%s\"", testLogUrls[0].Url, testLogJsonPath), res.Body.String())
+			assert.Equal(t, test.expectedCode, res.Code)
+			assert.Equal(t, test.expectedBody, res.Body.String())
+		})
+	}
 }
 
 func TestGetResources(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), false)
-
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/crontabs", nil)
-	router.ServeHTTP(res, req)
-
-	assert.Equal(t, http.StatusOK, res.Code)
-	var resources List
-	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
-		t.Fail()
+	tests := []struct {
+		name              string
+		api               string
+		isCore            bool
+		expectedCode      int
+		expectedResources []*unstructured.Unstructured
+	}{
+		{
+			name:              "crontabs",
+			api:               "/apis/stable.example.com/v1/crontabs",
+			isCore:            false,
+			expectedCode:      http.StatusOK,
+			expectedResources: nonCoreResources,
+		},
+		{
+			name:              "namespaced crontabs",
+			api:               "/apis/stable.example.com/v1/namespaces/test/crontabs",
+			isCore:            false,
+			expectedCode:      http.StatusOK,
+			expectedResources: nonCoreResources,
+		},
+		{
+			name:              "namespaced crontabs",
+			api:               "/apis/stable.example.com/v1/namespaces/test/crontabs",
+			isCore:            false,
+			expectedCode:      http.StatusOK,
+			expectedResources: nonCoreResources,
+		},
+		{
+			name:              "pods",
+			api:               "/api/v1/pods",
+			isCore:            true,
+			expectedCode:      http.StatusOK,
+			expectedResources: coreResources,
+		},
+		{
+			name:              "namespaced pods",
+			api:               "/api/v1/namespaces/test/pods",
+			isCore:            true,
+			expectedCode:      http.StatusOK,
+			expectedResources: coreResources,
+		},
 	}
-	assert.Equal(t, nonCoreResources, resources.Items)
-}
 
-func TestGetNamespacedResources(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), false)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), test.isCore)
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, test.api, nil)
+			router.ServeHTTP(res, req)
 
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespaces/test/crontabs", nil)
-	router.ServeHTTP(res, req)
-
-	assert.Equal(t, http.StatusOK, res.Code)
-	var resources List
-	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
-		t.Fail()
+			assert.Equal(t, test.expectedCode, res.Code)
+			var resources List
+			if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
+				t.Fail()
+			}
+			assert.Equal(t, test.expectedResources, resources.Items)
+		})
 	}
-
-	assert.Equal(t, nonCoreResources, resources.Items)
 }
 
 func TestGetResourceByName(t *testing.T) {
@@ -264,6 +310,18 @@ func TestGetResourceByName(t *testing.T) {
 	}
 }
 
+func TestDBError(t *testing.T) {
+	router := setupRouter(fake.NewFakeDatabaseWithError(errors.New("test error")), true)
+
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
+	router.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusInternalServerError, res.Code)
+	assert.Contains(t, res.Body.String(), "test error")
+	assert.NotContains(t, res.Body.String(), "Kind")
+}
+
 func TestGetResourcesEmpty(t *testing.T) {
 	router := setupRouter(fake.NewFakeDatabase([]*unstructured.Unstructured{}, []fake.LogUrlRow{}, testLogJsonPath), false)
 
@@ -279,65 +337,7 @@ func TestGetResourcesEmpty(t *testing.T) {
 	assert.Equal(t, 0, len(resources.Items))
 }
 
-func TestGetAllCoreResources(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), true)
-
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
-	router.ServeHTTP(res, req)
-
-	assert.Equal(t, http.StatusOK, res.Code)
-	var resources List
-	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
-		t.Fail()
-	}
-	assert.Equal(t, coreResources, resources.Items)
-}
-
-func TestGetCoreNamespacedResources(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), true)
-
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespaces/test/pods", nil)
-	router.ServeHTTP(res, req)
-
-	assert.Equal(t, http.StatusOK, res.Code)
-	var resources List
-	if err := json.NewDecoder(res.Body).Decode(&resources); err != nil {
-		t.Fail()
-	}
-	assert.Equal(t, coreResources, resources.Items)
-}
-
-func TestGetCoreNamespacedResourcesByName(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), true)
-
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/namespaces/test/pods/test", nil)
-	router.ServeHTTP(res, req)
-
-	assert.Equal(t, http.StatusOK, res.Code)
-	var resource *unstructured.Unstructured
-	if err := json.NewDecoder(res.Body).Decode(&resource); err != nil {
-		t.Fail()
-	}
-	assert.Equal(t, coreResources[0], resource)
-}
-
-func TestDBError(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabaseWithError(errors.New("test error")), true)
-
-	res := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/pods", nil)
-	router.ServeHTTP(res, req)
-
-	assert.Equal(t, http.StatusInternalServerError, res.Code)
-	assert.Contains(t, res.Body.String(), "test error")
-	assert.NotContains(t, res.Body.String(), "Kind")
-}
-
 func TestNoAPIResourceInContextError(t *testing.T) {
-
 	// Setting a router without a middleware that sets the api resource
 	router := gin.Default()
 	ctrl := Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath)}
@@ -353,7 +353,6 @@ func TestNoAPIResourceInContextError(t *testing.T) {
 }
 
 func TestLivez(t *testing.T) {
-
 	router := gin.Default()
 	ctrl := Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath),
 		CacheConfiguration: CacheExpirations{Authorized: 60, Unauthorized: 5}}
@@ -375,7 +374,6 @@ func TestLivez(t *testing.T) {
 }
 
 func TestReadyz(t *testing.T) {
-
 	testCases := []struct {
 		name        string
 		dbConnReady bool

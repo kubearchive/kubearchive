@@ -99,6 +99,10 @@ customConfig:
       endpoint: "http://loki.grafana-loki.svc.cluster.local:3100"
       encoding:
         codec: "raw_message"
+      auth:
+        strategy: "basic"
+        user: "${LOKI_USERNAME}"
+        password: "${LOKI_PASSWORD}"
       labels:
         namespace: .kubernetes.namespace_name
         pod: .kubernetes.pod_name
@@ -108,3 +112,14 @@ image:
   tag: 0.46.1-distroless-libc
   pullPolicy: IfNotPresent
   base: "debian"
+env:
+  - name: LOKI_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: loki-basic-auth
+        key: username
+  - name: LOKI_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: loki-basic-auth
+        key: password

@@ -36,4 +36,5 @@ resources:
   - templates/sink/sink.yaml
   - templates/sink/trigger.yaml
   - templates/certificates.yaml
+  - templates/clusterroles.yaml
   - templates/namespace.yaml

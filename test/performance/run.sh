@@ -70,7 +70,7 @@ cat <<EOF > ${GITHUB_STEP_SUMMARY:-/dev/stdout}
 $(kubectl get -n kubearchive deployments.apps -l app.kubernetes.io/part-of=kubearchive -o go-template-file=${SCRIPT_DIR}/limits.gotemplate)
 \`\`\`
 
-## Create | Requests
+## Create | Requests (milliseconds)
 \`\`\`
 $(tail -n13 perf-results/create.txt)
 \`\`\`
@@ -85,7 +85,7 @@ $(go run ${SCRIPT_DIR}/stats/main.go --file=perf-results/create-cpu.csv --type c
 ## Create | Memory (MB)
 $(go run ${SCRIPT_DIR}/stats/main.go --file=perf-results/create-memory.csv --type memory)
 
-## Get | Requests
+## Get | Requests (milliseconds)
 \`\`\`
 $(tail -n13 perf-results/get.txt)
 \`\`\`

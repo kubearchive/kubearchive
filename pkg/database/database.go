@@ -4,6 +4,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -47,6 +48,18 @@ func newDatabase() (interfaces.Database, error) {
 			db = regDB
 		} else {
 			err = fmt.Errorf("no interfaces registered with name '%s'", e[env.DbKindEnvVar])
+			return
+		}
+
+		var dbVersion string
+		dbVersion, err = db.QueryDatabaseSchemaVersion(context.TODO())
+		if err != nil {
+			return
+		}
+
+		if dbVersion != CurrentDatabaseSchemaVersion {
+			err = fmt.Errorf("expected database schema version '%s', found '%s'", CurrentDatabaseSchemaVersion, dbVersion)
+			return
 		}
 	})
 

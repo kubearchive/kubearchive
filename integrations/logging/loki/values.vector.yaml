@@ -112,14 +112,14 @@ image:
   tag: 0.46.1-distroless-libc
   pullPolicy: IfNotPresent
   base: "debian"
-env:
-  - name: LOKI_USERNAME
-    valueFrom:
-      secretKeyRef:
-        name: loki-basic-auth
-        key: username
-  - name: LOKI_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: loki-basic-auth
-        key: password
+# env:
+#   - name: LOKI_USERNAME
+#     valueFrom:
+#       secretKeyRef:
+#         name: loki-basic-auth
+#         key: username
+#   - name: LOKI_PASSWORD
+#     valueFrom:
+#       secretKeyRef:
+#         name: loki-basic-auth
+#         key: password

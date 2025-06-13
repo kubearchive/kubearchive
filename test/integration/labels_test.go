@@ -140,7 +140,7 @@ func TestLabels(t *testing.T) {
 	podsURL := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods", port, namespaceName)
 	retryErr := retry.Do(func() error {
 		var getUrlErr error
-		list, getUrlErr = test.GetUrl(t, token.Status.Token, podsURL)
+		list, getUrlErr = test.GetUrl(t, token.Status.Token, podsURL, map[string][]string{})
 		if getUrlErr != nil {
 			t.Fatal(getUrlErr)
 		}
@@ -172,7 +172,7 @@ func TestLabels(t *testing.T) {
 			}
 
 			retryErr := retry.Do(func() error {
-				podList, getUrlErr := test.GetUrl(t, token.Status.Token, podsURL)
+				podList, getUrlErr := test.GetUrl(t, token.Status.Token, podsURL, map[string][]string{})
 				if getUrlErr != nil {
 					t.Fatal(getUrlErr)
 				}

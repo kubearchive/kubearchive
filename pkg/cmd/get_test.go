@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCompleteAPI(t *testing.T) {
+func TestGetComplete(t *testing.T) {
 	testCases := []struct {
 		name            string
 		namespace       string

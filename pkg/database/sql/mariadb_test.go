@@ -5,6 +5,7 @@ package sql
 
 import (
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"os"
 	"regexp"
@@ -24,7 +25,8 @@ func TestMariaDBWriteResource(t *testing.T) {
 			string
 			time.Time
 		}
-		err error
+		err  error
+		logs []models.LogTuple
 	}{
 		{
 			name: "insert objects successfully",
@@ -90,6 +92,25 @@ func TestMariaDBWriteResource(t *testing.T) {
 			},
 			err: errors.New("error writing to the database"),
 		},
+		{
+			name: "insert objects successfully with logs",
+			inserts: []struct {
+				string
+				time.Time
+			}{
+				{
+					"../testdata/pod-3-containers.json",
+					time.Now(),
+				},
+			},
+			logs: []models.LogTuple{
+				{
+					ContainerName: "hello",
+					Url:           "https://example.com/logs/hello",
+				},
+			},
+			err: nil,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -107,6 +128,7 @@ func TestMariaDBWriteResource(t *testing.T) {
 					t.Fatal(err)
 				}
 
+				mock.ExpectBegin()
 				query, args := database.getInserter().ResourceInserter(
 					string(obj.GetUID()),
 					obj.GetAPIVersion(),
@@ -121,7 +143,26 @@ func TestMariaDBWriteResource(t *testing.T) {
 					data,
 				).BuildWithFlavor(database.getFlavor())
 
-				mock.ExpectBegin()
+				if obj.GetKind() == "Pod" {
+					delBuilder := database.getDeleter().UrlDeleter()
+					delBuilder.Where(database.filter.UuidFilter(delBuilder.Cond, string(obj.GetUID())))
+					delQuery, delArgs := delBuilder.BuildWithFlavor(database.flavor)
+					mock.ExpectExec(regexp.QuoteMeta(delQuery)).WithArgs(sliceOfAny2sliceOfValue(delArgs)...).WillReturnResult(driver.ResultNoRows)
+				}
+
+				if len(test.logs) >= 1 {
+					for _, log := range test.logs {
+						logQuery, logArgs := database.getInserter().UrlInserter(
+							string(obj.GetUID()),
+							log.Url,
+							log.ContainerName,
+							"jsonPath",
+						).BuildWithFlavor(database.flavor)
+
+						mock.ExpectExec(regexp.QuoteMeta(logQuery)).WithArgs(sliceOfAny2sliceOfValue(logArgs)...).WillReturnResult(driver.ResultNoRows)
+					}
+				}
+
 				if test.err == nil {
 					mock.ExpectExec(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnResult(sqlmock.NewResult(0, 1))
 					mock.ExpectCommit()
@@ -130,7 +171,7 @@ func TestMariaDBWriteResource(t *testing.T) {
 					mock.ExpectRollback()
 				}
 
-				_, dbErr := database.WriteResource(t.Context(), obj, data, insert.Time)
+				_, dbErr := database.WriteResource(t.Context(), obj, data, insert.Time, "jsonPath", test.logs...)
 				if test.err == nil {
 					assert.Nil(t, dbErr)
 				} else {

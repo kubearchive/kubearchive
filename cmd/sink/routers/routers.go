@@ -63,60 +63,42 @@ func NewController(
 	return controller, nil
 }
 
-func (c *Controller) writeLogs(ctx context.Context, obj *unstructured.Unstructured) error {
-	logCtx, cancel := context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
-	urls, err := c.LogUrlBuilder.Urls(logCtx, obj)
-	if err != nil {
-		slog.Error(
-			"Could not build log urls for resource",
-			"id", obj.GetUID(),
-			"kind", obj.GetKind(),
-			"namespace", obj.GetNamespace(),
-			"name", obj.GetName(),
-			"err", err,
-		)
-		return err
-	}
-	if len(urls) == 0 {
-		slog.Info(
-			"No log urls were generated for object",
-			"id", obj.GetUID(),
-			"kind", obj.GetKind(),
-			"namespace", obj.GetNamespace(),
-			"name", obj.GetName(),
-		)
-		return nil
-	}
-	err = c.Db.WriteUrls(logCtx, obj, c.LogUrlBuilder.GetJsonPath(), urls...)
-	if err != nil {
-		slog.Error(
-			"Failed to write log urls for object to the database",
-			"id", obj.GetUID(),
-			"kind", obj.GetKind(),
-			"namespace", obj.GetNamespace(),
-			"name", obj.GetName(),
-			"err", err,
-		)
-		return err
-	}
-	slog.Info(
-		"Successfully wrote log urls for object to the database",
-		"id", obj.GetUID(),
-		"kind", obj.GetKind(),
-		"namespace", obj.GetNamespace(),
-		"name", obj.GetName(),
-	)
-	return nil
-}
-
 func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstructured, event cloudevents.Event) (interfaces.WriteResourceResult, error) {
 	lastUpdateTs := k8s.GetLastUpdateTs(obj)
 	dbCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
-	result, err := c.Db.WriteResource(dbCtx, obj, event.Data(), lastUpdateTs)
-	if err != nil {
+	var urls []models.LogTuple
+	var jsonPath string
+	if c.LogUrlBuilder != nil {
+		jsonPath = c.LogUrlBuilder.GetJsonPath()
+
+		var err error
+		urls, err = c.LogUrlBuilder.Urls(ctx, obj)
+		if err != nil {
+			slog.Error(
+				"Could not build log urls for resource",
+				"id", obj.GetUID(),
+				"kind", obj.GetKind(),
+				"namespace", obj.GetNamespace(),
+				"name", obj.GetName(),
+				"err", err,
+			)
+			return interfaces.WriteResourceResultError, err
+		}
+		if len(urls) == 0 {
+			slog.Info(
+				"No log urls were generated for object",
+				"id", obj.GetUID(),
+				"kind", obj.GetKind(),
+				"namespace", obj.GetNamespace(),
+				"name", obj.GetName(),
+			)
+		}
+	}
+
+	result, writeResourceErr := c.Db.WriteResource(dbCtx, obj, event.Data(), lastUpdateTs, jsonPath, urls...)
+	if writeResourceErr != nil {
 		slog.Error(
 			"Failed to write object from cloudevent to the database",
 			"event-id", event.ID(),
@@ -125,10 +107,11 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 			"kind", obj.GetKind(),
 			"namespace", obj.GetNamespace(),
 			"name", obj.GetName(),
-			"err", err,
+			"err", writeResourceErr,
 		)
-		return result, err
+		return result, writeResourceErr
 	}
+
 	slog.Info(
 		"Successfully wrote object from cloudevent to the database",
 		"event-id", event.ID(),
@@ -139,11 +122,7 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 		"name", obj.GetName(),
 	)
 
-	// only write logs for k8s resources likes pods that have them and UrlBuilder is configured
-	if c.LogUrlBuilder != nil && strings.ToLower(obj.GetKind()) == "pod" {
-		err = c.writeLogs(ctx, obj)
-	}
-	return result, err
+	return result, nil
 }
 
 // receiveCloudEvent returns an HTTP 422 if event.Data is not a kubernetes object. All other failures should return HTTP

@@ -178,11 +178,23 @@ type postgreSQLDatabase struct {
 	*sqlDatabaseImpl
 }
 
-func (db *postgreSQLDatabase) WriteResource(ctx context.Context, k8sObj *unstructured.Unstructured, data []byte, lastUpdated time.Time) (interfaces.WriteResourceResult, error) {
-	tx, err := db.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return interfaces.WriteResourceResultError, fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), err)
+func (db *postgreSQLDatabase) WriteResource(
+	ctx context.Context,
+	k8sObj *unstructured.Unstructured,
+	data []byte,
+	lastUpdated time.Time,
+	jsonPath string,
+	logs ...models.LogTuple,
+) (interfaces.WriteResourceResult, error) {
+	if k8sObj == nil {
+		return interfaces.WriteResourceResultError, errors.New("kubernetes object was 'nil', something went wrong")
 	}
+
+	tx, txErr := db.db.BeginTxx(ctx, nil)
+	if txErr != nil {
+		return interfaces.WriteResourceResultError, fmt.Errorf("could not begin transaction for resource %s: %s", k8sObj.GetUID(), txErr)
+	}
+
 	inserter := db.inserter.ResourceInserter(
 		string(k8sObj.GetUID()),
 		k8sObj.GetAPIVersion(),
@@ -201,10 +213,50 @@ func (db *postgreSQLDatabase) WriteResource(ctx context.Context, k8sObj *unstruc
 	if execErr != nil && !errors.Is(execErr, sql.ErrNoRows) {
 		rollbackErr := tx.Rollback()
 		if rollbackErr != nil {
-			return interfaces.WriteResourceResultError, fmt.Errorf("write to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
+			return interfaces.WriteResourceResultError, fmt.Errorf("write resource to database failed: %s and unable to roll back transaction: %s", execErr, rollbackErr)
 		}
-		return interfaces.WriteResourceResultError, fmt.Errorf("write to database failed: %s", execErr)
+		return interfaces.WriteResourceResultError, fmt.Errorf("write resource to database failed: %s", execErr)
 	}
+
+	if k8sObj.GetKind() == "Pod" {
+		delBuilder := db.deleter.UrlDeleter()
+		delBuilder.Where(db.filter.UuidFilter(delBuilder.Cond, string(k8sObj.GetUID())))
+		query, args := delBuilder.BuildWithFlavor(db.flavor)
+		_, delErr := tx.ExecContext(ctx, query, args...)
+		if delErr != nil {
+			rollbackErr := tx.Rollback()
+			if rollbackErr != nil {
+				return interfaces.WriteResourceResultError, fmt.Errorf(
+					"delete urls from database failed: %w and unable to roll back transaction: %w",
+					delErr,
+					rollbackErr,
+				)
+			}
+			return interfaces.WriteResourceResultError, fmt.Errorf("delete urls from database failed: %w", delErr)
+		}
+
+		for _, log := range logs {
+			logQuery, logArgs := db.inserter.UrlInserter(
+				string(k8sObj.GetUID()),
+				log.Url,
+				log.ContainerName,
+				jsonPath,
+			).BuildWithFlavor(db.flavor)
+			_, logQueryErr := tx.ExecContext(ctx, logQuery, logArgs...)
+			if logQueryErr != nil {
+				rollbackErr := tx.Rollback()
+				if rollbackErr != nil {
+					return interfaces.WriteResourceResultError, fmt.Errorf(
+						"write urls to database failed: %w and unable to roll back transaction: %w",
+						logQueryErr,
+						rollbackErr,
+					)
+				}
+				return interfaces.WriteResourceResultError, fmt.Errorf("write urls to database failed: %w", logQueryErr)
+			}
+		}
+	}
+
 	execErr = tx.Commit()
 	if execErr != nil {
 		rollbackErr := tx.Rollback()

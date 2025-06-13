@@ -170,35 +170,34 @@ func (f *fakeDatabase) filterResourceByKindApiVersionNamespaceAndName(kind, apiV
 	return filteredResources
 }
 
-func (f *fakeDatabase) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte, _ time.Time) (interfaces.WriteResourceResult, error) {
+func (f *fakeDatabase) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte, _ time.Time, jsonPath string, logs ...models.LogTuple) (interfaces.WriteResourceResult, error) {
 	if f.err != nil {
 		return interfaces.WriteResourceResultError, f.err
 	}
-	f.resources = append(f.resources, k8sObj)
-	return interfaces.WriteResourceResultInserted, nil
-}
-
-func (f *fakeDatabase) WriteUrls(_ context.Context, k8sObj *unstructured.Unstructured, jsonPath string, logs ...models.LogTuple) error {
-	if f.urlErr != nil {
-		return f.urlErr
-	}
-
 	if k8sObj == nil {
-		return errors.New("cannot write log urls to the database when k8sObj is nil")
+		return interfaces.WriteResourceResultError, errors.New("kubernetes object was 'nil', something went wrong")
 	}
 
-	newLogUrls := make([]LogUrlRow, 0)
-	for _, row := range f.logUrl {
-		if k8sObj.GetUID() != row.Uuid {
-			newLogUrls = append(newLogUrls, row)
+	if k8sObj.GetKind() == "Pod" {
+		if f.urlErr != nil {
+			return interfaces.WriteResourceResultError, f.urlErr
+		}
+
+		newLogUrls := make([]LogUrlRow, 0)
+		for _, row := range f.logUrl {
+			if k8sObj.GetUID() != row.Uuid {
+				newLogUrls = append(newLogUrls, row)
+			}
+		}
+		f.logUrl = newLogUrls
+
+		for _, url := range logs {
+			f.logUrl = append(f.logUrl, LogUrlRow{Uuid: k8sObj.GetUID(), Url: url.Url, ContainerName: url.ContainerName, JsonPath: jsonPath})
 		}
 	}
-	f.logUrl = newLogUrls
 
-	for _, url := range logs {
-		f.logUrl = append(f.logUrl, LogUrlRow{Uuid: k8sObj.GetUID(), Url: url.Url, ContainerName: url.ContainerName, JsonPath: jsonPath})
-	}
-	return nil
+	f.resources = append(f.resources, k8sObj)
+	return interfaces.WriteResourceResultInserted, nil
 }
 
 func (f *fakeDatabase) NumResources() int {

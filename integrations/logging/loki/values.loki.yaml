@@ -1,5 +1,6 @@
 # Copyright KubeArchive Authors
 # SPDX-License-Identifier: Apache-2.0
+---
 loki:
   limits_config:
     max_query_length: 0

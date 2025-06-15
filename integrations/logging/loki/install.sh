@@ -14,8 +14,14 @@ case $i in
     --loki-pwd=*)
     LOKI_PWD=`echo $i | sed 's/[-a-zA-Z0-9]*=//'`
     ;;
+    --loki-username=*)
+    LOKI_PWD=`echo $i | sed 's/[-a-zA-Z0-9]*=//'`
+    ;;
     --grafana)
     GRAFANA=True
+    ;;
+    --vector)
+    VECTOR=True
     ;;
     --help)
     HELP=True
@@ -31,21 +37,28 @@ done
 HELP=${HELP:-"False"}
 UNKNOWN=${UNKNOWN:-"False"}
 NAMESPACE=${NAMESPACE:-"grafana-loki"}
+LOKI_USERNAME=${LOKI_USERNAME:-"admin"}
 LOKI_PWD=${LOKI_PWD:-"password"}
 GRAFANA=${GRAFANA:-"False"}
+VECTOR=${VECTOR:-"False"}
 
 # Help and usage
 if [ "${HELP}" == "True" ] || [ "${UNKNOWN}" == "True" ]; then
     echo -e "$0
 
-    --namespace    Namespace to use to deploy loki.
-                   Default value is ${NAMESPACE}
+    --namespace         Namespace to use to deploy loki.
+                        Default value is ${NAMESPACE}
+    --loki-username     The username to use to deploy loki.
+                        Default value is ${LOKI_USERNAME}
+    --loki-pwd          The password to use to deploy loki.
+                        Default value is ${LOKI_PWD}
 
-    --loki-pwd     The password to use to deploy loki.
-                   Default value is ${LOKI_PWD}
+    --grafana           If enabled Grafana UI is deployed along loki.
+                        Default value is ${GRAFANA}
 
-    --grafana      If enabled Grafana UI is deployed along loki.
-                   Default value is ${GRAFANA}
+    --vector            If enabled, Vector will be deployed as a 
+                        log collector for loki. By default, log-forwarder 
+                        operator will be used instead of Vector. 
 
     "
     if [ "${UNKNOWN}" == "True" ]; then
@@ -60,6 +73,7 @@ cd ${SCRIPT_DIR}
 
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add grafana https://grafana.github.io/helm-charts
+helm repo add vector https://helm.vector.dev
 helm repo update
 
 # Deploy MinIO for S3 bucket like storage
@@ -71,7 +85,7 @@ kubectl get secret -n ${NAMESPACE} loki-basic-auth > /dev/null 2>&1
 
 if [ $? -ne 0 ]; then
   echo "Secret 'loki-basic-auth' not found, creating it..."
-  kubectl create secret -n ${NAMESPACE} generic loki-basic-auth --from-literal=username=admin --from-literal=password=${LOKI_PWD}
+  kubectl create secret -n ${NAMESPACE} generic loki-basic-auth --from-literal=username=admin=${LOKI_USERNAME} --from-literal=password=${LOKI_PWD}
 else
   echo "Secret 'loki-basic-auth' already exists."
 fi
@@ -88,16 +102,34 @@ if [ "${GRAFANA}" == "True" ]; then
   helm upgrade --install --create-namespace --namespace ${NAMESPACE} --values values.grafana.yaml grafana grafana/grafana
 fi
 
-helm upgrade --install --wait --create-namespace \
-    --namespace ${NAMESPACE} \
-    logging-operator oci://ghcr.io/kube-logging/helm-charts/logging-operator
-kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=180s
+if [ "${VECTOR}" == "True" ]; then
 
-# Deploy the log-forwarder
-kubectl -n ${NAMESPACE} apply -f ./manifests
+  LOKI_ENDPOINT="http://loki.${NAMESPACE}.svc.cluster.local:3100"
+  echo "Using Loki endpoint: ${LOKI_ENDPOINT}"
+  #Deploy Vector
+  helm upgrade kubearchive-vector vector/vector --install \
+    --create-namespace --namespace ${NAMESPACE} \
+    --set "customConfig.sinks.loki.endpoint=${LOKI_ENDPOINT}" \
+    --set "env[0].name=LOKI_USERNAME" \
+    --set "env[0].value=${LOKI_USERNAME}" \
+    --set "env[1].name=LOKI_PASSWORD" \
+    --set "env[1].value=${LOKI_PWD}" \
+    --reuse-values \
+    --values values.vector.yaml
+  kubectl rollout restart --namespace ${NAMESPACE} daemonset/kubearchive-vector
+  kubectl rollout status daemonset --namespace ${NAMESPACE} --timeout=90s
+else
+  helm upgrade --install --wait --create-namespace \
+      --namespace ${NAMESPACE} \
+      logging-operator oci://ghcr.io/kube-logging/helm-charts/logging-operator
+  kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=180s
 
-kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=180s
-kubectl rollout status statefulset --namespace=${NAMESPACE} --timeout=180s
+  # Deploy the log-forwarder
+  kubectl -n ${NAMESPACE} apply -f ./manifests
+
+  kubectl rollout status deployment --namespace=${NAMESPACE} --timeout=180s
+  kubectl rollout status statefulset --namespace=${NAMESPACE} --timeout=180s
+fi
 
 # If KubeArchive is installed, update the credentials and set the jsonpath
 KUBEARCHIVE_NS="kubearchive"

@@ -96,14 +96,18 @@ customConfig:
     loki:
       type: loki
       inputs: ["remap_app_logs"]
-      endpoint: "http://loki.grafana-loki.svc.cluster.local:3100"
+      endpoint: http://loki.grafana-loki.svc.cluster.local:3100
       encoding:
         codec: "raw_message"
-      auth:
-        strategy: "basic"
-        user: "${LOKI_USERNAME}"
-        password: "${LOKI_PASSWORD}"
+      # auth:
+      #   strategy: "basic"
+      #   user: "${LOKI_USERNAME}"
+      #   password: "${LOKI_PASSWORD}"
+      request:
+        headers:
+          X-Scope-OrgID: "${LOKI_USERNAME}"  # Required for Grafana Cloud/multi-tenant Loki
       labels:
+        job: "vector"
         namespace: .kubernetes.namespace_name
         pod: .kubernetes.pod_name
         container: .kubernetes.container_name

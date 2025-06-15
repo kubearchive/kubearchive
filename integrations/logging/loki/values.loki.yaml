@@ -4,10 +4,10 @@
 loki:
   limits_config:
     max_query_length: 0
-  auth_enabled: true
-  basic_auth:
-    enabled: true
-    username: admin
+  auth_enabled: false
+  # basic_auth:
+  #   enabled: true
+  #   username: admin
   storage:
     type: s3
     bucketNames:

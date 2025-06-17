@@ -57,7 +57,7 @@ func TestPagination(t *testing.T) {
 	var list *unstructured.UnstructuredList
 	var getUrlErr error
 	err := retry.Do(func() error {
-		list, getUrlErr = test.GetUrl(t, token.Status.Token, url)
+		list, getUrlErr = test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
 			t.Fatal(getUrlErr)
 		}
@@ -73,7 +73,7 @@ func TestPagination(t *testing.T) {
 	}
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?limit=10", port, namespaceName)
-	initList, getUrlErrInitList := test.GetUrl(t, token.Status.Token, url)
+	initList, getUrlErrInitList := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 	if getUrlErrInitList != nil {
 		t.Fatal(getUrlErrInitList)
 	}
@@ -85,14 +85,14 @@ func TestPagination(t *testing.T) {
 		namespaceName,
 		initList.GetContinue(),
 	)
-	continueList, getUrlErrContinueList := test.GetUrl(t, token.Status.Token, url)
+	continueList, getUrlErrContinueList := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 	if getUrlErrContinueList != nil {
 		t.Fatal(getUrlErrContinueList)
 	}
 	assert.Equal(t, 10, len(continueList.Items))
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?limit=20", port, namespaceName)
-	allList, getUrlErrAllList := test.GetUrl(t, token.Status.Token, url)
+	allList, getUrlErrAllList := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 	if getUrlErrAllList != nil {
 		t.Fatal(getUrlErrAllList)
 	}

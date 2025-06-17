@@ -54,6 +54,7 @@ const (
 )
 
 var namespaceIndex = 1
+var ErrUnauth = errors.New("unauthorized")
 
 func RandomString() string {
 	suffix := make([]byte, randSuffixLen)
@@ -154,12 +155,14 @@ func PortForwardApiServer(t testing.TB, clientset kubernetes.Interface) string {
 	forwardRequests++
 
 	t.Cleanup(func() {
+		t.Log("Cleanup")
 		forwardRequestsMutex.Lock()
 		defer forwardRequestsMutex.Unlock()
 		forwardRequests--
 
 		// close the port if no longer needed
 		if forwardRequests == 0 {
+			t.Log("close")
 			close(forwardChan)
 		}
 	})
@@ -230,9 +233,9 @@ func GetPodName(t testing.TB, clientset *kubernetes.Clientset, namespace, prefix
 	return podName
 }
 
-func GetUrl(t testing.TB, token string, url string) (*unstructured.UnstructuredList, error) {
+func GetUrl(t testing.TB, token string, url string, extraHeaders map[string][]string) (*unstructured.UnstructuredList, error) {
 	client := getHTTPClient(t)
-	body, err := getUrl(t, &client, token, url)
+	body, err := getUrl(t, &client, token, url, extraHeaders)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +252,7 @@ func GetUrl(t testing.TB, token string, url string) (*unstructured.UnstructuredL
 
 func GetLogs(t testing.TB, token string, url string) ([]byte, error) {
 	client := getHTTPClient(t)
-	return getUrl(t, &client, token, url)
+	return getUrl(t, &client, token, url, map[string][]string{})
 }
 
 func getHTTPClient(t testing.TB) http.Client {
@@ -279,7 +282,7 @@ func getHTTPClient(t testing.TB) http.Client {
 	}
 }
 
-func getUrl(t testing.TB, client *http.Client, token string, url string) ([]byte, error) {
+func getUrl(t testing.TB, client *http.Client, token string, url string, extraHeaders map[string][]string) ([]byte, error) {
 	t.Helper()
 	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -287,6 +290,11 @@ func getUrl(t testing.TB, client *http.Client, token string, url string) ([]byte
 		return nil, err
 	}
 	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	for key, values := range extraHeaders {
+		for _, value := range values {
+			request.Header.Add(key, value)
+		}
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		t.Logf("Could not get an HTTP response, %s", err)
@@ -302,6 +310,9 @@ func getUrl(t testing.TB, client *http.Client, token string, url string) ([]byte
 
 	if response.StatusCode != http.StatusOK {
 		t.Logf("HTTP status: %s, response: %s", response.Status, string(body))
+		if response.StatusCode == http.StatusUnauthorized {
+			return nil, ErrUnauth
+		}
 		return nil, fmt.Errorf("%d", response.StatusCode)
 	}
 
@@ -343,7 +354,7 @@ func RunLogGenerator(t testing.TB, namespace string) string {
 
 // Create a test namespace, returning the namespace name and the SA token.
 func CreateTestNamespace(t testing.TB, customCleanup bool) (string, *authenticationv1.TokenRequest) {
-	// Create a randomly name testing namespace and return the name.
+	// Create a random name testing namespace and return the name.
 	t.Helper()
 
 	clientset, _ := GetKubernetesClient(t)

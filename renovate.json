@@ -39,6 +39,10 @@
       "matchManagers": ["regex"],
       "matchDepNames": ["cert-manager"],
       "groupName": "cert manager"
+    },
+    {
+      "matchPackageNames": ["go"],
+      "automerge": false
     }
   ]
 }

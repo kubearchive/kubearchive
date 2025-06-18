@@ -11,10 +11,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -470,11 +470,11 @@ func createAKAC(t testing.TB, filename string, namespace string, resources strin
 		}
 
 		err = retry.Do(func() error {
-			object, retryErr := dynamicClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
+			obj, retryErr := dynamicClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 			if retryErr != nil {
 				return retryErr
 			}
-			sinkFilter, retryErr := kubearchiveapi.ConvertObjectToSinkFilter(object)
+			sinkFilter, retryErr := kubearchiveapi.ConvertObjectToSinkFilter(obj)
 			if retryErr != nil {
 				return retryErr
 			}
@@ -651,7 +651,7 @@ func cleanResults(results string) string {
 }
 
 func ReadExpected(t testing.TB, file string) string {
-	content, err := ioutil.ReadFile(file)
+	content, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatalf("unable to read result file: %v", err)
 	}
@@ -660,7 +660,7 @@ func ReadExpected(t testing.TB, file string) string {
 }
 
 func ReadFileIntoUnstructured(t testing.TB, filename string) *unstructured.Unstructured {
-	contents, err := ioutil.ReadFile(filename)
+	contents, err := os.ReadFile(filename)
 	if err != nil {
 		t.Fatal("unable to read result file:", err)
 	}

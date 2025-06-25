@@ -116,7 +116,7 @@ if [ "${VECTOR}" == "True" ]; then
   # Remove existing Vector deployment if it exists in the Loki namespace
   helm uninstall kubearchive-vector -n ${NAMESPACE} 2>/dev/null || true
   
-  #Deploy Vector to kubearchive-vector namespace
+  #Deploy Vector to loki namespace
   helm install kubearchive-vector vector/vector \
     --namespace ${NAMESPACE} \
     --set "customConfig.sinks.loki.endpoint=${LOKI_ENDPOINT}" \

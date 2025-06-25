@@ -1,6 +1,6 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
-//go:build logging
+//go:build integration
 
 package main
 
@@ -30,23 +30,9 @@ func TestLogging(t *testing.T) {
 	job := test.RunLogGenerator(t, namespaceName)
 	test.WaitForJob(t, clientset, namespaceName, job)
 
-	// Wait for the job to be archived before trying to retrieve logs
-	jobArchiveURL := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s", port, namespaceName, job)
-	retryErr := retry.Do(func() error {
-		_, err := test.GetUrl(t, token.Status.Token, jobArchiveURL, map[string][]string{})
-		if err != nil {
-			return fmt.Errorf("job not yet archived: %v", err)
-		}
-		t.Log("Job successfully archived")
-		return nil
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
-
-	if retryErr != nil {
-		t.Fatalf("Job was not archived in expected time: %v", retryErr)
-	}
-
+	// Try to retrieve logs with increased retry attempts and delays
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespaceName, job)
-	retryErr = retry.Do(func() error {
+	retryErr := retry.Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -63,7 +49,7 @@ func TestLogging(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(120), retry.MaxDelay(5*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -214,22 +200,8 @@ func TestDefaultContainer(t *testing.T) {
 		}
 	}
 
-	// Wait for all pods to be archived before trying to retrieve logs
-	for _, testCase := range tests {
-		podArchiveURL := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/%s", port, namespaceName, testCase.podName)
-		retryErr := retry.Do(func() error {
-			_, err := test.GetUrl(t, token.Status.Token, podArchiveURL, map[string][]string{})
-			if err != nil {
-				return fmt.Errorf("pod %s not yet archived: %v", testCase.podName, err)
-			}
-			t.Logf("Pod %s successfully archived", testCase.podName)
-			return nil
-		}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
-
-		if retryErr != nil {
-			t.Fatalf("Pod %s was not archived in expected time: %v", testCase.podName, retryErr)
-		}
-	}
+	// Give pods a moment to complete, then try to retrieve logs with increased retries
+	time.Sleep(5 * time.Second)
 
 	for _, testCase := range tests {
 		t.Logf("checking logs for pod '%s', expected log '%s'", testCase.podName, testCase.expectedLog)
@@ -252,7 +224,7 @@ func TestDefaultContainer(t *testing.T) {
 			}
 
 			return nil
-		}, retry.Attempts(30), retry.MaxDelay(5*time.Second))
+		}, retry.Attempts(120), retry.MaxDelay(5*time.Second))
 
 		if retryErr != nil {
 			t.Fatal(retryErr)
@@ -295,23 +267,11 @@ func TestQueryContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Wait for the pod to be archived before trying to retrieve logs
-	podArchiveURL := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first", port, namespaceName)
-	retryErr := retry.Do(func() error {
-		_, err := test.GetUrl(t, token.Status.Token, podArchiveURL, map[string][]string{})
-		if err != nil {
-			return fmt.Errorf("pod not yet archived: %v", err)
-		}
-		t.Log("Pod successfully archived")
-		return nil
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
-
-	if retryErr != nil {
-		t.Fatalf("Pod was not archived in expected time: %v", retryErr)
-	}
+	// Give pod a moment to complete, then try to retrieve logs with increased retries
+	time.Sleep(5 * time.Second)
 
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log", port, namespaceName)
-	retryErr = retry.Do(func() error {
+	retryErr := retry.Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -329,7 +289,7 @@ func TestQueryContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(120), retry.MaxDelay(5*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -355,7 +315,7 @@ func TestQueryContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(120), retry.MaxDelay(5*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

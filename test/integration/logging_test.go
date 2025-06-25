@@ -1,6 +1,6 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
-//go:build integration
+//go:build logging
 
 package main
 
@@ -29,8 +29,24 @@ func TestLogging(t *testing.T) {
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 	job := test.RunLogGenerator(t, namespaceName)
 	test.WaitForJob(t, clientset, namespaceName, job)
-	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespaceName, job)
+
+	// Wait for the job to be archived before trying to retrieve logs
+	jobArchiveURL := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s", port, namespaceName, job)
 	retryErr := retry.Do(func() error {
+		_, err := test.GetUrl(t, token.Status.Token, jobArchiveURL, map[string][]string{})
+		if err != nil {
+			return fmt.Errorf("job not yet archived: %v", err)
+		}
+		t.Log("Job successfully archived")
+		return nil
+	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatalf("Job was not archived in expected time: %v", retryErr)
+	}
+
+	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespaceName, job)
+	retryErr = retry.Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -122,7 +138,6 @@ func TestLogOrder(t *testing.T) {
 
 		bodyString := string(body)
 		if bodyString != "First\nSecond\n" {
-			t.Log("log does not match")
 			return fmt.Errorf("log does not match the expected 'First\nSecond\n'")
 		}
 
@@ -199,6 +214,23 @@ func TestDefaultContainer(t *testing.T) {
 		}
 	}
 
+	// Wait for all pods to be archived before trying to retrieve logs
+	for _, testCase := range tests {
+		podArchiveURL := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/%s", port, namespaceName, testCase.podName)
+		retryErr := retry.Do(func() error {
+			_, err := test.GetUrl(t, token.Status.Token, podArchiveURL, map[string][]string{})
+			if err != nil {
+				return fmt.Errorf("pod %s not yet archived: %v", testCase.podName, err)
+			}
+			t.Logf("Pod %s successfully archived", testCase.podName)
+			return nil
+		}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+
+		if retryErr != nil {
+			t.Fatalf("Pod %s was not archived in expected time: %v", testCase.podName, retryErr)
+		}
+	}
+
 	for _, testCase := range tests {
 		t.Logf("checking logs for pod '%s', expected log '%s'", testCase.podName, testCase.expectedLog)
 		url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/%s/log", port, namespaceName, testCase.podName)
@@ -263,8 +295,23 @@ func TestQueryContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log", port, namespaceName)
+	// Wait for the pod to be archived before trying to retrieve logs
+	podArchiveURL := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first", port, namespaceName)
 	retryErr := retry.Do(func() error {
+		_, err := test.GetUrl(t, token.Status.Token, podArchiveURL, map[string][]string{})
+		if err != nil {
+			return fmt.Errorf("pod not yet archived: %v", err)
+		}
+		t.Log("Pod successfully archived")
+		return nil
+	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatalf("Pod was not archived in expected time: %v", retryErr)
+	}
+
+	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log", port, namespaceName)
+	retryErr = retry.Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err

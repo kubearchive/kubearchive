@@ -124,11 +124,16 @@ customConfig:
         headers:
           X-Scope-OrgID: "kubearchive"
       labels:
+        # job: "vector"
+        # pod_id: pod_id
+        # container: container
+        # namespace: namespace
+        # pod: pod_name
         job: "vector"
-        pod_id: pod_id
-        container: container
-        namespace: namespace
-        pod: pod_name
+        pod_id: "{{ pod_id }}"
+        container: "{{ container }}"
+        namespace: "{{ namespace }}"
+        pod: "{{ pod_name }}"
 image:
   repository: quay.io/kubearchive/vector
   tag: 0.46.1-distroless-libc

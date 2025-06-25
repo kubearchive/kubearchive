@@ -105,15 +105,9 @@ fi
 
 if [ "${VECTOR}" == "True" ]; then
 
-  # Create kubearchive-vector namespace if it doesn't exist
-  kubectl create namespace kubearchive-vector --dry-run=client -o yaml | kubectl apply -f -
-  
-  # Copy authentication secrets to kubearchive-vector namespace
-  kubectl get secret loki-basic-auth -n ${NAMESPACE} -o yaml | sed 's/namespace: '${NAMESPACE}'/namespace: kubearchive-vector/' | kubectl apply -f -
-  
-  # Create bearer token for kubearchive-vector namespace
-  kubectl create token default -n kubearchive-vector --duration=8760h | \
-    kubectl create secret generic loki-bearer-token -n kubearchive-vector --from-literal=token="$(cat)" --dry-run=client -o yaml | \
+  # Create bearer token for kubearchive-vector
+  kubectl create token default -n ${NAMESPACE} --duration=8760h | \
+    kubectl create secret generic loki-bearer-token -n ${NAMESPACE} --from-literal=token="$(cat)" --dry-run=client -o yaml | \
     kubectl apply -f -
 
   LOKI_ENDPOINT="http://loki.${NAMESPACE}.svc.cluster.local:3100"
@@ -124,11 +118,11 @@ if [ "${VECTOR}" == "True" ]; then
   
   #Deploy Vector to kubearchive-vector namespace
   helm install kubearchive-vector vector/vector \
-    --namespace kubearchive-vector \
+    --namespace ${NAMESPACE} \
     --set "customConfig.sinks.loki.endpoint=${LOKI_ENDPOINT}" \
     --values values.vector.yaml
     
-  kubectl rollout status daemonset/kubearchive-vector -n kubearchive-vector --timeout=90s
+  kubectl rollout status daemonset/kubearchive-vector -n ${NAMESPACE} --timeout=90s
 else
   helm upgrade --install --wait --create-namespace \
       --namespace ${NAMESPACE} \

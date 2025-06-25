@@ -2,6 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 ---
 role: Agent
+env:
+  - name: LOKI_BEARER_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: loki-bearer-token
+        key: token
+  - name: VECTOR_LOG
+    value: "info"
 customConfig:
   data_dir: /vector-data-dir
   api:
@@ -32,6 +40,27 @@ customConfig:
         - reduce_events
       source: |-
         .tmp = del(.)
+        # Preserve original kubernetes fields for Loki labels
+        if exists(.tmp.kubernetes.pod_uid) {
+          .pod_id = del(.tmp.kubernetes.pod_uid)
+        } else {
+          .pod_id = "unknown_pod_id"
+        }
+        if exists(.tmp.kubernetes.pod_name) {
+          .pod_name = del(.tmp.kubernetes.pod_name)
+        } else {
+          .pod_name = "unknown_pod"
+        }
+        if exists(.tmp.kubernetes.container_name) {
+          .container = del(.tmp.kubernetes.container_name)
+        } else {
+          .container = "unknown_container"
+        }
+        if exists(.tmp.kubernetes.pod_namespace) {
+          .namespace = del(.tmp.kubernetes.pod_namespace)
+        } else {
+          .namespace = "unlabeled"
+        }
         # Handling Tekton-specific labels
         if exists(.tmp.kubernetes.pod_labels."tekton.dev/taskRunUID") {
           .taskRunUID = del(.tmp.kubernetes.pod_labels."tekton.dev/taskRunUID")
@@ -73,17 +102,6 @@ customConfig:
         } else {
           .pod_labels = "no_labels"
         }
-        if exists(.tmp.kubernetes.pod_namespace) {
-          .namespace = del(.tmp.kubernetes.pod_namespace)
-        } else {
-          .namespace = "unlabeled"
-        }
-        # General Kubernetes container name
-        if exists(.tmp.kubernetes.container_name) {
-          .container = del(.tmp.kubernetes.container_name)
-        } else {
-          .container = "unknown_container"
-        }
         # General message field handling
         if exists(.tmp.message) {
           .message = del(.tmp.message)
@@ -96,13 +114,21 @@ customConfig:
     loki:
       type: loki
       inputs: ["remap_app_logs"]
-      endpoint: "http://loki.grafana-loki.svc.cluster.local:3100"
+      endpoint: http://loki.grafana-loki.svc.cluster.local:3100
       encoding:
-        codec: "raw_message"
+        codec: "json"
+      auth:
+        strategy: "bearer"
+        token: "${LOKI_BEARER_TOKEN}"
+      request:
+        headers:
+          X-Scope-OrgID: "kubearchive"
       labels:
-        namespace: .kubernetes.namespace_name
-        pod: .kubernetes.pod_name
-        container: .kubernetes.container_name
+        job: "vector"
+        pod_id: pod_id
+        container: container
+        namespace: namespace
+        pod: pod_name
 image:
   repository: quay.io/kubearchive/vector
   tag: 0.46.1-distroless-libc

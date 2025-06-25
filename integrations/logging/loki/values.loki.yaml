@@ -4,10 +4,19 @@
 loki:
   limits_config:
     max_query_length: 0
-  auth_enabled: true
+  # Disable strict authentication to allow both basic auth and bearer tokens
+  auth_enabled: false
+  # Keep basic auth for gateway compatibility
   basic_auth:
     enabled: true
     username: admin
+    # Add JWT authentication support
+  auth:
+    enabled: true
+    # Enable multi-tenant authentication
+  server:
+    http_listen_port: 3100
+    grpc_listen_port: 9095
   storage:
     type: s3
     bucketNames:

@@ -35,7 +35,7 @@ Run the log generators to create logs:
     ```
 1. Determine the `admin` password for Grafana:
     ```bash
-    echo `kubectl -n grafana-loki get secret grafana -o jsonpath='{.data.root-password}' | base --decode`
+    echo `kubectl -n grafana-loki get secret grafana -o jsonpath='{.data.admin-password}' | base64 --decode`
     ```
 1. In your browser, navigate to `http://localhost:3000`, using the username `admin` and the password retrieved
    in the previous step to login.

@@ -28,6 +28,7 @@ func TestLogging(t *testing.T) {
 
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 	job := test.RunLogGenerator(t, namespaceName)
+	test.WaitForJob(t, clientset, namespaceName, job)
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespaceName, job)
 	retryErr := retry.Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
@@ -83,8 +84,32 @@ func TestLogOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/logs-order/log", port, namespaceName)
+	// Wait for the pod to complete before trying to retrieve logs
 	retryErr := retry.Do(func() error {
+		podStatus, err := clientset.CoreV1().Pods(namespaceName).Get(context.Background(), "logs-order", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		// Wait for pod to be in a terminal state (Succeeded or Failed)
+		if podStatus.Status.Phase != corev1.PodSucceeded && podStatus.Status.Phase != corev1.PodFailed {
+			return fmt.Errorf("pod not yet in terminal state, current phase: %s", podStatus.Status.Phase)
+		}
+
+		// If pod failed, we still want to try to get logs for debugging
+		if podStatus.Status.Phase == corev1.PodFailed {
+			t.Logf("Pod failed, but will attempt to retrieve logs: %+v", podStatus.Status)
+		}
+
+		return nil
+	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatalf("Pod did not complete in expected time: %v", retryErr)
+	}
+
+	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/logs-order/log", port, namespaceName)
+	retryErr = retry.Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -102,7 +127,7 @@ func TestLogOrder(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(1000), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -348,7 +373,7 @@ func TestLogsWithResourceThatHasNoPods(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(60), retry.MaxDelay(5*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

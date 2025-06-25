@@ -54,7 +54,7 @@ Run the log generators to create logs:
 1. Try out the REST API with `curl`. The following example is for retrieving the logs of the container `<container-name>`
    in the pod `<pod-id>`.
    ```bash
-   curl -u admin:password -H "X-Scope-OrgID: tenant" http://localhost:3100/loki/api/v1/query_range \
+   curl -u admin:password http://localhost:3100/loki/api/v1/query_range \
     -H "X-Scope-OrgID: my-tenant-id" \
     --data-urlencode 'query={pod-id="<pod-id>", container="<container-name>"} | json | line_format "{{.message}}"' \
     --data-urlencode 'start=2025-05-07T00:00:00Z' \

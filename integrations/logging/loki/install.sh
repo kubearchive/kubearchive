@@ -85,7 +85,7 @@ kubectl get secret -n ${NAMESPACE} loki-basic-auth > /dev/null 2>&1
 
 if [ $? -ne 0 ]; then
   echo "Secret 'loki-basic-auth' not found, creating it..."
-  kubectl create secret -n ${NAMESPACE} generic loki-basic-auth --from-literal=username=${LOKI_USERNAME} --from-literal=password=${LOKI_PWD}
+  kubectl create secret -n ${NAMESPACE} generic loki-basic-auth --from-literal=USERNAME=${LOKI_USERNAME} --from-literal=PASSWORD=${LOKI_PWD}
 else
   echo "Secret 'loki-basic-auth' already exists."
 fi

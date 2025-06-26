@@ -106,15 +106,15 @@ fi
 if [ "${VECTOR}" == "True" ]; then
 
   # Create bearer token for kubearchive-vector
-  kubectl create token default -n ${NAMESPACE} --duration=8760h | \
-    kubectl create secret generic loki-bearer-token -n ${NAMESPACE} --from-literal=token="$(cat)" --dry-run=client -o yaml | \
-    kubectl apply -f -
+  # kubectl create token default -n ${NAMESPACE} --duration=8760h | \
+  #   kubectl create secret generic loki-bearer-token -n ${NAMESPACE} --from-literal=token="$(cat)" --dry-run=client -o yaml | \
+  #   kubectl apply -f -
 
   LOKI_ENDPOINT="http://loki.${NAMESPACE}.svc.cluster.local:3100"
   echo "Using Loki endpoint: ${LOKI_ENDPOINT}"
   
   # Remove existing Vector deployment if it exists in the Loki namespace
-  helm uninstall kubearchive-vector -n ${NAMESPACE} 2>/dev/null || true
+  # helm uninstall kubearchive-vector -n ${NAMESPACE} 2>/dev/null || true
   
   #Deploy Vector to loki namespace
   helm install kubearchive-vector vector/vector \

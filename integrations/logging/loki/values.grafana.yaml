@@ -25,8 +25,8 @@ sidecar:
       LOKI_USER:
         secretKeyRef:
           name: loki-basic-auth
-          key: username
+          key: USERNAME
       LOKI_PWD:
         secretKeyRef:
           name: loki-basic-auth
-          key: password
+          key: PASSWORD

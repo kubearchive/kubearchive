@@ -9,7 +9,7 @@ loki:
   # Keep basic auth for gateway compatibility
   basic_auth:
     enabled: true
-    username: admin
+    existingSecret: loki-basic-auth
     # Add JWT authentication support
   auth:
     enabled: true

@@ -3,11 +3,21 @@
 ---
 role: Agent
 env:
-  - name: LOKI_BEARER_TOKEN
+  # - name: LOKI_BEARER_TOKEN
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: loki-bearer-token
+  #       key: token
+  - name: LOKI_USERNAME
     valueFrom:
       secretKeyRef:
-        name: loki-bearer-token
-        key: token
+        name: loki-basic-auth
+        key: USERNAME
+  - name: LOKI_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: loki-basic-auth
+        key: PASSWORD
   - name: VECTOR_LOG
     value: "info"
 customConfig:
@@ -117,9 +127,13 @@ customConfig:
       endpoint: http://loki.grafana-loki.svc.cluster.local:3100
       encoding:
         codec: "json"
+      # auth:
+      #   strategy: "bearer"
+      #   token: "${LOKI_BEARER_TOKEN}"
       auth:
-        strategy: "bearer"
-        token: "${LOKI_BEARER_TOKEN}"
+        strategy: "basic"
+        user: "${LOKI_USERNAME}"
+        password: "${LOKI_PASSWORD}"
       request:
         headers:
           X-Scope-OrgID: "kubearchive"

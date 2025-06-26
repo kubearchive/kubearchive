@@ -5,7 +5,7 @@ loki:
   limits_config:
     max_query_length: 0
   # Disable strict authentication to allow both basic auth and bearer tokens
-  auth_enabled: false
+  auth_enabled: true
   # Keep basic auth for gateway compatibility
   basic_auth:
     enabled: true

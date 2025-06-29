@@ -3,20 +3,15 @@
 ---
 role: Agent
 env:
-  # - name: LOKI_BEARER_TOKEN
-  #   valueFrom:
-  #     secretKeyRef:
-  #       name: loki-bearer-token
-  #       key: token
   - name: LOKI_USERNAME
     valueFrom:
       secretKeyRef:
-        name: loki-basic-auth
+        name: loki-gateway-auth
         key: USERNAME
   - name: LOKI_PASSWORD
     valueFrom:
       secretKeyRef:
-        name: loki-basic-auth
+        name: loki-gateway-auth
         key: PASSWORD
   - name: VECTOR_LOG
     value: "info"
@@ -114,29 +109,42 @@ customConfig:
         }
         # General message field handling
         if exists(.tmp.message) {
-          .message = del(.tmp.message)
+          .message = to_string(del(.tmp.message)) ?? "no_message"
         } else {
           .message = "no_message"
         }
+        
+        # Basic data sanitization to prevent 400 errors
+        # Truncate very long messages
+        if length(.message) > 32768 {
+          .message = slice!(.message, 0, 32768) + "...[TRUNCATED]"
+        }
+        
         # Clean up temporary fields
         del(.tmp)
   sinks:
     loki:
       type: loki
       inputs: ["remap_app_logs"]
-      endpoint: http://loki.grafana-loki.svc.cluster.local:3100
+      endpoint: http://loki-gateway.grafana-loki.svc.cluster.local:80
       encoding:
         codec: "json"
-      # auth:
-      #   strategy: "bearer"
-      #   token: "${LOKI_BEARER_TOKEN}"
       auth:
         strategy: "basic"
         user: "${LOKI_USERNAME}"
         password: "${LOKI_PASSWORD}"
+      tenant_id: "kubearchive"
       request:
         headers:
-          X-Scope-OrgID: "kubearchive"
+          X-Scope-OrgID: kubearchive
+        retry_attempts: 3
+        retry_initial_backoff_secs: 1
+        retry_max_duration_secs: 10
+        timeout_secs: 30
+      batch:
+        max_events: 100
+        timeout_secs: 5
+        max_bytes: 1048576  # 1MB
       labels:
         job: "vector"
         pod_id: "{{`{{ pod_id }}`}}"

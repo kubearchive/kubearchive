@@ -80,6 +80,7 @@ helm repo update
 helm upgrade --install --create-namespace --namespace ${NAMESPACE} --values values.minio.yaml minio bitnami/minio
 MINIO_PWD=`kubectl -n ${NAMESPACE} get secret minio -o jsonpath='{.data.root-password}' | base64 --decode`
 
+
 set +e
 kubectl get secret -n ${NAMESPACE} loki-basic-auth > /dev/null 2>&1
 
@@ -89,14 +90,46 @@ if [ $? -ne 0 ]; then
 else
   echo "Secret 'loki-basic-auth' already exists."
 fi
-
 set -e
+
+
+# Create htpasswd secret for Loki gateway authentication
+create_htpasswd_secret() {
+    local namespace=$1
+    local username=$2
+    local password=$3
+    
+    echo "Creating htpasswd secret for Loki gateway authentication..."
+    
+    # Create temporary htpasswd file with proper formatting
+    local temp_htpasswd=$(mktemp)
+    
+    # Add admin user with specified password
+    htpasswd -cb "${temp_htpasswd}" "${username}" "${password}"
+    
+    # Add self-monitoring user with empty password (required for Loki canary)
+    htpasswd -b "${temp_htpasswd}" "self-monitoring" ""
+    
+    # Create the secret with the correct .htpasswd key
+    kubectl create secret generic loki-gateway-auth \
+        --namespace="${namespace}" \
+        --from-literal=USERNAME="${username}" \
+        --from-literal=PASSWORD="${password}" \
+        --from-file=.htpasswd="${temp_htpasswd}" \
+        --dry-run=client -o yaml | kubectl apply -f -
+    
+    # Clean up temporary file
+    rm -f "${temp_htpasswd}"
+    
+    echo "htpasswd secret 'loki-gateway-auth' created successfully"
+}
+
+# Create htpasswd secret
+create_htpasswd_secret "${NAMESPACE}" "${LOKI_USERNAME}" "${LOKI_PWD}"
 
 # Deploy loki
 helm upgrade --install --create-namespace --namespace ${NAMESPACE} --values values.loki.yaml loki grafana/loki \
- --set "loki.storage.s3.secretAccessKey=${MINIO_PWD}" \
- --set "loki.basic_auth.password=${LOKI_PWD}" \
- --set "loki.basic_auth.username=${LOKI_USERNAME}"
+ --set "loki.storage.s3.secretAccessKey=${MINIO_PWD}"
 
 # Deploy Grafana
 if [ "${GRAFANA}" == "True" ]; then
@@ -105,16 +138,9 @@ fi
 
 if [ "${VECTOR}" == "True" ]; then
 
-  # Create bearer token for kubearchive-vector
-  # kubectl create token default -n ${NAMESPACE} --duration=8760h | \
-  #   kubectl create secret generic loki-bearer-token -n ${NAMESPACE} --from-literal=token="$(cat)" --dry-run=client -o yaml | \
-  #   kubectl apply -f -
-
+  # LOKI_ENDPOINT="http://loki.${NAMESPACE}.svc.cluster.local:3100"
   LOKI_ENDPOINT="http://loki.${NAMESPACE}.svc.cluster.local:3100"
   echo "Using Loki endpoint: ${LOKI_ENDPOINT}"
-  
-  # Remove existing Vector deployment if it exists in the Loki namespace
-  # helm uninstall kubearchive-vector -n ${NAMESPACE} 2>/dev/null || true
   
   #Deploy Vector to loki namespace
   helm install kubearchive-vector vector/vector \

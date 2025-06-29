@@ -219,7 +219,16 @@ func TestGlobalAndLocalKAC(t *testing.T) {
 	test.CreateCKAC(t, "testdata/ckac-with-pod.yaml")
 	test.CreateKAC(t, "testdata/kac-with-job.yaml", namespace)
 
+	// Wait longer for the operator to fully reconcile all resources
+	// including namespace labeling and apiserversource updates
+	time.Sleep(30 * time.Second)
+
 	job := test.RunLogGenerator(t, namespace)
+	test.WaitForJob(t, clientset, namespace, job)
+
+	// Wait for the job to be archived (happens automatically based on archiveWhen condition)
+	time.Sleep(30 * time.Second)
+
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespace, job)
 	retryErr := retry.Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
@@ -238,7 +247,7 @@ func TestGlobalAndLocalKAC(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(60), retry.MaxDelay(5*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

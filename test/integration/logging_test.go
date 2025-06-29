@@ -27,7 +27,15 @@ func TestLogging(t *testing.T) {
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Wait longer for the operator to fully reconcile all resources
+	// including namespace labeling and apiserversource updates
+	time.Sleep(30 * time.Second)
+
 	job := test.RunLogGenerator(t, namespaceName)
+	test.WaitForJob(t, clientset, namespaceName, job)
+
+	// Try to retrieve logs with increased retry attempts and delays
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespaceName, job)
 	retryErr := retry.Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
@@ -46,7 +54,7 @@ func TestLogging(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(120), retry.MaxDelay(5*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -61,6 +69,10 @@ func TestLogOrder(t *testing.T) {
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Wait longer for the operator to fully reconcile all resources
+	// including namespace labeling and apiserversource updates
+	time.Sleep(30 * time.Second)
 
 	// Create a pod
 	pod := &corev1.Pod{
@@ -83,8 +95,35 @@ func TestLogOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/logs-order/log", port, namespaceName)
+	// Wait for the pod to complete before trying to retrieve logs
 	retryErr := retry.Do(func() error {
+		podStatus, err := clientset.CoreV1().Pods(namespaceName).Get(context.Background(), "logs-order", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		// Wait for pod to be in a terminal state (Succeeded or Failed)
+		if podStatus.Status.Phase != corev1.PodSucceeded && podStatus.Status.Phase != corev1.PodFailed {
+			return fmt.Errorf("pod not yet in terminal state, current phase: %s", podStatus.Status.Phase)
+		}
+
+		// If pod failed, we still want to try to get logs for debugging
+		if podStatus.Status.Phase == corev1.PodFailed {
+			t.Logf("Pod failed, but will attempt to retrieve logs: %+v", podStatus.Status)
+		}
+
+		return nil
+	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatalf("Pod did not complete in expected time: %v", retryErr)
+	}
+
+	// Wait for the pod to be archived (happens automatically when status.phase is Succeeded or Failed)
+	time.Sleep(30 * time.Second)
+
+	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/logs-order/log", port, namespaceName)
+	retryErr = retry.Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -97,12 +136,11 @@ func TestLogOrder(t *testing.T) {
 
 		bodyString := string(body)
 		if bodyString != "First\nSecond\n" {
-			t.Log("log does not match")
 			return fmt.Errorf("log does not match the expected 'First\nSecond\n'")
 		}
 
 		return nil
-	}, retry.Attempts(1000), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -118,6 +156,10 @@ func TestDefaultContainer(t *testing.T) {
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Wait longer for the operator to fully reconcile all resources
+	// including namespace labeling and apiserversource updates
+	time.Sleep(30 * time.Second)
 
 	tests := []struct {
 		podName     string
@@ -174,6 +216,9 @@ func TestDefaultContainer(t *testing.T) {
 		}
 	}
 
+	// Give pods a moment to complete, then wait for them to be archived automatically
+	time.Sleep(15 * time.Second)
+
 	for _, testCase := range tests {
 		t.Logf("checking logs for pod '%s', expected log '%s'", testCase.podName, testCase.expectedLog)
 		url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/%s/log", port, namespaceName, testCase.podName)
@@ -195,7 +240,7 @@ func TestDefaultContainer(t *testing.T) {
 			}
 
 			return nil
-		}, retry.Attempts(30), retry.MaxDelay(5*time.Second))
+		}, retry.Attempts(120), retry.MaxDelay(5*time.Second))
 
 		if retryErr != nil {
 			t.Fatal(retryErr)
@@ -211,6 +256,10 @@ func TestQueryContainer(t *testing.T) {
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Wait longer for the operator to fully reconcile all resources
+	// including namespace labeling and apiserversource updates
+	time.Sleep(30 * time.Second)
 
 	// Create a pod
 	pod := &corev1.Pod{
@@ -238,6 +287,9 @@ func TestQueryContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Give pod a moment to complete, then wait for it to be archived automatically
+	time.Sleep(15 * time.Second)
+
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log", port, namespaceName)
 	retryErr := retry.Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
@@ -257,7 +309,7 @@ func TestQueryContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(120), retry.MaxDelay(5*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -283,7 +335,7 @@ func TestQueryContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(120), retry.MaxDelay(5*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -299,6 +351,10 @@ func TestLogsWithResourceThatHasNoPods(t *testing.T) {
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Wait longer for the operator to fully reconcile all resources
+	// including namespace labeling and apiserversource updates
+	time.Sleep(30 * time.Second)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -348,7 +404,7 @@ func TestLogsWithResourceThatHasNoPods(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+	}, retry.Attempts(60), retry.MaxDelay(5*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

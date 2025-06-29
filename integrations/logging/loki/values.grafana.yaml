@@ -1,5 +1,6 @@
 # Copyright KubeArchive Authors
 # SPDX-License-Identifier: Apache-2.0
+---
 datasources:
   datasources.yaml:
     apiVersion: 1
@@ -12,7 +13,7 @@ datasources:
         basicAuthUser: $LOKI_USER
         secureJsonData:
           basicAuthPassword: $LOKI_PWD
-          httpHeaderValue1: my-tenant-id
+          httpHeaderValue1: kubearchive
         jsonData:
           httpHeaderName1: "X-Scope-OrgID"
           httpMethod: "GET"
@@ -24,8 +25,8 @@ sidecar:
       LOKI_USER:
         secretKeyRef:
           name: loki-basic-auth
-          key: username
+          key: USERNAME
       LOKI_PWD:
         secretKeyRef:
           name: loki-basic-auth
-          key: password
+          key: PASSWORD

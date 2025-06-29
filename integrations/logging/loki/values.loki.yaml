@@ -1,12 +1,18 @@
 # Copyright KubeArchive Authors
 # SPDX-License-Identifier: Apache-2.0
+---
 loki:
   limits_config:
     max_query_length: 0
+  # Enable authentication for basic auth support
   auth_enabled: true
   basic_auth:
     enabled: true
     username: admin
+  gatewayAuthSecret: loki-gateway-auth
+  server:
+    http_listen_port: 3100
+    grpc_listen_port: 9095
   storage:
     type: s3
     bucketNames:
@@ -43,6 +49,13 @@ loki:
         directory: /tmp/rules
 
 deploymentMode: SingleBinary
+
+gateway:
+  enabled: true
+  replicas: 1
+  basicAuth:
+    enabled: true
+    existingSecret: loki-gateway-auth
 
 singleBinary:
   replicas: 1

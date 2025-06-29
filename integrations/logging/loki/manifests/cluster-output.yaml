@@ -14,12 +14,12 @@ spec:
       valueFrom:
         secretKeyRef:
           name: loki-basic-auth
-          key: password
+          key: PASSWORD
     username:
       valueFrom:
         secretKeyRef:
           name: loki-basic-auth
-          key: username
+          key: USERNAME
     buffer:
       type: memory
       timekey: 1m

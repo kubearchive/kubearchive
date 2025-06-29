@@ -15,6 +15,7 @@ func TestCompleteAPI(t *testing.T) {
 		args            []string
 		expectedApiPath string
 		isCore          bool
+		output          string
 	}{
 		{
 			name:            "core",
@@ -60,4 +61,79 @@ func TestCompleteAPI(t *testing.T) {
 		})
 	}
 
+}
+
+func TestOutputOK(t *testing.T) {
+	testCases := []struct {
+		name           string
+		args           []string
+		expectedOutput string
+		isValid        bool
+	}{
+		{
+			name:           "valid json",
+			args:           []string{"-o", "json"},
+			expectedOutput: "json",
+			isValid:        true,
+		},
+
+		{
+			name:           "valid yaml",
+			args:           []string{"-o", "yaml"},
+			expectedOutput: "yaml",
+			isValid:        true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			options := NewGetOptions()
+			options.Output = tc.args[1]
+			err := options.Complete(tc.args)
+
+			assert.NoError(t, err)
+			assert.Equal(t, tc.isValid, options.IsValidOutput)
+			assert.Equal(t, tc.expectedOutput, options.Output)
+		})
+	}
+}
+
+func TestOutputError(t *testing.T) {
+	testCases := []struct {
+		name        string
+		args        []string
+		expectedErr string
+		isValid     bool
+	}{
+		{
+			name:        "invalid json",
+			args:        []string{"-o", "jon"},
+			expectedErr: "unable to match a printer suitable for the output format jon, allowed formats are: json, yaml",
+			isValid:     false,
+		},
+		{
+			name:        "invalid yaml",
+			args:        []string{"-o", "aml"},
+			expectedErr: "unable to match a printer suitable for the output format aml, allowed formats are: json, yaml",
+			isValid:     false,
+		},
+		{
+			name:        "empty output",
+			args:        []string{"-o", "     "},
+			expectedErr: "unable to match a printer suitable for the output format      , allowed formats are: json, yaml",
+			isValid:     false,
+		},
+	}
+	for _, tc := range testCases {
+
+		t.Run(tc.name, func(t *testing.T) {
+			options := NewGetOptions()
+			options.Output = tc.args[1]
+			err := options.Complete(tc.args)
+			t.Logf("error: %s", err)
+
+			assert.Equal(t, tc.isValid, options.IsValidOutput)
+			assert.EqualErrorf(t, err, tc.expectedErr, "expected error '%s', got '%s'", tc.expectedErr, err.Error())
+		})
+	}
 }

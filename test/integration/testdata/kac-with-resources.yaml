@@ -14,7 +14,7 @@ spec:
     - selector:
         apiVersion: v1
         kind: Pod
-      archiveWhen: "true"
+      archiveWhen: "status.phase in ['Succeeded', 'Failed']"
     - selector:
         apiVersion: v1
         kind: Service

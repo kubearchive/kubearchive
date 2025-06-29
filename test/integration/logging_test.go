@@ -27,6 +27,11 @@ func TestLogging(t *testing.T) {
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Wait longer for the operator to fully reconcile all resources
+	// including namespace labeling and apiserversource updates
+	time.Sleep(30 * time.Second)
+
 	job := test.RunLogGenerator(t, namespaceName)
 	test.WaitForJob(t, clientset, namespaceName, job)
 
@@ -64,6 +69,10 @@ func TestLogOrder(t *testing.T) {
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Wait longer for the operator to fully reconcile all resources
+	// including namespace labeling and apiserversource updates
+	time.Sleep(30 * time.Second)
 
 	// Create a pod
 	pod := &corev1.Pod{
@@ -110,6 +119,9 @@ func TestLogOrder(t *testing.T) {
 		t.Fatalf("Pod did not complete in expected time: %v", retryErr)
 	}
 
+	// Wait for the pod to be archived (happens automatically when status.phase is Succeeded or Failed)
+	time.Sleep(15 * time.Second)
+
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/logs-order/log", port, namespaceName)
 	retryErr = retry.Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
@@ -144,6 +156,10 @@ func TestDefaultContainer(t *testing.T) {
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Wait longer for the operator to fully reconcile all resources
+	// including namespace labeling and apiserversource updates
+	time.Sleep(30 * time.Second)
 
 	tests := []struct {
 		podName     string
@@ -200,8 +216,8 @@ func TestDefaultContainer(t *testing.T) {
 		}
 	}
 
-	// Give pods a moment to complete, then try to retrieve logs with increased retries
-	time.Sleep(5 * time.Second)
+	// Give pods a moment to complete, then wait for them to be archived automatically
+	time.Sleep(15 * time.Second)
 
 	for _, testCase := range tests {
 		t.Logf("checking logs for pod '%s', expected log '%s'", testCase.podName, testCase.expectedLog)
@@ -241,6 +257,10 @@ func TestQueryContainer(t *testing.T) {
 
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 
+	// Wait longer for the operator to fully reconcile all resources
+	// including namespace labeling and apiserversource updates
+	time.Sleep(30 * time.Second)
+
 	// Create a pod
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -267,8 +287,8 @@ func TestQueryContainer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Give pod a moment to complete, then try to retrieve logs with increased retries
-	time.Sleep(5 * time.Second)
+	// Give pod a moment to complete, then wait for it to be archived automatically
+	time.Sleep(15 * time.Second)
 
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log", port, namespaceName)
 	retryErr := retry.Do(func() error {
@@ -331,6 +351,10 @@ func TestLogsWithResourceThatHasNoPods(t *testing.T) {
 	namespaceName, token := test.CreateTestNamespace(t, false)
 
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Wait longer for the operator to fully reconcile all resources
+	// including namespace labeling and apiserversource updates
+	time.Sleep(30 * time.Second)
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

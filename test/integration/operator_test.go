@@ -247,7 +247,7 @@ func TestGlobalAndLocalKAC(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(120), retry.MaxDelay(5*time.Second))
+	}, retry.Attempts(60), retry.MaxDelay(5*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

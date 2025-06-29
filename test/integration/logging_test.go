@@ -120,7 +120,7 @@ func TestLogOrder(t *testing.T) {
 	}
 
 	// Wait for the pod to be archived (happens automatically when status.phase is Succeeded or Failed)
-	time.Sleep(15 * time.Second)
+	time.Sleep(30 * time.Second)
 
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/logs-order/log", port, namespaceName)
 	retryErr = retry.Do(func() error {

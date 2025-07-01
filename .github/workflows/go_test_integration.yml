@@ -58,7 +58,7 @@ jobs:
         run: |
           export KO_DOCKER_REPO="kind.local"
           bash hack/quick-install.sh
-          bash integrations/logging/loki/install.sh
+          bash integrations/logging/loki/install.sh --vector
       - name: Test Go code
         run: |
           bash test/integration/run.sh

@@ -9,17 +9,17 @@ spec:
   loki:
     url: http://loki.grafana-loki.svc.cluster.local:3100
     configure_kubernetes_labels: true
-    tenant: "my-tenant-id"
+    tenant: "kubearchive"
     password:
       valueFrom:
         secretKeyRef:
           name: loki-basic-auth
-          key: password
+          key: PASSWORD
     username:
       valueFrom:
         secretKeyRef:
           name: loki-basic-auth
-          key: username
+          key: USERNAME
     buffer:
       type: memory
       timekey: 1m

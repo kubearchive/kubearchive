@@ -35,7 +35,7 @@ Run the log generators to create logs:
     ```
 1. Determine the `admin` password for Grafana:
     ```bash
-    echo `kubectl -n grafana-loki get secret grafana -o jsonpath='{.data.root-password}' | base --decode`
+    echo `kubectl -n grafana-loki get secret grafana -o jsonpath='{.data.admin-password}' | base64 --decode`
     ```
 1. In your browser, navigate to `http://localhost:3000`, using the username `admin` and the password retrieved
    in the previous step to login.
@@ -54,8 +54,8 @@ Run the log generators to create logs:
 1. Try out the REST API with `curl`. The following example is for retrieving the logs of the container `<container-name>`
    in the pod `<pod-id>`.
    ```bash
-   curl -u admin:password -H "X-Scope-OrgID: tenant" http://localhost:3100/loki/api/v1/query_range \
-    -H "X-Scope-OrgID: my-tenant-id" \
+   curl -u admin:password http://localhost:3100/loki/api/v1/query_range \
+    -H "X-Scope-OrgID: kubearchive" \
     --data-urlencode 'query={pod-id="<pod-id>", container="<container-name>"} | json | line_format "{{.message}}"' \
     --data-urlencode 'start=2025-05-07T00:00:00Z' \
     --data-urlencode 'end=2025-05-07T23:00:00Z' \

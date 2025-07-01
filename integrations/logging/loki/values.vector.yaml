@@ -1,5 +1,20 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
 ---
 role: Agent
+env:
+  - name: LOKI_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: loki-basic-auth
+        key: USERNAME
+  - name: LOKI_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: loki-basic-auth
+        key: PASSWORD
+  - name: VECTOR_LOG
+    value: "info"
 customConfig:
   data_dir: /vector-data-dir
   api:
@@ -30,6 +45,27 @@ customConfig:
         - reduce_events
       source: |-
         .tmp = del(.)
+        # Preserve original kubernetes fields for Loki labels
+        if exists(.tmp.kubernetes.pod_uid) {
+          .pod_id = del(.tmp.kubernetes.pod_uid)
+        } else {
+          .pod_id = "unknown_pod_id"
+        }
+        if exists(.tmp.kubernetes.pod_name) {
+          .pod_name = del(.tmp.kubernetes.pod_name)
+        } else {
+          .pod_name = "unknown_pod"
+        }
+        if exists(.tmp.kubernetes.container_name) {
+          .container = del(.tmp.kubernetes.container_name)
+        } else {
+          .container = "unknown_container"
+        }
+        if exists(.tmp.kubernetes.pod_namespace) {
+          .namespace = del(.tmp.kubernetes.pod_namespace)
+        } else {
+          .namespace = "unlabeled"
+        }
         # Handling Tekton-specific labels
         if exists(.tmp.kubernetes.pod_labels."tekton.dev/taskRunUID") {
           .taskRunUID = del(.tmp.kubernetes.pod_labels."tekton.dev/taskRunUID")
@@ -64,29 +100,22 @@ customConfig:
           .log_type = "application"
         }
         # --- End: Cronjob Specific Handling ---
-
         # Handling general Kubernetes labels
         if exists(.tmp.kubernetes.pod_labels) {
           .pod_labels = .tmp.kubernetes.pod_labels
         } else {
           .pod_labels = "no_labels"
         }
-        if exists(.tmp.kubernetes.pod_namespace) {
-          .namespace = del(.tmp.kubernetes.pod_namespace)
-        } else {
-          .namespace = "unlabeled"
-        }
-        # General Kubernetes container name
-        if exists(.tmp.kubernetes.container_name) {
-          .container = del(.tmp.kubernetes.container_name)
-        } else {
-          .container = "unknown_container"
-        }
         # General message field handling
         if exists(.tmp.message) {
-          .message = del(.tmp.message)
+          .message = to_string(del(.tmp.message)) ?? "no_message"
         } else {
           .message = "no_message"
+        }
+        # Basic data sanitization to prevent 400 errors
+        # Truncate very long messages
+        if length(.message) > 32768 {
+          .message = slice!(.message, 0, 32768) + "...[TRUNCATED]"
         }
         # Clean up temporary fields
         del(.tmp)
@@ -94,16 +123,33 @@ customConfig:
     loki:
       type: loki
       inputs: ["remap_app_logs"]
-      endpoint: "http://loki.grafana-loki.svc.cluster.local:3100"
-      encoding: 
-        codec: "raw_message"
+      endpoint: http://loki.grafana-loki.svc.cluster.local:3100
+      encoding:
+        codec: "json"
+      auth:
+        strategy: "basic"
+        user: "${LOKI_USERNAME}"
+        password: "${LOKI_PASSWORD}"
+      tenant_id: "kubearchive"
+      request:
+        headers:
+          X-Scope-OrgID: kubearchive
+        retry_attempts: 3
+        retry_initial_backoff_secs: 1
+        retry_max_duration_secs: 10
+        timeout_secs: 30
+      batch:
+        max_events: 100
+        timeout_secs: 5
+        max_bytes: 1048576  # 1MB
       labels:
-          namespace: .kubernetes.namespace_name
-          pod: .kubernetes.pod_name
-          container: .kubernetes.container_name
+        job: "vector"
+        pod_id: "{{`{{ pod_id }}`}}"
+        container: "{{`{{ container }}`}}"
+        namespace: "{{`{{ namespace }}`}}"
+        pod: "{{`{{ pod_name }}`}}"
 image:
   repository: quay.io/kubearchive/vector
   tag: 0.46.1-distroless-libc
   pullPolicy: IfNotPresent
   base: "debian"
-

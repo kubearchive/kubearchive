@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/rest"
 )
 
@@ -25,14 +29,26 @@ type GetOptions struct {
 
 	KubeArchiveHost string
 
-	RESTConfig *rest.Config
-	kubeFlags  *genericclioptions.ConfigFlags
+	RESTConfig         *rest.Config
+	kubeFlags          *genericclioptions.ConfigFlags
+	OutputFormat       *string
+	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
+	IsValidOutput      bool
+	genericiooptions.IOStreams
 }
 
 func NewGetOptions() *GetOptions {
+	outputFormat := ""
 	return &GetOptions{
-		kubeFlags:       genericclioptions.NewConfigFlags(true),
-		KubeArchiveHost: "https://localhost:8081",
+		kubeFlags:          genericclioptions.NewConfigFlags(true),
+		KubeArchiveHost:    "https://localhost:8081",
+		OutputFormat:       &outputFormat,
+		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
+		IOStreams: genericiooptions.IOStreams{
+			In:     os.Stdin,
+			Out:    os.Stdout,
+			ErrOut: os.Stderr,
+		},
 	}
 }
 
@@ -62,6 +78,8 @@ func NewGetCmd() *cobra.Command {
 	o.kubeFlags.AddFlags(cmd.Flags())
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringVar(&o.KubeArchiveHost, "kubearchive-host", o.KubeArchiveHost, fmt.Sprintf("Host where the KubeArchive API Server is listening. Defaults to '%s'", o.KubeArchiveHost))
+	cmd.Flags().StringVarP(o.OutputFormat, "output", "o", *o.OutputFormat, fmt.Sprintf(`Output format. One of: (%s).`, strings.Join(o.JSONYamlPrintFlags.AllowedFormats(), ", ")))
+	o.JSONYamlPrintFlags.AddFlags(cmd)
 
 	return cmd
 }
@@ -93,13 +111,14 @@ func (o *GetOptions) Complete(args []string) error {
 	return nil
 }
 
-func (o *GetOptions) getResources(host string) ([]unstructured.Unstructured, error) {
+func (o *GetOptions) getResources(host string) ([]runtime.Object, error) {
 	url := fmt.Sprintf("%s%s", host, o.APIPath)
 
 	client, err := rest.HTTPClientFor(o.RESTConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error creating the HTTP client from the REST config: %w", err)
 	}
+
 	response, err := client.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("error on GET to '%s': %w", url, err)
@@ -121,10 +140,16 @@ func (o *GetOptions) getResources(host string) ([]unstructured.Unstructured, err
 		return nil, fmt.Errorf("error deserializing the body into unstructured.UnstructuredList: %w", err)
 	}
 
-	return list.Items, nil
+	// Convert unstructured objects to runtime.Object
+	var runtimeObjects []runtime.Object
+	for _, item := range list.Items {
+		runtimeObjects = append(runtimeObjects, &item)
+	}
+
+	return runtimeObjects, nil
 }
 
-func (o *GetOptions) getKubeArchiveResources() ([]unstructured.Unstructured, error) {
+func (o *GetOptions) getKubeArchiveResources() ([]runtime.Object, error) {
 	o.RESTConfig.CAData = nil      // Remove CA data from the Kubeconfig
 	o.RESTConfig.CAFile = "ca.crt" // This expects you to have extracted the CA, see DEVELOPMENT.md
 	o.RESTConfig.BearerToken = *o.kubeFlags.BearerToken
@@ -142,12 +167,47 @@ func (o *GetOptions) Run() error {
 	if err != nil {
 		return fmt.Errorf("error retrieving resources from the KubeArchive API: %w", err)
 	}
-	var objs []unstructured.Unstructured
+	var objs []runtime.Object
 	objs = append(objs, clusterResources...)
 	objs = append(objs, kubearchiveResources...)
 
-	for ix := range objs {
-		fmt.Println(objs[ix].GetName())
+	// Handle JSON/YAML output differently - create a List object
+	if o.OutputFormat != nil && *o.OutputFormat != "" {
+		printer, printerErr := o.JSONYamlPrintFlags.ToPrinter(*o.OutputFormat)
+		if printerErr != nil {
+			return fmt.Errorf("error getting printer: %w", printerErr)
+		}
+		// Create a List containing all objects
+		list := &unstructured.UnstructuredList{
+			Object: map[string]interface{}{
+				"kind":       "List",
+				"apiVersion": "v1",
+				"metadata": map[string]interface{}{
+					"resourceVersion": "",
+				},
+			},
+		}
+
+		for _, obj := range objs {
+			if unstructuredObj, ok := obj.(*unstructured.Unstructured); ok {
+				list.Items = append(list.Items, *unstructuredObj)
+			}
+		}
+
+		// Print the list once
+		if printErr := printer.PrintObj(list, o.Out); printErr != nil {
+			return fmt.Errorf("error printing list: %w", printErr)
+		}
+	} else {
+		// For table output, print each object individually
+		printer := printers.NewTablePrinter(printers.PrintOptions{})
+		tabWriter := printers.GetNewTabWriter(o.Out)
+		defer tabWriter.Flush()
+		for _, obj := range objs {
+			if printErr := printer.PrintObj(obj, tabWriter); printErr != nil {
+				return fmt.Errorf("error printing object: %w", printErr)
+			}
+		}
 	}
 
 	return nil

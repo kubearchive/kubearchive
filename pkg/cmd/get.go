@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
@@ -25,8 +26,10 @@ type GetOptions struct {
 
 	KubeArchiveHost string
 
-	RESTConfig *rest.Config
-	kubeFlags  *genericclioptions.ConfigFlags
+	RESTConfig    *rest.Config
+	kubeFlags     *genericclioptions.ConfigFlags
+	Output        string
+	IsValidOutput bool
 }
 
 func NewGetOptions() *GetOptions {
@@ -62,6 +65,7 @@ func NewGetCmd() *cobra.Command {
 	o.kubeFlags.AddFlags(cmd.Flags())
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringVar(&o.KubeArchiveHost, "kubearchive-host", o.KubeArchiveHost, fmt.Sprintf("Host where the KubeArchive API Server is listening. Defaults to '%s'", o.KubeArchiveHost))
+	cmd.Flags().StringVarP(&o.Output, "output", "o", "", "Output format. One of: (json, yaml).")
 
 	return cmd
 }
@@ -90,7 +94,42 @@ func (o *GetOptions) Complete(args []string) error {
 
 	o.RESTConfig = config
 
+	if o.Output != "" {
+		err = o.Validate()
+		if err != nil {
+			o.IsValidOutput = false
+			return err
+		}
+		o.IsValidOutput = true
+	}
+
 	return nil
+}
+
+type outputFormat string
+
+func (of outputFormat) String() string {
+	return string(of)
+}
+
+func (of outputFormat) Is(str string) bool {
+	return string(of) == str
+}
+
+const (
+	outputJson  outputFormat = "json"
+	outputYaml  outputFormat = "yaml"
+	outputTable outputFormat = "" // default
+)
+
+func (o *GetOptions) Validate() error {
+	validOutputFormats := []string{outputJson.String(), outputYaml.String()}
+	switch o.Output {
+	case outputJson.String(), outputYaml.String(), outputTable.String():
+		return nil
+	default:
+		return fmt.Errorf("unable to match a printer suitable for the output format %s, allowed formats are: %s", o.Output, strings.Join(validOutputFormats, ", "))
+	}
 }
 
 func (o *GetOptions) getResources(host string) ([]unstructured.Unstructured, error) {
@@ -132,6 +171,25 @@ func (o *GetOptions) getKubeArchiveResources() ([]unstructured.Unstructured, err
 	return o.getResources(o.KubeArchiveHost)
 }
 
+type List struct {
+	Items      []*unstructured.Unstructured `json:"items"`
+	ApiVersion string                       `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string                       `json:"kind"`
+	Metadata   map[string]any               `json:"metadata"`
+}
+
+func NewList(objs []unstructured.Unstructured) *List {
+	list := &List{
+		ApiVersion: "v1",
+		Kind:       "List",
+		Metadata:   map[string]any{},
+	}
+	for _, obj := range objs {
+		list.Items = append(list.Items, &obj)
+	}
+	return list
+}
+
 func (o *GetOptions) Run() error {
 	clusterResources, err := o.getResources(o.RESTConfig.Host)
 	if err != nil {
@@ -146,9 +204,28 @@ func (o *GetOptions) Run() error {
 	objs = append(objs, clusterResources...)
 	objs = append(objs, kubearchiveResources...)
 
-	for ix := range objs {
-		fmt.Println(objs[ix].GetName())
+	switch o.Output {
+	case outputJson.String():
+		list := NewList(objs)
+		listData, err := json.MarshalIndent(list, "", "    ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(listData))
+		return nil
+	case outputYaml.String():
+		list := NewList(objs)
+		listYaml, err := yaml.Marshal(list)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(listYaml))
+		return nil
+	default:
+		// print table format (without -o option)
+		for ix := range objs {
+			fmt.Println(objs[ix].GetName())
+		}
+		return nil
 	}
-
-	return nil
 }

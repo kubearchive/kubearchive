@@ -202,7 +202,7 @@ with `hack/kubearchive-delete.sh` and `hack/kubearchive-install.sh`
 ## Enabling Telemetry
 
 We use the Grafana Labs Stack (Grafana, Tempo, Loki and Prometheus) for observability on development.
-Specifially we use the
+Specifically we use the
 [LGTM Docker container](https://github.com/grafana/docker-otel-lgtm)
 which also includes an OpenTelemetry Collector.
 As some dependencies use the Zipkin format to send traces, we are using the
@@ -227,7 +227,7 @@ start exploring metrics.
 
 ## Logging
 
-KubeArchive currenty has integrations for both Elasticsearch and Splunk. The sections
+KubeArchive currently has integrations for both Elasticsearch and Splunk. The sections
 below detail how to install each of those logging systems in a development environment.
 When the installation is complete, `Pod` logs will be sent to the logging system automatically.
 
@@ -239,6 +239,31 @@ log URLs.
 * [ElasticSearch](./integrations/logging/elasticsearch/README.md)
 * [Splunk](./integrations/logging/splunk/README.md)
 * [Datadog](./integrations/logging/datadog/README.md)
+
+## Kafka
+
+Knative Eventing can be configured to use Kafka Brokers to achieve better event delivery guarantees. This requires
+setting up a kafka cluster and installing the Knative Eventing Kafka Extensions. For development we use
+[Strimzi](https://strimzi.io)
+to create a Kafka cluster.
+
+After installing KubeArchive, run:
+```bash
+bash integrations/kafka/install.sh
+```
+***Note***: You may encounter containers failing to start due to a too many files open error. You can fix this by
+following
+[these](https://kind.sigs.k8s.io/docs/user/known-issues/#pod-errors-due-to-too-many-open-files)
+instructions.
+
+If you want to stop using the Knative Eventing Kafka Brokers without having to redeploy your development environment,
+you can run:
+```bash
+bash integrations/kafka/uninstall.sh
+```
+***Note***: Strimzi, your Kafka cluster, and the Knative Eventing Kafka extensions will still be installed in your
+development cluster, but Knative will not be configured to use them by default after running the uninstall script.
+
 
 ## Known issues
 

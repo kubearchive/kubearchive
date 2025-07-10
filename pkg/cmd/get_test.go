@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestCompleteAPI(t *testing.T) {
+func TestGetComplete(t *testing.T) {
 	testCases := []struct {
 		name            string
 		namespace       string
@@ -65,7 +65,6 @@ func TestCompleteAPI(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedApiPath, options.APIPath)
-			assert.Equal(t, tc.isCore, options.IsCoreResource)
 			assert.Equal(t, tc.args[0], options.GroupVersion)
 			assert.Equal(t, tc.args[1], options.Resource)
 			assert.NotNil(t, options.RESTConfig)

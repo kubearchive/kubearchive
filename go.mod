@@ -48,6 +48,7 @@ require (
 	knative.dev/eventing v0.45.2
 	knative.dev/pkg v0.0.0-20250710001404-a4cc1bdef5b2
 	sigs.k8s.io/controller-runtime v0.20.4
+	sigs.k8s.io/yaml v1.5.0
 )
 
 require (
@@ -176,5 +177,4 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.19.0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
-	sigs.k8s.io/yaml v1.5.0 // indirect
 )

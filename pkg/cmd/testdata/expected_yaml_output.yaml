@@ -1,0 +1,19 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: v1
+items:
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      creationTimestamp: "2025-07-08T09:54:00Z"
+      name: test-pod-1
+      namespace: default
+  - apiVersion: v1
+    kind: Pod
+    metadata:
+      creationTimestamp: "2025-07-08T09:54:00Z"
+      name: archived-pod-1
+      namespace: default
+kind: List
+metadata:
+  resourceVersion: ""

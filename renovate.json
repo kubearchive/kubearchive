@@ -44,5 +44,8 @@
       "matchPackageNames": ["go"],
       "automerge": false
     }
-  ]
+  ],
+  "constraints": {
+    "go": "1.23"
+  }
 }

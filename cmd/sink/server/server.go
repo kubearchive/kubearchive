@@ -12,11 +12,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Cyprinus12138/otelgin"
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/sink/routers"
 	"github.com/kubearchive/kubearchive/pkg/middleware"
 	"github.com/kubearchive/kubearchive/pkg/observability"
+	"github.com/rh-hemartin/otelgin"
 )
 
 type Server struct {
@@ -31,7 +31,7 @@ func NewServer(controller *routers.Controller) *Server {
 		"/livez":  "DEBUG",
 		"/readyz": "DEBUG",
 	}}))
-	router.Use(otelgin.Middleware(""))
+	router.Use(otelgin.Middleware("", otelgin.WithDisableGinErrorsOnMetrics(true)))
 
 	router.POST("/", controller.CloudEventsHandler)
 

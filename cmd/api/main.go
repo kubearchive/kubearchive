@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Cyprinus12138/otelgin"
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/auth"
 	"github.com/kubearchive/kubearchive/cmd/api/discovery"
@@ -26,6 +25,7 @@ import (
 	kaLogging "github.com/kubearchive/kubearchive/pkg/logging"
 	"github.com/kubearchive/kubearchive/pkg/middleware"
 	"github.com/kubearchive/kubearchive/pkg/observability"
+	"github.com/rh-hemartin/otelgin"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -70,7 +70,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 		"/livez":  "DEBUG",
 		"/readyz": "DEBUG",
 	}}))
-	router.Use(otelgin.Middleware("")) // Empty string so the library sets the proper server
+	router.Use(otelgin.Middleware("", otelgin.WithDisableGinErrorsOnMetrics(true))) // Empty string so the library sets the proper server
 
 	apiGroup := router.Group("/api")
 	apisGroup := router.Group("/apis")

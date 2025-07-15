@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	// Import all Kubernetes client auth plugins (for example Azure, GCP, OIDC, and other auth plugins)
@@ -76,12 +77,14 @@ func main() {
 	var enableLeaderElection bool
 	var probeAddr string
 	var enableHTTP2 bool
+	var leaseDuration time.Duration
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for operator. "+
 			"Enabling this will ensure there is only one active operator.")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
+	flag.DurationVar(&leaseDuration, "leader-lease-duration", 15*time.Second, "Duration of the leader lease, defaults to 15s.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -155,6 +158,7 @@ func main() {
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
+		LeaseDuration:          &leaseDuration,
 		LeaderElectionID:       "e7a70c64.kubearchive.org",
 		Logger:                 logr.FromSlogHandler(slog.Default().Handler()),
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily

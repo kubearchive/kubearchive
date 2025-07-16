@@ -104,7 +104,8 @@ func (f *fakeDatabase) QueryLogURL(_ context.Context, _, _, _, _, _ string) (str
 }
 
 func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namespace, name,
-	continueId, continueDate string, _ *models.LabelFilters, limit int) ([]string, int64, string, error) {
+	continueId, continueDate string, _ *models.LabelFilters,
+	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]string, int64, string, error) {
 	var resources []*unstructured.Unstructured
 
 	if name != "" {
@@ -113,6 +114,11 @@ func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namesp
 		resources = f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace)
 	} else {
 		resources = f.queryResources(ctx, kind, version, continueId, continueDate, limit)
+	}
+
+	// Apply timestamp filters if provided
+	if creationTimestampAfter != nil || creationTimestampBefore != nil {
+		resources = f.filterResourcesByTimestamp(resources, creationTimestampAfter, creationTimestampBefore)
 	}
 
 	var date string
@@ -133,6 +139,30 @@ func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namesp
 	}
 
 	return stringResources, id, date, f.err
+}
+
+// filterResourcesByTimestamp filters resources based on creation timestamp
+func (f *fakeDatabase) filterResourcesByTimestamp(resources []*unstructured.Unstructured,
+	creationTimestampAfter, creationTimestampBefore *time.Time) []*unstructured.Unstructured {
+	var filteredResources []*unstructured.Unstructured
+
+	for _, resource := range resources {
+		creationTime := resource.GetCreationTimestamp().Time
+
+		// Apply after filter
+		if creationTimestampAfter != nil && creationTime.Before(*creationTimestampAfter) {
+			continue
+		}
+
+		// Apply before filter
+		if creationTimestampBefore != nil && creationTime.After(*creationTimestampBefore) {
+			continue
+		}
+
+		filteredResources = append(filteredResources, resource)
+	}
+
+	return filteredResources
 }
 
 func (f *fakeDatabase) queryNamespacedResourceByName(_ context.Context, kind, version, namespace, name string,

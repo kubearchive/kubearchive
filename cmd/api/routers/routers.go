@@ -61,6 +61,26 @@ func (c *Controller) GetResources(context *gin.Context) {
 		return
 	}
 
+	// Parse timestamp filters
+	creationTimestampAfter, err := parseTimestampQuery(context, "creationTimestampAfter")
+	if err != nil {
+		abort.Abort(context, err, http.StatusBadRequest)
+		return
+	}
+
+	creationTimestampBefore, err := parseTimestampQuery(context, "creationTimestampBefore")
+	if err != nil {
+		abort.Abort(context, err, http.StatusBadRequest)
+		return
+	}
+
+	if creationTimestampAfter != nil && creationTimestampBefore != nil {
+		if creationTimestampBefore.Before(*creationTimestampAfter) || creationTimestampBefore.Equal(*creationTimestampAfter) {
+			abort.Abort(context, errors.New("creationTimestampBefore must be after creationTimestampAfter"), http.StatusBadRequest)
+			return
+		}
+	}
+
 	apiVersion := version
 	if group != "" {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
@@ -69,7 +89,8 @@ func (c *Controller) GetResources(context *gin.Context) {
 	// We send namespace even if it's an empty string (non-namespaced resources) the Database
 	// knows what to do
 	resources, lastId, lastDate, err := c.Database.QueryResources(
-		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters, limit)
+		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
+		creationTimestampAfter, creationTimestampBefore, limit)
 
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
@@ -90,6 +111,27 @@ func (c *Controller) GetResources(context *gin.Context) {
 
 	continueToken := pagination.CreateToken(lastId, lastDate)
 	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
+}
+
+// parseTimestampQuery parses a timestamp query parameter and returns a pointer to time.Time
+// Returns nil if the parameter is not provided or empty
+func parseTimestampQuery(context *gin.Context, paramName string) (*time.Time, error) {
+	value := context.Query(paramName)
+	if value == "" {
+		return nil, nil //nolint:nilnil // This is intentional - empty parameter means no filter
+	}
+
+	// Try parsing as RFC3339 format (ISO 8601)
+	timestamp, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		// Try parsing as RFC3339Nano format
+		timestamp, err = time.Parse(time.RFC3339Nano, value)
+		if err != nil {
+			return nil, fmt.Errorf("invalid %s format: %s. Expected RFC3339 format (e.g., 2023-01-01T12:00:00Z)", paramName, value)
+		}
+	}
+
+	return &timestamp, nil
 }
 
 func (c *Controller) GetLogURL(context *gin.Context) {

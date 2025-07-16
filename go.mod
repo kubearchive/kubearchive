@@ -39,11 +39,11 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.37.0
 	google.golang.org/grpc v1.73.0
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.33.2
-	k8s.io/apimachinery v0.33.2
+	k8s.io/api v0.33.3
+	k8s.io/apimachinery v0.33.3
 	k8s.io/apiserver v0.33.0-alpha.2
 	k8s.io/cli-runtime v0.33.0-alpha.2
-	k8s.io/client-go v0.33.2
+	k8s.io/client-go v0.33.3
 	k8s.io/klog/v2 v2.130.1
 	knative.dev/eventing v0.45.2
 	knative.dev/pkg v0.0.0-20250415155312-ed3e2158b883

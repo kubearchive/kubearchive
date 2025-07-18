@@ -1,0 +1,103 @@
+= CLI Configuration
+
+The kubectl-archive plugin supports configuration through environment variables and CLI flags, following the same pattern as kubectl and other plugins.
+
+== Configuration Precedence
+
+Configuration values are resolved in the following order (highest to lowest priority):
+
+. *Plugin CLI Flags* - Plugin-specific command line arguments
+. *Environment Variables* - System environment variables
+. *Default Values* - Built-in defaults
+
+== Global Configuration Parameters
+
+All configuration can be set using environment variables with the prefix `KUBECTL_PLUGIN_ARCHIVE_`:
+
+[cols="1,2,1,1"]
+|===
+|Environment Variable |Description |Default |CLI Flag
+
+|`KUBECTL_PLUGIN_ARCHIVE_HOST`
+|KubeArchive API host:port
+|`https://localhost:8081`
+|`--host`
+
+|`KUBECTL_PLUGIN_ARCHIVE_CERT_PATH`
+|Path to KubeArchive API certificate file
+|(none)
+|`--kubearchive-certificate-authority`
+
+|`KUBECTL_PLUGIN_ARCHIVE_TLS_INSECURE`
+|Skip TLS certificate verification for the KubeArchive API server
+|`false`
+|`--kubearchive-insecure-skip-tls-verify`
+
+|`KUBECTL_PLUGIN_ARCHIVE_TOKEN`
+|Bearer token for KubeArchive API authentication
+|(from kubeconfig)
+|(uses kubectl's `--token` flag)
+
+|===
+
+== Authentication
+
+The KubeArchive API only supports bearer token authentication. If your kubeconfig uses client certificates or other authentication methods, you must provide a bearer token from a service account in the cluster with sufficient permissions to perform the requested operations (`get`, `list`, `logs`).
+
+Bearer tokens are resolved in the following order:
+
+. *kubectl's `--token` flag* - Highest priority
+. *`KUBECTL_PLUGIN_ARCHIVE_TOKEN` environment variable* - Medium priority
+. *kubeconfig bearer token* - Lowest priority (if available)
+
+If no bearer token is available through any of these methods, the plugin will fail with an authentication error.
+
+== Certificate Handling
+
+The plugin uses separate certificate handling for Kubernetes and KubeArchive APIs:
+
+=== KubeArchive API Certificate
+
+The KubeArchive API certificate is configured independently from the Kubernetes cluster certificate:
+
+. *`--kubearchive-certificate-authority` flag* - Path to certificate file for KubeArchive API
+. *`KUBECTL_PLUGIN_ARCHIVE_CERT_PATH` environment variable* - Path to certificate file for KubeArchive API
+. *`--kubearchive-insecure-skip-tls-verify` flag* - Skip TLS verification for KubeArchive API
+. *`KUBECTL_PLUGIN_ARCHIVE_TLS_INSECURE` environment variable* - Skip TLS verification for KubeArchive API
+
+=== Kubernetes Cluster Certificate
+
+The Kubernetes cluster certificate continues to use kubectl's standard flags:
+
+. *`--certificate-authority`* - kubectl's certificate authority flag
+. *`--insecure-skip-tls-verify`* - kubectl's insecure flag
+
+== Examples
+
+=== Use a bearer token for a service account
+
+[source,bash]
+----
+KUBECTL_PLUGIN_ARCHIVE_TOKEN=$(kubectl -n test create token default) kubectl archive get v1 pods
+----
+
+=== Use insecure TLS for KubeArchive API
+
+[source,bash]
+----
+kubectl archive get v1 pods --kubearchive-insecure-skip-tls-verify
+----
+
+=== Use a certificate file for KubeArchive API
+
+[source,bash]
+----
+KUBECTL_PLUGIN_ARCHIVE_CERT_PATH="/path/to/ca.crt" kubectl archive get v1 pods
+----
+
+=== Use a host different from a portforwarded one
+
+[source,bash]
+----
+KUBECTL_PLUGIN_ARCHIVE_HOST="https://kubearchive.apps.example.com" kubectl archive get v1 pods
+----

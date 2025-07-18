@@ -31,7 +31,7 @@ func NewServer(controller *routers.Controller) *Server {
 		"/livez":  "DEBUG",
 		"/readyz": "DEBUG",
 	}}))
-	router.Use(otelgin.Middleware(""))
+	router.Use(otelgin.Middleware("", otelgin.WithDisableGinErrorsOnMetrics(true)))
 
 	router.POST("/", controller.CloudEventsHandler)
 

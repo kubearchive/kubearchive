@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.5
 
 require (
-	github.com/Cyprinus12138/otelgin v1.0.2
+	github.com/Cyprinus12138/otelgin v1.0.3
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/XSAM/otelsql v0.39.0

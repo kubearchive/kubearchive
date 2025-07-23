@@ -405,6 +405,11 @@ func (r *KubeArchiveConfigReconciler) reconcileNamespace(ctx context.Context, ka
 		return nil, err
 	}
 
+	// if the label is already present, we can skip the update
+	if l, ok := ns.Labels[ApiServerSourceLabelName]; ok && l == ApiServerSourceLabelValue {
+		return ns, nil
+	}
+
 	ns.Labels[ApiServerSourceLabelName] = ApiServerSourceLabelValue
 	err = r.Client.Update(ctx, ns)
 	if err != nil {
@@ -425,6 +430,11 @@ func (r *KubeArchiveConfigReconciler) removeNamespaceLabel(ctx context.Context, 
 	if err != nil {
 		log.Error(err, "Failed to get Namespace "+kaconfig.Namespace)
 		return err
+	}
+
+	// if the label is not present, we can skip the update
+	if _, ok := ns.Labels[ApiServerSourceLabelName]; !ok {
+		return nil
 	}
 
 	delete(ns.Labels, ApiServerSourceLabelName)

@@ -29,11 +29,22 @@ jobs:
     name: Add assignee to the PR
     if: github.actor != 'kubearchive-renovate[bot]'
     steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
+      - name: Check if user can be assigned
+        id: check-assignable
+        run: |
+          # Check if user is a member of the organization or a collaborator
+          if gh api "repos/${{ github.repository }}/collaborators/${{ github.event.pull_request.user.login }}" > /dev/null 2>&1; then
+            echo "can_assign=true" >> $GITHUB_OUTPUT
+            echo "User ${{ github.event.pull_request.user.login }} can be assigned"
+          else
+            echo "can_assign=false" >> $GITHUB_OUTPUT
+            echo "User ${{ github.event.pull_request.user.login }} cannot be assigned (external contributor)"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Add assignee to the PR
         id: add-assignee
-        if: ${{ github.event.pull_request.assignee == null }}
+        if: ${{ github.event.pull_request.assignee == null && steps.check-assignable.outputs.can_assign == 'true' }}
         run: gh pr edit ${PR_ID} --add-assignee ${AUTHOR}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

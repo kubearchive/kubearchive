@@ -19,40 +19,35 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestCompleteAPI(t *testing.T) {
+func TestGetComplete(t *testing.T) {
 	testCases := []struct {
 		name            string
 		namespace       string
 		args            []string
 		expectedApiPath string
-		isCore          bool
 		output          string
 	}{
 		{
 			name:            "core",
 			args:            []string{"v1", "pods"},
 			expectedApiPath: "/api/v1/pods",
-			isCore:          true,
 		},
 		{
 			name:            "non-core",
 			args:            []string{"batch/v1", "jobs"},
 			expectedApiPath: "/apis/batch/v1/jobs",
-			isCore:          false,
 		},
 		{
 			name:            "core namespaced",
 			namespace:       "test",
 			args:            []string{"v1", "pods"},
 			expectedApiPath: "/api/v1/namespaces/test/pods",
-			isCore:          true,
 		},
 		{
 			name:            "non-core namespaced",
 			namespace:       "test",
 			args:            []string{"batch/v1", "jobs"},
 			expectedApiPath: "/apis/batch/v1/namespaces/test/jobs",
-			isCore:          false,
 		},
 	}
 
@@ -65,7 +60,6 @@ func TestCompleteAPI(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tc.expectedApiPath, options.APIPath)
-			assert.Equal(t, tc.isCore, options.IsCoreResource)
 			assert.Equal(t, tc.args[0], options.GroupVersion)
 			assert.Equal(t, tc.args[1], options.Resource)
 			assert.NotNil(t, options.RESTConfig)
@@ -166,7 +160,6 @@ func createTestOptionsWithTwoServers(t *testing.T, kubernetesServerURL, kubeArch
 	options.AllNamespaces = true
 	options.Resource = "pods"
 	options.GroupVersion = "v1"
-	options.IsCoreResource = true
 	options.APIPath = "/api/v1/pods"
 
 	// Set up bearer token to avoid a nil pointer in getKubeArchiveResources

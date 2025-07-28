@@ -20,12 +20,11 @@ import (
 )
 
 type GetOptions struct {
-	AllNamespaces  bool
-	IsCoreResource bool
-	APIPath        string
-	Resource       string
-	GroupVersion   string
-	Token          string
+	AllNamespaces bool
+	APIPath       string
+	Resource      string
+	GroupVersion  string
+	Token         string
 
 	KubeArchiveHost string
 
@@ -86,9 +85,6 @@ func NewGetCmd() *cobra.Command {
 
 func (o *GetOptions) Complete(args []string) error {
 	o.GroupVersion = args[0]
-	if strings.HasPrefix(o.GroupVersion, "v1") {
-		o.IsCoreResource = true
-	}
 
 	o.Resource = args[1]
 	APIPathWithoutRoot := fmt.Sprintf("%s/%s", o.GroupVersion, o.Resource)
@@ -97,7 +93,7 @@ func (o *GetOptions) Complete(args []string) error {
 	}
 
 	o.APIPath = fmt.Sprintf("/apis/%s", APIPathWithoutRoot)
-	if o.IsCoreResource {
+	if strings.HasPrefix(o.GroupVersion, "v1") {
 		o.APIPath = fmt.Sprintf("/api/%s", APIPathWithoutRoot)
 	}
 

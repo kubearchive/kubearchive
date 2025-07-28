@@ -13,6 +13,7 @@ import (
 func main() {
 	rootCmd := NewRootCmd()
 	rootCmd.AddCommand(cmd.NewGetCmd())
+	rootCmd.AddCommand(cmd.NewLogCmd())
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

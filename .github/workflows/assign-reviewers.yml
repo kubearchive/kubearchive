@@ -19,6 +19,6 @@ jobs:
     steps:
       - name: Assign reviewers by label
         id: assign-reviewers
-        uses: totallymoney/assign-reviewers-by-labels-action@v1
+        uses: totallymoney/assign-reviewers-by-labels-action@v1.2.0
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"

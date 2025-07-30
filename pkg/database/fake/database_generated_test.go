@@ -79,7 +79,7 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
-			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, "", "", "", "", &models.LabelFilters{}, 100)
+			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, "", "", "", "", &models.LabelFilters{}, nil, nil, 100)
 			expected := make([]string, 0)
 			if len(tt.expected) != 0 {
 				for _, resource := range tt.expected {
@@ -143,7 +143,7 @@ func TestQueryResources(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace,
-				"", "", "", &models.LabelFilters{}, 100)
+				"", "", "", &models.LabelFilters{}, nil, nil, 100)
 			expected := make([]string, 0)
 			if len(tt.expected) != 0 {
 				for _, resource := range tt.expected {
@@ -232,7 +232,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(tt.testData, testLogUrls, testJsonPath)
 			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace,
-				tt.resourceName, "", "", &models.LabelFilters{}, 100)
+				tt.resourceName, "", "", &models.LabelFilters{}, nil, nil, 100)
 			expected := make([]string, 0)
 			if tt.expected != nil {
 				for _, exp := range tt.expected {

@@ -29,6 +29,8 @@ jobs:
     name: Add assignee to the PR
     if: github.actor != 'kubearchive-renovate[bot]'
     steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
       - name: Check if user can be assigned
         id: check-assignable
         run: |

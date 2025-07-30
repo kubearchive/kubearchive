@@ -310,8 +310,8 @@ func (c *Controller) Readyz(ctx *gin.Context) {
 		return
 	}
 
-	_, err = c.K8sClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).List(ctx.Request.Context(), metav1.ListOptions{})
-	if err != nil {
+	_, err = c.K8sClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(ctx.Request.Context(), constants.SinkFilterResourceName, metav1.GetOptions{})
+	if err != nil && !errs.IsNotFound(err) {
 		abort.Abort(ctx, err, http.StatusServiceUnavailable)
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "ready"})

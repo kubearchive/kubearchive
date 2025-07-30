@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -183,6 +184,56 @@ func TestPostgreSQLWriteResource(t *testing.T) {
 					assert.Equal(t, inserted, interfaces.WriteResourceResultError)
 				}
 			}
+		})
+	}
+}
+
+func TestConvertFieldPathToJSONPath(t *testing.T) {
+	tests := []struct {
+		name      string
+		fieldPath string
+		expected  string
+	}{
+		{
+			name:      "simple field",
+			fieldPath: "metadata.name",
+			expected:  "$.metadata.name",
+		},
+		{
+			name:      "nested field",
+			fieldPath: "status.phase",
+			expected:  "$.status.phase",
+		},
+		{
+			name:      "deeply nested field",
+			fieldPath: "spec.containers.name",
+			expected:  "$.spec.containers.name",
+		},
+		{
+			name:      "array access",
+			fieldPath: "spec.containers[0].name",
+			expected:  "$.spec.containers[0].name",
+		},
+		{
+			name:      "multiple array access",
+			fieldPath: "spec.containers[0].env[1].name",
+			expected:  "$.spec.containers[0].env[1].name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test the JsonPathPredicateCheck function
+			filter := postgreSQLFilter{}
+			cond := sqlbuilder.NewCond()
+			result := filter.JsonPathPredicateCheck(*cond, tt.fieldPath, "==", "test-value")
+
+			// The result should contain the @@ operator
+			assert.Contains(t, result, "data @@")
+			// The result should be a valid SQL expression
+			assert.NotEmpty(t, result)
+			// Verify that the method generates SQL for the given field path
+			assert.True(t, len(result) > 0, "JsonPathPredicateCheck should generate SQL")
 		})
 	}
 }

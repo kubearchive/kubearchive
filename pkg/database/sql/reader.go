@@ -18,10 +18,13 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
 )
 
-func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
-	continueId, continueDate string, labelFilters *models.LabelFilters, limit int) ([]string, int64, string, error) {
+func (db *sqlDatabaseImpl) QueryResources(
+	ctx context.Context, kind, apiVersion, namespace, name, continueId, continueDate string,
+	labelFilters *models.LabelFilters, fieldReqs []fields.Requirement, limit int,
+) ([]string, int64, string, error) {
 	sb := db.selector.ResourceSelector()
 	sb.Where(db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion))
 	if namespace != "" {
@@ -51,6 +54,13 @@ func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion,
 		}
 		if labelFilters.NotIn != nil {
 			sb.Where(db.filter.NotInLabelFilter(sb.Cond, labelFilters.NotIn, mainWhereClause))
+		}
+		if fieldReqs != nil {
+			slog.Info("Processing field requirements", "count", len(fieldReqs))
+			for _, req := range fieldReqs {
+				fieldSQL := db.filter.JsonPathPredicateCheck(sb.Cond, req.Field, string(req.Operator), req.Value)
+				sb.Where(fieldSQL)
+			}
 		}
 		sb = db.sorter.CreationTSAndIDSorter(sb)
 		sb.Limit(limit)
@@ -211,11 +221,16 @@ func (db *sqlDatabaseImpl) performResourceQuery(ctx context.Context, sb *sqlbuil
 		Resource string `db:"data"`
 	}
 
+	// Log the final SQL query for debugging
+	sql, args := sb.Build()
+	slog.Info("Executing SQL query", "sql", sql, "args", args)
+
 	var resources []string
 
 	parsedRows, err := newQueryPerformer[resourceFields](db.db, db.flavor).performQuery(ctx, sb)
 
 	if err != nil {
+		slog.Error("SQL query failed", "error", err, "sql", sql, "args", args)
 		return resources, 0, "", err
 	}
 
@@ -227,6 +242,7 @@ func (db *sqlDatabaseImpl) performResourceQuery(ctx context.Context, sb *sqlbuil
 	for _, parsedRow := range parsedRows {
 		resources = append(resources, parsedRow.Resource)
 	}
+
 	return resources, lastRow.Id, lastRow.Date, nil
 }
 

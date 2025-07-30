@@ -6,6 +6,7 @@ package routers
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -18,7 +19,9 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	labelFilter "github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/kubearchive/kubearchive/pkg/observability"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 )
 
 type CacheExpirations struct {
@@ -45,6 +48,8 @@ func (c *Controller) GetResources(context *gin.Context) {
 	version := context.Param("version")
 	namespace := context.Param("namespace")
 	name := context.Param("name")
+
+	// Parse label selector
 	selector, parserErr := labels.Parse(context.Query("labelSelector"))
 	if parserErr != nil {
 		abort.Abort(context, parserErr, http.StatusBadRequest)
@@ -54,6 +59,36 @@ func (c *Controller) GetResources(context *gin.Context) {
 	labelFilters, labelFiltersErr := labelFilter.NewLabelFilters(reqs)
 	if labelFiltersErr != nil {
 		abort.Abort(context, labelFiltersErr, http.StatusBadRequest)
+		return
+	}
+
+	// Parse field selector
+	fieldSelectorString := context.Query("fieldSelector")
+	slog.Debug("Router: Raw field selector string", slog.String("fieldSelectorString", fieldSelectorString))
+
+	fieldSelector, fieldParserErr := fields.ParseSelector(fieldSelectorString)
+	if fieldParserErr != nil {
+		slog.Error("Router: Field selector parsing failed",
+			slog.String("fieldSelectorString", fieldSelectorString),
+			slog.Any("error", fieldParserErr))
+		abort.Abort(context, fieldParserErr, http.StatusBadRequest)
+		return
+	}
+	fieldReqs := fieldSelector.Requirements()
+
+	var filteredFieldReqs []fields.Requirement
+	for _, req := range fieldReqs {
+		if req.Field == "metadata.name" && req.Operator == selection.Equals {
+			if name != "" {
+				slog.Error("Router: Error - name already provided in URL path")
+				abort.Abort(context,
+					fmt.Errorf("field selector metadata.name not allowed when providing the name"),
+					http.StatusBadRequest)
+			}
+			name = req.Value
+		} else {
+			filteredFieldReqs = append(filteredFieldReqs, req)
+		}
 	}
 
 	apiVersion := version
@@ -61,15 +96,26 @@ func (c *Controller) GetResources(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
+	slog.Debug("Router: Calling Database.QueryResources",
+		slog.String("kind", kind),
+		slog.String("apiVersion", apiVersion),
+		slog.String("namespace", namespace),
+		slog.String("name", name),
+		slog.Int("limit", limit),
+		slog.Int("fieldReqs", len(filteredFieldReqs)))
+
 	// We send namespace even if it's an empty string (non-namespaced resources) the Database
 	// knows what to do
 	resources, lastId, lastDate, err := c.Database.QueryResources(
-		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters, limit)
+		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters, filteredFieldReqs, limit)
 
 	if err != nil {
+		slog.Error("Router: Database.QueryResources failed", slog.Any("error", err))
 		abort.Abort(context, err, http.StatusInternalServerError)
 		return
 	}
+
+	slog.Debug("Router: Database.QueryResources succeeded", slog.Int("count", len(resources)))
 
 	if name != "" {
 		if len(resources) == 0 {

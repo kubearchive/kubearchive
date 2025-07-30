@@ -15,9 +15,20 @@ KubeArchive exposes the following custom metrics:
 Tracks the total number of Cloud Events (resource updates) received aggregated by `resource_type`,
 `event_type` and `result`.
 
-* `result`: one of `insert`, `update`, `none`, `error`, `no_match` or `no_conf`. `none` is returned when the
-Cloud Event contains data older than the one already persisted (out of order), `no_conf` is returned when the
-a resource is received but it is not configured.
+* `result`: one of `insert`, `update`, `none`, `error`, `no_match` or `no_conf`.
+** `error`: there was an error during the processing of the resource update. This may indicate
+    problems with the database, deleting resources, Cloud Event corruption, etc. Check the logs
+    to find the root cause.
+** `no_conf`: the resource update received is not configured on any `KubeArchiveConfig`. This may
+    mean there is something sending Cloud Events to KubeArchive but it should not.
+** `no_match`: the resource update received does not match the conditions for processing. This may
+    indicate that KubeArchiveConfig rules should be refined.
+** `insert`: the resource was inserted into the database.
+** `update`: a resource with the same `metadata.uid` exists in the database and it was updated.
+** `none`: a resource with the same `metadata.uid` exists in the database and its
+    `metadata.managedFields.time` was newer, so there was no update. This may indicate a problem
+    with the system that sends resource updates.
+
 * `resource_type`: a combination of the resource `apiVersion` and `kind`. For example `apps/v1/Deployment`,
 `v1/Pods` or `tekton.dev/v1/PipelineRun`.
 * `event_type`: one of `dev.knative.apiserver.resource.new`, `dev.knative.apiserver.resource.update`

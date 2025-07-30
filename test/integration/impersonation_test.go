@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -21,7 +22,6 @@ import (
 )
 
 func TestImpersonation(t *testing.T) {
-
 	tests := []struct {
 		name                 string
 		impersonationEnabled bool
@@ -40,12 +40,14 @@ func TestImpersonation(t *testing.T) {
 	}
 
 	clientset, _ := test.GetKubernetesClient(t)
+	t.Cleanup(func() {
+		// The default state of impersonation is disabled
+		setImpersonation(t, clientset, false)
+	})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.impersonationEnabled {
-				enableImpersonation(t, clientset)
-			}
+			setImpersonation(t, clientset, tt.impersonationEnabled)
 			port := test.PortForwardApiServer(t, clientset)
 			namespaceName, _ := test.CreateTestNamespace(t, false)
 			impersonatedUser := fmt.Sprintf("system:serviceaccount:%s:default", namespaceName)
@@ -81,8 +83,7 @@ func TestImpersonation(t *testing.T) {
 
 }
 
-func enableImpersonation(t *testing.T, clientset *kubernetes.Clientset) {
-
+func setImpersonation(t *testing.T, clientset *kubernetes.Clientset, enabled bool) {
 	t.Helper()
 
 	t.Logf("Changing API to 0 replicas")
@@ -128,21 +129,19 @@ func enableImpersonation(t *testing.T, clientset *kubernetes.Clientset) {
 	for idx := range deployment.Spec.Template.Spec.Containers {
 		container := &deployment.Spec.Template.Spec.Containers[idx]
 		if container.Name == "kubearchive-api-server" {
-			var update bool
-			for _, env := range container.Env {
+			var exists bool
+			for envIdx := range container.Env {
+				env := &container.Env[envIdx]
 				if env.Name == "AUTH_IMPERSONATE" {
 					t.Log("Updating AUTH_IMPERSONATE")
-					env.Value = "true"
-					update = true
+					env.Value = strconv.FormatBool(enabled)
+					exists = true
 					break
 				}
 			}
-			if !update {
-				t.Log("Setting AUTH_IMPERSONATE")
-				container.Env = append(container.Env, corev1.EnvVar{
-					Name:  "AUTH_IMPERSONATE",
-					Value: "true",
-				})
+
+			if !exists {
+				t.Fatalf("AUTH_IMPERSONATE should exists on the kubearchive-api-server Deployment")
 			}
 		}
 	}
@@ -178,7 +177,7 @@ func enableImpersonation(t *testing.T, clientset *kubernetes.Clientset) {
 		if strings.Contains(logs, "Successfully connected to the database") {
 			return nil
 		}
-		t.Log(logs)
+		t.Log("logs:", logs)
 		return fmt.Errorf("API has not started yet")
 	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
 

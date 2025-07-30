@@ -80,6 +80,8 @@ spec:
               value: "1m"
             - name: KUBEARCHIVE_LOGGING_DIR
               value: /data/logging
+            - name: AUTH_IMPERSONATE
+              value: "false"
           ports:
             - containerPort: 8081
               name: server

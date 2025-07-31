@@ -70,7 +70,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 		"/livez":  "DEBUG",
 		"/readyz": "DEBUG",
 	}}))
-	router.Use(otelgin.Middleware("")) // Empty string so the library sets the proper server
+	router.Use(otelgin.Middleware("", otelgin.WithDisableGinErrorsOnMetrics(true))) // Empty string so the library sets the proper server
 
 	apiGroup := router.Group("/api")
 	apisGroup := router.Group("/apis")

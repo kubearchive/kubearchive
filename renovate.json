@@ -43,9 +43,10 @@
     {
       "matchPackageNames": ["go"],
       "automerge": false
+    },
+    {
+      "matchPackageNames": ["k8s.io/api", "k8s.io/apimachinery", "k8s.io/apiserver", "k8s.io/cli-runtime", "k8s.io/client-go", "k8s.io/apiextensions-apiserver"],
+      "allowedVersions": "<0.33.0"
     }
-  ],
-  "constraints": {
-    "go": "1.23"
-  }
+  ]
 }

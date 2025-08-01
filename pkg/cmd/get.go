@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/kubearchive/kubearchive/pkg/cmd/config"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,10 +27,9 @@ type GetOptions struct {
 	GroupVersion  string
 	Token         string
 
-	KubeArchiveHost string
+	*config.ArchiveOptions
 
 	RESTConfig         *rest.Config
-	kubeFlags          *genericclioptions.ConfigFlags
 	OutputFormat       *string
 	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
 	IsValidOutput      bool
@@ -39,8 +39,6 @@ type GetOptions struct {
 func NewGetOptions() *GetOptions {
 	outputFormat := ""
 	return &GetOptions{
-		kubeFlags:          genericclioptions.NewConfigFlags(true),
-		KubeArchiveHost:    "https://localhost:8081",
 		OutputFormat:       &outputFormat,
 		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
 		IOStreams: genericiooptions.IOStreams{
@@ -48,6 +46,7 @@ func NewGetOptions() *GetOptions {
 			Out:    os.Stdout,
 			ErrOut: os.Stderr,
 		},
+		ArchiveOptions: config.NewArchiveOptions(),
 	}
 }
 
@@ -64,7 +63,6 @@ func NewGetCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("error completing the args: %w", err)
 			}
-
 			err = o.Run()
 			if err != nil {
 				return fmt.Errorf("error running the command: %w", err)
@@ -74,35 +72,51 @@ func NewGetCmd() *cobra.Command {
 		},
 	}
 
-	o.kubeFlags.AddFlags(cmd.Flags())
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
-	cmd.Flags().StringVar(&o.KubeArchiveHost, "kubearchive-host", o.KubeArchiveHost, fmt.Sprintf("Host where the KubeArchive API Server is listening. Defaults to '%s'", o.KubeArchiveHost))
-	cmd.Flags().StringVarP(o.OutputFormat, "output", "o", *o.OutputFormat, fmt.Sprintf(`Output format. One of: (%s).`, strings.Join(o.JSONYamlPrintFlags.AllowedFormats(), ", ")))
+	o.AddFlags(cmd.Flags())
 	o.JSONYamlPrintFlags.AddFlags(cmd)
+	cmd.Flags().StringVarP(o.OutputFormat, "output", "o", *o.OutputFormat, fmt.Sprintf(`Output format. One of: (%s).`, strings.Join(o.JSONYamlPrintFlags.AllowedFormats(), ", ")))
 
 	return cmd
 }
 
 func (o *GetOptions) Complete(args []string) error {
+	restConfig, err := o.KubeFlags.ToRESTConfig()
+	if err != nil {
+		return fmt.Errorf("error creating the REST configuration: %w", err)
+	}
+
+	o.RESTConfig = restConfig
+	err = o.ArchiveOptions.Complete(restConfig)
+	if err != nil {
+		return fmt.Errorf("error completing the args: %w", err)
+	}
+
 	o.GroupVersion = args[0]
 
 	o.Resource = args[1]
 	APIPathWithoutRoot := fmt.Sprintf("%s/%s", o.GroupVersion, o.Resource)
-	if *o.kubeFlags.Namespace != "" {
-		APIPathWithoutRoot = fmt.Sprintf("%s/namespaces/%s/%s", o.GroupVersion, *o.kubeFlags.Namespace, o.Resource)
+
+	if !o.AllNamespaces {
+		var namespace string
+		if o.KubeFlags.Namespace != nil && *o.KubeFlags.Namespace != "" {
+			namespace = *o.KubeFlags.Namespace
+		} else {
+			if rawLoader := o.KubeFlags.ToRawKubeConfigLoader(); rawLoader != nil {
+				ns, _, nsErr := rawLoader.Namespace()
+				if nsErr != nil {
+					return fmt.Errorf("error retrieving namespace from kubeconfig context: %w", nsErr)
+				}
+				namespace = ns
+			}
+		}
+		APIPathWithoutRoot = fmt.Sprintf("%s/namespaces/%s/%s", o.GroupVersion, namespace, o.Resource)
 	}
 
 	o.APIPath = fmt.Sprintf("/apis/%s", APIPathWithoutRoot)
 	if strings.HasPrefix(o.GroupVersion, "v1") {
 		o.APIPath = fmt.Sprintf("/api/%s", APIPathWithoutRoot)
 	}
-
-	config, err := o.kubeFlags.ToRESTConfig()
-	if err != nil {
-		return fmt.Errorf("error creating the REST configuration: %w", err)
-	}
-
-	o.RESTConfig = config
 
 	return nil
 }
@@ -146,11 +160,26 @@ func (o *GetOptions) getResources(host string) ([]runtime.Object, error) {
 }
 
 func (o *GetOptions) getKubeArchiveResources() ([]runtime.Object, error) {
-	o.RESTConfig.CAData = nil      // Remove CA data from the Kubeconfig
-	o.RESTConfig.CAFile = "ca.crt" // This expects you to have extracted the CA, see DEVELOPMENT.md
-	o.RESTConfig.BearerToken = *o.kubeFlags.BearerToken
 
-	return o.getResources(o.KubeArchiveHost)
+	certData, err := o.GetCertificateData()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get certificate data: %w", err)
+	}
+
+	o.RESTConfig = &rest.Config{
+		Host:        o.Host,
+		BearerToken: o.Token,
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: o.TLSInsecure,
+		},
+	}
+
+	if certData != nil {
+		o.RESTConfig.CAData = certData
+		o.RESTConfig.Insecure = false
+	}
+
+	return o.getResources(o.Host)
 }
 
 func (o *GetOptions) Run() error {
@@ -167,13 +196,11 @@ func (o *GetOptions) Run() error {
 	objs = append(objs, clusterResources...)
 	objs = append(objs, kubearchiveResources...)
 
-	// Handle JSON/YAML output differently - create a List object
 	if o.OutputFormat != nil && *o.OutputFormat != "" {
 		printer, printerErr := o.JSONYamlPrintFlags.ToPrinter(*o.OutputFormat)
 		if printerErr != nil {
 			return fmt.Errorf("error getting printer: %w", printerErr)
 		}
-		// Create a List containing all objects
 		list := &unstructured.UnstructuredList{
 			Object: map[string]interface{}{
 				"kind":       "List",
@@ -190,12 +217,10 @@ func (o *GetOptions) Run() error {
 			}
 		}
 
-		// Print the list once
 		if printErr := printer.PrintObj(list, o.Out); printErr != nil {
 			return fmt.Errorf("error printing list: %w", printErr)
 		}
 	} else {
-		// For table output, print each object individually
 		printer := printers.NewTablePrinter(printers.PrintOptions{})
 		tabWriter := printers.GetNewTabWriter(o.Out)
 		defer tabWriter.Flush()

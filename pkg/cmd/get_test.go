@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kubearchive/kubearchive/pkg/cmd/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/client-go/rest"
@@ -23,6 +24,7 @@ func TestGetComplete(t *testing.T) {
 	testCases := []struct {
 		name            string
 		namespace       string
+		allNamespaces   bool
 		args            []string
 		expectedApiPath string
 		output          string
@@ -30,31 +32,52 @@ func TestGetComplete(t *testing.T) {
 		{
 			name:            "core",
 			args:            []string{"v1", "pods"},
-			expectedApiPath: "/api/v1/pods",
+			expectedApiPath: "/api/v1/namespaces/default/pods",
 		},
 		{
 			name:            "non-core",
 			args:            []string{"batch/v1", "jobs"},
-			expectedApiPath: "/apis/batch/v1/jobs",
+			expectedApiPath: "/apis/batch/v1/namespaces/default/jobs",
 		},
 		{
 			name:            "core namespaced",
 			namespace:       "test",
+			allNamespaces:   false,
 			args:            []string{"v1", "pods"},
 			expectedApiPath: "/api/v1/namespaces/test/pods",
 		},
 		{
 			name:            "non-core namespaced",
 			namespace:       "test",
+			allNamespaces:   false,
 			args:            []string{"batch/v1", "jobs"},
 			expectedApiPath: "/apis/batch/v1/namespaces/test/jobs",
+		},
+		{
+			name:            "core with all-namespaces flag",
+			namespace:       "test",
+			allNamespaces:   true,
+			args:            []string{"v1", "pods"},
+			expectedApiPath: "/api/v1/pods",
+		},
+		{
+			name:            "non-core with all-namespaces flag",
+			namespace:       "test",
+			allNamespaces:   true,
+			args:            []string{"batch/v1", "jobs"},
+			expectedApiPath: "/apis/batch/v1/jobs",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			options := NewGetOptions()
-			options.kubeFlags.Namespace = &tc.namespace
+
+			if tc.namespace != "" {
+				options.KubeFlags.Namespace = &tc.namespace
+			}
+
+			options.AllNamespaces = tc.allNamespaces
 
 			err := options.Complete(tc.args)
 
@@ -65,10 +88,63 @@ func TestGetComplete(t *testing.T) {
 			assert.NotNil(t, options.RESTConfig)
 		})
 	}
-
 }
 
-// Helper function to load expected content from testdata files
+func TestCompleteAPINamespaceFallback(t *testing.T) {
+	testCases := []struct {
+		name            string
+		kubeconfigNs    string
+		allNamespaces   bool
+		args            []string
+		expectedApiPath string
+		isCore          bool
+	}{
+		{
+			name:            "core with kubeconfig namespace",
+			kubeconfigNs:    "default",
+			allNamespaces:   false,
+			args:            []string{"v1", "pods"},
+			expectedApiPath: "/api/v1/namespaces/default/pods",
+			isCore:          true,
+		},
+		{
+			name:            "non-core with kubeconfig namespace",
+			kubeconfigNs:    "kube-system",
+			allNamespaces:   false,
+			args:            []string{"batch/v1", "jobs"},
+			expectedApiPath: "/apis/batch/v1/namespaces/kube-system/jobs",
+			isCore:          false,
+		},
+		{
+			name:            "with all-namespaces flag ignores kubeconfig namespace",
+			kubeconfigNs:    "default",
+			allNamespaces:   true,
+			args:            []string{"v1", "pods"},
+			expectedApiPath: "/api/v1/pods",
+			isCore:          true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			options := NewGetOptions()
+			options.AllNamespaces = tc.allNamespaces
+
+			if tc.kubeconfigNs != "" {
+				options.KubeFlags.Namespace = &tc.kubeconfigNs
+			}
+
+			err := options.Complete(tc.args)
+
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expectedApiPath, options.APIPath)
+			assert.Equal(t, tc.args[0], options.GroupVersion)
+			assert.Equal(t, tc.args[1], options.Resource)
+			assert.NotNil(t, options.RESTConfig)
+		})
+	}
+}
+
 func loadExpectedOutput(t *testing.T, filename string) string {
 	t.Helper()
 	path := filepath.Join("testdata", filename)
@@ -77,7 +153,6 @@ func loadExpectedOutput(t *testing.T, filename string) string {
 	return string(content)
 }
 
-// Helper function to normalize JSON for comparison
 func normalizeJSON(t *testing.T, jsonStr string) string {
 	t.Helper()
 	var obj interface{}
@@ -88,7 +163,6 @@ func normalizeJSON(t *testing.T, jsonStr string) string {
 	return string(normalized)
 }
 
-// Helper function to normalize YAML for comparison
 func normalizeYAML(t *testing.T, yamlStr string) string {
 	t.Helper()
 	var obj interface{}
@@ -99,9 +173,6 @@ func normalizeYAML(t *testing.T, yamlStr string) string {
 	return string(normalized)
 }
 
-// Helper function to create a mock server that returns a pod with the specified name and timestamp
-// If podName is empty, returns an empty list
-// If timestamp is empty, no timestamp is set (for empty lists)
 func createMockServer(t *testing.T, podName string, timestamp string) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -137,7 +208,6 @@ func createMockServer(t *testing.T, podName string, timestamp string) *httptest.
 	}))
 }
 
-// Helper function to create a mock server that returns an error
 func createMockErrorServer(t *testing.T) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -149,40 +219,31 @@ func createMockErrorServer(t *testing.T) *httptest.Server {
 	}))
 }
 
-// Helper function to create test options with two separate mock servers
 func createTestOptionsWithTwoServers(t *testing.T, kubernetesServerURL, kubeArchiveServerURL string) *GetOptions {
 	t.Helper()
 	options := NewGetOptions()
 	options.RESTConfig = &rest.Config{
 		Host: kubernetesServerURL,
 	}
-	options.KubeArchiveHost = kubeArchiveServerURL
+	options.Host = kubeArchiveServerURL
 	options.AllNamespaces = true
 	options.Resource = "pods"
 	options.GroupVersion = "v1"
 	options.APIPath = "/api/v1/pods"
 
-	// Set up bearer token to avoid a nil pointer in getKubeArchiveResources
 	token := "test-token"
-	options.kubeFlags.BearerToken = &token
+	options.KubeFlags.BearerToken = &token
+	options.RESTConfig.BearerToken = token
 
 	return options
 }
 
-// setupTestEnvironmentCommon handles common setup: creates CA file, creates test options, returns cleanup
 func setupTestEnvironmentCommon(t *testing.T, mockKubernetesServer, mockKubeArchiveServer *httptest.Server) (*GetOptions, func()) {
 	t.Helper()
 
-	// Create CA certificate file
-	err := os.WriteFile("ca.crt", []byte(""), 0600)
-	require.NoError(t, err)
-
-	// Create test options
 	options := createTestOptionsWithTwoServers(t, mockKubernetesServer.URL, mockKubeArchiveServer.URL)
 
-	// Return cleanup function
 	cleanup := func() {
-		os.Remove("ca.crt")
 		mockKubernetesServer.Close()
 		mockKubeArchiveServer.Close()
 	}
@@ -190,42 +251,36 @@ func setupTestEnvironmentCommon(t *testing.T, mockKubernetesServer, mockKubeArch
 	return options, cleanup
 }
 
-// setupTestEnvironment handles test setup: creates CA file, mock servers, and test options
-// Returns cleanup function that should be deferred
 func setupTestEnvironment(t *testing.T, kubernetesPodName, kubeArchivePodName, kubernetesTimestamp, kubeArchiveTimestamp string) (*GetOptions, func()) {
 	t.Helper()
 
-	// Create mock servers
 	mockKubernetesServer := createMockServer(t, kubernetesPodName, kubernetesTimestamp)
 	mockKubeArchiveServer := createMockServer(t, kubeArchivePodName, kubeArchiveTimestamp)
 
 	return setupTestEnvironmentCommon(t, mockKubernetesServer, mockKubeArchiveServer)
 }
 
-// setupTestEnvironmentWithErrorServers creates test environment with error servers for testing failure scenarios
 func setupTestEnvironmentWithErrorServers(t *testing.T, kubernetesError, kubeArchiveError bool) (*GetOptions, func()) {
 	t.Helper()
 
-	// Create appropriate servers based on error flags
 	var mockKubernetesServer *httptest.Server
 	if kubernetesError {
 		mockKubernetesServer = createMockErrorServer(t)
 	} else {
-		mockKubernetesServer = createMockServer(t, "", "") // Empty list, no timestamp
+		mockKubernetesServer = createMockServer(t, "", "")
 	}
 
 	var mockKubeArchiveServer *httptest.Server
 	if kubeArchiveError {
 		mockKubeArchiveServer = createMockErrorServer(t)
 	} else {
-		mockKubeArchiveServer = createMockServer(t, "", "") // Empty list, no timestamp
+		mockKubeArchiveServer = createMockServer(t, "", "")
 	}
 
 	return setupTestEnvironmentCommon(t, mockKubernetesServer, mockKubeArchiveServer)
 }
 
 func TestRunOutputFormats(t *testing.T) {
-	// Calculate the dynamic timestamp for table test (5 minutes ago)
 	dynamicTimestamp := time.Now().Add(-5 * time.Minute).Format(time.RFC3339)
 
 	testCases := []struct {
@@ -267,25 +322,20 @@ func TestRunOutputFormats(t *testing.T) {
 			options, cleanup := setupTestEnvironment(t, "test-pod-1", "archived-pod-1", tc.kubernetesTimestamp, tc.kubeArchiveTimestamp)
 			defer cleanup()
 
-			// Set output format if specified
 			if tc.outputFormat != "" {
 				options.OutputFormat = &tc.outputFormat
 			}
 
-			// Capture output
 			var buf bytes.Buffer
 			options.Out = &buf
 
-			// Call the Run function directly
 			err := options.Run()
 			require.NoError(t, err)
 
-			// Compare with expected output
 			expectedOutput := loadExpectedOutput(t, tc.expectedOutputFile)
 			actualOutput := buf.String()
 
 			if tc.needsNormalization {
-				// Normalize both expected and actual output for JSON/YAML
 				if tc.outputFormat == "json" {
 					expectedNormalized := normalizeJSON(t, expectedOutput)
 					actualNormalized := normalizeJSON(t, strings.TrimSpace(actualOutput))
@@ -296,7 +346,6 @@ func TestRunOutputFormats(t *testing.T) {
 					assert.Equal(t, expectedNormalized, actualNormalized)
 				}
 			} else {
-				// Direct comparison for table output
 				assert.Equal(t, expectedOutput, actualOutput)
 			}
 		})
@@ -329,14 +378,36 @@ func TestRunErrorHandling(t *testing.T) {
 			options, cleanup := setupTestEnvironmentWithErrorServers(t, tc.kubernetesError, tc.kubeArchiveError)
 			defer cleanup()
 
-			// Capture output
 			var buf bytes.Buffer
 			options.Out = &buf
 
-			// Call the Run function directly and expect an error
 			err := options.Run()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.expectedErrorString)
 		})
 	}
+}
+
+func TestKubectlFlagsIntegration(t *testing.T) {
+	opts := &GetOptions{
+		ArchiveOptions: config.NewArchiveOptions(),
+		RESTConfig: &rest.Config{
+			Host: "https://test-cluster.com",
+		},
+	}
+
+	caFile := "/tmp/test-ca.crt"
+	insecure := true
+	opts.KubeFlags.CAFile = &caFile
+	opts.KubeFlags.Insecure = &insecure
+
+	err := opts.ArchiveOptions.Complete(opts.RESTConfig)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "", opts.CertificatePath)
+	assert.Equal(t, false, opts.TLSInsecure)
+
+	certData, err := opts.GetCertificateData()
+	assert.NoError(t, err)
+	assert.Nil(t, certData)
 }

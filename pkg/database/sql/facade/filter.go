@@ -23,6 +23,7 @@ type DBFilter interface {
 	InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string
 	NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string
 
+	JsonPathPredicateCheck(cond sqlbuilder.Cond, field, operator, value string) string
 	ContainerNameFilter(cond sqlbuilder.Cond, containerName string) string
 }
 

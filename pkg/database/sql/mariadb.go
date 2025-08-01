@@ -99,6 +99,35 @@ func (mariaDBFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]
 	return ""
 }
 
+func (mariaDBFilter) JsonPathPredicateCheck(cond sqlbuilder.Cond, field, operator, value string) string {
+	// Add the $. prefix to create a valid JSONPath expression
+	jsonPath := "$." + field
+
+	// Convert = to == for MariaDB
+	if operator == "=" {
+		operator = "=="
+	}
+
+	// Determine if the value should be quoted based on its type
+	var quotedValue string
+	if isNumeric(value) {
+		// Numbers don't need quotes
+		quotedValue = value
+	} else if isBoolean(value) {
+		// Booleans don't need quotes
+		quotedValue = value
+	} else if isJSONArrayOrObject(value) {
+		// JSON arrays/objects don't need quotes
+		quotedValue = value
+	} else {
+		// Strings need to be quoted with single quotes for MariaDB
+		quotedValue = fmt.Sprintf("'%s'", value)
+	}
+
+	// Use JSON_VALUE with the appropriate comparison operator
+	return fmt.Sprintf("JSON_VALUE(data, %s) %s %s", cond.Var(jsonPath), operator, cond.Var(quotedValue))
+}
+
 type mariaDBSorter struct{}
 
 func (mariaDBSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {

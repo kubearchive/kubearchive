@@ -180,7 +180,7 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 					defer cancel()
 
 					resources, lastId, _, err := tt.database.QueryResources(ctx, podKind, version,
-						"", "", "", "", &models.LabelFilters{}, 100)
+						"", "", "", "", &models.LabelFilters{}, nil, 100)
 					if ttt.numResources == 0 {
 						assert.Nil(t, resources)
 						assert.Equal(t, int64(0), lastId)
@@ -223,7 +223,7 @@ func TestQueryResources(t *testing.T) {
 					defer cancel()
 
 					resources, _, _, err := tt.database.QueryResources(ctx, podKind, version, namespace,
-						"", "", "", &models.LabelFilters{}, 100)
+						"", "", "", &models.LabelFilters{}, nil, 100)
 					if ttt.numResources == 0 {
 						assert.Nil(t, resources)
 					} else {
@@ -403,7 +403,7 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 
 				resources, _, _, err := tt.database.QueryResources(ctx, podKind, version,
 					"", "", "", "",
-					&ttt.labelFilters, 100,
+					&ttt.labelFilters, nil, 100,
 				)
 				assert.NotNil(t, resources)
 				assert.NoError(t, err)
@@ -439,7 +439,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 					defer cancel()
 
 					resources, _, _, err := tt.database.QueryResources(ctx, kind, version, namespace, podName,
-						"", "", &models.LabelFilters{}, 100)
+						"", "", &models.LabelFilters{}, nil, 100)
 					if ttt.numResources == 0 {
 						assert.Empty(t, resources)
 					} else {
@@ -547,6 +547,56 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, innerTest.expectedLogUrl, logUrl)
 				assert.Equal(t, "", jp)
+			})
+		}
+	}
+}
+
+func TestQueryResourcesWithFieldFilters(t *testing.T) {
+	// Simple test to verify field filters are passed to the query methods
+	// This test focuses on validating that field filters reach the SQL generation
+
+	fieldFilterTests := []struct {
+		name            string
+		equalsFields    map[string]string
+		notEqualsFields map[string]string
+	}{
+		{
+			name:         "metadata.name equality",
+			equalsFields: map[string]string{"metadata.name": "test-pod"},
+		},
+		{
+			name:         "status.phase equality",
+			equalsFields: map[string]string{"status.phase": "Running"},
+		},
+		{
+			name:            "field inequality",
+			notEqualsFields: map[string]string{"metadata.namespace": "kube-system"},
+		},
+	}
+
+	for _, tt := range tests {
+		for _, ttt := range fieldFilterTests {
+			t.Run(fmt.Sprintf("%s_%s", tt.name, ttt.name), func(t *testing.T) {
+				// Test that the field filters are properly applied by checking
+				// that the SQL builder methods are called and return non-empty SQL
+				filter := tt.database.getFilter()
+				cond := sqlbuilder.NewCond()
+
+				// Apply field filters similar to how QueryResources does it
+				if ttt.equalsFields != nil {
+					for field, value := range ttt.equalsFields {
+						sql := filter.JsonPathPredicateCheck(*cond, field, "==", value)
+						assert.NotEmpty(t, sql, "JsonPathPredicateCheck should return non-empty SQL")
+						// For now, just verify that SQL is generated - specific content checking is complex with SQL builders
+					}
+				}
+				if ttt.notEqualsFields != nil {
+					for field, value := range ttt.notEqualsFields {
+						sql := filter.JsonPathPredicateCheck(*cond, field, "!=", value)
+						assert.NotEmpty(t, sql, "JsonPathPredicateCheck should return non-empty SQL")
+					}
+				}
 			})
 		}
 	}

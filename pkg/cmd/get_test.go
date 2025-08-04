@@ -5,79 +5,21 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/kubearchive/kubearchive/pkg/cmd/config"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/client-go/rest"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
+	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"sigs.k8s.io/yaml"
 )
 
-func TestGetComplete(t *testing.T) {
-	testCases := []struct {
-		name            string
-		namespace       string
-		args            []string
-		expectedApiPath string
-		output          string
-	}{
-		{
-			name:            "core",
-			args:            []string{"v1", "pods"},
-			expectedApiPath: "/api/v1/pods",
-		},
-		{
-			name:            "non-core",
-			args:            []string{"batch/v1", "jobs"},
-			expectedApiPath: "/apis/batch/v1/jobs",
-		},
-		{
-			name:            "core namespaced",
-			namespace:       "test",
-			args:            []string{"v1", "pods"},
-			expectedApiPath: "/api/v1/namespaces/test/pods",
-		},
-		{
-			name:            "non-core namespaced",
-			namespace:       "test",
-			args:            []string{"batch/v1", "jobs"},
-			expectedApiPath: "/apis/batch/v1/namespaces/test/jobs",
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			options := NewGetOptions()
-			options.kubeFlags.Namespace = &tc.namespace
-
-			err := options.Complete(tc.args)
-
-			assert.NoError(t, err)
-			assert.Equal(t, tc.expectedApiPath, options.APIPath)
-			assert.Equal(t, tc.args[0], options.GroupVersion)
-			assert.Equal(t, tc.args[1], options.Resource)
-			assert.NotNil(t, options.RESTConfig)
-		})
-	}
-
-}
-
-// Helper function to load expected content from testdata files
-func loadExpectedOutput(t *testing.T, filename string) string {
-	t.Helper()
-	path := filepath.Join("testdata", filename)
-	content, err := os.ReadFile(path)
-	require.NoError(t, err, "Failed to read expected output file: %s", path)
-	return string(content)
-}
-
-// Helper function to normalize JSON for comparison
+// normalizeJSON normalizes JSON for comparison
 func normalizeJSON(t *testing.T, jsonStr string) string {
 	t.Helper()
 	var obj interface{}
@@ -88,7 +30,7 @@ func normalizeJSON(t *testing.T, jsonStr string) string {
 	return string(normalized)
 }
 
-// Helper function to normalize YAML for comparison
+// normalizeYAML normalizes YAML for comparison
 func normalizeYAML(t *testing.T, yamlStr string) string {
 	t.Helper()
 	var obj interface{}
@@ -99,244 +41,268 @@ func normalizeYAML(t *testing.T, yamlStr string) string {
 	return string(normalized)
 }
 
-// Helper function to create a mock server that returns a pod with the specified name and timestamp
-// If podName is empty, returns an empty list
-// If timestamp is empty, no timestamp is set (for empty lists)
-func createMockServer(t *testing.T, podName string, timestamp string) *httptest.Server {
-	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		response := map[string]interface{}{
-			"kind":       "List",
-			"apiVersion": "v1",
-			"items":      []map[string]interface{}{},
-		}
-
-		// Add a pod only if podName is provided
-		if podName != "" {
-			pod := map[string]interface{}{
-				"kind":       "Pod",
+// createPodListJSON creates a PodList JSON with the given pod name and timestamp
+func createPodListJSON(podName, timestamp string) string {
+	podList := map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "PodList",
+		"metadata": map[string]interface{}{
+			"resourceVersion": "",
+		},
+		"items": []map[string]interface{}{
+			{
 				"apiVersion": "v1",
+				"kind":       "Pod",
 				"metadata": map[string]interface{}{
-					"name":      podName,
-					"namespace": "default",
+					"name":              podName,
+					"namespace":         "default",
+					"creationTimestamp": timestamp,
 				},
-			}
+			},
+		},
+	}
 
-			// Add timestamp if provided
-			if timestamp != "" {
-				pod["metadata"].(map[string]interface{})["creationTimestamp"] = timestamp
-			}
+	jsonBytes, _ := json.Marshal(podList)
+	return string(jsonBytes)
+}
 
-			response["items"] = []map[string]interface{}{pod}
+// MockArchiveCLICommand implements the ArchiveCLICommand interface for testing
+type MockArchiveCLICommand struct {
+	k8sResponse    string
+	k9eResponse    string
+	k8sError       error
+	k9eError       error
+	completeError  error
+	namespaceValue string
+	namespaceError error
+}
+
+func (m *MockArchiveCLICommand) GetFromAPI(api config.API, _ string) ([]byte, error) {
+	switch api {
+	case config.Kubernetes:
+		if m.k8sError != nil {
+			return nil, m.k8sError
 		}
-
-		err := json.NewEncoder(w).Encode(response)
-		if err != nil {
-			return
+		return []byte(m.k8sResponse), nil
+	case config.KubeArchive:
+		if m.k9eError != nil {
+			return nil, m.k9eError
 		}
-	}))
-}
-
-// Helper function to create a mock server that returns an error
-func createMockErrorServer(t *testing.T) *httptest.Server {
-	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		_, err := w.Write([]byte("server error"))
-		if err != nil {
-			return
-		}
-	}))
-}
-
-// Helper function to create test options with two separate mock servers
-func createTestOptionsWithTwoServers(t *testing.T, kubernetesServerURL, kubeArchiveServerURL string) *GetOptions {
-	t.Helper()
-	options := NewGetOptions()
-	options.RESTConfig = &rest.Config{
-		Host: kubernetesServerURL,
+		return []byte(m.k9eResponse), nil
+	default:
+		return nil, fmt.Errorf("unknown API type")
 	}
-	options.KubeArchiveHost = kubeArchiveServerURL
-	options.AllNamespaces = true
-	options.Resource = "pods"
-	options.GroupVersion = "v1"
-	options.APIPath = "/api/v1/pods"
-
-	// Set up bearer token to avoid a nil pointer in getKubeArchiveResources
-	token := "test-token"
-	options.kubeFlags.BearerToken = &token
-
-	return options
 }
 
-// setupTestEnvironmentCommon handles common setup: creates CA file, creates test options, returns cleanup
-func setupTestEnvironmentCommon(t *testing.T, mockKubernetesServer, mockKubeArchiveServer *httptest.Server) (*GetOptions, func()) {
-	t.Helper()
+func (m *MockArchiveCLICommand) Complete() error {
+	return m.completeError
+}
 
-	// Create CA certificate file
-	err := os.WriteFile("ca.crt", []byte(""), 0600)
-	require.NoError(t, err)
+func (m *MockArchiveCLICommand) AddFlags(_ *pflag.FlagSet) {}
 
-	// Create test options
-	options := createTestOptionsWithTwoServers(t, mockKubernetesServer.URL, mockKubeArchiveServer.URL)
-
-	// Return cleanup function
-	cleanup := func() {
-		os.Remove("ca.crt")
-		mockKubernetesServer.Close()
-		mockKubeArchiveServer.Close()
+func (m *MockArchiveCLICommand) GetNamespace() (string, error) {
+	if m.namespaceError != nil {
+		return "", m.namespaceError
 	}
-
-	return options, cleanup
-}
-
-// setupTestEnvironment handles test setup: creates CA file, mock servers, and test options
-// Returns cleanup function that should be deferred
-func setupTestEnvironment(t *testing.T, kubernetesPodName, kubeArchivePodName, kubernetesTimestamp, kubeArchiveTimestamp string) (*GetOptions, func()) {
-	t.Helper()
-
-	// Create mock servers
-	mockKubernetesServer := createMockServer(t, kubernetesPodName, kubernetesTimestamp)
-	mockKubeArchiveServer := createMockServer(t, kubeArchivePodName, kubeArchiveTimestamp)
-
-	return setupTestEnvironmentCommon(t, mockKubernetesServer, mockKubeArchiveServer)
-}
-
-// setupTestEnvironmentWithErrorServers creates test environment with error servers for testing failure scenarios
-func setupTestEnvironmentWithErrorServers(t *testing.T, kubernetesError, kubeArchiveError bool) (*GetOptions, func()) {
-	t.Helper()
-
-	// Create appropriate servers based on error flags
-	var mockKubernetesServer *httptest.Server
-	if kubernetesError {
-		mockKubernetesServer = createMockErrorServer(t)
-	} else {
-		mockKubernetesServer = createMockServer(t, "", "") // Empty list, no timestamp
+	if m.namespaceValue != "" {
+		return m.namespaceValue, nil
 	}
-
-	var mockKubeArchiveServer *httptest.Server
-	if kubeArchiveError {
-		mockKubeArchiveServer = createMockErrorServer(t)
-	} else {
-		mockKubeArchiveServer = createMockServer(t, "", "") // Empty list, no timestamp
-	}
-
-	return setupTestEnvironmentCommon(t, mockKubernetesServer, mockKubeArchiveServer)
+	return "default", nil
 }
 
-func TestRunOutputFormats(t *testing.T) {
-	// Calculate the dynamic timestamp for table test (5 minutes ago)
-	dynamicTimestamp := time.Now().Add(-5 * time.Minute).Format(time.RFC3339)
+// NewTestGetOptions creates GetOptions with a mock for testing
+func NewTestGetOptions(mockCLI config.ArchiveCLICommand) *GetOptions {
+	outputFormat := ""
+	return &GetOptions{
+		ArchiveCLICommand:  mockCLI,
+		OutputFormat:       &outputFormat,
+		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
+		IOStreams: genericiooptions.IOStreams{
+			In:     nil,
+			Out:    nil,
+			ErrOut: nil,
+		},
+	}
+}
 
+func TestGetComplete(t *testing.T) {
 	testCases := []struct {
-		name                 string
-		outputFormat         string
-		expectedOutputFile   string
-		needsNormalization   bool
-		kubernetesTimestamp  string
-		kubeArchiveTimestamp string
+		name            string
+		allNamespaces   bool
+		args            []string
+		expectedApiPath string
+		mockError       error
+		expectError     bool
+		errorContains   string
 	}{
 		{
-			name:                 "table",
-			outputFormat:         "",
-			expectedOutputFile:   "expected_table_output.txt",
-			needsNormalization:   false,
-			kubernetesTimestamp:  dynamicTimestamp,
-			kubeArchiveTimestamp: dynamicTimestamp,
+			name:            "core resource",
+			allNamespaces:   false,
+			args:            []string{"v1", "pods"},
+			expectedApiPath: "/api/v1/namespaces/default/pods",
 		},
 		{
-			name:                 "json",
-			outputFormat:         "json",
-			expectedOutputFile:   "expected_json_output.json",
-			needsNormalization:   true,
-			kubernetesTimestamp:  "2025-07-08T09:54:00Z",
-			kubeArchiveTimestamp: "2025-07-08T09:54:00Z",
+			name:            "non-core resource",
+			allNamespaces:   false,
+			args:            []string{"batch/v1", "jobs"},
+			expectedApiPath: "/apis/batch/v1/namespaces/default/jobs",
 		},
 		{
-			name:                 "yaml",
-			outputFormat:         "yaml",
-			expectedOutputFile:   "expected_yaml_output.yaml",
-			needsNormalization:   true,
-			kubernetesTimestamp:  "2025-07-08T09:54:00Z",
-			kubeArchiveTimestamp: "2025-07-08T09:54:00Z",
+			name:            "all namespaces",
+			allNamespaces:   true,
+			args:            []string{"v1", "pods"},
+			expectedApiPath: "/api/v1/pods",
+		},
+		{
+			name:          "complete error",
+			args:          []string{"v1", "pods"},
+			mockError:     fmt.Errorf("mock complete failed"),
+			expectError:   true,
+			errorContains: "error completing the args: mock complete failed",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			options, cleanup := setupTestEnvironment(t, "test-pod-1", "archived-pod-1", tc.kubernetesTimestamp, tc.kubeArchiveTimestamp)
-			defer cleanup()
-
-			// Set output format if specified
-			if tc.outputFormat != "" {
-				options.OutputFormat = &tc.outputFormat
+			var options *GetOptions
+			if tc.mockError != nil {
+				mockCLI := &MockArchiveCLICommand{
+					completeError: tc.mockError,
+				}
+				options = NewTestGetOptions(mockCLI)
+			} else {
+				options = NewGetOptions()
 			}
+			options.AllNamespaces = tc.allNamespaces
 
-			// Capture output
-			var buf bytes.Buffer
-			options.Out = &buf
+			err := options.Complete(tc.args)
 
-			// Call the Run function directly
-			err := options.Run()
-			require.NoError(t, err)
-
-			// Compare with expected output
-			expectedOutput := loadExpectedOutput(t, tc.expectedOutputFile)
-			actualOutput := buf.String()
-
-			if tc.needsNormalization {
-				// Normalize both expected and actual output for JSON/YAML
-				if tc.outputFormat == "json" {
-					expectedNormalized := normalizeJSON(t, expectedOutput)
-					actualNormalized := normalizeJSON(t, strings.TrimSpace(actualOutput))
-					assert.Equal(t, expectedNormalized, actualNormalized)
-				} else if tc.outputFormat == "yaml" {
-					expectedNormalized := normalizeYAML(t, expectedOutput)
-					actualNormalized := normalizeYAML(t, strings.TrimSpace(actualOutput))
-					assert.Equal(t, expectedNormalized, actualNormalized)
+			if tc.expectError {
+				assert.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
 				}
 			} else {
-				// Direct comparison for table output
-				assert.Equal(t, expectedOutput, actualOutput)
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedApiPath, options.APIPath)
+				assert.Equal(t, tc.args[0], options.GroupVersion)
+				assert.Equal(t, tc.args[1], options.Resource)
 			}
 		})
 	}
 }
 
-func TestRunErrorHandling(t *testing.T) {
+func TestRun(t *testing.T) {
 	testCases := []struct {
-		name                string
-		kubernetesError     bool
-		kubeArchiveError    bool
-		expectedErrorString string
+		name               string
+		k8sError           error
+		k9eError           error
+		outputFormat       string
+		expectError        bool
+		errorContains      string
+		expectedOutputFile string
+		needsNormalization bool
+		useDynamicTime     bool
 	}{
 		{
-			name:                "kubernetes server error",
-			kubernetesError:     true,
-			kubeArchiveError:    false,
-			expectedErrorString: "error retrieving resources from the cluster",
+			name:               "table output",
+			outputFormat:       "",
+			expectedOutputFile: "expected_table_output.txt",
+			useDynamicTime:     true,
 		},
 		{
-			name:                "kubearchive server error",
-			kubernetesError:     false,
-			kubeArchiveError:    true,
-			expectedErrorString: "error retrieving resources from the KubeArchive API",
+			name:               "JSON output",
+			outputFormat:       "json",
+			expectedOutputFile: "expected_json_output.json",
+			needsNormalization: true,
+		},
+		{
+			name:               "YAML output",
+			outputFormat:       "yaml",
+			expectedOutputFile: "expected_yaml_output.yaml",
+			needsNormalization: true,
+		},
+		{
+			name:          "API error",
+			k8sError:      fmt.Errorf("connection failed"),
+			expectError:   true,
+			errorContains: "error retrieving the resources from Kubernetes API server",
+		},
+		{
+			name:          "invalid output format",
+			outputFormat:  "invalid",
+			expectError:   true,
+			errorContains: "error getting printer",
+		},
+		{
+			name:          "invalid JSON response",
+			outputFormat:  "",
+			expectError:   true,
+			errorContains: "error retrieving resources from the cluster",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			options, cleanup := setupTestEnvironmentWithErrorServers(t, tc.kubernetesError, tc.kubeArchiveError)
-			defer cleanup()
+			var k8sResponse, k9eResponse string
+			if !tc.expectError || tc.name == "invalid JSON response" || tc.name == "invalid output format" {
+				var timestamp string
+				if tc.useDynamicTime {
+					timestamp = time.Now().Add(-5 * time.Minute).Format(time.RFC3339)
+				} else {
+					timestamp = "2025-07-08T09:54:00Z"
+				}
 
-			// Capture output
-			var buf bytes.Buffer
-			options.Out = &buf
+				if tc.name == "invalid JSON response" {
+					k8sResponse = `invalid json`
+					k9eResponse = createPodListJSON("archived-pod-1", timestamp)
+				} else {
+					k8sResponse = createPodListJSON("test-pod-1", timestamp)
+					k9eResponse = createPodListJSON("archived-pod-1", timestamp)
+				}
+			}
 
-			// Call the Run function directly and expect an error
-			err := options.Run()
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), tc.expectedErrorString)
+			mockCLI := &MockArchiveCLICommand{
+				k8sResponse:    k8sResponse,
+				k9eResponse:    k9eResponse,
+				k8sError:       tc.k8sError,
+				k9eError:       tc.k9eError,
+				namespaceValue: "default",
+			}
+
+			opts := NewTestGetOptions(mockCLI)
+			opts.APIPath = "/api/v1/pods"
+			opts.OutputFormat = &tc.outputFormat
+
+			var outBuf bytes.Buffer
+			opts.IOStreams = genericiooptions.IOStreams{Out: &outBuf}
+
+			err := opts.Run()
+
+			if tc.expectError {
+				assert.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				expectedOutput := loadGoldenFile(t, tc.expectedOutputFile)
+				actualOutput := outBuf.String()
+
+				if tc.needsNormalization {
+					if tc.outputFormat == "json" {
+						expectedNormalized := normalizeJSON(t, expectedOutput)
+						actualNormalized := normalizeJSON(t, strings.TrimSpace(actualOutput))
+						assert.Equal(t, expectedNormalized, actualNormalized)
+					} else if tc.outputFormat == "yaml" {
+						expectedNormalized := normalizeYAML(t, expectedOutput)
+						actualNormalized := normalizeYAML(t, strings.TrimSpace(actualOutput))
+						assert.Equal(t, expectedNormalized, actualNormalized)
+					}
+				} else {
+					assert.Equal(t, expectedOutput, actualOutput)
+				}
+			}
 		})
 	}
 }

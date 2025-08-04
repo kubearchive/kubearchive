@@ -118,19 +118,25 @@ After you make changes to the code use the script to redeploy KubeArchive:
 
 1. Get the Certificate Authority (CA) from the `kubearchive-api-server-tls` secret:
     ```bash
-    kubectl get -n kubearchive secrets kubearchive-api-server-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
+    kubectl get -n kubearchive secrets kubearchive-api-server-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ~/.config/kubectl/archive/ca.crt
     ```
 
-1. Run the CLI:
+1. Export the `KUBECTL_PLUGIN_ARCHIVE_CERT_PATH` with the `ca.crt` file path
     ```bash
-    go run cmd/kubectl-archive/main.go get batch/v1 jobs --token $(kubectl create -n test token default)
+    export KUBECTL_PLUGIN_ARCHIVE_CERT_PATH=~/.config/kubectl/archive/ca.crt
     ```
-   **NOTE**: For this to work the `test/users/test-user.yaml` must be applied.
+
+1. Export the `KUBECTL_PLUGIN_ARCHIVE_TOKEN` with the token of a service account with the proper permissions
+
+    ```bash
+    bash test/users/test-user.yml
+    export KUBECTL_PLUGIN_ARCHIVE_TOKEN=$(kubectl create token -n test default)
+    ```
 
 1. Generate a new job, and run again:
     ```bash
     kubectl create job my-job --image=busybox
-    go run cmd/kubectl-archive/main.go get batch/v1 jobs --token $(kubectl create -n test token default)
+    go run cmd/kubectl-archive/main.go get batch/v1 jobs
     ```
 
 ## Running integration tests

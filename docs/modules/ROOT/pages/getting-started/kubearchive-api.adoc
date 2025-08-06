@@ -11,19 +11,20 @@ may be different for a production cluster.
 
 == Port Forward KubeArchive
 
-After installing, KubeArchive creates different services. Use [command]`kubectl` to forward the port of the KubeArchive API:
+After installing, KubeArchive creates different services.Use [command]`kubectl` to forward the port of the KubeArchive API:
 
 [source,bash]
 ----
 kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081
 ----
 
+[#_authentication_and_authorization]
 == Authentication and Authorization
 
 KubeArchive delegates authentication and authorization to the Kubernetes
-RBAC service. In order to retrieve resources from KubeArchive,
-you need to pass an identity when you make a request. The easiest
-way is to use a service account. Create one and assign it permissions,
+RBAC service.In order to retrieve resources from KubeArchive,
+you need to pass an identity when you make a request.The easiest
+way is to use a service account.Create one and assign it permissions,
 for example:
 
 [source,bash]

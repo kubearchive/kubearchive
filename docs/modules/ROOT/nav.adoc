@@ -4,6 +4,7 @@
 ** xref:getting-started/configuration.adoc[]
 
 * CLI
+** xref:cli/installation.adoc[Installation]
 ** xref:cli/configuration.adoc[Configuration]
 
 * Configuration

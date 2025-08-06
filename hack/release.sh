@@ -54,7 +54,22 @@ git commit -s -m "Release ${NEXT_VERSION}"
 
 git tag -a "${NEXT_VERSION}" -m "Release ${NEXT_VERSION}"
 
-# Build and push
+# Build CLI binaries for different architectures
+echo "Building CLI binaries..."
+mkdir -p ./cli-binaries
+
+# Build flags for optimized release binaries
+BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+GIT_COMMIT=$(git rev-parse HEAD)
+LDFLAGS="-w -s -X main.version=${NEXT_VERSION} -X main.buildDate=${BUILD_DATE} -X main.gitCommit=${GIT_COMMIT}"
+
+echo "Building kubectl-ka for linux/amd64..."
+GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ./cli-binaries/kubectl-ka-linux-amd64 ./cmd/kubectl-ka/
+
+echo "Building kubectl-ka for linux/arm64..."
+GOOS=linux GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ./cli-binaries/kubectl-ka-linux-arm64 ./cmd/kubectl-ka/
+
+# Build and push container images
 bash cmd/operator/generate.sh
 kubectl kustomize config/ | envsubst '$NEXT_VERSION' | ko resolve -f - --base-import-paths --tags=${NEXT_VERSION} > kubearchive.yaml
 
@@ -65,6 +80,9 @@ gh release create "${NEXT_VERSION}" \
     --notes-file ./release-notes.md \
     --title "Release ${NEXT_VERSION}" \
     --repo ${RELEASE_REPOSITORY} \
-    kubearchive.yaml
+    kubearchive.yaml \
+    ./cli-binaries/kubectl-ka-linux-amd64 \
+    ./cli-binaries/kubectl-ka-linux-arm64
 rm ./release-notes.md
 rm ./kubearchive.yaml
+rm -rf ./cli-binaries

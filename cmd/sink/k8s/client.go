@@ -5,7 +5,9 @@ package k8s
 
 import (
 	"fmt"
+	"net/http"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
@@ -22,6 +24,7 @@ func GetKubernetesClient() (*dynamic.DynamicClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving in-cluster k8s client config: %s", err)
 	}
+	config.Wrap(func(rt http.RoundTripper) http.RoundTripper { return otelhttp.NewTransport(rt) })
 	client, err := dynamic.NewForConfig(config)
 	if err != nil {
 		return nil, fmt.Errorf("error instantiating k8s from host %s: %s", config.Host, err)

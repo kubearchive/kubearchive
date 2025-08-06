@@ -3,210 +3,315 @@
 package cmd
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"strings"
+	"bytes"
+	"fmt"
 	"testing"
 
+	"github.com/kubearchive/kubearchive/pkg/cmd/config"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestLogsComplete(t *testing.T) {
+// MockArchiveCLICommandForLogs implements the ArchiveCLICommand interface for logs testing
+type MockArchiveCLICommandForLogs struct {
+	responses      map[string]string // Path -> response
+	errors         map[string]error  // Path -> error
+	completeError  error
+	namespaceValue string
+	namespaceError error
+}
+
+func (m *MockArchiveCLICommandForLogs) GetFromAPI(_ config.API, path string) ([]byte, error) {
+	// Check for errors first
+	if err, exists := m.errors[path]; exists {
+		return nil, err
+	}
+
+	// Return response if it exists
+	if response, exists := m.responses[path]; exists {
+		return []byte(response), nil
+	}
+
+	// If no response is configured, return an error
+	return nil, fmt.Errorf("unexpected API call to path: %s", path)
+}
+
+func (m *MockArchiveCLICommandForLogs) Complete() error {
+	return m.completeError
+}
+
+func (m *MockArchiveCLICommandForLogs) AddFlags(_ *pflag.FlagSet) {}
+
+func (m *MockArchiveCLICommandForLogs) GetNamespace() (string, error) {
+	if m.namespaceError != nil {
+		return "", m.namespaceError
+	}
+	if m.namespaceValue != "" {
+		return m.namespaceValue, nil
+	}
+	return "default", nil
+}
+
+// NewTestLogsOptions creates LogsOptions with a mock for testing
+func NewTestLogsOptions(mockCLI *MockArchiveCLICommandForLogs) *LogsOptions {
+	return &LogsOptions{
+		ArchiveCLICommand: mockCLI,
+	}
+}
+
+func TestLogsOptionsComplete(t *testing.T) {
 	testCases := []struct {
-		name                     string
-		args                     []string
-		expectedResource         string
-		labelSelectorResultsPath string
-		expectedLog              string
-		shouldError              bool
+		name           string
+		args           []string
+		labelSelector  string
+		expectedError  bool
+		expectedResult *LogsOptions
 	}{
 		{
-			name:             "one arg",
-			args:             []string{"pod-name"},
-			shouldError:      false,
-			expectedResource: "pods",
-			expectedLog:      "I'm a log line\n",
+			name:          "no args with selector",
+			args:          []string{},
+			labelSelector: "app=test",
+			expectedError: false,
+			expectedResult: &LogsOptions{
+				GroupVersion: "v1",
+				Resource:     "pods",
+			},
 		},
 		{
-			name:             "one arg and container",
-			args:             []string{"pod-name", "-c", "container-name"},
-			shouldError:      false,
-			expectedResource: "pods",
-			expectedLog:      "I'm a log line\n",
+			name:          "one arg",
+			args:          []string{"pod-name"},
+			expectedError: false,
+			expectedResult: &LogsOptions{
+				GroupVersion: "v1",
+				Resource:     "pods",
+				Name:         "pod-name",
+			},
 		},
 		{
-			name:                     "two args with selector",
-			args:                     []string{"batch/v1", "jobs", "-l", "app=test"},
-			labelSelectorResultsPath: "testdata/jobs.json",
-			shouldError:              false,
-			expectedResource:         "jobs",
-			expectedLog:              "I'm a log line\n",
+			name:          "two args with selector",
+			args:          []string{"batch/v1", "jobs"},
+			labelSelector: "app=test",
+			expectedError: false,
+			expectedResult: &LogsOptions{
+				GroupVersion: "batch/v1",
+				Resource:     "jobs",
+			},
 		},
 		{
-			name:             "three args",
-			args:             []string{"batch/v1", "jobs", "job-name"},
-			shouldError:      false,
-			expectedResource: "jobs",
-			expectedLog:      "I'm a log line\n",
+			name:          "three args",
+			args:          []string{"batch/v1", "jobs", "job-name"},
+			expectedError: false,
+			expectedResult: &LogsOptions{
+				GroupVersion: "batch/v1",
+				Resource:     "jobs",
+				Name:         "job-name",
+			},
 		},
 		{
-			name:                     "three args and container",
-			args:                     []string{"batch/v1", "jobs", "job-name", "-c", "container-name"},
-			labelSelectorResultsPath: "testdata/jobs.json",
-			shouldError:              false,
-			expectedResource:         "jobs",
-			expectedLog:              "I'm a log line\n",
+			name:          "no args without selector",
+			args:          []string{},
+			expectedError: true,
 		},
 		{
-			name:                     "two args with selector",
-			args:                     []string{"batch/v1", "jobs", "-l", "test=abc"},
-			labelSelectorResultsPath: "testdata/jobs.json",
-			shouldError:              false,
-			expectedResource:         "jobs",
-			expectedLog:              "I'm a log line\n",
+			name:          "one arg with selector",
+			args:          []string{"pod-name"},
+			labelSelector: "app=test",
+			expectedError: true,
 		},
 		{
-			name:                     "no args with selector",
-			args:                     []string{"-l", "test=abc"},
-			labelSelectorResultsPath: "testdata/pods.json",
-			shouldError:              false,
-			expectedResource:         "pods",
-			expectedLog:              "I'm a log line\nI'm a log line\n",
+			name:          "two args without selector",
+			args:          []string{"batch/v1", "jobs"},
+			expectedError: true,
 		},
 		{
-			name:        "no args",
-			args:        []string{},
-			shouldError: true,
-		},
-		{
-			name:        "one arg with selector",
-			args:        []string{"pod-name", "-l", "app=test"},
-			shouldError: true,
-		},
-		{
-			name:        "two args without selector",
-			args:        []string{"batch/v1", "jobs"},
-			shouldError: true,
-		},
-		{
-			name:        "three args with selector",
-			args:        []string{"batch/v1", "jobs", "my-job", "-l", "app=test"},
-			shouldError: true,
-		},
-		{
-			name:        "four args with selector",
-			args:        []string{"batch/v1", "jobs", "my-job", "my-container", "-l", "app=test"},
-			shouldError: true,
-		},
-		{
-			name:        "four args",
-			args:        []string{"batch/v1", "jobs", "job-name", "container-name"},
-			shouldError: true,
+			name:          "three args with selector",
+			args:          []string{"batch/v1", "jobs", "job-name"},
+			labelSelector: "app=test",
+			expectedError: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if !strings.Contains(r.URL.Path, tc.expectedResource) {
-					w.WriteHeader(http.StatusNotFound)
-					return
-				}
+			options := NewLogsOptions()
+			options.LabelSelector = tc.labelSelector
 
-				if strings.Contains(r.URL.RawQuery, "labelSelector") {
-					fh, err := os.Open(tc.labelSelectorResultsPath)
-					if err != nil {
-						t.Fatal(err)
-					}
-					t.Cleanup(func() { fh.Close() })
-					content, readErr := io.ReadAll(fh)
-					if readErr != nil {
-						t.Fatal(readErr)
-					}
-					_, errWrite := w.Write(content)
-					if errWrite != nil {
-						t.Fatal(errWrite)
-					}
-				} else {
-					_, errWrite := w.Write([]byte("I'm a log line"))
-					if errWrite != nil {
-						t.Fatal(errWrite)
-					}
-				}
-			}))
-			defer srv.Close()
+			err := options.Complete(tc.args)
 
-			args := append(tc.args, "--kubearchive-host")
-			args = append(args, srv.URL)
-			args = append(args, "--kubearchive-ca")
-			args = append(args, "")
-			command := NewLogCmd()
-
-			var outBuf strings.Builder
-			var errBuf strings.Builder
-			command.SetOut(&outBuf)
-			command.SetErr(&errBuf)
-			command.SetArgs(args)
-			err := command.Execute()
-
-			if tc.shouldError {
+			if tc.expectedError {
 				assert.Error(t, err)
-				assert.NotEqual(t, "", errBuf.String())
-			} else {
-				assert.Equal(t, "", errBuf.String())
-				assert.NoError(t, err)
-				assert.Equal(t, tc.expectedLog, outBuf.String())
+				return
 			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectedResult.GroupVersion, options.GroupVersion)
+			assert.Equal(t, tc.expectedResult.Resource, options.Resource)
+			assert.Equal(t, tc.expectedResult.Name, options.Name)
 		})
 	}
 }
 
-func TestErrorLogs(t *testing.T) {
+func TestLogsRun(t *testing.T) {
+	podsData := loadGoldenFile(t, "pods.json")
+	jobsData := loadGoldenFile(t, "jobs.json")
+
 	testCases := []struct {
-		name      string
-		args      []string
-		errorCode int
-		errorMsg  string
+		name           string
+		groupVersion   string
+		resource       string
+		resourceName   string
+		containerName  string
+		labelSelector  string
+		namespace      string
+		mock           *MockArchiveCLICommandForLogs
+		expectError    bool
+		errorContains  string
+		expectedOutput string
 	}{
 		{
-			name:      "unauthorized error",
-			args:      []string{"pod-name"},
-			errorMsg:  "unauthorized",
-			errorCode: 401,
+			name:         "single pod logs from pods.json",
+			groupVersion: "v1",
+			resource:     "pods",
+			resourceName: "generate-log-1-29141722-k7s8m",
+			namespace:    "generate-logs-cronjobs",
+			mock: &MockArchiveCLICommandForLogs{
+				namespaceValue: "generate-logs-cronjobs",
+				responses: map[string]string{
+					"/api/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-29141722-k7s8m/log": "Log output from pod generate-log-1-29141722-k7s8m",
+				},
+			},
+			expectedOutput: "Log output from pod generate-log-1-29141722-k7s8m\n",
 		},
 		{
-			name:      "not found error",
-			args:      []string{"pod-name"},
-			errorMsg:  "not found",
-			errorCode: 404,
+			name:          "pod logs with container from pods.json",
+			groupVersion:  "v1",
+			resource:      "pods",
+			resourceName:  "generate-log-1-29141722-k7s8m",
+			containerName: "generate3",
+			namespace:     "generate-logs-cronjobs",
+			mock: &MockArchiveCLICommandForLogs{
+				namespaceValue: "generate-logs-cronjobs",
+				responses: map[string]string{
+					"/api/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-29141722-k7s8m/log?container=generate3": "Log output from generate3 container",
+				},
+			},
+			expectedOutput: "Log output from generate3 container\n",
+		},
+		{
+			name:         "job logs from jobs.json",
+			groupVersion: "batch/v1",
+			resource:     "jobs",
+			resourceName: "generate-log-1-29141722",
+			namespace:    "generate-logs-cronjobs",
+			mock: &MockArchiveCLICommandForLogs{
+				namespaceValue: "generate-logs-cronjobs",
+				responses: map[string]string{
+					"/apis/batch/v1/namespaces/generate-logs-cronjobs/jobs/generate-log-1-29141722/log": "Log output from job generate-log-1-29141722",
+				},
+			},
+			expectedOutput: "Log output from job generate-log-1-29141722\n",
+		},
+		{
+			name:          "pods with label selector from pods.json",
+			groupVersion:  "v1",
+			resource:      "pods",
+			labelSelector: "batch.kubernetes.io/job-name=generate-log-1-29141722",
+			namespace:     "generate-logs-cronjobs",
+			mock: &MockArchiveCLICommandForLogs{
+				namespaceValue: "generate-logs-cronjobs",
+				responses: map[string]string{
+					"/api/v1/namespaces/generate-logs-cronjobs/pods?labelSelector=batch.kubernetes.io%2Fjob-name%3Dgenerate-log-1-29141722": podsData,
+					"/api/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-29141722-k7s8m/log":                                      "Log output from pod generate-log-1-29141722-k7s8m",
+					"/api/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-29141723-vvvds/log":                                      "Log output from pod generate-log-1-29141723-vvvds",
+				},
+			},
+			expectedOutput: "Log output from pod generate-log-1-29141722-k7s8m\nLog output from pod generate-log-1-29141723-vvvds\n",
+		},
+		{
+			name:         "API error",
+			groupVersion: "v1",
+			resource:     "pods",
+			resourceName: "generate-log-1-29141722-k7s8m",
+			namespace:    "generate-logs-cronjobs",
+			mock: &MockArchiveCLICommandForLogs{
+				namespaceValue: "generate-logs-cronjobs",
+				errors: map[string]error{
+					"/api/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-29141722-k7s8m/log": fmt.Errorf("connection failed"),
+				},
+			},
+			expectError:   true,
+			errorContains: "error retrieving resources from the KubeArchive API",
+		},
+		{
+			name:         "namespace error",
+			groupVersion: "v1",
+			resource:     "pods",
+			resourceName: "generate-log-1-29141722-k7s8m",
+			mock: &MockArchiveCLICommandForLogs{
+				namespaceError: fmt.Errorf("namespace error"),
+			},
+			expectError:   true,
+			errorContains: "error getting namespace",
+		},
+		{
+			name:          "no resources found with label selector",
+			groupVersion:  "v1",
+			resource:      "pods",
+			labelSelector: "app=nonexistent",
+			namespace:     "generate-logs-cronjobs",
+			mock: &MockArchiveCLICommandForLogs{
+				namespaceValue: "generate-logs-cronjobs",
+				responses: map[string]string{
+					"/api/v1/namespaces/generate-logs-cronjobs/pods?labelSelector=app%3Dnonexistent": `{"apiVersion":"v1","kind":"List","metadata":{},"items":[]}`,
+				},
+			},
+			expectError:   true,
+			errorContains: "no resources found in the generate-logs-cronjobs namespace",
+		},
+		{
+			name:          "cronjob to jobs to pods to container logs flow",
+			groupVersion:  "batch/v1",
+			resource:      "jobs",
+			labelSelector: "job-name=generate-log-1-29141722",
+			containerName: "generate1",
+			namespace:     "generate-logs-cronjobs",
+			mock: &MockArchiveCLICommandForLogs{
+				namespaceValue: "generate-logs-cronjobs",
+				responses: map[string]string{
+					"/apis/batch/v1/namespaces/generate-logs-cronjobs/jobs?labelSelector=job-name%3Dgenerate-log-1-29141722": jobsData,
+					"/apis/batch/v1/namespaces/generate-logs-cronjobs/jobs/generate-log-1-29141722/log?container=generate1":  "Log output from job generate-log-1-29141722 container generate1",
+				},
+			},
+			expectedOutput: "Log output from job generate-log-1-29141722 container generate1\n",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(tc.errorCode)
-			}))
-			defer srv.Close()
+			opts := NewTestLogsOptions(tc.mock)
+			opts.GroupVersion = tc.groupVersion
+			opts.Resource = tc.resource
+			opts.Name = tc.resourceName
+			opts.ContainerName = tc.containerName
+			opts.LabelSelector = tc.labelSelector
 
-			args := append(tc.args, "--kubearchive-host")
-			args = append(args, srv.URL)
-			args = append(args, "--kubearchive-ca")
-			args = append(args, "")
-			command := NewLogCmd()
+			var outBuf bytes.Buffer
+			cmd := &cobra.Command{}
+			cmd.SetOut(&outBuf)
 
-			var outBuf strings.Builder
-			var errBuf strings.Builder
-			command.SetOut(&outBuf)
-			command.SetErr(&errBuf)
-			command.SetArgs(args)
-			err := command.Execute()
+			err := opts.Run(cmd)
 
-			assert.Error(t, err)
-			assert.NotEqual(t, "", errBuf.String())
-			assert.Contains(t, errBuf.String(), tc.errorMsg)
+			if tc.expectError {
+				assert.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedOutput, outBuf.String())
+			}
 		})
 	}
 }

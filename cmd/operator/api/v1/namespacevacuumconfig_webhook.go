@@ -9,13 +9,13 @@ import (
 	"fmt"
 
 	"github.com/kubearchive/kubearchive/pkg/constants"
+	"github.com/kubearchive/kubearchive/pkg/k8sclient"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
@@ -161,23 +161,9 @@ func getNamespaceResourceSet(client dynamic.Interface, namespace string) (map[so
 	return resources, nil
 }
 
-func getDynamicClient() (dynamic.Interface, error) {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	dynamicClient, err := dynamic.NewForConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	return dynamicClient, nil
-}
-
 func init() {
 	var err error
-	dynaClient, err = getDynamicClient()
+	dynaClient, err = k8sclient.NewInstrumentedDynamicClient()
 	if err != nil {
 		nvlog.Error(err, "Unable to get dynamic client")
 	}

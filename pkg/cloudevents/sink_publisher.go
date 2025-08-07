@@ -14,14 +14,16 @@ import (
 	"github.com/cloudevents/sdk-go/v2/client"
 	cehttp "github.com/cloudevents/sdk-go/v2/protocol/http"
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
-	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	"github.com/kubearchive/kubearchive/pkg/constants"
+	"github.com/kubearchive/kubearchive/pkg/k8sclient"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 	kclient "knative.dev/eventing/pkg/client/clientset/versioned"
 )
@@ -56,12 +58,21 @@ func NewSinkCloudEventPublisher(source string, etype string) (*SinkCloudEventPub
 		return nil, err
 	}
 
-	if scep.mapper, err = k8s.GetRESTMapper(); err != nil {
-		slog.Error("Unable to get RESTMapper", "error", err)
+	var discoveryClient *discovery.DiscoveryClient
+	if discoveryClient, err = k8sclient.NewInstrumentedDiscoveryClient(); err != nil {
+		slog.Error("Unable to get discoveryClient", "error", err)
 		return nil, err
 	}
 
-	if scep.dynaClient, err = k8s.GetKubernetesClient(); err != nil {
+	var groupResources []*restmapper.APIGroupResources
+	if groupResources, err = restmapper.GetAPIGroupResources(discoveryClient); err != nil {
+		slog.Error("Unable to get groupResources", "error", err)
+		return nil, err
+	}
+
+	scep.mapper = restmapper.NewDiscoveryRESTMapper(groupResources)
+
+	if scep.dynaClient, err = k8sclient.NewInstrumentedDynamicClient(); err != nil {
 		slog.Error("Unable to get dynamic client", "error", err)
 		return nil, err
 	}

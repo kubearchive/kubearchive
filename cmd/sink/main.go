@@ -8,12 +8,12 @@ import (
 	"os"
 
 	"github.com/kubearchive/kubearchive/cmd/sink/filters"
-	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	"github.com/kubearchive/kubearchive/cmd/sink/logs"
 	"github.com/kubearchive/kubearchive/cmd/sink/routers"
 	"github.com/kubearchive/kubearchive/cmd/sink/server"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
+	"github.com/kubearchive/kubearchive/pkg/k8sclient"
 	"github.com/kubearchive/kubearchive/pkg/logging"
 	kaObservability "github.com/kubearchive/kubearchive/pkg/observability"
 )
@@ -56,7 +56,7 @@ func main() {
 		}
 	}(db)
 
-	dynClient, err := k8s.GetKubernetesClient()
+	dynClient, err := k8sclient.NewInstrumentedDynamicClient()
 	if err != nil {
 		slog.Error("Could not get a kubernetes dynamic client", "error", err)
 		os.Exit(1)

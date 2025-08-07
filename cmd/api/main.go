@@ -23,12 +23,11 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/cache"
 	"github.com/kubearchive/kubearchive/pkg/database"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
+	"github.com/kubearchive/kubearchive/pkg/k8sclient"
 	kaLogging "github.com/kubearchive/kubearchive/pkg/logging"
 	"github.com/kubearchive/kubearchive/pkg/middleware"
 	"github.com/kubearchive/kubearchive/pkg/observability"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 const (
@@ -46,20 +45,6 @@ var (
 type Server struct {
 	k8sClient kubernetes.Interface
 	router    *gin.Engine
-}
-
-func getKubernetesClient() *kubernetes.Clientset {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		panic(fmt.Sprintf("Error retrieving in-cluster k8s client config: %s", err.Error()))
-	}
-
-	config.Wrap(func(rt http.RoundTripper) http.RoundTripper { return otelhttp.NewTransport(rt) })
-	client, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(fmt.Sprintf("Error instantiating k8s from host %s: %s", config.Host, err.Error()))
-	}
-	return client
 }
 
 func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, cache *cache.Cache,
@@ -143,7 +128,13 @@ func main() {
 	}(db)
 
 	controller := routers.Controller{Database: db, CacheConfiguration: *cacheExpirations}
-	server := NewServer(getKubernetesClient(), controller, memCache, cacheExpirations)
+	k8sClient, err := k8sclient.NewInstrumentedKubernetesClient()
+	if err != nil {
+		slog.Error("Could not create instrumented kubernetes client", "error", err.Error())
+		os.Exit(1)
+	}
+
+	server := NewServer(k8sClient, controller, memCache, cacheExpirations)
 	httpServer := http.Server{
 		Addr:    "0.0.0.0:8081",
 		Handler: server.router.Handler(),

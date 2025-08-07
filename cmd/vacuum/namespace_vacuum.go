@@ -12,8 +12,8 @@ import (
 	"os"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
-	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	publisher "github.com/kubearchive/kubearchive/pkg/cloudevents"
+	"github.com/kubearchive/kubearchive/pkg/k8sclient"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
@@ -24,7 +24,7 @@ func namespaceVacuum(configName string) error {
 		return errors.New("no NAMESPACE environment variable set")
 	}
 
-	client, err := k8s.GetKubernetesClient()
+	client, err := k8sclient.NewInstrumentedDynamicClient()
 	if err != nil {
 		return fmt.Errorf("unable to get client: %v", err)
 	}

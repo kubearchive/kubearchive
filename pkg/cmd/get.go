@@ -19,7 +19,7 @@ import (
 
 type GetOptions struct {
 	genericiooptions.IOStreams
-	config.ArchiveCLICommand
+	config.KACLICommand
 	AllNamespaces      bool
 	APIPath            string
 	Resource           string
@@ -39,7 +39,7 @@ func NewGetOptions() *GetOptions {
 			Out:    os.Stdout,
 			ErrOut: os.Stderr,
 		},
-		ArchiveCLICommand: config.NewArchiveOptions(),
+		KACLICommand: config.NewKAOptions(),
 	}
 }
 
@@ -74,7 +74,7 @@ func NewGetCmd() *cobra.Command {
 }
 
 func (o *GetOptions) Complete(args []string) error {
-	err := o.ArchiveCLICommand.Complete()
+	err := o.KACLICommand.Complete()
 	if err != nil {
 		return fmt.Errorf("error completing the args: %w", err)
 	}

@@ -477,8 +477,8 @@ k8s.io/utils v0.0.0-20241210054802-24370beab758 h1:sdbE21q2nlQtFh65saZY+rRM6x6aJ
 k8s.io/utils v0.0.0-20241210054802-24370beab758/go.mod h1:OLgZIPagt7ERELqWJFomSt595RzquPNLL48iOWgYOg0=
 knative.dev/eventing v0.45.3 h1:VySKmVDHFxrYRZMH0/TVV+Ne1dzq+a31ADSsUCUNemE=
 knative.dev/eventing v0.45.3/go.mod h1:Fz5VjV/vWVN93UfTX3lzc+uFrvJ9wxiiKrRIPhQxoj8=
-knative.dev/pkg v0.0.0-20250804212045-2a0abb7b5eb3 h1:5IWHlFvSTR/gZY+bShXCAHFFZ6rQqhYvx1KxVwlsnKw=
-knative.dev/pkg v0.0.0-20250804212045-2a0abb7b5eb3/go.mod h1:qpyBu3z/r1fRfyLo/Zdpis1mmtixdXmsCPmJMz/BsLc=
+knative.dev/pkg v0.0.0-20250807143752-9402b8ca51f1 h1:VAh9eNHLXlYzdGd7FWPPZFs/mzROsJFlm/u5j7eHqBg=
+knative.dev/pkg v0.0.0-20250807143752-9402b8ca51f1/go.mod h1:qpyBu3z/r1fRfyLo/Zdpis1mmtixdXmsCPmJMz/BsLc=
 nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=
 sigs.k8s.io/controller-runtime v0.20.4 h1:X3c+Odnxz+iPTRobG4tp092+CvBU9UK0t/bRf+n0DGU=
 sigs.k8s.io/controller-runtime v0.20.4/go.mod h1:xg2XB0K5ShQzAgsoujxuKN4LNXR2LfwwHsPj7Iaw+XY=

@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// MockArchiveCLICommandForLogs implements the ArchiveCLICommand interface for logs testing
-type MockArchiveCLICommandForLogs struct {
+// MockKACLICommandForLogs implements the KACLICommand interface for logs testing
+type MockKACLICommandForLogs struct {
 	responses      map[string]string // Path -> response
 	errors         map[string]error  // Path -> error
 	completeError  error
@@ -23,7 +23,7 @@ type MockArchiveCLICommandForLogs struct {
 	namespaceError error
 }
 
-func (m *MockArchiveCLICommandForLogs) GetFromAPI(_ config.API, path string) ([]byte, error) {
+func (m *MockKACLICommandForLogs) GetFromAPI(_ config.API, path string) ([]byte, error) {
 	// Check for errors first
 	if err, exists := m.errors[path]; exists {
 		return nil, err
@@ -38,13 +38,13 @@ func (m *MockArchiveCLICommandForLogs) GetFromAPI(_ config.API, path string) ([]
 	return nil, fmt.Errorf("unexpected API call to path: %s", path)
 }
 
-func (m *MockArchiveCLICommandForLogs) Complete() error {
+func (m *MockKACLICommandForLogs) Complete() error {
 	return m.completeError
 }
 
-func (m *MockArchiveCLICommandForLogs) AddFlags(_ *pflag.FlagSet) {}
+func (m *MockKACLICommandForLogs) AddFlags(_ *pflag.FlagSet) {}
 
-func (m *MockArchiveCLICommandForLogs) GetNamespace() (string, error) {
+func (m *MockKACLICommandForLogs) GetNamespace() (string, error) {
 	if m.namespaceError != nil {
 		return "", m.namespaceError
 	}
@@ -55,9 +55,9 @@ func (m *MockArchiveCLICommandForLogs) GetNamespace() (string, error) {
 }
 
 // NewTestLogsOptions creates LogsOptions with a mock for testing
-func NewTestLogsOptions(mockCLI *MockArchiveCLICommandForLogs) *LogsOptions {
+func NewTestLogsOptions(mockCLI *MockKACLICommandForLogs) *LogsOptions {
 	return &LogsOptions{
-		ArchiveCLICommand: mockCLI,
+		KACLICommand: mockCLI,
 	}
 }
 
@@ -165,7 +165,7 @@ func TestLogsRun(t *testing.T) {
 		containerName  string
 		labelSelector  string
 		namespace      string
-		mock           *MockArchiveCLICommandForLogs
+		mock           *MockKACLICommandForLogs
 		expectError    bool
 		errorContains  string
 		expectedOutput string
@@ -176,7 +176,7 @@ func TestLogsRun(t *testing.T) {
 			resource:     "pods",
 			resourceName: "generate-log-1-29141722-k7s8m",
 			namespace:    "generate-logs-cronjobs",
-			mock: &MockArchiveCLICommandForLogs{
+			mock: &MockKACLICommandForLogs{
 				namespaceValue: "generate-logs-cronjobs",
 				responses: map[string]string{
 					"/api/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-29141722-k7s8m/log": "Log output from pod generate-log-1-29141722-k7s8m",
@@ -191,7 +191,7 @@ func TestLogsRun(t *testing.T) {
 			resourceName:  "generate-log-1-29141722-k7s8m",
 			containerName: "generate3",
 			namespace:     "generate-logs-cronjobs",
-			mock: &MockArchiveCLICommandForLogs{
+			mock: &MockKACLICommandForLogs{
 				namespaceValue: "generate-logs-cronjobs",
 				responses: map[string]string{
 					"/api/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-29141722-k7s8m/log?container=generate3": "Log output from generate3 container",
@@ -205,7 +205,7 @@ func TestLogsRun(t *testing.T) {
 			resource:     "jobs",
 			resourceName: "generate-log-1-29141722",
 			namespace:    "generate-logs-cronjobs",
-			mock: &MockArchiveCLICommandForLogs{
+			mock: &MockKACLICommandForLogs{
 				namespaceValue: "generate-logs-cronjobs",
 				responses: map[string]string{
 					"/apis/batch/v1/namespaces/generate-logs-cronjobs/jobs/generate-log-1-29141722/log": "Log output from job generate-log-1-29141722",
@@ -219,7 +219,7 @@ func TestLogsRun(t *testing.T) {
 			resource:      "pods",
 			labelSelector: "batch.kubernetes.io/job-name=generate-log-1-29141722",
 			namespace:     "generate-logs-cronjobs",
-			mock: &MockArchiveCLICommandForLogs{
+			mock: &MockKACLICommandForLogs{
 				namespaceValue: "generate-logs-cronjobs",
 				responses: map[string]string{
 					"/api/v1/namespaces/generate-logs-cronjobs/pods?labelSelector=batch.kubernetes.io%2Fjob-name%3Dgenerate-log-1-29141722": podsData,
@@ -235,7 +235,7 @@ func TestLogsRun(t *testing.T) {
 			resource:     "pods",
 			resourceName: "generate-log-1-29141722-k7s8m",
 			namespace:    "generate-logs-cronjobs",
-			mock: &MockArchiveCLICommandForLogs{
+			mock: &MockKACLICommandForLogs{
 				namespaceValue: "generate-logs-cronjobs",
 				errors: map[string]error{
 					"/api/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-29141722-k7s8m/log": fmt.Errorf("connection failed"),
@@ -249,7 +249,7 @@ func TestLogsRun(t *testing.T) {
 			groupVersion: "v1",
 			resource:     "pods",
 			resourceName: "generate-log-1-29141722-k7s8m",
-			mock: &MockArchiveCLICommandForLogs{
+			mock: &MockKACLICommandForLogs{
 				namespaceError: fmt.Errorf("namespace error"),
 			},
 			expectError:   true,
@@ -261,7 +261,7 @@ func TestLogsRun(t *testing.T) {
 			resource:      "pods",
 			labelSelector: "app=nonexistent",
 			namespace:     "generate-logs-cronjobs",
-			mock: &MockArchiveCLICommandForLogs{
+			mock: &MockKACLICommandForLogs{
 				namespaceValue: "generate-logs-cronjobs",
 				responses: map[string]string{
 					"/api/v1/namespaces/generate-logs-cronjobs/pods?labelSelector=app%3Dnonexistent": `{"apiVersion":"v1","kind":"List","metadata":{},"items":[]}`,
@@ -277,7 +277,7 @@ func TestLogsRun(t *testing.T) {
 			labelSelector: "job-name=generate-log-1-29141722",
 			containerName: "generate1",
 			namespace:     "generate-logs-cronjobs",
-			mock: &MockArchiveCLICommandForLogs{
+			mock: &MockKACLICommandForLogs{
 				namespaceValue: "generate-logs-cronjobs",
 				responses: map[string]string{
 					"/apis/batch/v1/namespaces/generate-logs-cronjobs/jobs?labelSelector=job-name%3Dgenerate-log-1-29141722": jobsData,

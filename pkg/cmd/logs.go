@@ -15,7 +15,7 @@ import (
 )
 
 type LogsOptions struct {
-	config.ArchiveCLICommand
+	config.KACLICommand
 	ContainerName string
 	Name          string
 	Resource      string
@@ -44,7 +44,7 @@ kubectl archive logs tekton.dev/v1 taskrun my-task
 
 func NewLogsOptions() *LogsOptions {
 	return &LogsOptions{
-		ArchiveCLICommand: config.NewArchiveOptions(),
+		KACLICommand: config.NewKAOptions(),
 	}
 }
 
@@ -81,7 +81,7 @@ func NewLogCmd() *cobra.Command {
 }
 
 func (o *LogsOptions) Complete(args []string) error {
-	err := o.ArchiveCLICommand.Complete()
+	err := o.KACLICommand.Complete()
 	if err != nil {
 		return fmt.Errorf("error completing the args: %w", err)
 	}

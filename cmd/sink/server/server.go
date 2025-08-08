@@ -15,6 +15,7 @@ import (
 	"github.com/Cyprinus12138/otelgin"
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/sink/routers"
+	"github.com/kubearchive/kubearchive/pkg/logging"
 	"github.com/kubearchive/kubearchive/pkg/middleware"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 )
@@ -27,11 +28,12 @@ type Server struct {
 func NewServer(controller *routers.Controller) *Server {
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(otelgin.Middleware("", otelgin.WithDisableGinErrorsOnMetrics(true)))
+	router.Use(logging.TracingMiddleware())
 	router.Use(middleware.Logger(middleware.LoggerConfig{PathLoggingLevel: map[string]string{
 		"/livez":  "DEBUG",
 		"/readyz": "DEBUG",
 	}}))
-	router.Use(otelgin.Middleware("", otelgin.WithDisableGinErrorsOnMetrics(true)))
 
 	router.POST("/", controller.CloudEventsHandler)
 

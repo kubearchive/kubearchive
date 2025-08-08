@@ -3,7 +3,6 @@
 package middleware
 
 import (
-	"context"
 	"log/slog"
 	"time"
 
@@ -44,7 +43,7 @@ func Logger(conf LoggerConfig) gin.HandlerFunc {
 		}
 
 		slog.Log(
-			context.Background(), // They use `Background` in the slog implementation
+			c.Request.Context(),
 			logLevel,
 			"Served request",
 			"method", c.Request.Method,

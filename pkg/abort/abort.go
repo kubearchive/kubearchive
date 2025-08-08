@@ -10,7 +10,7 @@ import (
 )
 
 func Abort(c *gin.Context, err error, code int) {
-	slog.Error("there was a problem", "error", err.Error(), "code", code)
+	slog.ErrorContext(c.Request.Context(), "there was a problem", "error", err.Error(), "code", code)
 	c.JSON(code, gin.H{"message": err.Error()})
 	c.Abort()
 }

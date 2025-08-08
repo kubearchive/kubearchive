@@ -51,11 +51,12 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	cacheExpirations *routers.CacheExpirations) *Server {
 	router := gin.New()
 	router.Use(gin.Recovery())
+	router.Use(otelgin.Middleware("", otelgin.WithDisableGinErrorsOnMetrics(true))) // Empty string so the library sets the proper server
+	router.Use(kaLogging.TracingMiddleware())
 	router.Use(middleware.Logger(middleware.LoggerConfig{PathLoggingLevel: map[string]string{
 		"/livez":  "DEBUG",
 		"/readyz": "DEBUG",
 	}}))
-	router.Use(otelgin.Middleware("", otelgin.WithDisableGinErrorsOnMetrics(true))) // Empty string so the library sets the proper server
 
 	apiGroup := router.Group("/api")
 	apisGroup := router.Group("/apis")

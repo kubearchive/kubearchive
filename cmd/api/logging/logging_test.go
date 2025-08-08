@@ -4,6 +4,7 @@
 package logging
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -86,6 +87,9 @@ func TestLogRetrievalError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			res := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(res)
+			c.Request = &http.Request{}
+			c.Request = c.Request.WithContext(context.Background())
+
 			for key, value := range tt.contextValues {
 				c.Set(key, value)
 			}

@@ -82,7 +82,7 @@ func LogRetrieval() gin.HandlerFunc {
 			abort.Abort(c, fmt.Errorf("no log URL found"), http.StatusNotFound)
 			return
 		}
-		slog.Info("Retrieving logs", "logURL", logUrl)
+		slog.InfoContext(c.Request.Context(), "Retrieving logs", "logURL", logUrl)
 
 		var jsonPathParser jp.Expr
 		var errJsonPath error

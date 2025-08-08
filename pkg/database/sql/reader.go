@@ -100,7 +100,8 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 		}
 	}
 
-	slog.Debug(
+	slog.DebugContext(
+		ctx,
 		"found pod preferred container for logs",
 		"container", containerName,
 		"namespace", namespace,
@@ -154,7 +155,8 @@ func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, na
 		return "", "", err
 	}
 
-	slog.Debug(
+	slog.DebugContext(
+		ctx,
 		"getting owned pods for resource",
 		"kind", kind,
 		"namespace", namespace,

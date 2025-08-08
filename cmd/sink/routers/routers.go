@@ -76,9 +76,10 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 		var err error
 		urls, err = c.LogUrlBuilder.Urls(ctx, obj)
 		if err != nil {
-			slog.Error(
+			slog.ErrorContext(
+				ctx,
 				"Could not build log urls for resource",
-				"id", obj.GetUID(),
+				"id", string(obj.GetUID()),
 				"kind", obj.GetKind(),
 				"namespace", obj.GetNamespace(),
 				"name", obj.GetName(),
@@ -87,9 +88,10 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 			return interfaces.WriteResourceResultError, err
 		}
 		if len(urls) == 0 {
-			slog.Info(
+			slog.InfoContext(
+				ctx,
 				"No log urls were generated for object",
-				"id", obj.GetUID(),
+				"id", string(obj.GetUID()),
 				"kind", obj.GetKind(),
 				"namespace", obj.GetNamespace(),
 				"name", obj.GetName(),
@@ -99,11 +101,12 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 
 	result, writeResourceErr := c.Db.WriteResource(dbCtx, obj, event.Data(), lastUpdateTs, jsonPath, urls...)
 	if writeResourceErr != nil {
-		slog.Error(
+		slog.ErrorContext(
+			ctx,
 			"Failed to write object from cloudevent to the database",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
-			"id", obj.GetUID(),
+			"id", string(obj.GetUID()),
 			"kind", obj.GetKind(),
 			"namespace", obj.GetNamespace(),
 			"name", obj.GetName(),
@@ -112,11 +115,12 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 		return result, writeResourceErr
 	}
 
-	slog.Info(
+	slog.InfoContext(
+		ctx,
 		"Successfully wrote object from cloudevent to the database",
 		"event-id", event.ID(),
 		"event-type", event.Type(),
-		"id", obj.GetUID(),
+		"id", string(obj.GetUID()),
 		"kind", obj.GetKind(),
 		"namespace", obj.GetNamespace(),
 		"name", obj.GetName(),
@@ -144,10 +148,10 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 	}()
 
 	ex := event.Extensions()
-	slog.Info("Received CloudEvent", "event-id", event.ID(), "event-type", event.Type(), "kind", ex["kind"], "name", ex["name"], "namespace", ex["namespace"])
+	slog.InfoContext(ctx, "Received CloudEvent", "event-id", event.ID(), "event-type", event.Type(), "kind", ex["kind"], "name", ex["name"], "namespace", ex["namespace"])
 	k8sObj, err := models.UnstructuredFromByteSlice(event.Data())
 	if err != nil {
-		slog.Error("Received malformed CloudEvent", "event-id", event.ID(), "err", err)
+		slog.ErrorContext(ctx, "Received malformed CloudEvent", "event-id", event.ID(), "err", err)
 		return NewCEResult(http.StatusUnprocessableEntity)
 	}
 
@@ -155,11 +159,12 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 
 	if !c.Filters.IsConfigured(ctx, k8sObj) {
 		CEMetricAttrs["result"] = string(observability.CEResultNoConfiguration)
-		slog.Warn(
+		slog.WarnContext(
+			ctx,
 			"Resource update received, resource is not configured",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
-			"id", k8sObj.GetUID(),
+			"id", string(k8sObj.GetUID()),
 			"kind", k8sObj.GetKind(),
 			"apiVersion", k8sObj.GetAPIVersion(),
 			"namespace", k8sObj.GetNamespace(),
@@ -182,11 +187,12 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			logMsg = "Resource deletion received, resource did not match for archive on deletion"
 		}
 
-		slog.Info(
+		slog.InfoContext(
+			ctx,
 			logMsg,
 			"event-id", event.ID(),
 			"event-type", event.Type(),
-			"id", k8sObj.GetUID(),
+			"id", string(k8sObj.GetUID()),
 			"kind", k8sObj.GetKind(),
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
@@ -196,11 +202,12 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 
 	// If resource does not match archival, we exit early
 	if !c.Filters.MustArchive(ctx, k8sObj) {
-		slog.Info(
+		slog.InfoContext(
+			ctx,
 			"Resource update received, no archive needed",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
-			"id", k8sObj.GetUID(),
+			"id", string(k8sObj.GetUID()),
 			"kind", k8sObj.GetKind(),
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
@@ -217,11 +224,12 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
 	// If after archiving the resource does not need to be deleted we exit early
 	if !c.Filters.MustDelete(ctx, k8sObj) {
-		slog.Info(
+		slog.InfoContext(
+			ctx,
 			"Resource was updated and archived",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
-			"id", k8sObj.GetUID(),
+			"id", string(k8sObj.GetUID()),
 			"kind", k8sObj.GetKind(),
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
@@ -241,11 +249,12 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 		metav1.DeleteOptions{PropagationPolicy: &propagationPolicy},
 	)
 	if errs.IsNotFound(err) {
-		slog.Info(
+		slog.InfoContext(
+			ctx,
 			"Resource is already deleted",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
-			"id", k8sObj.GetUID(),
+			"id", string(k8sObj.GetUID()),
 			"kind", k8sObj.GetKind(),
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
@@ -253,11 +262,12 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 		return NewCEResult(http.StatusAccepted)
 	}
 	if err != nil {
-		slog.Error(
+		slog.ErrorContext(
+			ctx,
 			"Error deleting a resource",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
-			"id", k8sObj.GetUID(),
+			"id", string(k8sObj.GetUID()),
 			"kind", k8sObj.GetKind(),
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
@@ -275,11 +285,12 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 	}
 
 	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
-	slog.Info(
+	slog.InfoContext(
+		ctx,
 		"Resource was updated, archived and deleted from the cluster",
 		"event-id", event.ID(),
 		"event-type", event.Type(),
-		"id", k8sObj.GetUID(),
+		"id", string(k8sObj.GetUID()),
 		"kind", k8sObj.GetKind(),
 		"namespace", k8sObj.GetNamespace(),
 		"name", k8sObj.GetName(),

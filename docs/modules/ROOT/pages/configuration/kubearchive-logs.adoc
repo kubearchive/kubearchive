@@ -23,3 +23,18 @@ kubectl set -n kubearchive env deployment kubearchive-sink LOG_LEVEL=DEBUG
 The rollout of the Deployments happens automatically after using the
 command `kubectl set env`.
 ====
+
+== TraceID and SpanID
+
+The KubeArchive Sink and API print logs with `trace-id` and `span-id`. If 
+xref:configuration/observability.adoc[observability]
+is configured, their values are correlated with the emitted traces.
+If
+xref:configuration/observability.adoc[observability]
+is not configured, their values are generated and only used within
+KubeArchive to correlate logs.
+
+[NOTE]
+====
+The KubeArchive Operator logs do not have `trace-id` and `span-id`.
+====

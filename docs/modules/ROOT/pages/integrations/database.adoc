@@ -10,37 +10,34 @@ endif::[]
 == Overview
 
 KubeArchive requires a database to store resources.
-This document list the databases supported, how to set up the database schema
+This document lists the databases supported, how to set up the database schema
 and how to add new database integrations.
 
 === PostgreSQL
 
 Currently, PostgreSQL is the only fully supported database engine.
-The KubeArchive integration test suite runs with the PostgreSQL version detailed in
-link:{download-path}/kubearchive.sql[the kubearchive.sql file].
+The KubeArchive integration test suite runs with the PostgreSQL version detailed under
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/integrations[the postgresql database integration directory].
 
 The PostgreSQL implementation is available
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/postgresql.go[here].
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/sql/postgresql.go[here].
 
 The PostgreSQL schema is available
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/integrations/database/postgresql/kubearchive.sql[here]
-and in the
-link:{download-path}[release]
-as [filename]`kubearchive.sql`.
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/integrations/database/postgresql/migrations/01_initial_schema.up.sql[here].
 
 === MariaDB
 
 This integration is still in progress.
 
 The MariaDB implementation is available
-link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/mariadb.go[here].
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/sql/mariadb.go[here].
 
 [#_configuration_and_customization]
 == Configuration and Customization
 
 === Schema
 
-KubeArchive offers a [filename]`kubearchive.sql` file with the instructions to set up
+KubeArchive offers a [filename]`setup.sql` file and migration scripts with the instructions to set up
 the schema as part of the installation process.
 
 [IMPORTANT]
@@ -57,13 +54,13 @@ The schema expects the existence of a `kubearchive` database user fow owning thi
 
 [IMPORTANT]
 ====
-An account with admin privileges should run [filename]`kubearchive.sql`.
+An account with admin privileges should run the [filename]`setup.sql` script.
 
 [source, bash]
 ----
 psql -U admin \ <1>
 -h database.example.com \ <2>
--f kubearchive.sql
+-f setup.sql
 ----
 <1> The database admin account used to apply the schema. It can be different from the KubeArchive DB user.
 <2> The database URL
@@ -114,7 +111,7 @@ the schema provided within the KubeArchive release.
 
 [IMPORTANT]
 ====
-Don't forget to restart kubearchive sink and api as both access the database:
+Remember to restart kubearchive sink and api as both access the database:
 
 [source, bash]
 ----
@@ -125,12 +122,12 @@ kubectl rollout -n kubearchive restart deployment kubearchive-sink kubearchive-a
 
 == Adding a New Database engine
 
-To add a new database integration follow the instructions:
+To add a new database integration, follow the instructions:
 
 1. Create a new file under `pkg/database` named after the new database engine.
-   If it's a sql engine, it should be under `pkg/database/sql`.
+   If it's a SQL engine, it should be under `pkg/database/sql`.
 2. Include a new entry on the
-link:https://github.com/kubearchive/kubearchive/blob/main/pkg/database/database.go#L15[`RegisteredDatabases`]
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/database.go#L17[`RegisteredDatabases`]
 map with the instance of the new `Database` implementation.
 
 === The `Database` implementation
@@ -140,18 +137,18 @@ map with the instance of the new `Database` implementation.
 This section includes the development guidelines expected by the KubeArchive maintainers.
 ====
 
-If the engine is a sql one, `Database` implementation should be a struct with
-link:https://github.com/kubearchive/kubearchive/blob/main/pkg/database/database.go#L40[`sqlDatabaseImpl`]
+If the engine is a SQL one, `Database` implementation should be a struct with
+link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/sql/database.go#L29[`sqlDatabaseImpl`]
 embedded. `sqlDatabaseImpl` is a partial implementation, so make sure the new engine implementation
 fully implements all methods required by the `Database` interface.
 
 Make sure to implement the interfaces that are part of it:
 
-* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/deleter.go[DBDeleter]
-* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/filter.go[DBFilter]
-* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/inserter.go[DBInserter]
-* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/selector.go[DBSelector]
-* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/facade/sorter.go[DBSorter]
+* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/sql/facade/deleter.go[DBDeleter]
+* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/sql/facade/filter.go[DBFilter]
+* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/sql/facade/inserter.go[DBInserter]
+* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/sql/facade/selector.go[DBSelector]
+* link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/pkg/database/sql/facade/sorter.go[DBSorter]
 
 [NOTE]
 ====

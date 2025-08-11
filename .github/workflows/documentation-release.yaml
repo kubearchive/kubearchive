@@ -33,7 +33,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       # Checkout 'fetch-tags' does not work properly, see https://github.com/actions/checkout/issues/701
       - name: Fecth tags
         run: git fetch --tags origin

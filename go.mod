@@ -41,11 +41,11 @@ require (
 	go.opentelemetry.io/otel/trace v1.37.0
 	google.golang.org/grpc v1.74.2
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.32.2
+	k8s.io/api v0.32.7
 	k8s.io/apimachinery v0.32.7
-	k8s.io/apiserver v0.32.2
+	k8s.io/apiserver v0.32.7
 	k8s.io/cli-runtime v0.32.2
-	k8s.io/client-go v0.32.2
+	k8s.io/client-go v0.32.7
 	k8s.io/klog/v2 v2.130.1
 	knative.dev/eventing v0.45.3
 	knative.dev/pkg v0.0.0-20250415155312-ed3e2158b883

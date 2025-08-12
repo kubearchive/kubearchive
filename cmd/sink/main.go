@@ -73,11 +73,7 @@ func main() {
 	if err != nil {
 		slog.Error("Could not enable log url creation", "error", err)
 	}
-	controller, err := routers.NewController(db, filter, dynClient, builder)
-	if err != nil {
-		slog.Error("Could not start HTTP server", "error", err)
-		os.Exit(1)
-	}
+	controller := routers.NewController(db, filter, dynClient, builder)
 	server := server.NewServer(controller)
 	server.Serve()
 }

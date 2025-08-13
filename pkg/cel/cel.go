@@ -13,6 +13,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	celext "github.com/google/cel-go/ext"
+	"go.opentelemetry.io/otel"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -78,6 +79,10 @@ func ExecuteBooleanCEL(ctx context.Context, program cel.Program, obj *unstructur
 }
 
 func ExecuteCEL(ctx context.Context, program cel.Program, obj *unstructured.Unstructured) ref.Val {
+	tracer := otel.Tracer("kubearchive")
+	ctx, span := tracer.Start(ctx, "ExecuteCEL")
+	defer span.End()
+
 	val, _, _ := program.ContextEval(ctx, obj.Object)
 	return val
 }

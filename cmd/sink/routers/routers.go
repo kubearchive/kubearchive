@@ -22,7 +22,9 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/kubearchive/kubearchive/pkg/observability"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	errs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -47,6 +49,10 @@ func NewController(
 }
 
 func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstructured, event *cloudevents.Event) (interfaces.WriteResourceResult, error) {
+	tracer := otel.Tracer("kubearchive")
+	ctx, span := tracer.Start(ctx, "writeResource")
+	defer span.End()
+
 	lastUpdateTs := k8s.GetLastUpdateTs(obj)
 	dbCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
@@ -68,6 +74,8 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 				"name", obj.GetName(),
 				"err", err,
 			)
+			span.SetStatus(codes.Error, "failed")
+			span.RecordError(err)
 			return interfaces.WriteResourceResultError, err
 		}
 		if len(urls) == 0 {
@@ -95,6 +103,8 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 			"name", obj.GetName(),
 			"err", writeResourceErr,
 		)
+		span.SetStatus(codes.Error, "failed")
+		span.RecordError(writeResourceErr)
 		return result, writeResourceErr
 	}
 
@@ -115,18 +125,41 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 // receiveCloudEvent returns an HTTP 400 if the request body is not a CloudEvent or HTTP 422 if event.Data is not a
 // kubernetes object. All other failures should return HTTP 500 instead.
 func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
+	tracer := otel.Tracer("kubearchive")
+	spanCtx, span := tracer.Start(ctx.Request.Context(), "ReceiveCloudEvent")
+	ctx.Request = ctx.Request.WithContext(spanCtx)
+	defer span.End()
+
+	childSpanCtx, childSpan := tracer.Start(ctx.Request.Context(), "cloudevents.NewEventFromHTTPRequest")
 	event, eventErr := cloudevents.NewEventFromHTTPRequest(ctx.Request)
 	if eventErr != nil || event == nil {
-		slog.Error("Could not parse a CloudEvent from http request", "err", eventErr)
+		slog.ErrorContext(childSpanCtx, "Could not parse a CloudEvent from http request", "err", eventErr)
 		ctx.Status(http.StatusBadRequest)
+		childSpan.SetStatus(codes.Error, "failed")
+		childSpan.RecordError(eventErr)
+		span.SetStatus(codes.Error, "failed")
+		span.RecordError(eventErr)
 		return
 	}
+	childSpan.End()
+
+	span.SetAttributes(
+		attribute.String("event-id", event.ID()),
+		attribute.String("event-type", event.Type()),
+	)
+
+	childSpanCtx, childSpan = tracer.Start(ctx.Request.Context(), "event.Validate")
 	validationErr := event.Validate()
 	if validationErr != nil {
-		slog.Error("Received invalid CloudEvent from http request", "err", validationErr)
+		slog.ErrorContext(childSpanCtx, "Received invalid CloudEvent from http request", "err", validationErr)
 		ctx.Status(http.StatusBadRequest)
+		childSpan.SetStatus(codes.Error, "failed")
+		childSpan.RecordError(validationErr)
+		span.SetStatus(codes.Error, "failed")
+		span.RecordError(validationErr)
 		return
 	}
+	childSpan.End()
 
 	CEMetricAttrs := map[string]string{
 		"event_type": event.Type(),
@@ -143,21 +176,34 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 		observability.CloudEvents.Add(ctx, 1, metric.WithAttributes(attrs...))
 	}()
 
+	childSpanCtx, childSpan = tracer.Start(ctx.Request.Context(), "models.UnstructuredFromByteSlice")
 	ex := event.Extensions()
-	slog.InfoContext(ctx, "Received CloudEvent", "event-id", event.ID(), "event-type", event.Type(), "kind", ex["kind"], "name", ex["name"], "namespace", ex["namespace"])
+	slog.InfoContext(childSpanCtx, "Received CloudEvent", "event-id", event.ID(), "event-type", event.Type(), "kind", ex["kind"], "name", ex["name"], "namespace", ex["namespace"])
 	k8sObj, err := models.UnstructuredFromByteSlice(event.Data())
 	if err != nil {
-		slog.ErrorContext(ctx, "Received malformed CloudEvent", "event-id", event.ID(), "err", err)
+		slog.ErrorContext(childSpanCtx, "Received malformed CloudEvent", "event-id", event.ID(), "err", err)
 		ctx.Status(http.StatusUnprocessableEntity)
+		childSpan.SetStatus(codes.Error, "failed")
+		childSpan.RecordError(err)
+		span.SetStatus(codes.Error, "failed")
+		span.RecordError(err)
 		return
 	}
+	childSpan.End()
 
 	CEMetricAttrs["resource_type"] = fmt.Sprintf("%s/%s", k8sObj.GetAPIVersion(), k8sObj.GetKind())
+	span.SetAttributes(
+		attribute.String("kind", k8sObj.GetKind()),
+		attribute.String("apiVersion", k8sObj.GetAPIVersion()),
+		attribute.String("id", string(k8sObj.GetUID())),
+		attribute.String("namespace", k8sObj.GetNamespace()),
+		attribute.String("name", k8sObj.GetName()),
+	)
 
-	if !c.Filters.IsConfigured(ctx, k8sObj) {
+	if !c.Filters.IsConfigured(ctx.Request.Context(), k8sObj) {
 		CEMetricAttrs["result"] = string(observability.CEResultNoConfiguration)
 		slog.WarnContext(
-			ctx,
+			ctx.Request.Context(),
 			"Resource update received, resource is not configured",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
@@ -167,16 +213,19 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName())
 		ctx.Status(http.StatusAccepted)
+		span.SetStatus(codes.Ok, "successful")
 		return
 	}
 
 	// If message is of type delete we end early
 	if strings.HasSuffix(event.Type(), ".delete") {
 		logMsg := "Resource deletion received, resource archived"
-		if c.Filters.MustArchiveOnDelete(ctx, k8sObj) {
-			result, writeErr := c.writeResource(ctx, k8sObj, event)
+		if c.Filters.MustArchiveOnDelete(ctx.Request.Context(), k8sObj) {
+			result, writeErr := c.writeResource(ctx.Request.Context(), k8sObj, event)
 			if writeErr != nil {
 				ctx.Status(http.StatusInternalServerError)
+				span.SetStatus(codes.Error, "failed")
+				span.RecordError(writeErr)
 				return
 			}
 
@@ -187,7 +236,7 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 		}
 
 		slog.InfoContext(
-			ctx,
+			ctx.Request.Context(),
 			logMsg,
 			"event-id", event.ID(),
 			"event-type", event.Type(),
@@ -197,13 +246,14 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 			"name", k8sObj.GetName(),
 		)
 		ctx.Status(http.StatusAccepted)
+		span.SetStatus(codes.Ok, "successful")
 		return
 	}
 
 	// If resource does not match archival, we exit early
-	if !c.Filters.MustArchive(ctx, k8sObj) {
+	if !c.Filters.MustArchive(ctx.Request.Context(), k8sObj) {
 		slog.InfoContext(
-			ctx,
+			ctx.Request.Context(),
 			"Resource update received, no archive needed",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
@@ -214,20 +264,23 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 		)
 		CEMetricAttrs["result"] = string(observability.CEResultNoMatch)
 		ctx.Status(http.StatusAccepted)
+		span.SetStatus(codes.Ok, "successful")
 		return
 	}
 
-	result, err := c.writeResource(ctx, k8sObj, event)
+	result, err := c.writeResource(ctx.Request.Context(), k8sObj, event)
 	if err != nil {
 		ctx.Status(http.StatusInternalServerError)
+		span.SetStatus(codes.Error, "failed")
+		span.RecordError(err)
 		return
 	}
 
 	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
 	// If after archiving the resource does not need to be deleted we exit early
-	if !c.Filters.MustDelete(ctx, k8sObj) {
+	if !c.Filters.MustDelete(ctx.Request.Context(), k8sObj) {
 		slog.InfoContext(
-			ctx,
+			ctx.Request.Context(),
 			"Resource was updated and archived",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
@@ -237,6 +290,7 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 			"name", k8sObj.GetName(),
 		)
 		ctx.Status(http.StatusAccepted)
+		span.SetStatus(codes.Ok, "successful")
 		return
 	}
 
@@ -244,16 +298,19 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 	kind := k8sObj.GetObjectKind().GroupVersionKind()
 	resource, _ := meta.UnsafeGuessKindToResource(kind)     // we only need the plural resource
 	propagationPolicy := metav1.DeletePropagationBackground // can't get address of a const
-	k8sCtx, k8sCancel := context.WithTimeout(ctx, time.Second*5)
-	defer k8sCancel()
+
+	childSpanCtx, childSpan = tracer.Start(ctx.Request.Context(), "delete resource")
+	deleteCtx, deleteCtxCancel := context.WithTimeout(childSpanCtx, time.Second*5)
+	defer deleteCtxCancel()
+
 	err = c.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).Delete(
-		k8sCtx,
+		deleteCtx,
 		k8sObj.GetName(),
 		metav1.DeleteOptions{PropagationPolicy: &propagationPolicy},
 	)
 	if errs.IsNotFound(err) {
 		slog.InfoContext(
-			ctx,
+			deleteCtx,
 			"Resource is already deleted",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
@@ -263,11 +320,13 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 			"name", k8sObj.GetName(),
 		)
 		ctx.Status(http.StatusAccepted)
+		childSpan.SetStatus(codes.Ok, "successful")
+		span.SetStatus(codes.Ok, "successful")
 		return
 	}
 	if err != nil {
 		slog.ErrorContext(
-			ctx,
+			deleteCtx,
 			"Error deleting a resource",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
@@ -278,21 +337,28 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 			"err", err,
 		)
 		ctx.Status(http.StatusInternalServerError)
+		childSpan.SetStatus(codes.Error, "failed")
+		childSpan.RecordError(err)
+		span.SetStatus(codes.Error, "failed")
+		span.RecordError(err)
 		return
 	}
+	childSpan.End()
 
 	// After deleting the resource we persist it with deletionTimestamp
 	deleteTs := metav1.Now()
 	k8sObj.SetDeletionTimestamp(&deleteTs)
-	result, err = c.writeResource(ctx, k8sObj, event)
+	result, err = c.writeResource(ctx.Request.Context(), k8sObj, event)
 	if err != nil {
 		ctx.Status(http.StatusInternalServerError)
+		span.SetStatus(codes.Error, "failed")
+		span.RecordError(err)
 		return
 	}
 
 	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
 	slog.InfoContext(
-		ctx,
+		ctx.Request.Context(),
 		"Resource was updated, archived and deleted from the cluster",
 		"event-id", event.ID(),
 		"event-type", event.Type(),
@@ -303,6 +369,7 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 	)
 
 	ctx.Status(http.StatusAccepted)
+	span.SetStatus(codes.Ok, "successful")
 }
 
 func (c *Controller) Livez(ctx *gin.Context) {

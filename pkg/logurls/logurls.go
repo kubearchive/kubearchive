@@ -13,6 +13,7 @@ import (
 	"github.com/google/cel-go/common/types/traits"
 	ocel "github.com/kubearchive/kubearchive/pkg/cel"
 	"github.com/kubearchive/kubearchive/pkg/models"
+	"go.opentelemetry.io/otel"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -23,6 +24,10 @@ const (
 )
 
 func GenerateLogURLs(ctx context.Context, cm map[string]interface{}, data *unstructured.Unstructured) ([]models.LogTuple, error) {
+	tracer := otel.Tracer("kubearchive")
+	ctx, span := tracer.Start(ctx, "GenerateLogURLs")
+	defer span.End()
+
 	urls := []models.LogTuple{}
 	r, err := regexp.Compile(variableRegex)
 	if err != nil {

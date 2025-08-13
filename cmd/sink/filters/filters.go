@@ -14,6 +14,7 @@ import (
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	ocel "github.com/kubearchive/kubearchive/pkg/cel"
 	"github.com/kubearchive/kubearchive/pkg/constants"
+	"go.opentelemetry.io/otel"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -51,6 +52,10 @@ func NewFilters(dynclient dynamic.Interface) *Filters {
 
 // changeFilters must be called when global filters for f have changed. This includes when f is first created.
 func (f *Filters) changeFilters(namespaces map[string][]kubearchiveapi.KubeArchiveConfigResource) error {
+	tracer := otel.Tracer("kubearchive")
+	_, span := tracer.Start(context.Background(), "changeFilters")
+	defer span.End()
+
 	errList := []error{}
 	archiveMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	deleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
@@ -62,11 +67,17 @@ func (f *Filters) changeFilters(namespaces map[string][]kubearchiveapi.KubeArchi
 		}
 	}
 	err := errors.Join(errList...)
+
+	span.AddEvent("Acquiring lock")
 	f.Lock()
 	defer f.Unlock()
+	defer span.AddEvent("Unlocking")
+
+	span.AddEvent("Got lock, doing work...")
 	f.archive = archiveMap
 	f.delete = deleteMap
 	f.archiveOnDelete = archiveOnDeleteMap
+
 	return err
 }
 
@@ -159,6 +170,10 @@ func (f *Filters) handleUpdates(watcher watch.Interface) {
 // MustArchive returns whether obj needs to be archived. Obj needs to be archived if any of the cel programs in archive
 // return true or if obj needs to be deleted. If obj is nil, it returns false.
 func (f *Filters) MustArchive(ctx context.Context, obj *unstructured.Unstructured) bool {
+	tracer := otel.Tracer("kubearchive")
+	ctx, span := tracer.Start(ctx, "MustArchive")
+	defer span.End()
+
 	if obj == nil {
 		return false
 	}
@@ -183,6 +198,10 @@ func (f *Filters) MustArchive(ctx context.Context, obj *unstructured.Unstructure
 // MustDelete returns whether obj needs to be deleted. Obj needs to be deleted if the cel program in delete that matches
 // the NamespaceGroupVersionKind of obj returns true. If obj is nil, it returns false.
 func (f *Filters) MustDelete(ctx context.Context, obj *unstructured.Unstructured) bool {
+	tracer := otel.Tracer("kubearchive")
+	ctx, span := tracer.Start(ctx, "MustDelete")
+	defer span.End()
+
 	if obj == nil {
 		return false
 	}
@@ -213,6 +232,10 @@ func (f *Filters) mustDelete(ctx context.Context, obj *unstructured.Unstructured
 // MustArchiveOnDelete returns whether obj needs to be archived if it was already deleted. Obj need to be archived if
 // any of the cel programs in archiveOnDelete return true. If obj is nil, it returns false.
 func (f *Filters) MustArchiveOnDelete(ctx context.Context, obj *unstructured.Unstructured) bool {
+	tracer := otel.Tracer("kubearchive")
+	ctx, span := tracer.Start(ctx, "MustArchiveOnDelete")
+	defer span.End()
+
 	if obj == nil {
 		return false
 	}
@@ -231,6 +254,10 @@ func (f *Filters) MustArchiveOnDelete(ctx context.Context, obj *unstructured.Uns
 }
 
 func (f *Filters) IsConfigured(ctx context.Context, obj *unstructured.Unstructured) bool {
+	tracer := otel.Tracer("kubearchive")
+	_, span := tracer.Start(ctx, "IsConfigured")
+	defer span.End()
+
 	ngvk := NamespaceGVKFromObject(obj)
 	_, namespaceArchiveOnDeleteExists := f.archiveOnDelete[ngvk]
 	_, namespaceArchiveWhenExists := f.archive[ngvk]

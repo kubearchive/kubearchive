@@ -77,11 +77,11 @@ func ConfigureLogging() error {
 func TracingMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
-		spanCtx := trace.SpanContextFromContext(ctx)
+		span := trace.SpanContextFromContext(ctx)
 
 		var traceID string
-		if spanCtx.HasTraceID() {
-			traceID = spanCtx.TraceID().String()
+		if span.HasTraceID() {
+			traceID = span.TraceID().String()
 		} else {
 			// 16 bytes as per definition: https://opentelemetry.io/docs/specs/otel/trace/api/#spancontext
 			buf := make([]byte, 16)
@@ -91,8 +91,8 @@ func TracingMiddleware() gin.HandlerFunc {
 		ctx = context.WithValue(ctx, traceIDKey, traceID)
 
 		var spanID string
-		if spanCtx.HasSpanID() {
-			spanID = spanCtx.SpanID().String()
+		if span.HasSpanID() {
+			spanID = span.SpanID().String()
 		} else {
 			// 8 bytes as per definition: https://opentelemetry.io/docs/specs/otel/trace/api/#spancontext
 			buf := make([]byte, 8)

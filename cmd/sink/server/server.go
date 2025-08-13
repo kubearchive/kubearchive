@@ -35,7 +35,7 @@ func NewServer(controller *routers.Controller) *Server {
 		"/readyz": "DEBUG",
 	}}))
 
-	router.POST("/", controller.CloudEventsHandler)
+	router.POST("/", controller.ReceiveCloudEvent)
 
 	router.GET("/livez", controller.Livez)
 	router.GET("/readyz", controller.Readyz)

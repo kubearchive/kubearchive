@@ -41,9 +41,8 @@ func setupRouter(
 ) *gin.Engine {
 	t.Helper()
 	router := gin.Default()
-	ctrl, err := NewController(db, filter, k8sClient, builder)
-	assert.Nil(t, err)
-	router.POST("/", ctrl.CloudEventsHandler)
+	ctrl := NewController(db, filter, k8sClient, builder)
+	router.POST("/", ctrl.ReceiveCloudEvent)
 	router.GET("/livez", ctrl.Livez)
 	router.GET("/readyz", ctrl.Readyz)
 	return router

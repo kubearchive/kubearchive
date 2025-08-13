@@ -11,10 +11,7 @@ import (
 	"strings"
 	"time"
 
-	ceOtelObs "github.com/cloudevents/sdk-go/observability/opentelemetry/v2/http"
 	cloudevents "github.com/cloudevents/sdk-go/v2"
-	ceClient "github.com/cloudevents/sdk-go/v2/client"
-	"github.com/cloudevents/sdk-go/v2/protocol"
 	"github.com/gin-gonic/gin"
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/cmd/sink/filters"
@@ -35,8 +32,6 @@ import (
 )
 
 type Controller struct {
-	ceHandler     *ceClient.EventReceiver
-	ceProtocol    *cloudevents.HTTPProtocol
 	Db            interfaces.DBWriter
 	Filters       filters.Interface
 	K8sClient     dynamic.Interface
@@ -45,25 +40,13 @@ type Controller struct {
 
 func NewController(
 	db interfaces.DBWriter, filter filters.Interface, k8sClient dynamic.Interface, urlBuilder *logs.UrlBuilder,
-) (*Controller, error) {
-	controller := &Controller{
+) *Controller {
+	return &Controller{
 		Db: db, Filters: filter, K8sClient: k8sClient, LogUrlBuilder: urlBuilder,
 	}
-	ceProtocol, err := ceOtelObs.NewObservedHTTP()
-	if err != nil {
-		return nil, fmt.Errorf("could not create controller: %w", err)
-	}
-	controller.ceProtocol = ceProtocol
-	// using context.Background() because the context passed to this function does not get used
-	ceHandler, err := cloudevents.NewHTTPReceiveHandler(context.Background(), ceProtocol, controller.receiveCloudEvent)
-	if err != nil {
-		return nil, fmt.Errorf("could not create controller: %w", err)
-	}
-	controller.ceHandler = ceHandler
-	return controller, nil
 }
 
-func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstructured, event cloudevents.Event) (interfaces.WriteResourceResult, error) {
+func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstructured, event *cloudevents.Event) (interfaces.WriteResourceResult, error) {
 	lastUpdateTs := k8s.GetLastUpdateTs(obj)
 	dbCtx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
@@ -129,9 +112,22 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 	return result, nil
 }
 
-// receiveCloudEvent returns an HTTP 422 if event.Data is not a kubernetes object. All other failures should return HTTP
-// 500 instead.
-func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Event) protocol.Result {
+// receiveCloudEvent returns an HTTP 400 if the request body is not a CloudEvent or HTTP 422 if event.Data is not a
+// kubernetes object. All other failures should return HTTP 500 instead.
+func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
+	event, eventErr := cloudevents.NewEventFromHTTPRequest(ctx.Request)
+	if eventErr != nil || event == nil {
+		slog.Error("Could not parse a CloudEvent from http request", "err", eventErr)
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+	validationErr := event.Validate()
+	if validationErr != nil {
+		slog.Error("Received invalid CloudEvent from http request", "err", validationErr)
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+
 	CEMetricAttrs := map[string]string{
 		"event_type": event.Type(),
 		// We default to error because error is the most duplicated result code path
@@ -152,7 +148,8 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 	k8sObj, err := models.UnstructuredFromByteSlice(event.Data())
 	if err != nil {
 		slog.ErrorContext(ctx, "Received malformed CloudEvent", "event-id", event.ID(), "err", err)
-		return NewCEResult(http.StatusUnprocessableEntity)
+		ctx.Status(http.StatusUnprocessableEntity)
+		return
 	}
 
 	CEMetricAttrs["resource_type"] = fmt.Sprintf("%s/%s", k8sObj.GetAPIVersion(), k8sObj.GetKind())
@@ -169,7 +166,8 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			"apiVersion", k8sObj.GetAPIVersion(),
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName())
-		return NewCEResult(http.StatusAccepted)
+		ctx.Status(http.StatusAccepted)
+		return
 	}
 
 	// If message is of type delete we end early
@@ -178,7 +176,8 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 		if c.Filters.MustArchiveOnDelete(ctx, k8sObj) {
 			result, writeErr := c.writeResource(ctx, k8sObj, event)
 			if writeErr != nil {
-				return NewCEResult(http.StatusInternalServerError)
+				ctx.Status(http.StatusInternalServerError)
+				return
 			}
 
 			CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
@@ -197,7 +196,8 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
 		)
-		return NewCEResult(http.StatusAccepted)
+		ctx.Status(http.StatusAccepted)
+		return
 	}
 
 	// If resource does not match archival, we exit early
@@ -213,12 +213,14 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			"name", k8sObj.GetName(),
 		)
 		CEMetricAttrs["result"] = string(observability.CEResultNoMatch)
-		return NewCEResult(http.StatusAccepted)
+		ctx.Status(http.StatusAccepted)
+		return
 	}
 
 	result, err := c.writeResource(ctx, k8sObj, event)
 	if err != nil {
-		return NewCEResult(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
+		return
 	}
 
 	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
@@ -234,7 +236,8 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
 		)
-		return NewCEResult(http.StatusAccepted)
+		ctx.Status(http.StatusAccepted)
+		return
 	}
 
 	// We first schedule the deletion from the cluster
@@ -259,7 +262,8 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName(),
 		)
-		return NewCEResult(http.StatusAccepted)
+		ctx.Status(http.StatusAccepted)
+		return
 	}
 	if err != nil {
 		slog.ErrorContext(
@@ -273,7 +277,8 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 			"name", k8sObj.GetName(),
 			"err", err,
 		)
-		return NewCEResult(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
+		return
 	}
 
 	// After deleting the resource we persist it with deletionTimestamp
@@ -281,7 +286,8 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 	k8sObj.SetDeletionTimestamp(&deleteTs)
 	result, err = c.writeResource(ctx, k8sObj, event)
 	if err != nil {
-		return NewCEResult(http.StatusInternalServerError)
+		ctx.Status(http.StatusInternalServerError)
+		return
 	}
 
 	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
@@ -296,11 +302,7 @@ func (c *Controller) receiveCloudEvent(ctx context.Context, event cloudevents.Ev
 		"name", k8sObj.GetName(),
 	)
 
-	return NewCEResult(http.StatusAccepted)
-}
-
-func (c *Controller) CloudEventsHandler(ctx *gin.Context) {
-	c.ceHandler.ServeHTTP(ctx.Writer, ctx.Request)
+	ctx.Status(http.StatusAccepted)
 }
 
 func (c *Controller) Livez(ctx *gin.Context) {

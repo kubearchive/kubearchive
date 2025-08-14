@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
@@ -137,6 +139,82 @@ func (f postgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[stri
 		"NOT data->'metadata'->'labels' @> ANY(%s::jsonb[])",
 		cond.Var(pq.Array(jsons)))
 	return cond.And(f.ExistsLabelFilter(cond, slices.Collect(keys), nil), notContainsClause)
+}
+
+func (postgreSQLFilter) JsonPathPredicateCheck(cond sqlbuilder.Cond, field, operator, value string) string {
+	// Add the $. prefix to create a valid JSONPath expression
+	jsonPath := "$." + field
+
+	// Convert = to == for PostgreSQL JSONPath predicates
+	// PostgreSQL JSONPath predicates use == for equality
+	if operator == "=" {
+		operator = "=="
+	}
+
+	// Determine if the value should be quoted based on its type
+	var quotedValue string
+	if isNumeric(value) {
+		// Numbers don't need quotes
+		quotedValue = value
+	} else if isBoolean(value) {
+		// Booleans don't need quotes
+		quotedValue = value
+	} else if isJSONArrayOrObject(value) {
+		// JSON arrays/objects don't need quotes
+		quotedValue = value
+	} else {
+		// Strings need to be quoted
+		quotedValue = fmt.Sprintf("\"%s\"", value)
+	}
+
+	// Use the @@ operator with JSONPath predicate syntax: data @@ '$.field' ? (@ == value)
+	// The JSONPath should be part of the SQL string, not a parameter
+	var stringvariable = jsonPath + operator + quotedValue
+	result := fmt.Sprintf("data @@ %s", cond.Var(stringvariable))
+	slog.Info("PostgreSQL JsonPathPredicateCheck",
+		"field", field,
+		"operator", operator,
+		"value", value,
+		"sql", result)
+
+	return result
+}
+
+// isNumeric checks if a string represents a valid number
+func isNumeric(s string) bool {
+	// Check for integers
+	if len(s) > 0 && (s[0] == '-' || s[0] == '+') {
+		s = s[1:]
+	}
+	if len(s) == 0 {
+		return false
+	}
+
+	hasDigit := false
+	hasDecimal := false
+
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			hasDigit = true
+		} else if r == '.' && !hasDecimal {
+			hasDecimal = true
+		} else {
+			return false
+		}
+	}
+
+	return hasDigit
+}
+
+// isBoolean checks if a string represents a boolean value
+func isBoolean(s string) bool {
+	return s == "true" || s == "false"
+}
+
+// isJSONArrayOrObject checks if a string represents a JSON array or object
+func isJSONArrayOrObject(s string) bool {
+	s = strings.TrimSpace(s)
+	return len(s) > 0 && (s[0] == '[' || s[0] == '{')
 }
 
 type postgreSQLSorter struct{}

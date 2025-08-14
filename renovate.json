@@ -41,8 +41,9 @@
       "groupName": "cert manager"
     },
     {
-      "matchPackageNames": ["go"],
-      "automerge": false
+      "matchCategories": ["golang"],
+      "matchDepTypes": ["toolchain"],
+      "enabled": false
     },
     {
       "matchPackageNames": ["k8s.io/api", "k8s.io/apimachinery", "k8s.io/apiserver", "k8s.io/cli-runtime", "k8s.io/client-go", "k8s.io/apiextensions-apiserver"],
@@ -50,7 +51,8 @@
     },
     {
       "matchPackageNames": ["knative.dev/pkg"],
-      "allowedVersions": "/v0\\.0\\.0-20250415155312-ed3e2158b883/"
+      "matchUpdateTypes": "digest",
+      "automerge": false
     },
     {
       "matchPackageNames": ["knative.dev/eventing"],

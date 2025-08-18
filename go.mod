@@ -19,7 +19,7 @@ require (
 	github.com/huandu/go-sqlbuilder v1.36.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
-	github.com/ohler55/ojg v1.26.8
+	github.com/ohler55/ojg v1.26.9
 	github.com/onsi/ginkgo/v2 v2.24.0
 	github.com/onsi/gomega v1.38.0
 	github.com/spf13/cobra v1.9.1

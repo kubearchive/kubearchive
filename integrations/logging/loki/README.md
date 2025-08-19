@@ -1,7 +1,8 @@
 ## Loki
 
-There are two options for loki log collectors, logging operator and 
+There are two options for loki log collectors, logging operator and
 Vector observability pipeline.
+
 To set up your development environment to use Loki with logging operator,
 run the following command:
 ```bash
@@ -17,10 +18,9 @@ run the following command:
 This will install and configure:
 
 * The [Logging Operator](https://kube-logging.dev/) configured to send logs from the cluster through `fluentd`
-* [MinIO](https://min.io/) configured to store the 3 S3 bucket needed by Loki to store the logs
-* [Loki](https://grafana.com/docs/loki/latest/) configured to read from the S3 buckets
+* [Loki](https://grafana.com/docs/loki/latest/) configured with built-in [MinIO](https://min.io/) for S3-compatible storage using a single bucket
 * [Grafana](https://grafana.com/) to provide a UI to be able to explore the logs
-* [Vector](https://vector.dev/) configured to send kubernetes logs directly from the cluster to loki
+* [Vector](https://vector.dev/) configured to send kubernetes logs directly from the cluster to loki (if --vector flag is used)
 
 Run the log generators to create logs:
 ```bash
@@ -46,9 +46,9 @@ Run the log generators to create logs:
 
 ### Access Loki REST API
 
-1. Loki uses the port `3100` of `loki` service to expose the REST API. Use `kubectl` to forward the traffic.
+1. Loki Gateway uses the port `80` of `loki-gateway` service to expose the REST API. Use `kubectl` to forward the traffic.
     ```bash
-    kubectl port-forward -n grafana-loki service/loki 3100:3100
+    kubectl port-forward -n grafana-loki service/loki-gateway 3100:80
     ```
 
 1. Try out the REST API with `curl`. The following example is for retrieving the logs of the container `<container-name>`
@@ -56,7 +56,7 @@ Run the log generators to create logs:
    ```bash
    curl -u admin:password http://localhost:3100/loki/api/v1/query_range \
     -H "X-Scope-OrgID: kubearchive" \
-    --data-urlencode 'query={pod-id="<pod-id>", container="<container-name>"} | json | line_format "{{.message}}"' \
+    --data-urlencode 'query={pod_id="<pod-id>", container="<container-name>"} | json | line_format "{{.message}}"' \
     --data-urlencode 'start=2025-05-07T00:00:00Z' \
     --data-urlencode 'end=2025-05-07T23:00:00Z' \
     --data-urlencode 'limit=10' | jq '.data.result.[].values.[].[1]'

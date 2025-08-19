@@ -4,6 +4,14 @@
 loki:
   limits_config:
     max_query_length: 0
+    retention_period: 744h  # 31 days retention
+    ingestion_rate_mb: 10
+    ingestion_burst_size_mb: 20
+    max_streams_per_user: 0
+    max_line_size: 256000
+    reject_old_samples: true
+    reject_old_samples_max_age: 168h
+    discover_service_name: []
   # Enable authentication for basic auth support
   auth_enabled: true
   basic_auth:
@@ -13,12 +21,13 @@ loki:
     type: s3
     bucketNames:
       chunks: loki
-      ruler: loki-ruler
-      admin: loki-admin
+      ruler: loki
+      admin: loki
     s3:
-      endpoint: minio.grafana-loki.svc.cluster.local:9000
+      endpoint: loki-minio:9000
       region: us-east-1
-      accessKeyId: admin
+      accessKeyId: loki
+      secretAccessKey: supersecret
       s3ForcePathStyle: true
       insecure: true
 
@@ -38,24 +47,11 @@ loki:
   compactor:
     retention_enabled: true
     delete_request_store: s3
-  ruler:
-    storage:
-      type: local
-      local:
-        directory: /tmp/rules
 
-deploymentMode: SingleBinary
+deploymentMode: Distributed
 
 singleBinary:
-  replicas: 1
-  persistence:
-    enabled: false
-  extraVolumeMounts:
-    - name: loki-storage
-      mountPath: /var/loki
-  extraVolumes:
-    - name: loki-storage
-      emptyDir: {}
+  replicas: 0
 
 # Zero out replica counts of other deployment modes
 backend:
@@ -65,21 +61,83 @@ read:
 write:
   replicas: 0
 
+# Distributed components configuration
 ingester:
-  replicas: 0
+  replicas: 1
+  autoscaling:
+    enabled: false
+  zoneAwareReplication:
+    enabled: false
+  persistence:
+    enabled: true
+    size: 10Gi
+  affinity: {}
+  podAntiAffinity:
+    soft: {}
+    hard: {}
+
 querier:
-  replicas: 0
+  replicas: 1
+  autoscaling:
+    enabled: false
+  affinity: {}
+
 queryFrontend:
-  replicas: 0
+  replicas: 1
+
 queryScheduler:
-  replicas: 0
+  replicas: 1
+
 distributor:
-  replicas: 0
+  replicas: 1
+  autoscaling:
+    enabled: false
+  affinity: {}
+
 compactor:
-  replicas: 0
+  replicas: 1
+
 indexGateway:
-  replicas: 0
+  replicas: 1
+  maxUnavailable: 0
+  affinity: {}
+
+ruler:
+  replicas: 1
+
+# Disable bloom components for now (they can be enabled later for optimization)
 bloomCompactor:
   replicas: 0
 bloomGateway:
   replicas: 0
+bloomPlanner:
+  replicas: 0
+bloomBuilder:
+  replicas: 0
+
+# Gateway configuration for load balancing
+gateway:
+  enabled: true
+  replicas: 1
+  image:
+    registry: docker.io
+    repository: nginxinc/nginx-unprivileged
+    tag: 1.24-alpine
+  service:
+    type: ClusterIP
+    port: 80
+
+# Enable Minio deployment within Loki chart
+minio:
+  enabled: true
+  rootUser: loki
+  rootPassword: supersecret
+  mode: standalone
+  persistence:
+    enabled: true
+    size: 10Gi
+  resources:
+    requests:
+      memory: 512Mi
+  postJob:
+    enabled: false

@@ -8,7 +8,7 @@ datasources:
       - name: Loki
         type: loki
         access: proxy
-        url: http://loki.grafana-loki.svc.cluster.local:3100
+        url: http://loki-gateway.grafana-loki.svc.cluster.local:80
         basicAuth: true
         basicAuthUser: $LOKI_USER
         secureJsonData:

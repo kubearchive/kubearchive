@@ -10,5 +10,5 @@ data:
   START: "cel:status.?startTime == optional.none() ? int(now()-duration('1h'))*1000000000: status.startTime"
   END: "cel:status.?startTime == optional.none() ? int(now()+duration('1h'))*1000000000: int(timestamp(status.startTime)+duration('72h'))*1000000000" # temporary workaround until CONTAINER_NAME is allowed on CEL expressions as variable: 3 days since start timestamp
   # END: "cel:(status.?containerStatuses.?filter(c, c.name == '{CONTAINER_NAME}')?[0].?state.?terminated.?finishedAt != optional.none()) ? timestamp(status.containerStatuses.filter(c, c.name == '{CONTAINER_NAME}')[0].state.terminated.finishedAt) : int(now()+duration('5m'))*1000000000"
-  LOG_URL: "http://loki.grafana-loki.svc.cluster.local:3100/loki/api/v1/query_range?query=%7Bpod_id%3D%22{POD_ID}%22%2C%20container%3D%22{CONTAINER_NAME}%22%7D%20%7C%20json%20%7C%20line_format%20%22%7B%7B.message%7D%7D%22&start={START}&end={END}&direction=forward "
+  LOG_URL: "http://loki-gateway.grafana-loki.svc.cluster.local:80/loki/api/v1/query_range?query=%7Bpod_id%3D%22{POD_ID}%22%2C%20container%3D%22{CONTAINER_NAME}%22%7D%20%7C%20json%20%7C%20line_format%20%22%7B%7B.message%7D%7D%22&start={START}&end={END}&direction=forward "
   LOG_URL_JSONPATH: "$.data.result[*].values[*][1]"

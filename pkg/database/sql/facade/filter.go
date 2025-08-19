@@ -3,7 +3,11 @@
 
 package facade
 
-import "github.com/huandu/go-sqlbuilder"
+import (
+	"time"
+
+	"github.com/huandu/go-sqlbuilder"
+)
 
 // DBFilter encapsulates all the filter functions that must be implemented by the drivers
 // All its functions share the same signature
@@ -12,6 +16,8 @@ type DBFilter interface {
 	NamespaceFilter(cond sqlbuilder.Cond, ns string) string
 	NameFilter(cond sqlbuilder.Cond, name string) string
 	CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string
+	CreationTimestampAfterFilter(cond sqlbuilder.Cond, timestamp time.Time) string
+	CreationTimestampBeforeFilter(cond sqlbuilder.Cond, timestamp time.Time) string
 	OwnerFilter(cond sqlbuilder.Cond, ownersUuids []string) string
 	UuidsFilter(cond sqlbuilder.Cond, uuids []string) string
 	UuidFilter(cond sqlbuilder.Cond, uuid string) string

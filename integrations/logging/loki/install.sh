@@ -56,9 +56,9 @@ if [ "${HELP}" == "True" ] || [ "${UNKNOWN}" == "True" ]; then
     --grafana           If enabled Grafana UI is deployed along loki.
                         Default value is ${GRAFANA}
 
-    --vector            If enabled, Vector will be deployed as a 
-                        log collector for loki. By default, log-forwarder 
-                        operator will be used instead of Vector. 
+    --vector            If enabled, Vector will be deployed as a
+                        log collector for loki. By default, log-forwarder
+                        operator will be used instead of Vector.
 
     "
     if [ "${UNKNOWN}" == "True" ]; then
@@ -71,17 +71,12 @@ fi
 set -o errexit -o xtrace
 cd ${SCRIPT_DIR}
 
-helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add grafana https://grafana.github.io/helm-charts
 helm repo add vector https://helm.vector.dev
 helm repo update
 
-# Deploy MinIO for S3 bucket like storage
-helm upgrade --install --create-namespace --namespace ${NAMESPACE} --values values.minio.yaml minio bitnami/minio
-MINIO_PWD=`kubectl -n ${NAMESPACE} get secret minio -o jsonpath='{.data.root-password}' | base64 --decode`
-
-
 set +e
+kubectl create namespace ${NAMESPACE}
 kubectl get secret -n ${NAMESPACE} loki-basic-auth > /dev/null 2>&1
 
 if [ $? -ne 0 ]; then
@@ -92,10 +87,8 @@ else
 fi
 set -e
 
-
-# Deploy loki
-helm upgrade --install --create-namespace --namespace ${NAMESPACE} --values values.loki.yaml loki grafana/loki \
- --set "loki.storage.s3.secretAccessKey=${MINIO_PWD}"
+# Deploy loki with built-in Minio
+helm upgrade --install --create-namespace --namespace ${NAMESPACE} --values values.loki.yaml loki grafana/loki
 
 # Deploy Grafana
 if [ "${GRAFANA}" == "True" ]; then
@@ -104,15 +97,15 @@ fi
 
 if [ "${VECTOR}" == "True" ]; then
 
-  LOKI_ENDPOINT="http://loki.${NAMESPACE}.svc.cluster.local:3100"
+  LOKI_ENDPOINT="http://loki-gateway.${NAMESPACE}.svc.cluster.local"
   echo "Using Loki endpoint: ${LOKI_ENDPOINT}"
-  
+
   #Deploy Vector to loki namespace
   helm install kubearchive-vector vector/vector \
     --namespace ${NAMESPACE} \
     --set "customConfig.sinks.loki.endpoint=${LOKI_ENDPOINT}" \
     --values values.vector.yaml
-    
+
   kubectl rollout status daemonset/kubearchive-vector -n ${NAMESPACE} --timeout=90s
 else
   helm upgrade --install --wait --create-namespace \

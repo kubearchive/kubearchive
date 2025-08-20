@@ -24,7 +24,7 @@ func withMultipleEnv(t *testing.T, envVars map[string]string, testFunc func()) {
 	testFunc()
 }
 
-func TestNewArchiveOptions(t *testing.T) {
+func TestNewKAOptions(t *testing.T) {
 	testCases := []struct {
 		name             string
 		envVars          map[string]string
@@ -42,9 +42,9 @@ func TestNewArchiveOptions(t *testing.T) {
 		{
 			name: "environment variables",
 			envVars: map[string]string{
-				"KUBECTL_PLUGIN_ARCHIVE_HOST":         "https://env-host:7070",
-				"KUBECTL_PLUGIN_ARCHIVE_CERT_PATH":    "/path/to/env/cert.crt",
-				"KUBECTL_PLUGIN_ARCHIVE_TLS_INSECURE": "true",
+				"KUBECTL_PLUGIN_KA_HOST":         "https://env-host:7070",
+				"KUBECTL_PLUGIN_KA_CERT_PATH":    "/path/to/env/cert.crt",
+				"KUBECTL_PLUGIN_KA_TLS_INSECURE": "true",
 			},
 			expectedHost:     "https://env-host:7070",
 			expectedCert:     "/path/to/env/cert.crt",
@@ -55,7 +55,7 @@ func TestNewArchiveOptions(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			withMultipleEnv(t, tc.envVars, func() {
-				opts := NewArchiveOptions()
+				opts := NewKAOptions()
 				assert.Equal(t, tc.expectedHost, opts.host)
 				assert.Equal(t, tc.expectedCert, opts.certificatePath)
 				assert.Equal(t, tc.expectedInsecure, opts.tlsInsecure)
@@ -83,7 +83,7 @@ func TestAddFlagsAndPrecedence(t *testing.T) {
 		},
 		{
 			name:             "env vars only",
-			envVars:          map[string]string{"KUBECTL_PLUGIN_ARCHIVE_HOST": "https://env-host:7070"},
+			envVars:          map[string]string{"KUBECTL_PLUGIN_KA_HOST": "https://env-host:7070"},
 			flagValues:       map[string]string{},
 			expectedHost:     "https://env-host:7070",
 			expectedCert:     "",
@@ -91,7 +91,7 @@ func TestAddFlagsAndPrecedence(t *testing.T) {
 		},
 		{
 			name:             "flags override env vars",
-			envVars:          map[string]string{"KUBECTL_PLUGIN_ARCHIVE_HOST": "https://env-host:7070"},
+			envVars:          map[string]string{"KUBECTL_PLUGIN_KA_HOST": "https://env-host:7070"},
 			flagValues:       map[string]string{"host": "https://flag-host:9090"},
 			expectedHost:     "https://flag-host:9090",
 			expectedCert:     "",
@@ -102,7 +102,7 @@ func TestAddFlagsAndPrecedence(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			withMultipleEnv(t, tc.envVars, func() {
-				opts := NewArchiveOptions()
+				opts := NewKAOptions()
 
 				if len(tc.flagValues) > 0 {
 					flags := pflag.NewFlagSet("test", pflag.ExitOnError)
@@ -129,7 +129,7 @@ func TestComplete(t *testing.T) {
 
 	testCases := []struct {
 		name                string
-		setup               func(opts *ArchiveOptions)
+		setup               func(opts *KAOptions)
 		env                 map[string]string
 		expectedK9eHost     string
 		expectedK9eToken    string
@@ -140,7 +140,7 @@ func TestComplete(t *testing.T) {
 	}{
 		{
 			name:                "default configuration",
-			setup:               func(opts *ArchiveOptions) {},
+			setup:               func(opts *KAOptions) {},
 			env:                 map[string]string{},
 			expectedK9eHost:     "https://localhost:8081",
 			expectedK9eToken:    "k8s-config-token",
@@ -150,12 +150,12 @@ func TestComplete(t *testing.T) {
 		},
 		{
 			name: "token precedence - kubectl flag wins",
-			setup: func(opts *ArchiveOptions) {
+			setup: func(opts *KAOptions) {
 				testToken := "kubectl-token" // #nosec G101 - this is a test token
 				opts.kubeFlags.BearerToken = &testToken
 			},
 			env: map[string]string{
-				"KUBECTL_PLUGIN_ARCHIVE_TOKEN": "env-token",
+				"KUBECTL_PLUGIN_KA_TOKEN": "env-token",
 			},
 			expectedK9eHost:     "https://localhost:8081",
 			expectedK9eToken:    "kubectl-token",
@@ -165,9 +165,9 @@ func TestComplete(t *testing.T) {
 		},
 		{
 			name:  "token from environment variable",
-			setup: func(opts *ArchiveOptions) {},
+			setup: func(opts *KAOptions) {},
 			env: map[string]string{
-				"KUBECTL_PLUGIN_ARCHIVE_TOKEN": "env-token",
+				"KUBECTL_PLUGIN_KA_TOKEN": "env-token",
 			},
 			expectedK9eHost:     "https://localhost:8081",
 			expectedK9eToken:    "env-token",
@@ -177,7 +177,7 @@ func TestComplete(t *testing.T) {
 		},
 		{
 			name: "certificate path with TLS override",
-			setup: func(opts *ArchiveOptions) {
+			setup: func(opts *KAOptions) {
 				opts.tlsInsecure = true
 				opts.certificatePath = filepath.Join("testdata", "test-cert.crt")
 			},
@@ -190,7 +190,7 @@ func TestComplete(t *testing.T) {
 		},
 		{
 			name: "certificate error",
-			setup: func(opts *ArchiveOptions) {
+			setup: func(opts *KAOptions) {
 				opts.certificatePath = "/nonexistent/cert.crt"
 			},
 			env:           map[string]string{},
@@ -202,7 +202,7 @@ func TestComplete(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			withMultipleEnv(t, tc.env, func() {
-				opts := NewArchiveOptions()
+				opts := NewKAOptions()
 				if tc.setup != nil {
 					tc.setup(opts)
 				}
@@ -238,13 +238,13 @@ func TestGetNamespace(t *testing.T) {
 	testCases := []struct {
 		name          string
 		useKubeconfig bool
-		setup         func(opts *ArchiveOptions)
+		setup         func(opts *KAOptions)
 		expectedNs    string
 		expectError   bool
 	}{
 		{
 			name: "namespace from flags",
-			setup: func(opts *ArchiveOptions) {
+			setup: func(opts *KAOptions) {
 				ns := "test-namespace"
 				opts.kubeFlags.Namespace = &ns
 			},
@@ -254,7 +254,7 @@ func TestGetNamespace(t *testing.T) {
 		{
 			name:          "namespace from kubeconfig",
 			useKubeconfig: true,
-			setup:         func(opts *ArchiveOptions) {},
+			setup:         func(opts *KAOptions) {},
 			expectedNs:    "kubeconfig-namespace",
 			expectError:   false,
 		},
@@ -267,7 +267,7 @@ func TestGetNamespace(t *testing.T) {
 				t.Setenv("KUBECONFIG", kubeconfigPath)
 			}
 
-			opts := &ArchiveOptions{
+			opts := &KAOptions{
 				kubeFlags: genericclioptions.NewConfigFlags(true),
 			}
 			if tc.setup != nil {
@@ -361,7 +361,7 @@ func TestGetFromAPI(t *testing.T) {
 				serverURL = server.URL
 			}
 
-			opts := &ArchiveOptions{
+			opts := &KAOptions{
 				host: serverURL,
 				K8sRESTConfig: &rest.Config{
 					Host: serverURL,

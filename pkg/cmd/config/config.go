@@ -21,14 +21,14 @@ const (
 	KubeArchive
 )
 
-type ArchiveCLICommand interface {
+type KACLICommand interface {
 	Complete() error
 	AddFlags(flags *pflag.FlagSet)
 	GetFromAPI(api API, path string) ([]byte, error)
 	GetNamespace() (string, error)
 }
 
-type ArchiveOptions struct {
+type KAOptions struct {
 	host            string
 	tlsInsecure     bool
 	certificatePath string
@@ -37,27 +37,27 @@ type ArchiveOptions struct {
 	K9eRESTConfig   *rest.Config
 }
 
-// NewArchiveOptions loads config from env vars and sets defaults
-func NewArchiveOptions() *ArchiveOptions {
-	opts := &ArchiveOptions{
+// NewKAOptions loads config from env vars and sets defaults
+func NewKAOptions() *KAOptions {
+	opts := &KAOptions{
 		host:            "https://localhost:8081",
 		certificatePath: "",
 		kubeFlags:       genericclioptions.NewConfigFlags(true),
 	}
-	if v := os.Getenv("KUBECTL_PLUGIN_ARCHIVE_HOST"); v != "" {
+	if v := os.Getenv("KUBECTL_PLUGIN_KA_HOST"); v != "" {
 		opts.host = v
 	}
-	if v := os.Getenv("KUBECTL_PLUGIN_ARCHIVE_CERT_PATH"); v != "" {
+	if v := os.Getenv("KUBECTL_PLUGIN_KA_CERT_PATH"); v != "" {
 		opts.certificatePath = v
 	}
-	if v := os.Getenv("KUBECTL_PLUGIN_ARCHIVE_TLS_INSECURE"); v != "" {
+	if v := os.Getenv("KUBECTL_PLUGIN_KA_TLS_INSECURE"); v != "" {
 		opts.tlsInsecure, _ = strconv.ParseBool(v)
 	}
 	return opts
 }
 
 // GetFromAPI HTTP GET request to the given endpoint
-func (opts *ArchiveOptions) GetFromAPI(api API, path string) ([]byte, error) {
+func (opts *KAOptions) GetFromAPI(api API, path string) ([]byte, error) {
 	var restConfig *rest.Config
 	var host string
 
@@ -102,7 +102,7 @@ func (opts *ArchiveOptions) GetFromAPI(api API, path string) ([]byte, error) {
 }
 
 // GetCertificateData get the certificate from a file path if set
-func (opts *ArchiveOptions) getCertificateData() ([]byte, error) {
+func (opts *KAOptions) getCertificateData() ([]byte, error) {
 	if opts.certificatePath != "" {
 		certData, err := os.ReadFile(opts.certificatePath)
 		if err == nil {
@@ -117,7 +117,7 @@ func (opts *ArchiveOptions) getCertificateData() ([]byte, error) {
 }
 
 // GetNamespace get the provided namespace or the namespace used in kubeconfig context
-func (opts *ArchiveOptions) GetNamespace() (string, error) {
+func (opts *KAOptions) GetNamespace() (string, error) {
 	if opts.kubeFlags.Namespace != nil && *opts.kubeFlags.Namespace != "" {
 		return *opts.kubeFlags.Namespace, nil
 	}
@@ -133,7 +133,7 @@ func (opts *ArchiveOptions) GetNamespace() (string, error) {
 }
 
 // Complete resolve the final values considering the values of the kubectl builtin flags
-func (opts *ArchiveOptions) Complete() error {
+func (opts *KAOptions) Complete() error {
 	restConfig, err := opts.kubeFlags.ToRESTConfig()
 	if err != nil {
 		return fmt.Errorf("error creating the REST configuration: %w", err)
@@ -148,7 +148,7 @@ func (opts *ArchiveOptions) Complete() error {
 	var token string
 	if opts.kubeFlags.BearerToken != nil && *opts.kubeFlags.BearerToken != "" {
 		token = *opts.kubeFlags.BearerToken
-	} else if t := os.Getenv("KUBECTL_PLUGIN_ARCHIVE_TOKEN"); t != "" {
+	} else if t := os.Getenv("KUBECTL_PLUGIN_KA_TOKEN"); t != "" {
 		token = t
 	} else {
 		token = opts.K8sRESTConfig.BearerToken
@@ -170,7 +170,7 @@ func (opts *ArchiveOptions) Complete() error {
 }
 
 // AddFlags adds all archive-related flags to the given flag set
-func (opts *ArchiveOptions) AddFlags(flags *pflag.FlagSet) {
+func (opts *KAOptions) AddFlags(flags *pflag.FlagSet) {
 	opts.kubeFlags.AddFlags(flags)
 	flags.StringVar(&opts.host, "host", opts.host, "host where the KubeArchive API Server is listening.")
 	flags.BoolVar(&opts.tlsInsecure, "kubearchive-insecure-skip-tls-verify", opts.tlsInsecure, "Allow insecure requests to the KubeArchive API.")

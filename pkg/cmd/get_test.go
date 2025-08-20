@@ -66,8 +66,8 @@ func createPodListJSON(podName, timestamp string) string {
 	return string(jsonBytes)
 }
 
-// MockArchiveCLICommand implements the ArchiveCLICommand interface for testing
-type MockArchiveCLICommand struct {
+// MockKACLICommand implements the KACLICommand interface for testing
+type MockKACLICommand struct {
 	k8sResponse    string
 	k9eResponse    string
 	k8sError       error
@@ -77,7 +77,7 @@ type MockArchiveCLICommand struct {
 	namespaceError error
 }
 
-func (m *MockArchiveCLICommand) GetFromAPI(api config.API, _ string) ([]byte, error) {
+func (m *MockKACLICommand) GetFromAPI(api config.API, _ string) ([]byte, error) {
 	switch api {
 	case config.Kubernetes:
 		if m.k8sError != nil {
@@ -94,13 +94,13 @@ func (m *MockArchiveCLICommand) GetFromAPI(api config.API, _ string) ([]byte, er
 	}
 }
 
-func (m *MockArchiveCLICommand) Complete() error {
+func (m *MockKACLICommand) Complete() error {
 	return m.completeError
 }
 
-func (m *MockArchiveCLICommand) AddFlags(_ *pflag.FlagSet) {}
+func (m *MockKACLICommand) AddFlags(_ *pflag.FlagSet) {}
 
-func (m *MockArchiveCLICommand) GetNamespace() (string, error) {
+func (m *MockKACLICommand) GetNamespace() (string, error) {
 	if m.namespaceError != nil {
 		return "", m.namespaceError
 	}
@@ -111,10 +111,10 @@ func (m *MockArchiveCLICommand) GetNamespace() (string, error) {
 }
 
 // NewTestGetOptions creates GetOptions with a mock for testing
-func NewTestGetOptions(mockCLI config.ArchiveCLICommand) *GetOptions {
+func NewTestGetOptions(mockCLI config.KACLICommand) *GetOptions {
 	outputFormat := ""
 	return &GetOptions{
-		ArchiveCLICommand:  mockCLI,
+		KACLICommand:       mockCLI,
 		OutputFormat:       &outputFormat,
 		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
 		IOStreams: genericiooptions.IOStreams{
@@ -166,7 +166,7 @@ func TestGetComplete(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var options *GetOptions
 			if tc.mockError != nil {
-				mockCLI := &MockArchiveCLICommand{
+				mockCLI := &MockKACLICommand{
 					completeError: tc.mockError,
 				}
 				options = NewTestGetOptions(mockCLI)
@@ -262,7 +262,7 @@ func TestRun(t *testing.T) {
 				}
 			}
 
-			mockCLI := &MockArchiveCLICommand{
+			mockCLI := &MockKACLICommand{
 				k8sResponse:    k8sResponse,
 				k9eResponse:    k9eResponse,
 				k8sError:       tc.k8sError,

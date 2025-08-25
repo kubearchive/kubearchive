@@ -1,0 +1,41 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: kubearchive.org/v1
+kind: SinkFilters
+metadata:
+  name: sink-filters
+  namespace: kubearchive
+spec:
+  Namespaces:
+    ___global___:
+      - selector:
+          apiversion: batch/v1
+          kind: CronJob
+          labelselector: null
+        archivewhen: ""
+        deletewhen: "true"
+        archiveondelete: ""
+      - selector:
+          apiversion: batch/v1
+          kind: Job
+          labelselector: null
+        archivewhen: ""
+        deletewhen: "true"
+        archiveondelete: ""
+      - selector:
+          apiversion: v1
+          kind: Pod
+          labelselector: null
+        archivewhen: ""
+        deletewhen: "true"
+        archiveondelete: ""
+    pods-archive:
+      - selector:
+          apiversion: v1
+          kind: Pod
+          labelselector: null
+        archivewhen: ""
+        deletewhen: "true"
+        archiveondelete: ""
+    pods-noarchive: []

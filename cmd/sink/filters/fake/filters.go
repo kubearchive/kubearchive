@@ -15,17 +15,23 @@ type Filters struct {
 	ArchiveKinds         []string
 	DeleteKinds          []string
 	ArchiveOnDeleteKinds []string
+	Namespaces           []string
 }
 
-func NewFilters(archiveTypes []string, deleteTypes []string, archiveOnDeleteTypes []string) *Filters {
+func NewFilters(archiveTypes []string, deleteTypes []string, archiveOnDeleteTypes []string, namespaces []string) *Filters {
 	return &Filters{
 		ArchiveKinds:         archiveTypes,
 		DeleteKinds:          deleteTypes,
 		ArchiveOnDeleteKinds: archiveOnDeleteTypes,
+		Namespaces:           namespaces,
 	}
 }
 
 func (f *Filters) MustArchive(ctx context.Context, obj *unstructured.Unstructured) bool {
+	if !f.shouldWatch(obj) {
+		return false
+	}
+
 	for _, kind := range f.ArchiveKinds {
 		if obj.GetKind() == kind {
 			return true
@@ -35,6 +41,10 @@ func (f *Filters) MustArchive(ctx context.Context, obj *unstructured.Unstructure
 }
 
 func (f *Filters) MustDelete(ctx context.Context, obj *unstructured.Unstructured) bool {
+	if !f.shouldWatch(obj) {
+		return false
+	}
+
 	for _, kind := range f.DeleteKinds {
 		if obj.GetKind() == kind {
 			return true
@@ -44,6 +54,10 @@ func (f *Filters) MustDelete(ctx context.Context, obj *unstructured.Unstructured
 }
 
 func (f *Filters) MustArchiveOnDelete(ctx context.Context, obj *unstructured.Unstructured) bool {
+	if !f.shouldWatch(obj) {
+		return false
+	}
+
 	for _, kind := range f.ArchiveOnDeleteKinds {
 		if obj.GetKind() == kind {
 			return true
@@ -54,4 +68,13 @@ func (f *Filters) MustArchiveOnDelete(ctx context.Context, obj *unstructured.Uns
 
 func (f *Filters) IsConfigured(ctx context.Context, obj *unstructured.Unstructured) bool {
 	return f.MustArchiveOnDelete(ctx, obj) || f.MustArchive(ctx, obj) || f.MustDelete(ctx, obj)
+}
+
+func (f *Filters) shouldWatch(obj *unstructured.Unstructured) bool {
+	for _, namespace := range f.Namespaces {
+		if obj.GetNamespace() == namespace {
+			return true
+		}
+	}
+	return false
 }

@@ -32,6 +32,8 @@ import (
 	"k8s.io/client-go/dynamic/fake"
 )
 
+var namespace string = "generate-logs-cronjobs"
+
 func setupRouter(
 	t testing.TB,
 	db interfaces.DBWriter,
@@ -95,7 +97,7 @@ func TestReceiveCloudEvents(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{}, "$.")
-			filter := fakeFilters.NewFilters([]string{}, []string{}, []string{})
+			filter := fakeFilters.NewFilters([]string{}, []string{}, []string{}, []string{namespace})
 			builder, _ := logs.NewUrlBuilder()
 			router := setupRouter(t, db, filter, nil, builder)
 			res := httptest.NewRecorder()
@@ -315,7 +317,7 @@ func TestReceiveCloudEventWithFilters(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := setupClient(t, tt.clusterObjs...)
 			db := fakeDb.NewFakeDatabase(make([]*unstructured.Unstructured, 0), make([]fakeDb.LogUrlRow, 0), "$.")
-			filter := fakeFilters.NewFilters(tt.archive, tt.delete, tt.archiveOnDelete)
+			filter := fakeFilters.NewFilters(tt.archive, tt.delete, tt.archiveOnDelete, []string{namespace})
 			builder, err := logs.NewUrlBuilder()
 			if err != nil {
 				assert.FailNow(t, err.Error())
@@ -493,7 +495,7 @@ func TestResourceWriteFails(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := fake.NewSimpleDynamicClient(testScheme, tt.clusterObjs...)
 			db := fakeDb.NewFakeDatabaseWithError(errors.New("test error"))
-			filter := fakeFilters.NewFilters(tt.archive, tt.delete, tt.archiveOnDelete)
+			filter := fakeFilters.NewFilters(tt.archive, tt.delete, tt.archiveOnDelete, []string{namespace})
 			builder, err := logs.NewUrlBuilder()
 			if err != nil {
 				assert.FailNow(t, err.Error())
@@ -660,7 +662,7 @@ func TestLogUrlWriteFails(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			client := fake.NewSimpleDynamicClient(testScheme, tt.clusterObjs...)
 			db := fakeDb.NewFakeDatabaseWithUrlError(errors.New("test error"))
-			filter := fakeFilters.NewFilters(tt.archive, tt.delete, tt.archiveOnDelete)
+			filter := fakeFilters.NewFilters(tt.archive, tt.delete, tt.archiveOnDelete, []string{namespace})
 			builder, err := logs.NewUrlBuilder()
 			if err != nil {
 				assert.FailNow(t, err.Error())
@@ -685,7 +687,7 @@ func TestLogUrlWriteFails(t *testing.T) {
 
 func TestLivez(t *testing.T) {
 	db := fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{}, "$.")
-	filter := fakeFilters.NewFilters([]string{}, []string{}, []string{})
+	filter := fakeFilters.NewFilters([]string{}, []string{}, []string{}, []string{namespace})
 	builder, _ := logs.NewUrlBuilder()
 	router := setupRouter(t, db, filter, nil, builder)
 	res := httptest.NewRecorder()
@@ -741,7 +743,7 @@ func TestReadyz(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			var db interfaces.DBWriter
-			filter := fakeFilters.NewFilters(nil, nil, nil)
+			filter := fakeFilters.NewFilters(nil, nil, nil, []string{namespace})
 			builder, _ := logs.NewUrlBuilder()
 			if tt.dbConnReady {
 				db = fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{}, "$.")

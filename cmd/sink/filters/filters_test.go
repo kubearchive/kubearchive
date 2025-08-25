@@ -423,6 +423,20 @@ func TestIsConfigured(t *testing.T) {
 			},
 			isConfigured: false,
 		},
+		{
+			name: "pod is not configured namespace is not monitored",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "not-monitored",
+					},
+				},
+			},
+			isConfigured: false,
+		},
 	}
 
 	for _, testCase := range tests {
@@ -430,6 +444,330 @@ func TestIsConfigured(t *testing.T) {
 			isConfigured := filters.IsConfigured(context.Background(), &testCase.resource)
 
 			assert.Equal(t, testCase.isConfigured, isConfigured)
+		})
+	}
+}
+
+func TestMustArchive(t *testing.T) {
+	filters := NewFilters(nil)
+	fh, err := os.Open("testdata/sf-archive.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { fh.Close() })
+
+	fileBytes, err := io.ReadAll(fh)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var unstructuredData map[string]interface{}
+	err = yaml.Unmarshal(fileBytes, &unstructuredData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	obj := &unstructured.Unstructured{Object: unstructuredData}
+	bytes, err := obj.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sf := &kubearchiveapi.SinkFilter{}
+
+	if err = json.Unmarshal(bytes, sf); err != nil {
+		t.Fatal(err)
+	}
+
+	err = filters.changeFilters(sf.Spec.Namespaces)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name        string
+		resource    unstructured.Unstructured
+		mustArchive bool
+	}{
+		{
+			name: "archive pod",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			mustArchive: true,
+		},
+		{
+			name: "archive cronjob",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "batch/v1",
+					"kind":       "CronJob",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			mustArchive: true,
+		},
+		{
+			name: "do not archive Deployment",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			mustArchive: false,
+		},
+		{
+			name: "do not archive pod namespace is not monitored",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "not-monitored",
+					},
+				},
+			},
+			mustArchive: false,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			archive := filters.MustArchive(context.Background(), &testCase.resource)
+
+			assert.Equal(t, testCase.mustArchive, archive)
+		})
+	}
+}
+
+func TestMustDelete(t *testing.T) {
+	filters := NewFilters(nil)
+	fh, err := os.Open("testdata/sf-delete.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { fh.Close() })
+
+	fileBytes, err := io.ReadAll(fh)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var unstructuredData map[string]interface{}
+	err = yaml.Unmarshal(fileBytes, &unstructuredData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	obj := &unstructured.Unstructured{Object: unstructuredData}
+	bytes, err := obj.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sf := &kubearchiveapi.SinkFilter{}
+
+	if err = json.Unmarshal(bytes, sf); err != nil {
+		t.Fatal(err)
+	}
+
+	err = filters.changeFilters(sf.Spec.Namespaces)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name        string
+		resource    unstructured.Unstructured
+		mustArchive bool
+	}{
+		{
+			name: "archive pod",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			mustArchive: true,
+		},
+		{
+			name: "archive cronjob",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "batch/v1",
+					"kind":       "CronJob",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			mustArchive: true,
+		},
+		{
+			name: "do not archive Deployment",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			mustArchive: false,
+		},
+		{
+			name: "do not archive pod namespace is not monitored",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "not-monitored",
+					},
+				},
+			},
+			mustArchive: false,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			archive := filters.MustDelete(context.Background(), &testCase.resource)
+
+			assert.Equal(t, testCase.mustArchive, archive)
+		})
+	}
+}
+
+func TestMustArchiveOnDelete(t *testing.T) {
+	filters := NewFilters(nil)
+	fh, err := os.Open("testdata/sf-archive-on-delete.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { fh.Close() })
+
+	fileBytes, err := io.ReadAll(fh)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var unstructuredData map[string]interface{}
+	err = yaml.Unmarshal(fileBytes, &unstructuredData)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	obj := &unstructured.Unstructured{Object: unstructuredData}
+	bytes, err := obj.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sf := &kubearchiveapi.SinkFilter{}
+
+	if err = json.Unmarshal(bytes, sf); err != nil {
+		t.Fatal(err)
+	}
+
+	err = filters.changeFilters(sf.Spec.Namespaces)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name        string
+		resource    unstructured.Unstructured
+		mustArchive bool
+	}{
+		{
+			name: "archive pod",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			mustArchive: true,
+		},
+		{
+			name: "archive cronjob",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "batch/v1",
+					"kind":       "CronJob",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			mustArchive: true,
+		},
+		{
+			name: "do not archive Deployment",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "apps/v1",
+					"kind":       "Deployment",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "pods-archive",
+					},
+				},
+			},
+			mustArchive: false,
+		},
+		{
+			name: "do not archive pod namespace is not monitored",
+			resource: unstructured.Unstructured{
+				Object: map[string]any{
+					"apiVersion": "v1",
+					"kind":       "Pod",
+					"metadata": map[string]any{
+						"name":      "busybox",
+						"namespace": "not-monitored",
+					},
+				},
+			},
+			mustArchive: false,
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			archive := filters.MustArchiveOnDelete(context.Background(), &testCase.resource)
+
+			assert.Equal(t, testCase.mustArchive, archive)
 		})
 	}
 }

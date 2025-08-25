@@ -61,6 +61,10 @@
     {
       "matchPackageNames": ["sigs.k8s.io/controller-runtime"],
       "allowedVersions": "<0.21.0"
+    },
+    {
+      "matchPackageNames": ["github.com/onsi/gomega"],
+      "allowedVersions": "<1.38.1"
     }
   ]
 }

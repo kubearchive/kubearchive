@@ -4,6 +4,7 @@
 package sql
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -174,7 +175,7 @@ func TestPostgreSQLWriteResource(t *testing.T) {
 
 				mock.ExpectCommit()
 
-				inserted, dbErr := database.WriteResource(t.Context(), k8sObj, data, insert.Time, "jsonPath", test.logs...)
+				inserted, dbErr := database.WriteResource(context.Background(), k8sObj, data, insert.Time, "jsonPath", test.logs...)
 				if test.err == nil {
 					assert.Nil(t, dbErr)
 					assert.Equal(t, inserted, interfaces.WriteResourceResultInserted)

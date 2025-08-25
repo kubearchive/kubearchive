@@ -4,6 +4,7 @@
 package sql
 
 import (
+	"context"
 	"database/sql"
 	"database/sql/driver"
 	"errors"
@@ -171,7 +172,7 @@ func TestMariaDBWriteResource(t *testing.T) {
 					mock.ExpectRollback()
 				}
 
-				_, dbErr := database.WriteResource(t.Context(), obj, data, insert.Time, "jsonPath", test.logs...)
+				_, dbErr := database.WriteResource(context.Background(), obj, data, insert.Time, "jsonPath", test.logs...)
 				if test.err == nil {
 					assert.Nil(t, dbErr)
 				} else {

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -404,5 +405,82 @@ func TestReadyz(t *testing.T) {
 		router.ServeHTTP(res, req)
 
 		assert.Equal(t, testCase.expected, res.Code)
+	}
+}
+
+func TestTimestampQueryParameters(t *testing.T) {
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), false)
+	tests := []struct {
+		name                    string
+		creationTimestampAfter  string
+		creationTimestampBefore string
+		expected                int
+	}{
+		{
+			name:                    "empty timestamp filters",
+			creationTimestampAfter:  "",
+			creationTimestampBefore: "",
+			expected:                200,
+		},
+		{
+			name:                    "valid creationTimestampAfter",
+			creationTimestampAfter:  "2023-01-01T00:00:00Z",
+			creationTimestampBefore: "",
+			expected:                200,
+		},
+		{
+			name:                    "valid creationTimestampBefore",
+			creationTimestampAfter:  "",
+			creationTimestampBefore: "2023-12-31T23:59:59Z",
+			expected:                200,
+		},
+		{
+			name:                    "both timestamp filters",
+			creationTimestampAfter:  "2023-01-01T00:00:00Z",
+			creationTimestampBefore: "2023-12-31T23:59:59Z",
+			expected:                200,
+		},
+		{
+			name:                    "invalid creationTimestampAfter format",
+			creationTimestampAfter:  "2023-01-01",
+			creationTimestampBefore: "",
+			expected:                400,
+		},
+		{
+			name:                    "invalid creationTimestampBefore format",
+			creationTimestampAfter:  "",
+			creationTimestampBefore: "2023-12-31",
+			expected:                400,
+		},
+		{
+			name:                    "invalid both timestamp formats",
+			creationTimestampAfter:  "2023-01-01",
+			creationTimestampBefore: "2023-12-31",
+			expected:                400,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requestURL := "/api/v1/pods"
+			if tt.creationTimestampAfter != "" {
+				requestURL += "?creationTimestampAfter=" + url.QueryEscape(tt.creationTimestampAfter)
+			}
+			if tt.creationTimestampBefore != "" {
+				separator := "?"
+				if strings.Contains(requestURL, "?") {
+					separator = "&"
+				}
+				requestURL += separator + "creationTimestampBefore=" + url.QueryEscape(tt.creationTimestampBefore)
+			}
+
+			w := httptest.NewRecorder()
+			req, _ := http.NewRequest(http.MethodGet, requestURL, nil)
+			router.ServeHTTP(w, req)
+
+			if w.Code != tt.expected {
+				t.Errorf("expected status code %d, got %d", tt.expected, w.Code)
+			}
+		})
 	}
 }

@@ -12,11 +12,14 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-func createUnstructured(t *testing.T, kind string) *unstructured.Unstructured {
+func createUnstructured(t *testing.T, kind string, namespace string) *unstructured.Unstructured {
 	t.Helper()
 	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"kind": kind,
+			"metadata": map[string]interface{}{
+				"namespace": namespace,
+			},
 		},
 	}
 }
@@ -32,6 +35,7 @@ func TestFakeFilters(t *testing.T) {
 		archiveResult         bool
 		deleteResult          bool
 		archiveOnDeleteResult bool
+		changeNamespace       bool
 	}{
 		{
 			name:                  "All objects should not match",
@@ -42,6 +46,7 @@ func TestFakeFilters(t *testing.T) {
 			archiveResult:         false,
 			deleteResult:          false,
 			archiveOnDeleteResult: false,
+			changeNamespace:       false,
 		},
 		{
 			name:                  "Only archive should match",
@@ -52,6 +57,7 @@ func TestFakeFilters(t *testing.T) {
 			archiveResult:         true,
 			deleteResult:          false,
 			archiveOnDeleteResult: false,
+			changeNamespace:       false,
 		},
 		{
 			name:                  "Archive does not match",
@@ -62,6 +68,7 @@ func TestFakeFilters(t *testing.T) {
 			archiveResult:         false,
 			deleteResult:          false,
 			archiveOnDeleteResult: false,
+			changeNamespace:       false,
 		},
 		{
 			name:                  "delete should match and cause archive to match",
@@ -72,6 +79,7 @@ func TestFakeFilters(t *testing.T) {
 			archiveResult:         true,
 			deleteResult:          true,
 			archiveOnDeleteResult: false,
+			changeNamespace:       false,
 		},
 		{
 			name:                  "Delete does not match",
@@ -82,6 +90,7 @@ func TestFakeFilters(t *testing.T) {
 			archiveResult:         false,
 			deleteResult:          false,
 			archiveOnDeleteResult: false,
+			changeNamespace:       false,
 		},
 		{
 			name:                  "Only archiveOnDelete should match",
@@ -92,6 +101,7 @@ func TestFakeFilters(t *testing.T) {
 			archiveResult:         false,
 			deleteResult:          false,
 			archiveOnDeleteResult: true,
+			changeNamespace:       false,
 		},
 		{
 			name:                  "ArchiveOnDelete does not match",
@@ -102,6 +112,7 @@ func TestFakeFilters(t *testing.T) {
 			archiveResult:         false,
 			deleteResult:          false,
 			archiveOnDeleteResult: false,
+			changeNamespace:       false,
 		},
 		{
 			name:                  "All should match",
@@ -112,6 +123,7 @@ func TestFakeFilters(t *testing.T) {
 			archiveResult:         true,
 			deleteResult:          true,
 			archiveOnDeleteResult: true,
+			changeNamespace:       false,
 		},
 		{
 			name:                  "None match",
@@ -122,13 +134,29 @@ func TestFakeFilters(t *testing.T) {
 			archiveResult:         false,
 			deleteResult:          false,
 			archiveOnDeleteResult: false,
+			changeNamespace:       false,
+		},
+		{
+			name:                  "None match wrong namespace",
+			archiveKinds:          []string{"Pod", "Job"},
+			deleteKinds:           []string{"Pod", "Job"},
+			archiveOnDeleteKinds:  []string{"Pod", "Job"},
+			kinds:                 []string{"Pod", "Job"},
+			archiveResult:         false,
+			deleteResult:          false,
+			archiveOnDeleteResult: false,
+			changeNamespace:       true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filter = NewFilters(tt.archiveKinds, tt.deleteKinds, tt.archiveOnDeleteKinds)
+			namespace := "foo"
+			filter = NewFilters(tt.archiveKinds, tt.deleteKinds, tt.archiveOnDeleteKinds, []string{namespace})
+			if tt.changeNamespace {
+				namespace = namespace + "bar"
+			}
 			for _, kind := range tt.kinds {
-				obj := createUnstructured(t, kind)
+				obj := createUnstructured(t, kind, namespace)
 				assert.Equal(t, tt.archiveResult, filter.MustArchive(context.Background(), obj))
 				assert.Equal(t, tt.deleteResult, filter.MustDelete(context.Background(), obj))
 				assert.Equal(t, tt.archiveOnDeleteResult, filter.MustArchiveOnDelete(context.Background(), obj))

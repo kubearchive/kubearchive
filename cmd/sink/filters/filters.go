@@ -37,6 +37,7 @@ type Filters struct {
 	archive         map[NamespaceGroupVersionKind]cel.Program
 	delete          map[NamespaceGroupVersionKind]cel.Program
 	archiveOnDelete map[NamespaceGroupVersionKind]cel.Program
+	namespaces      map[string]struct{}
 }
 
 // NewFilters creates a Filters struct with empty archive, delete, and archiveOnDelete slices.
@@ -47,6 +48,7 @@ func NewFilters(dynclient dynamic.Interface) *Filters {
 		archive:         make(map[NamespaceGroupVersionKind]cel.Program),
 		delete:          make(map[NamespaceGroupVersionKind]cel.Program),
 		archiveOnDelete: make(map[NamespaceGroupVersionKind]cel.Program),
+		namespaces:      make(map[string]struct{}),
 	}
 }
 
@@ -60,7 +62,11 @@ func (f *Filters) changeFilters(namespaces map[string][]kubearchiveapi.KubeArchi
 	archiveMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	deleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
 	archiveOnDeleteMap := make(map[NamespaceGroupVersionKind]cel.Program)
+	namespacesMap := make(map[string]struct{})
 	for namespace, kacResources := range namespaces {
+		if namespace != constants.SinkFilterGlobalNamespace {
+			namespacesMap[namespace] = struct{}{}
+		}
 		nsErr := f.createFilters(namespace, kacResources, archiveMap, deleteMap, archiveOnDeleteMap)
 		if nsErr != nil {
 			errList = append(errList, nsErr)
@@ -77,6 +83,7 @@ func (f *Filters) changeFilters(namespaces map[string][]kubearchiveapi.KubeArchi
 	f.archive = archiveMap
 	f.delete = deleteMap
 	f.archiveOnDelete = archiveOnDeleteMap
+	f.namespaces = namespacesMap
 
 	return err
 }
@@ -122,7 +129,7 @@ type UpdateStopper func()
 // watcher for the SinkFilter resource.
 func noopUpdateStopper() {}
 
-// Update updates the archive, delete, and archiveOnDelete filters when the SinkFilter resouce changes.
+// Update updates the archive, delete, and archiveOnDelete filters when the SinkFilter resource changes.
 func (f *Filters) Update() (UpdateStopper, error) {
 	watcher := func(options metav1.ListOptions) (watch.Interface, error) {
 		return f.dynclient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Watch(
@@ -180,11 +187,17 @@ func (f *Filters) MustArchive(ctx context.Context, obj *unstructured.Unstructure
 	f.RLock()
 	defer f.RUnlock()
 
+	ngvk := NamespaceGVKFromObject(obj)
+
+	// Only attempt to archive resources from namespaces users have request kubearchive watch
+	if _, shouldWatch := f.namespaces[ngvk.Namespace()]; !shouldWatch {
+		return false
+	}
+
 	if f.mustDelete(ctx, obj) {
 		return true
 	}
 
-	ngvk := NamespaceGVKFromObject(obj)
 	program, exists := f.archive[ngvk]
 	if exists && ocel.ExecuteBooleanCEL(ctx, program, obj) {
 		return true
@@ -219,6 +232,12 @@ func (f *Filters) mustDelete(ctx context.Context, obj *unstructured.Unstructured
 	}
 
 	ngvk := NamespaceGVKFromObject(obj)
+
+	// Only attempt to delete resources from namespaces users have request kubearchive watch
+	if _, shouldWatch := f.namespaces[ngvk.Namespace()]; !shouldWatch {
+		return false
+	}
+
 	program, exists := f.delete[ngvk]
 	if exists && ocel.ExecuteBooleanCEL(ctx, program, obj) {
 		return true
@@ -243,6 +262,12 @@ func (f *Filters) MustArchiveOnDelete(ctx context.Context, obj *unstructured.Uns
 	defer f.RUnlock()
 
 	ngvk := NamespaceGVKFromObject(obj)
+
+	// Only attempt to archive on delete resources from namespaces users have request kubearchive watch
+	if _, shouldWatch := f.namespaces[ngvk.Namespace()]; !shouldWatch {
+		return false
+	}
+
 	program, exists := f.archiveOnDelete[ngvk]
 	if exists && ocel.ExecuteBooleanCEL(ctx, program, obj) {
 		return true
@@ -258,7 +283,15 @@ func (f *Filters) IsConfigured(ctx context.Context, obj *unstructured.Unstructur
 	_, span := tracer.Start(ctx, "IsConfigured")
 	defer span.End()
 
+	f.RLock()
+	defer f.RUnlock()
+
 	ngvk := NamespaceGVKFromObject(obj)
+	// Only configured if resource from namespaces users have requested kubearchive watch
+	if _, shouldWatch := f.namespaces[ngvk.Namespace()]; !shouldWatch {
+		return false
+	}
+
 	_, namespaceArchiveOnDeleteExists := f.archiveOnDelete[ngvk]
 	_, namespaceArchiveWhenExists := f.archive[ngvk]
 	_, namespaceDeleteExists := f.delete[ngvk]

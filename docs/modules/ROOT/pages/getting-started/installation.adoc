@@ -42,6 +42,12 @@ More information about the schema and its customization in the
 xref:integrations/database.adoc#_configuration_and_customization[Database Integration]
 section.
 
+[TIP]
+====
+A Kubernetes Job named `kubearchive-schema-migration` is installed in the `kubearchive` namespace.
+Use this as an example to build your migration automations.
+====
+
 == Configure Knative Eventing
 
 KubeArchive uses a broker to avoid missing Kubernetes resource updates. By default, it is an `MTChannelBasedBroker`, but

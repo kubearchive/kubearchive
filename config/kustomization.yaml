@@ -15,6 +15,7 @@ resources:
   - templates/api_server/role_binding.yaml
   - templates/api_server/service_account.yaml
   - templates/database/database_secret.yaml
+  - templates/database/migration_job.yaml
   - templates/eventing/brokers.yaml
   - templates/logging/configmap.yaml
   - templates/logging/secret.yaml

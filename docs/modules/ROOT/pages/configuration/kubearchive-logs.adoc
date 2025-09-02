@@ -6,22 +6,26 @@ xref:integrations/logging.adoc[].
 
 == Environment variables
 
-KubeArchive supports the environment variable `LOG_LEVEL`, which is present
-on all its Deployments with a value of `"INFO"` by default. This variable
-specifies the minimum log level to be logged. To see debug logs, set it as
-`"DEBUG"` and rollout the Deployment. For example:
+KubeArchive supports environment variables to configure logging:
+
+* `LOG_LEVEL`: specifies the minimum log level to be logged. Defaults to `"INFO"`.
+Supported values are "DEBUG", "INFO", "WARN" and "ERROR".
+* `KLOG_LEVEL`: specifies the log level for the tooling used by Kubernetes libraries.
+Defaults to "0". Supported values range from "0" to any arbitrary integer. We normally
+find "7" to be a balanced level when it comes to verbosity and usefulness.
+
+To change these variables you can use `kubectl set env`:
 
 [source,bash]
 ----
 kubectl set -n kubearchive env deployment kubearchive-api-server LOG_LEVEL=DEBUG
-kubectl set -n kubearchive env deployment kubearchive-operator LOG_LEVEL=DEBUG
-kubectl set -n kubearchive env deployment kubearchive-sink LOG_LEVEL=DEBUG
+kubectl set -n kubearchive env deployment kubearchive-operator KLOG_LEVEL=7
+kubectl set -n kubearchive env deployment kubearchive-sink LOG_LEVEL=ERROR
 ----
 
-[INFO]
+[WARNING]
 ====
-The rollout of the Deployments happens automatically after using the
-command `kubectl set env`.
+Pods automatically restart when their environment variables are changed.
 ====
 
 == TraceID and SpanID

@@ -33,6 +33,8 @@ spec:
               value: "true"
             - name: LOG_LEVEL
               value: INFO
+            - name: KLOG_LEVEL
+              value: "0"
             - name: KUBEARCHIVE_NAMESPACE
               valueFrom:
                 fieldRef:

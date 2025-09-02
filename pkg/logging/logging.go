@@ -6,20 +6,23 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/trace"
+	"k8s.io/klog/v2"
 )
 
 type contextKey string
 
 const (
-	loggingLevelEnvVar            = "LOG_LEVEL"
-	traceIDKey         contextKey = "trace-id"
-	spanIDKey          contextKey = "span-id"
+	loggingLevelEnvVar             = "LOG_LEVEL"
+	kLoggingLevelEnvVar            = "KLOG_LEVEL"
+	traceIDKey          contextKey = "trace-id"
+	spanIDKey           contextKey = "span-id"
 )
 
 // ContextHandler is an slog.Handler that adds context properties to
@@ -46,13 +49,25 @@ func (h *ContextHandler) Handle(ctx context.Context, r slog.Record) error {
 // with a ContextHandler configured with the LOG_LEVEL level
 // Returns an error if the level does not exist
 func ConfigureLogging() error {
+	klogLevel := os.Getenv(kLoggingLevelEnvVar)
+	if klogLevel == "" {
+		klogLevel = "0"
+	}
+
+	var fs flag.FlagSet
+	klog.InitFlags(&fs)
+	err := fs.Set("v", klogLevel)
+	if err != nil {
+		return fmt.Errorf("error setting klog level to '%s': %s", klogLevel, err)
+	}
+
 	levelText := os.Getenv(loggingLevelEnvVar)
 	if levelText == "" {
 		levelText = "INFO"
 	}
 
 	var level slog.Level
-	err := level.UnmarshalText([]byte(levelText))
+	err = level.UnmarshalText([]byte(levelText))
 	if err != nil {
 		return fmt.Errorf("log level '%s' does not exist", levelText)
 	}

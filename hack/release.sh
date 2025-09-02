@@ -56,7 +56,7 @@ git tag -a "${NEXT_VERSION}" -m "Release ${NEXT_VERSION}"
 
 # Build and push
 bash cmd/operator/generate.sh
-kubectl kustomize config/ | envsubst | ko resolve -f - --base-import-paths --tags=${NEXT_VERSION} > kubearchive.yaml
+kubectl kustomize config/ | envsubst '$NEXT_VERSION' | ko resolve -f - --base-import-paths --tags=${NEXT_VERSION} > kubearchive.yaml
 
 git push
 git push --tags

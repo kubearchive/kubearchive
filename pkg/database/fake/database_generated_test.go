@@ -72,14 +72,14 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 			name:     "Matching resources",
 			kind:     existingKind,
 			version:  existingVersion,
-			expected: testResources[1:2],
+			expected: testResources[1:3], // Now includes both Pods
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
-			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, "", "", "", "", &models.LabelFilters{}, 100)
+			filteredResources, _, _, err := db.QueryResources(context.Background(), tt.kind, tt.version, "", "", "", "", &models.LabelFilters{}, nil, 100)
 			expected := make([]string, 0)
 			if len(tt.expected) != 0 {
 				for _, resource := range tt.expected {
@@ -135,15 +135,15 @@ func TestQueryResources(t *testing.T) {
 			kind:      existingKind,
 			version:   existingVersion,
 			namespace: existingNamespace,
-			expected:  testResources[1:2],
+			expected:  testResources[1:3], // Includes both Pods
 		},
 	}
 	db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace,
-				"", "", "", &models.LabelFilters{}, 100)
+			filteredResources, _, _, err := db.QueryResources(context.Background(), tt.kind, tt.version, tt.namespace,
+				"", "", "", &models.LabelFilters{}, nil, 100)
 			expected := make([]string, 0)
 			if len(tt.expected) != 0 {
 				for _, resource := range tt.expected {
@@ -224,15 +224,15 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 			resourceName: existingName,
 			testData:     testResources,
 			err:          nil,
-			expected:     testResources[1:],
+			expected:     testResources[1:2], // Only the first Pod with name "test"
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(tt.testData, testLogUrls, testJsonPath)
-			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace,
-				tt.resourceName, "", "", &models.LabelFilters{}, 100)
+			filteredResources, _, _, err := db.QueryResources(context.Background(), tt.kind, tt.version, tt.namespace,
+				tt.resourceName, "", "", &models.LabelFilters{}, nil, 100)
 			expected := make([]string, 0)
 			if tt.expected != nil {
 				for _, exp := range tt.expected {

@@ -58,8 +58,22 @@ type mariaDBFilter struct {
 
 func (mariaDBFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string {
 	return fmt.Sprintf(
-		"(CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime), uuid) < (%s, %s)",
+		"(CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime), id) < (%s, %s)",
 		cond.Var(continueDate), cond.Var(continueId),
+	)
+}
+
+func (mariaDBFilter) CreationTimestampAfterFilter(cond sqlbuilder.Cond, timestamp time.Time) string {
+	return fmt.Sprintf(
+		"CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime) > %s",
+		cond.Var(timestamp.Format("2006-01-02 15:04:05")),
+	)
+}
+
+func (mariaDBFilter) CreationTimestampBeforeFilter(cond sqlbuilder.Cond, timestamp time.Time) string {
+	return fmt.Sprintf(
+		"CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime) < %s",
+		cond.Var(timestamp.Format("2006-01-02 15:04:05")),
 	)
 }
 

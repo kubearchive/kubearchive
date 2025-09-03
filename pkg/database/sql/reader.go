@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/huandu/go-sqlbuilder"
 	dbErrors "github.com/kubearchive/kubearchive/pkg/database/errors"
@@ -21,7 +22,8 @@ import (
 )
 
 func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
-	continueId, continueDate string, labelFilters *models.LabelFilters, limit int) ([]string, int64, string, error) {
+	continueId, continueDate string, labelFilters *models.LabelFilters,
+	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]string, int64, string, error) {
 	sb := db.selector.ResourceSelector()
 	sb.Where(db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion))
 	if namespace != "" {
@@ -33,6 +35,12 @@ func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion,
 	} else {
 		if continueId != "" && continueDate != "" {
 			sb.Where(db.filter.CreationTSAndIDFilter(sb.Cond, continueDate, continueId))
+		}
+		if creationTimestampAfter != nil {
+			sb.Where(db.filter.CreationTimestampAfterFilter(sb.Cond, *creationTimestampAfter))
+		}
+		if creationTimestampBefore != nil {
+			sb.Where(db.filter.CreationTimestampBeforeFilter(sb.Cond, *creationTimestampBefore))
 		}
 		if labelFilters.Exists != nil {
 			sb.Where(db.filter.ExistsLabelFilter(sb.Cond, labelFilters.Exists, mainWhereClause))

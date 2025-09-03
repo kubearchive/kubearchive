@@ -54,6 +54,7 @@ func newDatabase() (interfaces.Database, error) {
 		var dbVersion string
 		dbVersion, err = db.QueryDatabaseSchemaVersion(context.TODO())
 		if err != nil {
+			err = fmt.Errorf("problem querying 'schema_migrations'. The database may not be properly initialized: %s", err.Error())
 			return
 		}
 

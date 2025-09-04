@@ -5,6 +5,7 @@ package cloudevents
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -233,6 +234,11 @@ func getBrokerUrl() (string, error) {
 	if err != nil {
 		slog.Error("Failed to get KubeArchive broker", "error", err)
 		return "", err
+	}
+
+	if broker.Status.Address == nil {
+		slog.Error("KubeArchive broker has no address assigned")
+		return "", errors.New("broker does not have an address assigned")
 	}
 
 	return broker.Status.Address.URL.String(), nil

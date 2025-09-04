@@ -24,7 +24,7 @@ jobs:
       - name: Fetch tags
         run: git fetch --tags origin
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.25.1'
       - name: Install ko

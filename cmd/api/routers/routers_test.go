@@ -161,6 +161,13 @@ func TestGetResourcesLogURLS(t *testing.T) {
 			expectedCode: http.StatusOK,
 			expectedBody: fmt.Sprintf("\"%s-%s\"", testLogUrls[0].Url, testLogJsonPath),
 		},
+		{
+			name:         "my-pod",
+			api:          "/apis//v1/namespaces/ns/pods/my-pod/log",
+			isCore:       true,
+			expectedCode: http.StatusNotFound,
+			expectedBody: "{\"message\":\"Not Found\"}",
+		},
 	}
 
 	for _, test := range tests {
@@ -218,6 +225,13 @@ func TestGetResources(t *testing.T) {
 			isCore:            true,
 			expectedCode:      http.StatusOK,
 			expectedResources: coreResources,
+		},
+		{
+			name:              "namespaced pods",
+			api:               "/apis//v1/namespaces/test/pods",
+			isCore:            true,
+			expectedCode:      http.StatusNotFound,
+			expectedResources: nil,
 		},
 	}
 

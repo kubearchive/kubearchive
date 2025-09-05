@@ -67,9 +67,9 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 		group.Use(auth.Impersonation(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache,
 			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
+		group.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient(), cache))
 		group.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache,
 			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
-		group.Use(discovery.GetAPIResource(k8sClient.Discovery().RESTClient(), cache))
 		group.Use(pagination.Middleware())
 	}
 

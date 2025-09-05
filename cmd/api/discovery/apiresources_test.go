@@ -60,21 +60,21 @@ func TestGetAPIResource(t *testing.T) {
 			group:        "invalid",
 			version:      validVersion,
 			resource:     validResource,
-			expectedCode: http.StatusBadRequest,
+			expectedCode: http.StatusNotFound,
 		},
 		{
 			name:         "Invalid version",
 			group:        validGroup,
 			version:      "v2",
 			resource:     validResource,
-			expectedCode: http.StatusBadRequest,
+			expectedCode: http.StatusNotFound,
 		},
 		{
 			name:         "Invalid resource name",
 			group:        validGroup,
 			version:      validVersion,
 			resource:     "invalid",
-			expectedCode: http.StatusBadRequest,
+			expectedCode: http.StatusNotFound,
 		},
 		{
 			name:         "Valid resource",
@@ -93,7 +93,9 @@ func TestGetAPIResource(t *testing.T) {
 			response := ""
 			if err != nil {
 				response = err.Error()
-				status = http.StatusBadRequest
+				// 404 is the correct behaviour
+				// to check run `kubect proxy` and query /api/v2, /apis/bach/v1, /api/v1/pops
+				status = http.StatusNotFound
 			} else {
 				bodyBytes, err := json.Marshal(apiResources)
 				if err != nil {

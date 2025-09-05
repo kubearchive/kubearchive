@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -74,6 +75,30 @@ func TestNormalOperation(t *testing.T) {
 		}
 		return errors.New("could not retrieve a Job from the API")
 	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+}
+
+func TestKindNotFound(t *testing.T) {
+	t.Parallel()
+
+	clientset, _ := test.GetKubernetesClient(t)
+	port := test.PortForwardApiServer(t, clientset)
+	namespaceName, token := test.CreateTestNamespace(t, false)
+
+	// Retrieve the objects from the DB using the API.
+	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/pobs", port, namespaceName)
+	retryErr := retry.Do(func() error {
+		_, getUrlErr := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
+
+		if strings.Contains(getUrlErr.Error(), "404") {
+			return nil
+		}
+
+		return errors.New("expecting 404")
+	}, retry.Attempts(5), retry.MaxDelay(5*time.Second))
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

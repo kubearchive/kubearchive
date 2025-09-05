@@ -61,7 +61,7 @@ func GetAPIResource(client rest.Interface, cache *cache.Cache) gin.HandlerFunc {
 		}
 		abort.Abort(c,
 			fmt.Errorf("unable to find the API resource %s in the Kubernetes cluster", resourceName),
-			http.StatusBadRequest)
+			http.StatusNotFound)
 	}
 }
 

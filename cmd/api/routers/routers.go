@@ -120,6 +120,7 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 
 	if errors.Is(err, dbErrors.ErrResourceNotFound) {
 		abort.Abort(context, err, http.StatusNotFound)
+		return
 	}
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)

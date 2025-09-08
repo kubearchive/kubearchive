@@ -56,6 +56,11 @@ func (c *Controller) GetResources(context *gin.Context) {
 		abort.Abort(context, labelFiltersErr, http.StatusBadRequest)
 	}
 
+	if strings.HasPrefix(context.Request.URL.Path, "/apis/") && group == "" {
+		abort.Abort(context, errors.New(http.StatusText(http.StatusNotFound)), http.StatusNotFound)
+		return
+	}
+
 	apiVersion := version
 	if group != "" {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
@@ -99,6 +104,11 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 	namespace := context.Param("namespace")
 	name := context.Param("name")
 	containerName := context.Query("container")
+
+	if strings.HasPrefix(context.Request.URL.Path, "/apis/") && group == "" {
+		abort.Abort(context, errors.New(http.StatusText(http.StatusNotFound)), http.StatusNotFound)
+		return
+	}
 
 	apiVersion := version
 	if group != "" {

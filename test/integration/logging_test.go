@@ -354,3 +354,79 @@ func TestLogsWithResourceThatHasNoPods(t *testing.T) {
 		t.Fatal(retryErr)
 	}
 }
+
+// TestLogRetrievalConsecutiveNumbers tests that logs with consecutive numbers are retrieved in order
+func TestLogRetrievalConsecutiveNumbers(t *testing.T) {
+	t.Parallel()
+
+	clientset, _ := test.GetKubernetesClient(t)
+	port := test.PortForwardApiServer(t, clientset)
+	namespaceName, token := test.CreateTestNamespace(t, false)
+
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Create a pod that generates 1000 consecutive log entries
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "consecutive-logs",
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:  "log-generator",
+					Image: "quay.io/fedora/fedora:latest",
+					Command: []string{"/bin/sh", "-c", `
+						for i in $(seq 1 10000); do
+							echo "log-entry-$i"
+						done
+					`},
+				},
+			},
+		},
+	}
+	_, err := clientset.CoreV1().Pods(namespaceName).Create(context.Background(), pod, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/consecutive-logs/log", port, namespaceName)
+	retryErr := retry.Do(func() error {
+		body, err := test.GetLogs(t, token.Status.Token, url)
+		if err != nil {
+			return err
+		}
+
+		if len(body) == 0 {
+			return errors.New("could not retrieve the pod log")
+		}
+		t.Log("Successfully retrieved logs")
+
+		bodyString := string(body)
+		lines := strings.Split(strings.TrimSpace(bodyString), "\n")
+
+		// Verify we got exactly 1000 log entries
+		if len(lines) != 10000 {
+			msg := fmt.Sprintf("expected 10000 logs, got %d", len(lines))
+			t.Log(msg)
+			return fmt.Errorf("%s", msg)
+		}
+
+		// Verify that each log entry is in the correct order
+		for i, line := range lines {
+			expectedMessage := fmt.Sprintf("log-entry-%d", i+1)
+			if line != expectedMessage {
+				msg := fmt.Sprintf("expected '%s', got '%s'", expectedMessage, line)
+				t.Log(msg)
+				return fmt.Errorf("%s", msg)
+			}
+		}
+
+		t.Log("All 10000 log entries are in correct order")
+		return nil
+	}, retry.Attempts(60), retry.MaxDelay(5*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+}

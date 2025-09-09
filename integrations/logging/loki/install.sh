@@ -101,7 +101,7 @@ if [ "${VECTOR}" == "True" ]; then
   echo "Using Loki endpoint: ${LOKI_ENDPOINT}"
 
   #Deploy Vector to loki namespace
-  helm install kubearchive-vector vector/vector \
+  helm upgrade --install kubearchive-vector vector/vector \
     --namespace ${NAMESPACE} \
     --set "customConfig.sinks.loki.endpoint=${LOKI_ENDPOINT}" \
     --values values.vector.yaml

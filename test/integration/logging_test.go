@@ -377,8 +377,17 @@ func TestLogRetrievalConsecutiveNumbers(t *testing.T) {
 					Name:  "log-generator",
 					Image: "quay.io/fedora/fedora:latest",
 					Command: []string{"/bin/sh", "-c", `
-						for i in $(seq 1 10000); do
-							echo "log-entry-$i"
+						for i in $(seq 1 1000); do
+							echo "INFO - log-entry-$i"
+						done
+						for i in $(seq 1001 2000); do
+							echo "SUCCESS - log-entry-$i"
+						done
+						for i in $(seq 2001 3000); do
+							echo "ERROR - log-entry-$i"
+						done
+						for i in $(seq 3001 10000); do
+							echo "WARN - log-entry-$i"
 						done
 					`},
 				},
@@ -415,8 +424,8 @@ func TestLogRetrievalConsecutiveNumbers(t *testing.T) {
 		// Verify that each log entry is in the correct order
 		for i, line := range lines {
 			expectedMessage := fmt.Sprintf("log-entry-%d", i+1)
-			if line != expectedMessage {
-				msg := fmt.Sprintf("expected '%s', got '%s'", expectedMessage, line)
+			if !strings.HasSuffix(line, expectedMessage) {
+				msg := fmt.Sprintf("expected suffix '%s', got '%s'", expectedMessage, line)
 				t.Log(msg)
 				return fmt.Errorf("%s", msg)
 			}

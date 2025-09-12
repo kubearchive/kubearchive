@@ -33,12 +33,8 @@ Run the log generators to create logs:
     ```bash
     kubectl port-forward -n grafana-loki service/grafana 3000:80
     ```
-1. Determine the `admin` password for Grafana:
-    ```bash
-    echo `kubectl -n grafana-loki get secret grafana -o jsonpath='{.data.admin-password}' | base64 --decode`
-    ```
-1. In your browser, navigate to `http://localhost:3000`, using the username `admin` and the password retrieved
-   in the previous step to login.
+
+1. In your browser, navigate to `http://localhost:3000`, using `admin`/`password` credentials.
 
 1. Go to `Explore` and select `Loki`. Then write a query (e.g. `{pod="generate-log-1-29110151-kc2n9", container="generate1"}`).
 
@@ -56,7 +52,7 @@ Run the log generators to create logs:
    ```bash
    curl -u admin:password http://localhost:3100/loki/api/v1/query_range \
     -H "X-Scope-OrgID: kubearchive" \
-    --data-urlencode 'query={pod_id="<pod-id>", container="<container-name>"} | json | line_format "{{.message}}"' \
+    --data-urlencode 'query={stream="<pod-id>-<container-name>"}"' \
     --data-urlencode 'start=2025-05-07T00:00:00Z' \
     --data-urlencode 'end=2025-05-07T23:00:00Z' \
     --data-urlencode 'limit=10' | jq '.data.result.[].values.[].[1]'

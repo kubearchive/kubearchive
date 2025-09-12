@@ -1,6 +1,9 @@
 # Copyright KubeArchive Authors
 # SPDX-License-Identifier: Apache-2.0
 ---
+adminUser: admin
+adminPassword: password # notsecret
+
 datasources:
   datasources.yaml:
     apiVersion: 1

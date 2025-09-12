@@ -8,10 +8,12 @@ loki:
     ingestion_rate_mb: 10
     ingestion_burst_size_mb: 20
     max_streams_per_user: 0
-    max_line_size: 256000
+    max_line_size: 1048576  # Increased from 256000 to 1MB
     reject_old_samples: true
     reject_old_samples_max_age: 168h
     discover_service_name: []
+    max_entries_limit_per_query: 100000
+    increment_duplicate_timestamp: true
   # Enable authentication for basic auth support
   auth_enabled: true
   basic_auth:
@@ -99,8 +101,6 @@ compactor:
 
 indexGateway:
   replicas: 1
-  maxUnavailable: 0
-  affinity: {}
 
 ruler:
   replicas: 1
@@ -115,7 +115,7 @@ bloomPlanner:
 bloomBuilder:
   replicas: 0
 
-# Gateway configuration for load balancing
+# Gateway configuration for load balancing - configured for kind cluster
 gateway:
   enabled: true
   replicas: 1
@@ -126,6 +126,15 @@ gateway:
   service:
     type: ClusterIP
     port: 80
+  # Configure nginx resolver for kind cluster (CoreDNS)
+  nginxConfig:
+    resolver: "kube-dns.kube-system.svc.cluster.local."
+
+# DISABLE MEMCACHED COMPONENTS
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
 
 # Enable Minio deployment within Loki chart
 minio:

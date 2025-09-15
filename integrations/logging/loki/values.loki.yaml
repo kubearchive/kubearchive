@@ -14,6 +14,7 @@ loki:
     discover_service_name: []
     max_entries_limit_per_query: 100000
     increment_duplicate_timestamp: true
+    allow_structured_metadata: true
   # Enable authentication for basic auth support
   auth_enabled: true
   basic_auth:

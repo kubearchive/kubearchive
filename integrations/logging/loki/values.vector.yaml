@@ -56,6 +56,12 @@ customConfig:
         } else {
           .container = "unknown_container"
         }
+        # Extract namespace for low cardinality labeling
+        if exists(.tmp.kubernetes.pod_namespace) {
+          .namespace = del(.tmp.kubernetes.pod_namespace)
+        } else {
+          .namespace = "unknown_namespace"
+        }
         # Handle message field
         if exists(.tmp.message) {
           .message = to_string(del(.tmp.message)) ?? "no_message"
@@ -76,6 +82,11 @@ customConfig:
       endpoint: http://loki-gateway.grafana-loki.svc.cluster.local
       encoding:
         codec: "text"
+        only_fields:
+          - message
+      structured_metadata:
+        pod_id: "{{`{{ pod_id }}`}}"
+        container: "{{`{{ container }}`}}"
       auth:
         strategy: "basic"
         user: "${LOKI_USERNAME}"
@@ -93,7 +104,7 @@ customConfig:
         timeout_secs: 5
         max_bytes: 1048576  # 1MB
       labels:
-        stream: "{{`{{ pod_id }}-{{ container }}`}}"
+        stream: "{{`{{ namespace }}`}}"
 image:
   repository: quay.io/kubearchive/vector
   tag: 0.46.1-distroless-libc

@@ -12,6 +12,7 @@ loki:
     reject_old_samples: true
     reject_old_samples_max_age: 168h
     discover_service_name: []
+    discover_log_levels: false
     max_entries_limit_per_query: 100000
     increment_duplicate_timestamp: true
     allow_structured_metadata: true
@@ -24,7 +25,6 @@ loki:
     type: s3
     bucketNames:
       chunks: loki
-      ruler: loki
       admin: loki
     s3:
       endpoint: loki-minio:9000
@@ -103,7 +103,7 @@ indexGateway:
   replicas: 1
 
 ruler:
-  replicas: 1
+  enabled: false
 
 # Disable bloom components for now (they can be enabled later for optimization)
 bloomCompactor:

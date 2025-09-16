@@ -25,7 +25,6 @@ loki:
     type: s3
     bucketNames:
       chunks: loki
-      ruler: loki
       admin: loki
     s3:
       endpoint: loki-minio:9000
@@ -105,7 +104,7 @@ indexGateway:
   replicas: 1
 
 ruler:
-  replicas: 1
+  enabled: false
 
 # Disable bloom components for now (they can be enabled later for optimization)
 bloomCompactor:

@@ -48,7 +48,7 @@ loki:
     replication_factor: 1
 
   compactor:
-    retention_enabled: true
+    retention_enabled: false  # Disable retention for in-memory development
     delete_request_store: s3
 
 deploymentMode: Distributed
@@ -72,8 +72,7 @@ ingester:
   zoneAwareReplication:
     enabled: false
   persistence:
-    enabled: true
-    size: 10Gi
+    enabled: false  # No persistence for in-memory development
   affinity: {}
   podAntiAffinity:
     soft: {}
@@ -98,7 +97,7 @@ distributor:
   affinity: {}
 
 compactor:
-  replicas: 1
+  replicas: 0  # Disable compactor to prevent S3 access errors
 
 indexGateway:
   replicas: 1
@@ -136,18 +135,3 @@ chunksCache:
   enabled: false
 resultsCache:
   enabled: false
-
-# Enable Minio deployment within Loki chart
-minio:
-  enabled: true
-  rootUser: loki
-  rootPassword: supersecret
-  mode: standalone
-  persistence:
-    enabled: true
-    size: 10Gi
-  resources:
-    requests:
-      memory: 512Mi
-  postJob:
-    enabled: false

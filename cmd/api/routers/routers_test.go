@@ -23,7 +23,7 @@ var testResources = fake.CreateTestResources()
 var testLogUrls = fake.CreateTestLogUrls()
 var testLogJsonPath = "$."
 var nonCoreResources = testResources[:1]
-var coreResources = testResources[1:2]
+var coreResources = testResources[1:3]
 
 type List struct {
 	Items []*unstructured.Unstructured
@@ -179,6 +179,60 @@ func TestGetResourcesLogURLS(t *testing.T) {
 
 			assert.Equal(t, test.expectedCode, res.Code)
 			assert.Equal(t, test.expectedBody, res.Body.String())
+		})
+	}
+}
+
+func TestFieldSelectorQueryParameter(t *testing.T) {
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), false)
+	tests := []struct {
+		name          string
+		fieldSelector string
+		expected      int
+	}{
+		{
+			name:          "empty field selector",
+			fieldSelector: "",
+			expected:      200,
+		},
+		{
+			name:          "valid metadata.name equals",
+			fieldSelector: "metadata.name=test-pod",
+			expected:      404, // Now handled as name parameter, but no such resource exists
+		},
+		{
+			name:          "valid status.phase equals",
+			fieldSelector: "status.phase=Running",
+			expected:      200,
+		},
+		{
+			name:          "valid metadata.name not equals",
+			fieldSelector: "metadata.name!=test-pod",
+			expected:      200,
+		},
+		{
+			name:          "valid spec.nodeName equals",
+			fieldSelector: "spec.nodeName=worker-1",
+			expected:      200,
+		},
+		{
+			name:          "multiple field filters",
+			fieldSelector: "metadata.name=test-pod,status.phase=Running",
+			expected:      404, // Now handled as name parameter, but no such resource exists
+		},
+		{
+			name:          "invalid field selector - in operator not supported",
+			fieldSelector: "metadata.name in (value1,value2)",
+			expected:      400,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/apis/apps/v1/namespaces/default/deployments?fieldSelector="+url.QueryEscape(tt.fieldSelector), nil)
+			router.ServeHTTP(res, req)
+
+			assert.Equal(t, tt.expected, res.Code)
 		})
 	}
 }

@@ -14,20 +14,41 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getServer() *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := fmt.Fprintln(w, `{"message":"log-example1"}`)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
+func getServer(withLogs bool, retErr bool) *httptest.Server {
+	if retErr {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+			_, err := fmt.Fprintln(w, "no logs found")
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
 			return
-		}
-		_, err = fmt.Fprintf(w, `{"message":"log-example2"}`)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-	}))
+		}))
+	}
+	if withLogs {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, err := fmt.Fprintln(w, `{"message":"log-example1"}`)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			_, err = fmt.Fprintf(w, `{"message":"log-example2"}`)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+	} else {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, err := fmt.Fprintln(w, `{"message":""}`)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+	}
 }
 
 func TestSetLoggingHeadersSuccess(t *testing.T) {
@@ -42,21 +63,55 @@ func TestSetLoggingHeadersSuccess(t *testing.T) {
 
 func TestLogRetrievalSuccess(t *testing.T) {
 
-	res := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(res)
+	tests := []struct {
+		name string
+		logs bool
+		err  bool
+	}{
+		{
+			name: "logs available",
+			logs: true,
+			err:  false,
+		},
+		{
+			name: "no logs available",
+			logs: false,
+			err:  false,
+		},
+		{
+			name: "error returned",
+			logs: false,
+			err:  true,
+		},
+	}
 
-	server := getServer()
-	defer server.Close()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(res)
 
-	c.Set("logURL", server.URL)
-	c.Set("jsonPath", "$.message")
+			server := getServer(tt.logs, tt.err)
+			defer server.Close()
 
-	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
-	LogRetrieval()(c)
-	assert.Equal(t, http.StatusOK, res.Code)
-	assert.Equal(t, res.Body.String(), "log-example1\nlog-example2\n")
-	assert.Contains(t, res.Body.String(), "log-example1")
-	assert.Contains(t, res.Body.String(), "log-example2")
+			c.Set("logURL", server.URL)
+			c.Set("jsonPath", "$.message")
+
+			c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+			LogRetrieval()(c)
+			if !tt.err {
+				if tt.logs {
+					assert.Equal(t, http.StatusOK, res.Code)
+					assert.Equal(t, res.Body.String(), "log-example1\nlog-example2\n")
+				} else {
+					assert.Equal(t, http.StatusNotFound, res.Code)
+					assert.Contains(t, res.Body.String(), "no parsed logs for the json path:")
+				}
+			} else {
+				assert.Equal(t, http.StatusNotFound, res.Code)
+				assert.Contains(t, res.Body.String(), "no logs found")
+			}
+		})
+	}
 }
 
 func TestLogRetrievalError(t *testing.T) {

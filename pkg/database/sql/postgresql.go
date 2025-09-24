@@ -66,6 +66,10 @@ func (postgreSQLFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate
 	)
 }
 
+func (postgreSQLFilter) NameWildcardFilter(cond sqlbuilder.Cond, namePattern string) string {
+	return fmt.Sprintf("name ILIKE %s", cond.Var(namePattern))
+}
+
 func (postgreSQLFilter) OwnerFilter(cond sqlbuilder.Cond, owners []string) string {
 	return fmt.Sprintf(
 		"jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| %s",

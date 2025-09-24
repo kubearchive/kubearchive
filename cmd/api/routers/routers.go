@@ -45,6 +45,25 @@ func (c *Controller) GetResources(context *gin.Context) {
 	version := context.Param("version")
 	namespace := context.Param("namespace")
 	name := context.Param("name")
+
+	// Validate that path name doesn't contain wildcards (fail early)
+	if name != "" && strings.Contains(name, "*") {
+		abort.Abort(context, errors.New("wildcard characters (*) are not allowed in path parameters, use query parameter ?name= instead"), http.StatusBadRequest)
+		return
+	}
+
+	// Support name filtering via query parameter for wildcard searches
+	queryName := context.Query("name")
+
+	// Validate that user doesn't provide both path name and query name
+	if name != "" && queryName != "" {
+		abort.Abort(context, errors.New("cannot specify both path name parameter and query name parameter"), http.StatusBadRequest)
+		return
+	}
+
+	if queryName != "" {
+		name = queryName
+	}
 	selector, parserErr := labels.Parse(context.Query("labelSelector"))
 	if parserErr != nil {
 		abort.Abort(context, parserErr, http.StatusBadRequest)
@@ -76,7 +95,9 @@ func (c *Controller) GetResources(context *gin.Context) {
 		return
 	}
 
-	if name != "" {
+	// Handle exact name matches (any name without wildcards)
+	if name != "" && !strings.Contains(name, "*") {
+		// Single resource expected for exact name matches
 		if len(resources) == 0 {
 			abort.Abort(context, errors.New("resource not found"), http.StatusNotFound)
 			return

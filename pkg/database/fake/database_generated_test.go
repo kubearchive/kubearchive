@@ -419,3 +419,41 @@ func TestWriteResources(t *testing.T) {
 		})
 	}
 }
+
+func TestQueryResourcesWithWildcardName(t *testing.T) {
+	// Create minimal test resources inline
+	pod1 := &unstructured.Unstructured{}
+	pod1.SetKind("Pod")
+	pod1.SetAPIVersion("v1")
+	pod1.SetName("test-e2e-pod")
+	pod1.SetNamespace("test")
+
+	pod2 := &unstructured.Unstructured{}
+	pod2.SetKind("Pod")
+	pod2.SetAPIVersion("v1")
+	pod2.SetName("production-deployment")
+	pod2.SetNamespace("test")
+
+	testResources := []*unstructured.Unstructured{pod1, pod2}
+
+	tests := []struct {
+		namePattern   string
+		expectedCount int
+	}{
+		{"*e2e*", 1},      // should match "test-e2e-pod"
+		{"test-*", 1},     // should match "test-e2e-pod"
+		{"*prod*", 1},     // should match "production-deployment"
+		{"*notfound*", 0}, // should match nothing
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.namePattern, func(t *testing.T) {
+			db := NewFakeDatabase(testResources, []LogUrlRow{}, "$.")
+			resources, _, _, err := db.QueryResources(context.TODO(), "Pod", "v1", "test",
+				tt.namePattern, "", "", &models.LabelFilters{}, 100)
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedCount, len(resources))
+		})
+	}
+}

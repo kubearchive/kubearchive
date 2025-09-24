@@ -4,6 +4,13 @@
 package main
 
 import (
+	"fmt"
+	"strconv"
+
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"context"
 	"crypto/tls"
 	"flag"
 	"log"
@@ -34,6 +41,7 @@ import (
 	"github.com/go-logr/logr"
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/cmd/operator/internal/controller"
+	"github.com/kubearchive/kubearchive/pkg/k8sclient"
 	"github.com/kubearchive/kubearchive/pkg/logging"
 	"github.com/kubearchive/kubearchive/pkg/observability"
 
@@ -184,22 +192,48 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Read operator configuration
+	ctx := context.Background()
+	operatorConfig, err := getOperatorConfig(ctx)
+	if err != nil {
+		slog.Error("unable to get operator config", "err", err)
+		os.Exit(1)
+	}
+	slog.Info("operator configuration loaded", "use-knative", operatorConfig.UseKnative)
+
 	if err = (&controller.KubeArchiveConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Mapper: mgr.GetRESTMapper(),
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		Mapper:     mgr.GetRESTMapper(),
+		UseKnative: operatorConfig.UseKnative,
 	}).SetupKubeArchiveConfigWithManager(mgr); err != nil {
 		slog.Error("unable to create controller", "controller", "KubeArchiveConfig", "err", err)
 		os.Exit(1)
 	}
 
 	if err = (&controller.ClusterKubeArchiveConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Mapper: mgr.GetRESTMapper(),
+		Client:     mgr.GetClient(),
+		Scheme:     mgr.GetScheme(),
+		Mapper:     mgr.GetRESTMapper(),
+		UseKnative: operatorConfig.UseKnative,
 	}).SetupClusterKubeArchiveConfigWithManager(mgr); err != nil {
 		slog.Error("unable to create controller", "controller", "ClusterKubeArchiveConfig", "err", err)
 		os.Exit(1)
+	}
+
+	// Only register SinkFilterReconciler when not using Knative (use-knative=false)
+	if !operatorConfig.UseKnative {
+		slog.Info("registering SinkFilter controller", "use-knative", operatorConfig.UseKnative)
+		if err = (&controller.SinkFilterReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+			Mapper: mgr.GetRESTMapper(),
+		}).SetupWithManager(mgr); err != nil {
+			slog.Error("unable to create controller", "controller", "SinkFilter", "err", err)
+			os.Exit(1)
+		}
+	} else {
+		slog.Info("skipping SinkFilter controller registration", "use-knative", operatorConfig.UseKnative)
 	}
 
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
@@ -240,4 +274,48 @@ func main() {
 		slog.Error("problem running operator", "err", err)
 		os.Exit(1)
 	}
+}
+
+const (
+	OperatorConfigMapName      = "kubearchive-operator-config"
+	OperatorConfigMapNamespace = "kubearchive"
+	UseKnativeConfigKey        = "use-knative"
+)
+
+type OperatorConfig struct {
+	UseKnative bool
+}
+
+func getOperatorConfig(ctx context.Context) (*OperatorConfig, error) {
+	clientset, err := k8sclient.NewInstrumentedKubernetesClient()
+	if err != nil {
+		return nil, fmt.Errorf("error creating kubernetes client: %w", err)
+	}
+
+	configMap, err := clientset.CoreV1().ConfigMaps(OperatorConfigMapNamespace).Get(
+		ctx,
+		OperatorConfigMapName,
+		metav1.GetOptions{},
+	)
+
+	config := &OperatorConfig{
+		UseKnative: true,
+	}
+
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return config, nil
+		}
+		return nil, fmt.Errorf("failed to get operator config: %w", err)
+	}
+
+	if useKnativeStr, exists := configMap.Data[UseKnativeConfigKey]; exists {
+		useKnative, parseErr := strconv.ParseBool(useKnativeStr)
+		if parseErr != nil {
+			return nil, fmt.Errorf("invalid value for %s: %s (must be 'true' or 'false')", UseKnativeConfigKey, useKnativeStr)
+		}
+		config.UseKnative = useKnative
+	}
+
+	return config, nil
 }

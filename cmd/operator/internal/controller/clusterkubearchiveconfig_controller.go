@@ -24,9 +24,10 @@ import (
 
 // ClusterKubeArchiveConfigReconciler reconciles a ClusterKubeArchiveConfig object
 type ClusterKubeArchiveConfigReconciler struct {
-	Client client.Client
-	Scheme *runtime.Scheme
-	Mapper meta.RESTMapper
+	Client     client.Client
+	Scheme     *runtime.Scheme
+	Mapper     meta.RESTMapper
+	UseKnative bool
 }
 
 //+kubebuilder:rbac:groups=kubearchive.org,resources=clusterkubearchiveconfigs;clustervacuums;namespacevacuums;sinkfilters,verbs=get;list;watch;create;update;patch;delete
@@ -64,7 +65,7 @@ func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req 
 
 			log.Info("Deleting ClusterKubeArchiveConfig")
 
-			if _, err := reconcileAllCommonResources(ctx, r.Client, r.Mapper, constants.SinkFilterGlobalNamespace, nil); err != nil {
+			if _, err := reconcileAllCommonResources(ctx, r.Client, r.Mapper, constants.SinkFilterGlobalNamespace, nil, r.UseKnative); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -79,7 +80,7 @@ func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req 
 		return ctrl.Result{}, nil
 	}
 
-	if _, err := reconcileAllCommonResources(ctx, r.Client, r.Mapper, constants.SinkFilterGlobalNamespace, ckaconfig.Spec.Resources); err != nil {
+	if _, err := reconcileAllCommonResources(ctx, r.Client, r.Mapper, constants.SinkFilterGlobalNamespace, ckaconfig.Spec.Resources, r.UseKnative); err != nil {
 		return ctrl.Result{}, err
 	}
 

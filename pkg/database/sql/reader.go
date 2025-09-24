@@ -30,9 +30,19 @@ func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion,
 		sb.Where(db.filter.NamespaceFilter(sb.Cond, namespace))
 	}
 	mainWhereClause := sqlbuilder.CopyWhereClause(sb.WhereClause)
+
+	isWildcardQuery := false
 	if name != "" {
-		sb.Where(db.filter.NameFilter(sb.Cond, name))
-	} else {
+		if strings.Contains(name, "*") {
+			sqlPattern := strings.ReplaceAll(name, "*", "%")
+			sb.Where(db.filter.NameWildcardFilter(sb.Cond, sqlPattern))
+			isWildcardQuery = true
+		} else {
+			sb.Where(db.filter.NameFilter(sb.Cond, name))
+		}
+	}
+
+	if name == "" || isWildcardQuery {
 		if continueId != "" && continueDate != "" {
 			sb.Where(db.filter.CreationTSAndIDFilter(sb.Cond, continueDate, continueId))
 		}

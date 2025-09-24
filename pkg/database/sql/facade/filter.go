@@ -15,6 +15,7 @@ type DBFilter interface {
 	KindApiVersionFilter(cond sqlbuilder.Cond, kind, apiVersion string) string
 	NamespaceFilter(cond sqlbuilder.Cond, ns string) string
 	NameFilter(cond sqlbuilder.Cond, name string) string
+	NameWildcardFilter(cond sqlbuilder.Cond, namePattern string) string
 	CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string
 	CreationTimestampAfterFilter(cond sqlbuilder.Cond, timestamp time.Time) string
 	CreationTimestampBeforeFilter(cond sqlbuilder.Cond, timestamp time.Time) string
@@ -46,6 +47,10 @@ func (PartialDBFilterImpl) NamespaceFilter(cond sqlbuilder.Cond, ns string) stri
 
 func (PartialDBFilterImpl) NameFilter(cond sqlbuilder.Cond, name string) string {
 	return cond.Equal("name", name)
+}
+
+func (PartialDBFilterImpl) NameWildcardFilter(cond sqlbuilder.Cond, namePattern string) string {
+	return cond.Like("LOWER(name)", cond.Var(namePattern))
 }
 
 func (PartialDBFilterImpl) UuidsFilter(cond sqlbuilder.Cond, uuids []string) string {

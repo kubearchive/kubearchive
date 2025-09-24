@@ -1,6 +1,6 @@
 # Copyright KubeArchive Authors
 # SPDX-License-Identifier: Apache-2.0
-import urllib3, os, json
+import urllib3, os, json, random
 from datetime import datetime, timedelta
 from string import Template
 from uuid import uuid4
@@ -60,15 +60,29 @@ class GetPods(HttpUser):
             headers={"Authorization": f"Bearer {token}"}
         )
 
+    @task
+    def get_pods_wildcard(self):
+        """Match pods containing '1' in their name"""
+        self.client.get(
+            "https://localhost:8081/api/v1/pods?name=*1*",
+            verify=False,
+            headers={"Authorization": f"Bearer {token}"}
+        )
+
 
 class CreatePods(HttpUser):
     @task
     def create_pod(self):
         now = datetime.now()
+
+        # Generate pod name with numeric suffix for wildcard testing
+        numeric_suffix = random.randint(1000000, 9999999)  # 7-digit number
+        pod_name = f"pod-{numeric_suffix}"
+
         data = template.substitute(dict(
             kind="Pod",
             version="v1",
-            pod_name="pod",
+            pod_name=pod_name,
             pod_uuid=uuid4(),
             owner_uuid=uuid4(),
             create_timestamp=now.strftime("%Y-%m-%dT%H:%M:%SZ"),

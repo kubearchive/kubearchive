@@ -23,8 +23,8 @@ import (
 var testResources = fake.CreateTestResources()
 var testLogUrls = fake.CreateTestLogUrls()
 var testLogJsonPath = "$."
-var nonCoreResources = testResources[:1]
-var coreResources = testResources[1:2]
+var nonCoreResources = testResources[:4] // First 4 are crontabs
+var coreResources = testResources[4:5]   // Last 1 is pod
 
 type List struct {
 	Items []*unstructured.Unstructured
@@ -419,6 +419,127 @@ func TestReadyz(t *testing.T) {
 		router.ServeHTTP(res, req)
 
 		assert.Equal(t, testCase.expected, res.Code)
+	}
+}
+
+func TestWildcardNameFiltering(t *testing.T) {
+	// Use the existing testResources which now include diverse crontab names
+
+	tests := []struct {
+		name          string
+		api           string
+		isCore        bool
+		expectedCode  int
+		expectedCount int // Number of resources expected in response
+		description   string
+	}{
+		{
+			name:          "wildcard middle match *e2e*",
+			api:           "/apis/stable.example.com/v1/namespaces/test/crontabs?name=*e2e*",
+			isCore:        false,
+			expectedCode:  http.StatusOK,
+			expectedCount: 2, // should match "test-e2e-job" and "my-e2e-service"
+			description:   "Should match resources containing 'e2e' anywhere in name",
+		},
+		{
+			name:          "wildcard prefix match test-*",
+			api:           "/apis/stable.example.com/v1/namespaces/test/crontabs?name=test-*",
+			isCore:        false,
+			expectedCode:  http.StatusOK,
+			expectedCount: 1, // should match "test-e2e-job"
+			description:   "Should match resources starting with 'test-'",
+		},
+		{
+			name:          "wildcard suffix match *-job",
+			api:           "/apis/stable.example.com/v1/namespaces/test/crontabs?name=*-job",
+			isCore:        false,
+			expectedCode:  http.StatusOK,
+			expectedCount: 1, // should match "test-e2e-job"
+			description:   "Should match resources ending with '-job'",
+		},
+		{
+			name:          "wildcard no matches *notfound*",
+			api:           "/apis/stable.example.com/v1/namespaces/test/crontabs?name=*notfound*",
+			isCore:        false,
+			expectedCode:  http.StatusOK,
+			expectedCount: 0, // should match nothing
+			description:   "Should return empty list when no matches",
+		},
+		{
+			name:          "wildcard case insensitive *E2E*",
+			api:           "/apis/stable.example.com/v1/namespaces/test/crontabs?name=*E2E*",
+			isCore:        false,
+			expectedCode:  http.StatusOK,
+			expectedCount: 2, // should match "test-e2e-job" and "my-e2e-service" (case insensitive)
+			description:   "Should match case insensitively",
+		},
+		{
+			name:          "exact name match (no wildcard)",
+			api:           "/apis/stable.example.com/v1/namespaces/test/crontabs?name=test-e2e-job",
+			isCore:        false,
+			expectedCode:  http.StatusOK,
+			expectedCount: 1, // should match exact name and return single resource, not list
+			description:   "Should return single resource for exact match",
+		},
+		{
+			name:          "wildcard with core resources *test*",
+			api:           "/api/v1/namespaces/test/pods?name=*test*",
+			isCore:        true,
+			expectedCode:  http.StatusOK,
+			expectedCount: 1, // should match "test" pod
+			description:   "Should work with core resources",
+		},
+		{
+			name:          "conflicting path and query name parameters",
+			api:           "/apis/stable.example.com/v1/namespaces/test/crontabs/existing-resource?name=*e2e*",
+			isCore:        false,
+			expectedCode:  http.StatusBadRequest,
+			expectedCount: 0,
+			description:   "Should return 400 when both path name and query name are provided",
+		},
+		{
+			name:          "wildcard in path parameter",
+			api:           "/apis/stable.example.com/v1/namespaces/test/crontabs/*e2e*",
+			isCore:        false,
+			expectedCode:  http.StatusBadRequest,
+			expectedCount: 0,
+			description:   "Should return 400 when wildcard characters are used in path parameter",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), tt.isCore)
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tt.api, nil)
+			router.ServeHTTP(res, req)
+
+			assert.Equal(t, tt.expectedCode, res.Code, tt.description)
+
+			if tt.expectedCode == http.StatusOK {
+				if tt.name == "exact name match (no wildcard)" {
+					// For exact matches, expect a single resource (not a list)
+					var resource unstructured.Unstructured
+					err := json.NewDecoder(res.Body).Decode(&resource)
+					assert.NoError(t, err, "Should decode single resource")
+					assert.Equal(t, "test-e2e-job", resource.GetName(), "Should return exact match")
+				} else {
+					// For wildcard matches, expect a list
+					var resources List
+					err := json.NewDecoder(res.Body).Decode(&resources)
+					assert.NoError(t, err, "Should decode resource list")
+					assert.Equal(t, tt.expectedCount, len(resources.Items), tt.description)
+				}
+			} else if tt.expectedCode == http.StatusBadRequest {
+				// For validation errors, check that we got an appropriate error message
+				responseBody := res.Body.String()
+				if tt.name == "conflicting path and query name parameters" {
+					assert.Contains(t, responseBody, "cannot specify both path name parameter and query name parameter", "Should contain appropriate error message")
+				} else if tt.name == "wildcard in path parameter" {
+					assert.Contains(t, responseBody, "wildcard characters (*) are not allowed in path parameters", "Should contain appropriate error message")
+				}
+			}
+		})
 	}
 }
 

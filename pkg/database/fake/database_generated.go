@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
@@ -14,6 +15,51 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 )
+
+func matchesWildcard(name, pattern string) bool {
+	if !strings.Contains(pattern, "*") {
+		// Exact match, case-insensitive
+		return strings.EqualFold(name, pattern)
+	}
+
+	nameLower := strings.ToLower(name)
+	patternLower := strings.ToLower(pattern)
+
+	if strings.HasPrefix(patternLower, "*") && strings.HasSuffix(patternLower, "*") {
+		substring := patternLower[1 : len(patternLower)-1]
+		return strings.Contains(nameLower, substring)
+	} else if strings.HasPrefix(patternLower, "*") {
+		suffix := patternLower[1:]
+		return strings.HasSuffix(nameLower, suffix)
+	} else if strings.HasSuffix(patternLower, "*") {
+		prefix := patternLower[:len(patternLower)-1]
+		return strings.HasPrefix(nameLower, prefix)
+	}
+
+	parts := strings.Split(patternLower, "*")
+	pos := 0
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		idx := strings.Index(nameLower[pos:], part)
+		if idx == -1 {
+			return false
+		}
+		if i == 0 && idx != 0 {
+			// First part must match from beginning
+			return false
+		}
+		pos += idx + len(part)
+	}
+
+	lastPart := parts[len(parts)-1]
+	if lastPart != "" && !strings.HasSuffix(nameLower, lastPart) {
+		return false
+	}
+
+	return true
+}
 
 func CreateTestResources() []*unstructured.Unstructured {
 	var ret []*unstructured.Unstructured
@@ -23,12 +69,35 @@ func CreateTestResources() []*unstructured.Unstructured {
 	crontab.SetName("test")
 	crontab.SetNamespace("test")
 	ret = append(ret, crontab)
+
+	crontab1 := &unstructured.Unstructured{}
+	crontab1.SetKind("Crontab")
+	crontab1.SetAPIVersion("stable.example.com/v1")
+	crontab1.SetName("test-e2e-job")
+	crontab1.SetNamespace("test")
+	ret = append(ret, crontab1)
+
+	crontab2 := &unstructured.Unstructured{}
+	crontab2.SetKind("Crontab")
+	crontab2.SetAPIVersion("stable.example.com/v1")
+	crontab2.SetName("my-e2e-service")
+	crontab2.SetNamespace("test")
+	ret = append(ret, crontab2)
+
+	crontab3 := &unstructured.Unstructured{}
+	crontab3.SetKind("Crontab")
+	crontab3.SetAPIVersion("stable.example.com/v1")
+	crontab3.SetName("production-deployment")
+	crontab3.SetNamespace("test")
+	ret = append(ret, crontab3)
+
 	pod := &unstructured.Unstructured{}
 	pod.SetKind("Pod")
 	pod.SetAPIVersion("v1")
 	pod.SetName("test")
 	pod.SetNamespace("test")
 	ret = append(ret, pod)
+
 	return ret
 }
 
@@ -108,7 +177,9 @@ func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namesp
 	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]string, int64, string, error) {
 	var resources []*unstructured.Unstructured
 
-	if name != "" {
+	if name != "" && strings.Contains(name, "*") {
+		resources = f.filterResourcesByKindApiVersionNamespaceAndWildcardName(kind, version, namespace, name)
+	} else if name != "" {
 		resources = f.queryNamespacedResourceByName(ctx, kind, version, namespace, name)
 	} else if namespace != "" {
 		resources = f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace)
@@ -116,7 +187,6 @@ func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namesp
 		resources = f.queryResources(ctx, kind, version, continueId, continueDate, limit)
 	}
 
-	// Apply timestamp filters if provided
 	if creationTimestampAfter != nil || creationTimestampBefore != nil {
 		resources = f.filterResourcesByTimestamp(resources, creationTimestampAfter, creationTimestampBefore)
 	}
@@ -141,7 +211,6 @@ func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namesp
 	return stringResources, id, date, f.err
 }
 
-// filterResourcesByTimestamp filters resources based on creation timestamp
 func (f *fakeDatabase) filterResourcesByTimestamp(resources []*unstructured.Unstructured,
 	creationTimestampAfter, creationTimestampBefore *time.Time) []*unstructured.Unstructured {
 	var filteredResources []*unstructured.Unstructured
@@ -149,12 +218,10 @@ func (f *fakeDatabase) filterResourcesByTimestamp(resources []*unstructured.Unst
 	for _, resource := range resources {
 		creationTime := resource.GetCreationTimestamp().Time
 
-		// Apply after filter
 		if creationTimestampAfter != nil && creationTime.Before(*creationTimestampAfter) {
 			continue
 		}
 
-		// Apply before filter
 		if creationTimestampBefore != nil && creationTime.After(*creationTimestampBefore) {
 			continue
 		}
@@ -197,6 +264,29 @@ func (f *fakeDatabase) filterResourceByKindApiVersionNamespaceAndName(kind, apiV
 			filteredResources = append(filteredResources, resource)
 		}
 	}
+	return filteredResources
+}
+
+func (f *fakeDatabase) filterResourcesByKindApiVersionNamespaceAndWildcardName(kind, apiVersion, namespace, namePattern string) []*unstructured.Unstructured {
+	baseResources := f.filterResourcesByKindAndApiVersion(kind, apiVersion)
+
+	if namespace != "" {
+		var namespacedResources []*unstructured.Unstructured
+		for _, resource := range baseResources {
+			if resource.GetNamespace() == namespace {
+				namespacedResources = append(namespacedResources, resource)
+			}
+		}
+		baseResources = namespacedResources
+	}
+
+	var filteredResources []*unstructured.Unstructured
+	for _, resource := range baseResources {
+		if matchesWildcard(resource.GetName(), namePattern) {
+			filteredResources = append(filteredResources, resource)
+		}
+	}
+
 	return filteredResources
 }
 

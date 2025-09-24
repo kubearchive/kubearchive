@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
@@ -14,6 +15,65 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 )
+
+// hasWildcards checks if a name pattern contains wildcard characters
+func hasWildcards(pattern string) bool {
+	return strings.Contains(pattern, "*")
+}
+
+// matchesWildcard checks if a name matches a wildcard pattern (case-insensitive)
+func matchesWildcard(name, pattern string) bool {
+	if !hasWildcards(pattern) {
+		// Exact match, case-insensitive
+		return strings.EqualFold(name, pattern)
+	}
+
+	// Convert pattern to lowercase for case-insensitive matching
+	nameLower := strings.ToLower(name)
+	patternLower := strings.ToLower(pattern)
+
+	// Simple wildcard matching using prefix/suffix logic
+	if strings.HasPrefix(patternLower, "*") && strings.HasSuffix(patternLower, "*") {
+		// *substring* pattern
+		substring := patternLower[1 : len(patternLower)-1]
+		return strings.Contains(nameLower, substring)
+	} else if strings.HasPrefix(patternLower, "*") {
+		// *suffix pattern
+		suffix := patternLower[1:]
+		return strings.HasSuffix(nameLower, suffix)
+	} else if strings.HasSuffix(patternLower, "*") {
+		// prefix* pattern
+		prefix := patternLower[:len(patternLower)-1]
+		return strings.HasPrefix(nameLower, prefix)
+	}
+
+	// For more complex patterns, use basic matching
+	// This is a simplified implementation - could be enhanced with regexp if needed
+	parts := strings.Split(patternLower, "*")
+	pos := 0
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		idx := strings.Index(nameLower[pos:], part)
+		if idx == -1 {
+			return false
+		}
+		if i == 0 && idx != 0 {
+			// First part must match from beginning
+			return false
+		}
+		pos += idx + len(part)
+	}
+
+	// If last part is not empty, it must match at the end
+	lastPart := parts[len(parts)-1]
+	if lastPart != "" && !strings.HasSuffix(nameLower, lastPart) {
+		return false
+	}
+
+	return true
+}
 
 func CreateTestResources() []*unstructured.Unstructured {
 	var ret []*unstructured.Unstructured
@@ -23,12 +83,35 @@ func CreateTestResources() []*unstructured.Unstructured {
 	crontab.SetName("test")
 	crontab.SetNamespace("test")
 	ret = append(ret, crontab)
+
+	crontab1 := &unstructured.Unstructured{}
+	crontab1.SetKind("Crontab")
+	crontab1.SetAPIVersion("stable.example.com/v1")
+	crontab1.SetName("test-e2e-job")
+	crontab1.SetNamespace("test")
+	ret = append(ret, crontab1)
+
+	crontab2 := &unstructured.Unstructured{}
+	crontab2.SetKind("Crontab")
+	crontab2.SetAPIVersion("stable.example.com/v1")
+	crontab2.SetName("my-e2e-service")
+	crontab2.SetNamespace("test")
+	ret = append(ret, crontab2)
+
+	crontab3 := &unstructured.Unstructured{}
+	crontab3.SetKind("Crontab")
+	crontab3.SetAPIVersion("stable.example.com/v1")
+	crontab3.SetName("production-deployment")
+	crontab3.SetNamespace("test")
+	ret = append(ret, crontab3)
+
 	pod := &unstructured.Unstructured{}
 	pod.SetKind("Pod")
 	pod.SetAPIVersion("v1")
 	pod.SetName("test")
 	pod.SetNamespace("test")
 	ret = append(ret, pod)
+
 	return ret
 }
 
@@ -107,11 +190,18 @@ func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namesp
 	continueId, continueDate string, _ *models.LabelFilters, limit int) ([]string, int64, string, error) {
 	var resources []*unstructured.Unstructured
 
-	if name != "" {
+	// Start with base filtering by kind and version
+	if name != "" && hasWildcards(name) {
+		// Handle wildcard name filtering
+		resources = f.filterResourcesByKindApiVersionNamespaceAndWildcardName(kind, version, namespace, name)
+	} else if name != "" {
+		// Handle exact name match
 		resources = f.queryNamespacedResourceByName(ctx, kind, version, namespace, name)
 	} else if namespace != "" {
+		// Handle namespace filtering
 		resources = f.filterResourcesByKindApiVersionAndNamespace(kind, version, namespace)
 	} else {
+		// Handle general listing
 		resources = f.queryResources(ctx, kind, version, continueId, continueDate, limit)
 	}
 
@@ -167,6 +257,32 @@ func (f *fakeDatabase) filterResourceByKindApiVersionNamespaceAndName(kind, apiV
 			filteredResources = append(filteredResources, resource)
 		}
 	}
+	return filteredResources
+}
+
+func (f *fakeDatabase) filterResourcesByKindApiVersionNamespaceAndWildcardName(kind, apiVersion, namespace, namePattern string) []*unstructured.Unstructured {
+	// Start with kind and API version filtering
+	baseResources := f.filterResourcesByKindAndApiVersion(kind, apiVersion)
+
+	// Apply namespace filtering if specified
+	if namespace != "" {
+		var namespacedResources []*unstructured.Unstructured
+		for _, resource := range baseResources {
+			if resource.GetNamespace() == namespace {
+				namespacedResources = append(namespacedResources, resource)
+			}
+		}
+		baseResources = namespacedResources
+	}
+
+	// Apply wildcard name filtering
+	var filteredResources []*unstructured.Unstructured
+	for _, resource := range baseResources {
+		if matchesWildcard(resource.GetName(), namePattern) {
+			filteredResources = append(filteredResources, resource)
+		}
+	}
+
 	return filteredResources
 }
 

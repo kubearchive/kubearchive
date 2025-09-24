@@ -20,6 +20,23 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+// convertWildcardToSQL converts user wildcard patterns to SQL LIKE patterns
+// * becomes % (matches any sequence of characters)
+// Converts to lowercase for case-insensitive matching
+func convertWildcardToSQL(pattern string) string {
+	if pattern == "" {
+		return pattern
+	}
+	// Convert wildcard pattern to SQL LIKE pattern and make it case-insensitive
+	sqlPattern := strings.ReplaceAll(pattern, "*", "%")
+	return strings.ToLower(sqlPattern)
+}
+
+// hasWildcards checks if a name pattern contains wildcard characters
+func hasWildcards(pattern string) bool {
+	return strings.Contains(pattern, "*")
+}
+
 func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *models.LabelFilters, limit int) ([]string, int64, string, error) {
 	sb := db.selector.ResourceSelector()
@@ -28,9 +45,23 @@ func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion,
 		sb.Where(db.filter.NamespaceFilter(sb.Cond, namespace))
 	}
 	mainWhereClause := sqlbuilder.CopyWhereClause(sb.WhereClause)
+
+	// Handle name filtering (exact or wildcard)
+	isWildcardQuery := false
 	if name != "" {
-		sb.Where(db.filter.NameFilter(sb.Cond, name))
-	} else {
+		if hasWildcards(name) {
+			// Use wildcard filter for patterns like *e2e*
+			sqlPattern := convertWildcardToSQL(name)
+			sb.Where(db.filter.NameWildcardFilter(sb.Cond, sqlPattern))
+			isWildcardQuery = true
+		} else {
+			// Use exact match filter for specific names
+			sb.Where(db.filter.NameFilter(sb.Cond, name))
+		}
+	}
+
+	// Apply pagination, sorting, and label filters for list queries (no name or wildcard name)
+	if name == "" || isWildcardQuery {
 		if continueId != "" && continueDate != "" {
 			sb.Where(db.filter.CreationTSAndIDFilter(sb.Cond, continueDate, continueId))
 		}

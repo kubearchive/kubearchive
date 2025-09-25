@@ -30,9 +30,10 @@ import (
 
 // KubeArchiveConfigReconciler reconciles a KubeArchiveConfig object
 type KubeArchiveConfigReconciler struct {
-	Client client.Client
-	Scheme *runtime.Scheme
-	Mapper meta.RESTMapper
+	Client     client.Client
+	Scheme     *runtime.Scheme
+	Mapper     meta.RESTMapper
+	UseKnative bool
 }
 
 //+kubebuilder:rbac:groups=kubearchive.org,resources=clustervacuums;kubearchiveconfigs;namespacevacuums;sinkfilters,verbs=get;list;watch;create;update;patch;delete
@@ -70,7 +71,7 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 			log.Info("Deleting KubeArchiveConfig")
 
-			if _, err := reconcileAllCommonResources(ctx, r.Client, r.Mapper, kaconfig.Namespace, nil); err != nil {
+			if _, err := reconcileAllCommonResources(ctx, r.Client, r.Mapper, kaconfig.Namespace, nil, r.UseKnative); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -100,13 +101,22 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	var err error
 	var clusterrole *rbacv1.ClusterRole
-	if clusterrole, err = reconcileAllCommonResources(ctx, r.Client, r.Mapper, kaconfig.Namespace, kaconfig.Spec.Resources); err != nil {
+	if clusterrole, err = reconcileAllCommonResources(ctx, r.Client, r.Mapper, kaconfig.Namespace, kaconfig.Spec.Resources, r.UseKnative); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	_, err = r.reconcileA13eRoleBinding(ctx, kaconfig, clusterrole)
-	if err != nil {
-		return ctrl.Result{}, err
+	// Only create role binding when using Knative (clusterrole is not nil)
+	if r.UseKnative && clusterrole != nil {
+		_, err = r.reconcileA13eRoleBinding(ctx, kaconfig, clusterrole)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else if !r.UseKnative {
+		// Clean up A13e role binding when not using Knative
+		if err = r.deleteA13eRoleBinding(ctx, kaconfig); err != nil {
+			log.Error(err, "Failed to delete A13e role binding")
+			return ctrl.Result{}, err
+		}
 	}
 
 	role, err := r.reconcileSinkRole(ctx, kaconfig)
@@ -617,5 +627,34 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumBrokerRoleBinding(ctx conte
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// deleteA13eRoleBinding deletes the ApiServerSource role binding when switching to non-Knative mode
+func (r *KubeArchiveConfigReconciler) deleteA13eRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) error {
+	log := log.FromContext(ctx)
+
+	log.Info("deleting A13e role binding", "namespace", kaconfig.Namespace)
+
+	existing := &rbacv1.RoleBinding{}
+	err := r.Client.Get(ctx, types.NamespacedName{
+		Name:      constants.KubeArchiveApiServerSourceName,
+		Namespace: kaconfig.Namespace,
+	}, existing)
+
+	if errors.IsNotFound(err) {
+		log.Info("A13e role binding not found, nothing to delete")
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if err := r.Client.Delete(ctx, existing); err != nil {
+		return err
+	}
+
+	log.Info("A13e role binding deleted successfully")
 	return nil
 }

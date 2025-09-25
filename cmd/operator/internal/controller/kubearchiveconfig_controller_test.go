@@ -211,9 +211,10 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 					Expect(k8sClient.Delete(ctx, kac)).To(Succeed())
 				}
 				controllerReconciler := &KubeArchiveConfigReconciler{
-					Client: k8sClient,
-					Scheme: k8sClient.Scheme(),
-					Mapper: k8sClient.RESTMapper(),
+					Client:     k8sClient,
+					Scheme:     k8sClient.Scheme(),
+					Mapper:     k8sClient.RESTMapper(),
+					UseKnative: true,
 				}
 
 				_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{

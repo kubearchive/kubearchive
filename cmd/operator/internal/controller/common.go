@@ -34,10 +34,10 @@ const (
 	resourceFinalizerName     = "kubearchive.org/finalizer"
 )
 
-func reconcileAllCommonResources(ctx context.Context, client client.Client, mapper meta.RESTMapper, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) (*rbacv1.ClusterRole, error) {
+func reconcileAllCommonResources(ctx context.Context, client client.Client, mapper meta.RESTMapper, namespace string, resources []kubearchivev1.KubeArchiveConfigResource, useKnative bool) (*rbacv1.ClusterRole, error) {
 	log := log.FromContext(ctx)
 
-	log.Info("in ReconcileAllCommonResources")
+	log.Info("in ReconcileAllCommonResources", "useKnative", useKnative)
 
 	var err error
 	var sf *kubearchivev1.SinkFilter
@@ -46,20 +46,48 @@ func reconcileAllCommonResources(ctx context.Context, client client.Client, mapp
 	}
 	sfres := getSinkFilterResources(sf)
 
-	if _, err = reconcileServiceAccount(ctx, client, constants.KubeArchiveNamespace, constants.KubeArchiveApiServerSourceName); err != nil {
-		return nil, err
-	}
+	if useKnative {
+		// Only run ApiServerSource-related code when using Knative
+		if _, err = reconcileServiceAccount(ctx, client, constants.KubeArchiveNamespace, constants.KubeArchiveApiServerSourceName); err != nil {
+			return nil, err
+		}
 
-	var clusterrole *rbacv1.ClusterRole
-	if clusterrole, err = reconcileA13eRole(ctx, client, mapper, sfres); err != nil {
-		return nil, err
-	}
+		var clusterrole *rbacv1.ClusterRole
+		if clusterrole, err = reconcileA13eRole(ctx, client, mapper, sfres); err != nil {
+			return nil, err
+		}
 
-	if err = reconcileA13e(ctx, client, sfres); err != nil {
-		return nil, err
-	}
+		if err = reconcileA13e(ctx, client, sfres); err != nil {
+			return nil, err
+		}
 
-	return clusterrole, nil
+		return clusterrole, nil
+	} else {
+		log.Info("cleaning up ApiServerSource resources", "useKnative", useKnative)
+
+		// Delete ApiServerSource resource
+		if err := deleteA13e(ctx, client); err != nil {
+			log.Error(err, "Failed to delete ApiServerSource")
+			return nil, err
+		}
+
+		// Delete associated service account
+		if err := deleteServiceAccount(ctx, client, constants.KubeArchiveNamespace, constants.KubeArchiveApiServerSourceName); err != nil {
+			log.Error(err, "Failed to delete ApiServerSource service account")
+			return nil, err
+		}
+
+		// Delete associated cluster role
+		if err := deleteClusterRole(ctx, client, constants.KubeArchiveApiServerSourceName); err != nil {
+			log.Error(err, "Failed to delete ApiServerSource cluster role")
+			return nil, err
+		}
+
+		log.Info("ApiServerSource resources cleaned up successfully")
+		// Note: RoleBindings that reference the deleted ClusterRole will be cleaned up
+		// by individual controllers during their reconciliation cycles
+		return &rbacv1.ClusterRole{}, nil
+	}
 }
 
 func reconcileServiceAccount(ctx context.Context, client client.Client, namespace string, name string) (*corev1.ServiceAccount, error) {
@@ -319,4 +347,109 @@ func desiredSinkFilter(ctx context.Context, sf *kubearchivev1.SinkFilter, namesp
 	// Note that the owner reference is NOT set on the SinkFilter resource.  It should not be deleted when
 	// the KubeArchiveConfig object is deleted.
 	return sf
+}
+
+// deleteA13e deletes the ApiServerSource resource
+func deleteA13e(ctx context.Context, client client.Client) error {
+	log := log.FromContext(ctx)
+
+	log.Info("deleting ApiServerSource")
+
+	existing := &sourcesv1.ApiServerSource{}
+	err := client.Get(ctx, types.NamespacedName{
+		Name:      constants.KubeArchiveApiServerSourceName,
+		Namespace: constants.KubeArchiveNamespace,
+	}, existing)
+
+	if errors.IsNotFound(err) {
+		log.Info("ApiServerSource not found, nothing to delete")
+		return nil
+	}
+
+	if err != nil {
+		if isKnativeNotInstalledError(err) {
+			log.Info("Knative Eventing not installed, ApiServerSource cannot exist", "error", err.Error())
+			return nil
+		}
+		return err
+	}
+
+	if err := client.Delete(ctx, existing); err != nil {
+		if isKnativeNotInstalledError(err) {
+			log.Info("Knative Eventing not installed, ApiServerSource already gone", "error", err.Error())
+			return nil
+		}
+		return err
+	}
+
+	log.Info("ApiServerSource deleted successfully")
+	return nil
+}
+
+// deleteServiceAccount deletes a service account if it exists
+func deleteServiceAccount(ctx context.Context, client client.Client, namespace, name string) error {
+	log := log.FromContext(ctx)
+
+	log.Info("deleting service account", "namespace", namespace, "name", name)
+
+	existing := &corev1.ServiceAccount{}
+	err := client.Get(ctx, types.NamespacedName{
+		Name:      name,
+		Namespace: namespace,
+	}, existing)
+
+	if errors.IsNotFound(err) {
+		log.Info("service account not found, nothing to delete", "name", name)
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if err := client.Delete(ctx, existing); err != nil {
+		return err
+	}
+
+	log.Info("service account deleted successfully", "name", name)
+	return nil
+}
+
+// deleteClusterRole deletes a cluster role if it exists
+func deleteClusterRole(ctx context.Context, client client.Client, name string) error {
+	log := log.FromContext(ctx)
+
+	log.Info("deleting cluster role", "name", name)
+
+	existing := &rbacv1.ClusterRole{}
+	err := client.Get(ctx, types.NamespacedName{Name: name}, existing)
+
+	if errors.IsNotFound(err) {
+		log.Info("cluster role not found, nothing to delete", "name", name)
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	if err := client.Delete(ctx, existing); err != nil {
+		return err
+	}
+
+	log.Info("cluster role deleted successfully", "name", name)
+	return nil
+}
+
+// isKnativeNotInstalledError checks if the error is due to Knative Eventing not being installed
+func isKnativeNotInstalledError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	errMsg := err.Error()
+
+	// Check for REST mapping errors that indicate the ApiServerSource CRD doesn't exist
+	return strings.Contains(errMsg, "no matches for kind \"ApiServerSource\"") &&
+		strings.Contains(errMsg, "sources.knative.dev/v1")
 }

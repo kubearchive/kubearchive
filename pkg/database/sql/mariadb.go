@@ -63,6 +63,20 @@ func (mariaDBFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, c
 	)
 }
 
+func (mariaDBFilter) CreationTimestampAfterFilter(cond sqlbuilder.Cond, timestamp time.Time) string {
+	return fmt.Sprintf(
+		"CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime) > %s",
+		cond.Var(timestamp.Format("2006-01-02 15:04:05")),
+	)
+}
+
+func (mariaDBFilter) CreationTimestampBeforeFilter(cond sqlbuilder.Cond, timestamp time.Time) string {
+	return fmt.Sprintf(
+		"CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime) < %s",
+		cond.Var(timestamp.Format("2006-01-02 15:04:05")),
+	)
+}
+
 func (mariaDBFilter) OwnerFilter(cond sqlbuilder.Cond, uuids []string) string {
 	return fmt.Sprintf(
 		"JSON_OVERLAPS(JSON_EXTRACT(data, '$.metadata.ownerReferences.**.uid'), JSON_ARRAY(%s))",

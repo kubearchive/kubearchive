@@ -37,6 +37,38 @@ Parameters allowed:
 * `continue`: token to access the next page of the pagination. Retrieve it at `.metadata.continue`
 of the returned `List` resource. An empty string if there are no more pages remaining.
 * `labelSelector`: allows filtering resources based on label filtering.
+* `creationTimestampAfter`: filters resources created after the specified timestamp (RFC3339 format, e.g., `2023-01-01T12:00:00Z`).
+* `creationTimestampBefore`: filters resources created before the specified timestamp (RFC3339 format, e.g., `2023-12-31T23:59:59Z`).
+
+=== Timestamp Filters
+
+The API supports filtering resources by their creation timestamp using RFC3339 format:
+
+After timestamp::
+    `creationTimestampAfter=2023-01-01T12:00:00Z`
+Before timestamp::
+    `creationTimestampBefore=2023-12-31T23:59:59Z`
+Both filters::
+    `creationTimestampAfter=2023-01-01T12:00:00Z&creationTimestampBefore=2023-12-31T23:59:59Z`
+
+[NOTE]
+====
+Timestamp filters can be combined with other filters (labelSelector, pagination) and will be applied as AND conditions.
+====
+
+Examples:
+
+[source,text]
+----
+/api/v1/namespaces/default/pods?creationTimestampAfter=2023-06-01T00:00:00Z <1>
+/apis/apps/v1/namespaces/production/deployments?creationTimestampBefore=2023-12-31T23:59:59Z <2>
+/api/v1/pods?creationTimestampAfter=2023-01-01T00:00:00Z&creationTimestampBefore=2023-01-31T23:59:59Z <3>
+/api/v1/namespaces/default/pods?creationTimestampAfter=2023-06-01T00:00:00Z&labelSelector=app=frontend <4>
+----
+<1> Filter pods created after a specific date
+<2> Filter deployments created before a specific date
+<3> Filter resources created within a date range
+<4> Combine timestamp filters with label selectors
 
 === Label Selector
 

@@ -180,7 +180,7 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 					defer cancel()
 
 					resources, lastId, _, err := tt.database.QueryResources(ctx, podKind, version,
-						"", "", "", "", &models.LabelFilters{}, 100)
+						"", "", "", "", &models.LabelFilters{}, nil, nil, 100)
 					if ttt.numResources == 0 {
 						assert.Nil(t, resources)
 						assert.Equal(t, int64(0), lastId)
@@ -223,7 +223,7 @@ func TestQueryResources(t *testing.T) {
 					defer cancel()
 
 					resources, _, _, err := tt.database.QueryResources(ctx, podKind, version, namespace,
-						"", "", "", &models.LabelFilters{}, 100)
+						"", "", "", &models.LabelFilters{}, nil, nil, 100)
 					if ttt.numResources == 0 {
 						assert.Nil(t, resources)
 					} else {
@@ -403,7 +403,7 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 
 				resources, _, _, err := tt.database.QueryResources(ctx, podKind, version,
 					"", "", "", "",
-					&ttt.labelFilters, 100,
+					&ttt.labelFilters, nil, nil, 100,
 				)
 				assert.NotNil(t, resources)
 				assert.NoError(t, err)
@@ -439,7 +439,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 					defer cancel()
 
 					resources, _, _, err := tt.database.QueryResources(ctx, kind, version, namespace, podName,
-						"", "", &models.LabelFilters{}, 100)
+						"", "", &models.LabelFilters{}, nil, nil, 100)
 					if ttt.numResources == 0 {
 						assert.Empty(t, resources)
 					} else {
@@ -549,5 +549,165 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 				assert.Equal(t, "", jp)
 			})
 		}
+	}
+}
+
+func TestQueryResourcesWithTimestampFilters(t *testing.T) {
+	timestampTests := []struct {
+		name                    string
+		creationTimestampAfter  *time.Time
+		creationTimestampBefore *time.Time
+		expectedQueryContains   string
+		expectedArgs            []interface{}
+	}{
+		{
+			name: "creationTimestampAfter only",
+			creationTimestampAfter: func() *time.Time {
+				t := time.Date(2023, 6, 1, 12, 0, 0, 0, time.UTC)
+				return &t
+			}(),
+			creationTimestampBefore: nil,
+			expectedQueryContains:   "creationTimestamp",
+		},
+		{
+			name:                   "creationTimestampBefore only",
+			creationTimestampAfter: nil,
+			creationTimestampBefore: func() *time.Time {
+				t := time.Date(2023, 12, 31, 23, 59, 59, 0, time.UTC)
+				return &t
+			}(),
+			expectedQueryContains: "creationTimestamp",
+		},
+		{
+			name: "both timestamp filters",
+			creationTimestampAfter: func() *time.Time {
+				t := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
+				return &t
+			}(),
+			creationTimestampBefore: func() *time.Time {
+				t := time.Date(2023, 12, 31, 23, 59, 59, 0, time.UTC)
+				return &t
+			}(),
+			expectedQueryContains: "creationTimestamp",
+		},
+		{
+			name:                    "no timestamp filters",
+			creationTimestampAfter:  nil,
+			creationTimestampBefore: nil,
+			expectedQueryContains:   "creationTimestamp",
+		},
+	}
+
+	for _, tt := range tests {
+		for _, timestampTest := range timestampTests {
+			t.Run(fmt.Sprintf("%s %s", tt.name, timestampTest.name), func(t *testing.T) {
+				filter := tt.database.getFilter()
+				sb := tt.database.getSelector().ResourceSelector()
+				sb.Where(filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion))
+
+				// Add timestamp filters
+				if timestampTest.creationTimestampAfter != nil {
+					sb.Where(filter.CreationTimestampAfterFilter(sb.Cond, *timestampTest.creationTimestampAfter))
+				}
+				if timestampTest.creationTimestampBefore != nil {
+					sb.Where(filter.CreationTimestampBeforeFilter(sb.Cond, *timestampTest.creationTimestampBefore))
+				}
+
+				sb = tt.database.getSorter().CreationTSAndIDSorter(sb)
+				sb.Limit(100)
+				query, args := sb.BuildWithFlavor(tt.database.getFlavor())
+
+				// Verify the query contains timestamp filtering
+				if timestampTest.creationTimestampAfter != nil || timestampTest.creationTimestampBefore != nil {
+					assert.Contains(t, query, timestampTest.expectedQueryContains)
+				}
+
+				db, mock := NewMock()
+				tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+
+				rows := sqlmock.NewRows(resourceQueryColumns)
+				rows.AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource))
+				mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+				defer cancel()
+
+				resources, _, _, err := tt.database.QueryResources(ctx, podKind, podApiVersion, "", "",
+					"", "", &models.LabelFilters{}, timestampTest.creationTimestampAfter, timestampTest.creationTimestampBefore, 100)
+				assert.NotNil(t, resources)
+				assert.NoError(t, err)
+			})
+		}
+	}
+}
+
+func TestTimestampFilterMethods(t *testing.T) {
+	testTime := time.Date(2023, 6, 1, 12, 0, 0, 0, time.UTC)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := tt.database.getFilter()
+			cond := sqlbuilder.NewCond()
+
+			// Test CreationTimestampAfterFilter
+			afterFilter := filter.CreationTimestampAfterFilter(*cond, testTime)
+			assert.NotEmpty(t, afterFilter)
+			assert.Contains(t, afterFilter, "creationTimestamp")
+
+			// Test CreationTimestampBeforeFilter
+			beforeFilter := filter.CreationTimestampBeforeFilter(*cond, testTime)
+			assert.NotEmpty(t, beforeFilter)
+			assert.Contains(t, beforeFilter, "creationTimestamp")
+
+			// Verify the filters are different
+			assert.NotEqual(t, afterFilter, beforeFilter)
+		})
+	}
+}
+
+func TestTimestampFilterWithLabelFilters(t *testing.T) {
+	testTime := time.Date(2023, 6, 1, 12, 0, 0, 0, time.UTC)
+	labelFilters := &models.LabelFilters{
+		Equals: map[string]string{"app": "frontend"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := tt.database.getFilter()
+			sb := tt.database.getSelector().ResourceSelector()
+			sb.Where(filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion))
+
+			// Add both timestamp and label filters
+			sb.Where(filter.CreationTimestampAfterFilter(sb.Cond, testTime))
+			sb.Where(filter.EqualsLabelFilter(sb.Cond, labelFilters.Equals, nil))
+
+			sb = tt.database.getSorter().CreationTSAndIDSorter(sb)
+			sb.Limit(100)
+			query, args := sb.BuildWithFlavor(tt.database.getFlavor())
+
+			// Verify timestamp filter is present
+			assert.Contains(t, query, "creationTimestamp")
+
+			// For PostgreSQL, verify labels filter is present
+			// Note: MariaDB label filters are not fully implemented yet
+			if tt.name == "postgresql" {
+				assert.Contains(t, query, "labels")
+			}
+
+			db, mock := NewMock()
+			tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+
+			rows := sqlmock.NewRows(resourceQueryColumns)
+			rows.AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource))
+			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+
+			resources, _, _, err := tt.database.QueryResources(ctx, podKind, podApiVersion, "", "",
+				"", "", labelFilters, &testTime, nil, 100)
+			assert.NotNil(t, resources)
+			assert.NoError(t, err)
+		})
 	}
 }

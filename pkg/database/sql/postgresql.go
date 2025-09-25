@@ -66,6 +66,20 @@ func (postgreSQLFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate
 	)
 }
 
+func (postgreSQLFilter) CreationTimestampAfterFilter(cond sqlbuilder.Cond, timestamp time.Time) string {
+	return fmt.Sprintf(
+		"data->'metadata'->>'creationTimestamp' > %s",
+		cond.Var(timestamp.Format(time.RFC3339)),
+	)
+}
+
+func (postgreSQLFilter) CreationTimestampBeforeFilter(cond sqlbuilder.Cond, timestamp time.Time) string {
+	return fmt.Sprintf(
+		"data->'metadata'->>'creationTimestamp' < %s",
+		cond.Var(timestamp.Format(time.RFC3339)),
+	)
+}
+
 func (postgreSQLFilter) OwnerFilter(cond sqlbuilder.Cond, owners []string) string {
 	return fmt.Sprintf(
 		"jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| %s",

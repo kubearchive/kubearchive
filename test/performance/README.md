@@ -12,11 +12,15 @@ bash test/performance/run.sh
 
 **Note**: this requires at least Python 3.10
 
-The tests are run with [Locust](https://docs.locust.io/en/stable/) in order and they
+The tests are run with [Locust](https://docs.locust.io/en/stable/) in order, and they
 are the following:
 
 1. `create`: (Sink) POST / to create Pods from a template, aprox ~3k Pods are inserted
-1. `get`: (API) GET /api/v1/pods
+1. `get`: (API) GET /api/v1/pods with various query patterns including:
+   - Basic pod retrieval
+   - Timestamp filtering with `creationTimestampAfter`
+   - Timestamp filtering with `creationTimestampBefore`
+   - Timestamp range filtering with both parameters
 
 The results of the tests are on `./perf-results/`, relative to the root of the repository.
 Their name reference the test where they come from, currently `get-*.csv` and `create-*.csv`

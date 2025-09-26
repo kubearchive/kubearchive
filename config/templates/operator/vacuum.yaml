@@ -24,13 +24,6 @@ metadata:
     app.kubernetes.io/version: "${NEXT_VERSION}"
 rules:
 - apiGroups:
-  - eventing.knative.dev
-  resources:
-  - brokers
-  verbs:
-  - get
-  - list
-- apiGroups:
   - kubearchive.org
   resources:
   - sinkfilters

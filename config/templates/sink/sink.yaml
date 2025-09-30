@@ -79,6 +79,9 @@ spec:
             - containerPort: 8080
               name: sink
               protocol: TCP
+            - containerPort: 8888
+              name: pprof
+              protocol: TCP
           livenessProbe:
             httpGet:
               path: /livez

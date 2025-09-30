@@ -76,8 +76,6 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	router.GET("/livez", controller.Livez)
 	router.GET("/readyz", controller.Readyz)
 
-	observability.SetupPprof(router)
-
 	apisGroup.GET("/:group/:version/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
@@ -153,6 +151,17 @@ func main() {
 			os.Exit(1)
 		}
 	}()
+
+	if os.Getenv(observability.EnablePprofEnvVar) == "true" {
+		pprofServer := observability.GetObservabilityServer()
+		go func() {
+			shutdownErr := pprofServer.ListenAndServeTLS("/etc/kubearchive/ssl/tls.crt", "/etc/kubearchive/ssl/tls.key")
+			if shutdownErr != nil && shutdownErr != http.ErrServerClosed {
+				slog.Error("Error listening pprof server", "error", shutdownErr.Error())
+				os.Exit(1)
+			}
+		}()
+	}
 
 	// This blocks until `quitChan` gets a signal injected by `signal.Notify`.
 	// After the injection the execution continues and the shutdown happens.

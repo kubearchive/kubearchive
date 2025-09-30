@@ -40,8 +40,6 @@ func NewServer(controller *routers.Controller) *Server {
 	router.GET("/livez", controller.Livez)
 	router.GET("/readyz", controller.Readyz)
 
-	observability.SetupPprof(router)
-
 	return &Server{
 		controller: controller,
 		router:     router,
@@ -62,6 +60,17 @@ func (s *Server) Serve() {
 			os.Exit(1)
 		}
 	}()
+
+	if os.Getenv(observability.EnablePprofEnvVar) == "true" {
+		pprofServer := observability.GetObservabilityServer()
+		go func() {
+			shutdownErr := pprofServer.ListenAndServe()
+			if shutdownErr != nil && shutdownErr != http.ErrServerClosed {
+				slog.Error("Error listening pprof server", "error", shutdownErr.Error())
+				os.Exit(1)
+			}
+		}()
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

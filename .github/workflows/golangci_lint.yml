@@ -30,7 +30,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.23.9'
+          go-version: '1.25.1'
       - name: Display Go version
         run: go version
       - name: Generate operator code

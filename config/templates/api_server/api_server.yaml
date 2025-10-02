@@ -88,6 +88,9 @@ spec:
             - containerPort: 8081
               name: server
               protocol: TCP
+            - containerPort: 8888
+              name: pprof
+              protocol: TCP
           livenessProbe:
             httpGet:
               path: /livez

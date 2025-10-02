@@ -175,7 +175,7 @@ func main() {
 	}
 
 	if os.Getenv(observability.EnablePprofEnvVar) == "true" {
-		mgrOptions.PprofBindAddress = ":8082"
+		mgrOptions.PprofBindAddress = ":8888"
 	}
 
 	mgr, err := ctrl.NewManager(config, mgrOptions)

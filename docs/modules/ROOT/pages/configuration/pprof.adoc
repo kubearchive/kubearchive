@@ -5,9 +5,9 @@ link:https://pkg.go.dev/net/http/pprof[HTTP pprof endpoints]
 enabled on all of its components. Each component exposes the endpoint
 in its own port:
 
-* Operator: `:8082/debug/pprof/`
-* Sink: `:80/debug/pprof/`
-* API: `:8081/debug/pprof/`
+* Operator: `:8888/debug/pprof/`
+* Sink: `:8888/debug/pprof/`
+* API: `:8888/debug/pprof/`
 
 This feature is controlled by an environment variable called `KUBEARCHIVE_ENABLE_PPROF`.
 By default it is set as `"true"` (lowercase "true" string), change it to any other value

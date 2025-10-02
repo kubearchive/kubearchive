@@ -7,8 +7,9 @@ LOCALBIN=${SCRIPT_DIR}/bin
 
 mkdir -p ${LOCALBIN}
 
-test -s ${LOCALBIN}/controller-gen || GOBIN=${LOCALBIN} go install sigs.k8s.io/controller-tools/cmd/controller-gen@latest
-test -s ${LOCALBIN}/setup-envtest || GOBIN=${LOCALBIN} go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+go version
+test -s ${LOCALBIN}/controller-gen || GOBIN=${LOCALBIN} go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17
+test -s ${LOCALBIN}/setup-envtest || GOBIN=${LOCALBIN} go install sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.20
 
 cd ${SCRIPT_DIR}
 

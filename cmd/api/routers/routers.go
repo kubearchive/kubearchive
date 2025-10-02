@@ -125,7 +125,15 @@ func (c *Controller) GetResources(context *gin.Context) {
 		return
 	}
 
-	continueToken := pagination.CreateToken(lastId, lastDate)
+	// We can't know if there are more resources in the DB than the limit, because the number
+	// of resources that we know about is limited by the limit value in the first place.
+	// So we do know that if the number of resources is equal to the limit, it is possible that
+	// there are more resources stored. With some usage this would be true most of the time
+	continueToken := ""
+	if len(resources) == limit {
+		continueToken = pagination.CreateToken(lastId, lastDate)
+	}
+
 	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
 }
 

@@ -175,7 +175,7 @@ func main() {
 	}
 
 	if os.Getenv(observability.EnablePprofEnvVar) == "true" {
-		mgrOptions.PprofBindAddress = ":8888"
+		mgrOptions.PprofBindAddress = ":8082"
 	}
 
 	mgr, err := ctrl.NewManager(config, mgrOptions)
@@ -199,6 +199,17 @@ func main() {
 		Mapper: mgr.GetRESTMapper(),
 	}).SetupClusterKubeArchiveConfigWithManager(mgr); err != nil {
 		slog.Error("unable to create controller", "controller", "ClusterKubeArchiveConfig", "err", err)
+		os.Exit(1)
+	}
+
+	// Always register SinkFilter controller since we're no longer using Knative
+	slog.Info("registering SinkFilter controller")
+	if err = (&controller.SinkFilterReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Mapper: mgr.GetRESTMapper(),
+	}).SetupWithManager(mgr); err != nil {
+		slog.Error("unable to create controller", "controller", "SinkFilter", "err", err)
 		os.Exit(1)
 	}
 

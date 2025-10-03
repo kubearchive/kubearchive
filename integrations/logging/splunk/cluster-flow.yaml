@@ -12,7 +12,6 @@ spec:
     - exclude:
         namespaces:
           - cert-manager
-          - knative-eventing
           - kube-node-lease
           - kube-public
           - kube-system

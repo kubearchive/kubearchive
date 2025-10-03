@@ -2,3 +2,4 @@ yyyy/mm/dd hh:mm:ss INFO Event sent successfully apiversion=v1 kind=Pod namespac
 yyyy/mm/dd hh:mm:ss INFO Event sent successfully apiversion=v1 kind=Pod namespace=test-xxx-xxxxxxxx name=namespace-vacuum-xxxxxxxx-xxxxx code=202
 yyyy/mm/dd hh:mm:ss INFO Finished publishing sink events namespace=test-xxx-xxxxxxxx
 yyyy/mm/dd hh:mm:ss INFO Started publishing sink events namespace=test-xxx-xxxxxxxx
+yyyy/mm/dd hh:mm:ss INFO Using sink service URL url=http://kubearchive-sink.kubearchive.svc.cluster.local:80

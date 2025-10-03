@@ -16,9 +16,7 @@ const (
 	KubeArchiveApiServerSourceName                 = "kubearchive-a13e"
 	SinkFilterGlobalNamespace                      = "___global___"
 	ClusterVacuumAllNamespaces                     = "___all-namespaces___"
-	KubeArchiveBrokerName                          = "kubearchive-broker"
 	KubeArchiveVacuumName                          = "kubearchive-vacuum"
-	KubeArchiveVacuumBroker                        = "kubearchive-broker"
 	KubeArchiveClusterVacuumName                   = "kubearchive-cluster-vacuum"
 )
 

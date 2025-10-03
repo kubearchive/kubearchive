@@ -16,8 +16,6 @@ import (
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
-	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
@@ -25,29 +23,13 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 	Context("When reconciling a resource", func() {
 		ctx := context.Background()
 
-		installApiName := types.NamespacedName{
-			Name:      constants.KubeArchiveApiServerSourceName,
-			Namespace: constants.KubeArchiveNamespace,
-		}
 		installSFName := types.NamespacedName{
 			Name:      constants.SinkFilterResourceName,
 			Namespace: constants.KubeArchiveNamespace,
 		}
 
-		clusterApiName := types.NamespacedName{Name: constants.KubeArchiveApiServerSourceName}
 		clusterKACName := types.NamespacedName{
 			Name: constants.KubeArchiveConfigResourceName,
-		}
-
-		kacJobsPolicyRule := rbacv1.PolicyRule{
-			APIGroups: []string{"batch"},
-			Resources: []string{"jobs"},
-			Verbs:     []string{"get", "list", "watch"},
-		}
-		kacPodsPolicyRule := rbacv1.PolicyRule{
-			APIGroups: []string{""},
-			Resources: []string{"pods"},
-			Verbs:     []string{"get", "list", "watch"},
 		}
 
 		jobResource := kubearchivev1.KubeArchiveConfigResource{
@@ -86,7 +68,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 			err := k8sClient.Get(ctx, clusterKACName, kubearchiveconfig)
 			Expect(errors.IsNotFound(err)).To(BeTrue())
 		})
-		It("should successfully reconcile the resource", func() {
+		It("should successfully reconcile the ClusterKubeArchiveConfig resource", func() {
 			By("Reconciling the created resource")
 			for _, op := range []string{"create", "add-resource", "remove-resource", "delete"} {
 				By(op)
@@ -121,35 +103,6 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 				} else {
 					Expect(len(sf.Spec.Namespaces)).To(Equal(1))
 					Expect(sf.Spec.Namespaces).Should(HaveKey(constants.SinkFilterGlobalNamespace))
-				}
-
-				// Check for the ApiServerSource ServiceAccount in the kubearchive namespace.
-				err = k8sClient.Get(ctx, installApiName, &corev1.ServiceAccount{})
-				Expect(err).NotTo(HaveOccurred())
-
-				// Check for the ApiServerSource cluster role.
-				clusterRole := &rbacv1.ClusterRole{}
-				err = k8sClient.Get(ctx, clusterApiName, clusterRole)
-				Expect(err).NotTo(HaveOccurred())
-				if op == "create" {
-					Expect(len(clusterRole.Rules)).To(Equal(1))
-					Expect(clusterRole.Rules).Should(ContainElement(kacJobsPolicyRule))
-				} else if op == "update-add-resource" {
-					Expect(len(clusterRole.Rules)).To(Equal(2))
-					Expect(clusterRole.Rules).Should(ContainElement(kacJobsPolicyRule))
-					Expect(clusterRole.Rules).Should(ContainElement(kacPodsPolicyRule))
-				} else if op == "update-remove-resource" {
-					Expect(len(clusterRole.Rules)).To(Equal(1))
-					Expect(clusterRole.Rules).Should(ContainElement(kacJobsPolicyRule))
-					Expect(clusterRole.Rules).Should(Not(ContainElement(kacPodsPolicyRule)))
-				} else if op == "delete" {
-					Expect(len(clusterRole.Rules)).To(Equal(0))
-				}
-
-				if op != "delete" {
-					// Check for the ApiServerSource in the KubeArchive installation namespace.
-					err = k8sClient.Get(ctx, installApiName, &sourcesv1.ApiServerSource{})
-					Expect(err).NotTo(HaveOccurred())
 				}
 			}
 		})

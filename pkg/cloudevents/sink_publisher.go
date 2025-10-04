@@ -5,7 +5,6 @@ package cloudevents
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -23,10 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
-	kclient "knative.dev/eventing/pkg/client/clientset/versioned"
 )
 
 type SinkCloudEventPublisherResult struct {
@@ -41,12 +38,11 @@ type SinkCloudEventPublisher struct {
 	mapper          meta.RESTMapper
 	target          string
 	source          string
-	etype           string
 	globalResources map[sourcesv1.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource
 }
 
-func NewSinkCloudEventPublisher(source string, etype string) (*SinkCloudEventPublisher, error) {
-	scep := &SinkCloudEventPublisher{source: source, etype: etype}
+func NewSinkCloudEventPublisher(source string) (*SinkCloudEventPublisher, error) {
+	scep := &SinkCloudEventPublisher{source: source}
 
 	var err error
 	if scep.httpClient, err = otelObs.NewClientHTTP([]cehttp.Option{}, []client.Option{}); err != nil {
@@ -54,10 +50,8 @@ func NewSinkCloudEventPublisher(source string, etype string) (*SinkCloudEventPub
 		return nil, err
 	}
 
-	if scep.target, err = getBrokerUrl(); err != nil {
-		slog.Error("Unable to get broker URL", "error", err)
-		return nil, err
-	}
+	// Always use sink service URL since we're no longer using Knative
+	scep.target = getSinkServiceUrl()
 
 	var discoveryClient *discovery.DiscoveryClient
 	if discoveryClient, err = k8sclient.NewInstrumentedDiscoveryClient(); err != nil {
@@ -86,12 +80,12 @@ func NewSinkCloudEventPublisher(source string, etype string) (*SinkCloudEventPub
 	return scep, nil
 }
 
-func (scep *SinkCloudEventPublisher) SendByGVK(ctx context.Context, avk *sourcesv1.APIVersionKind, namespace string) []SinkCloudEventPublisherResult {
+func (scep *SinkCloudEventPublisher) SendByGVK(ctx context.Context, eventType string, avk *sourcesv1.APIVersionKind, namespace string) []SinkCloudEventPublisherResult {
 
 	return []SinkCloudEventPublisherResult{}
 }
 
-func (scep *SinkCloudEventPublisher) SendByNamespace(ctx context.Context, namespace string) (map[sourcesv1.APIVersionKind][]SinkCloudEventPublisherResult, error) {
+func (scep *SinkCloudEventPublisher) SendByNamespace(ctx context.Context, eventType string, namespace string) (map[sourcesv1.APIVersionKind][]SinkCloudEventPublisherResult, error) {
 
 	localResources, err := scep.getKubeArchiveConfigResources(namespace)
 	if err != nil {
@@ -103,13 +97,13 @@ func (scep *SinkCloudEventPublisher) SendByNamespace(ctx context.Context, namesp
 	allResources := mergeResources(scep.globalResources, localResources)
 
 	for avk := range allResources {
-		results[avk] = scep.SendByAPIVersionKind(ctx, namespace, &avk)
+		results[avk] = scep.SendByAPIVersionKind(ctx, eventType, namespace, &avk)
 	}
 
 	return results, nil
 }
 
-func (scep *SinkCloudEventPublisher) SendByAPIVersionKind(ctx context.Context, namespace string, avk *sourcesv1.APIVersionKind) []SinkCloudEventPublisherResult {
+func (scep *SinkCloudEventPublisher) SendByAPIVersionKind(ctx context.Context, eventType string, namespace string, avk *sourcesv1.APIVersionKind) []SinkCloudEventPublisherResult {
 	results := []SinkCloudEventPublisherResult{}
 
 	gvr, err := getGVR(scep.mapper, avk)
@@ -136,7 +130,7 @@ func (scep *SinkCloudEventPublisher) SendByAPIVersionKind(ctx context.Context, n
 
 		result := SinkCloudEventPublisherResult{Name: name, Message: "No event sent"}
 		if shouldSend(avk, scep.globalResources, localResources) {
-			sendResult := scep.send(ctx, item.Object)
+			sendResult := scep.Send(ctx, eventType, item.Object)
 			if ce.IsACK(sendResult) {
 				result.Message = "Event sent successfully"
 			} else {
@@ -157,13 +151,13 @@ func (scep *SinkCloudEventPublisher) SendByAPIVersionKind(ctx context.Context, n
 	return results
 }
 
-func (scep *SinkCloudEventPublisher) send(ctx context.Context, resource map[string]interface{}) error {
+func (scep *SinkCloudEventPublisher) Send(ctx context.Context, eventType string, resource map[string]interface{}) ce.Result {
 	event := ce.NewEvent()
 	event.SetSource(scep.source)
-	event.SetType(scep.etype)
+	event.SetType(eventType)
 	if err := event.SetData(ce.ApplicationJSON, resource); err != nil {
 		slog.Error("Error setting cloudevent data", "error", err)
-		return err
+		return ce.NewResult(err.Error())
 	}
 
 	event.SetExtension("apiversion", resource["apiVersion"].(string))
@@ -223,39 +217,6 @@ func mergeResources(globalRes map[sourcesv1.APIVersionKind]kubearchiveapi.KubeAr
 	return resourceMap
 }
 
-func getBrokerUrl() (string, error) {
-	client, err := getEventingClientset()
-	if err != nil {
-		slog.Error("Failed to create eventing clientset", "error", err)
-		return "", err
-	}
-
-	broker, err := client.EventingV1().Brokers(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveBrokerName, metav1.GetOptions{})
-	if err != nil {
-		slog.Error("Failed to get KubeArchive broker", "error", err)
-		return "", err
-	}
-
-	if broker.Status.Address == nil {
-		slog.Error("KubeArchive broker has no address assigned")
-		return "", errors.New("broker does not have an address assigned")
-	}
-
-	return broker.Status.Address.URL.String(), nil
-}
-
-func getEventingClientset() (*kclient.Clientset, error) {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving in-cluster eventing client config: %s", err)
-	}
-	client, err := kclient.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("error instantiating eventing client from host %s: %s", config.Host, err)
-	}
-	return client, nil
-}
-
 func getGVR(mapper meta.RESTMapper, avk *sourcesv1.APIVersionKind) (schema.GroupVersionResource, error) {
 	apiGroup := ""
 	apiVersion := avk.APIVersion
@@ -283,4 +244,13 @@ func shouldSend(avk *sourcesv1.APIVersionKind, globalResources map[sourcesv1.API
 	}
 
 	return false
+}
+
+// getSinkServiceUrl constructs the URL for the local sink service
+func getSinkServiceUrl() string {
+	// Construct the service URL: http://<service-name>.<namespace>.svc.cluster.local:<port>
+	// The sink service runs on port 80 by default
+	serviceUrl := fmt.Sprintf("http://%s.%s.svc.cluster.local:80", constants.KubeArchiveSinkName, constants.KubeArchiveNamespace)
+	slog.Info("Using sink service URL", "url", serviceUrl)
+	return serviceUrl
 }

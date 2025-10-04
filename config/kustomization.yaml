@@ -16,7 +16,6 @@ resources:
   - templates/api_server/service_account.yaml
   - templates/database/database_secret.yaml
   - templates/database/migration_job.yaml
-  - templates/eventing/brokers.yaml
   - templates/logging/configmap.yaml
   - templates/logging/secret.yaml
   - templates/operator/certificates.yaml
@@ -35,7 +34,6 @@ resources:
   - templates/sink/role_binding.yaml
   - templates/sink/service_account.yaml
   - templates/sink/sink.yaml
-  - templates/sink/trigger.yaml
   - templates/certificates.yaml
   - templates/clusterroles.yaml
   - templates/namespace.yaml

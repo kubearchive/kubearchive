@@ -18,7 +18,6 @@ import (
 	"github.com/kubearchive/kubearchive/test"
 	errs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestKACs(t *testing.T) {
@@ -42,12 +41,6 @@ func TestKACs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			namespace, _ := test.CreateTestNamespace(t, false)
 
-			t.Cleanup(func() {
-				// Delete any created API server source created.
-				_, dynaclient := test.GetKubernetesClient(t)
-				gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
-				_ = dynaclient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Delete(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.DeleteOptions{})
-			})
 			test.CreateKAC(t, values.kac, namespace)
 			checkResourcesAfterApply(t, namespace, values.applyNS)
 			test.DeleteKAC(t, namespace)
@@ -62,11 +55,6 @@ func checkResourcesAfterApply(t testing.TB, namespace string, applyNS int) {
 	clientset, dynaclient := test.GetKubernetesClient(t)
 
 	err := retry.Do(func() error {
-		gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
-		_, err := dynaclient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
 		object, err := dynaclient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -76,18 +64,6 @@ func checkResourcesAfterApply(t testing.TB, namespace string, applyNS int) {
 			return err
 		} else if len(sf.Spec.Namespaces) != applyNS {
 			return fmt.Errorf("Found %d namespaces in SinkFilter, expected %d", len(sf.Spec.Namespaces), applyNS)
-		}
-		_, err = clientset.CoreV1().ServiceAccounts(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		_, err = clientset.RbacV1().ClusterRoles().Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		_, err = clientset.RbacV1().RoleBindings(namespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
-		if err != nil {
-			return err
 		}
 		_, err = clientset.RbacV1().Roles(namespace).Get(context.Background(), constants.KubeArchiveSinkName, metav1.GetOptions{})
 		if err != nil {
@@ -108,13 +84,6 @@ func checkResourcesAfterApply(t testing.TB, namespace string, applyNS int) {
 		_, err = clientset.RbacV1().RoleBindings(namespace).Get(context.Background(), constants.KubeArchiveVacuumName, metav1.GetOptions{})
 		if err != nil {
 			return err
-		}
-		binding, err := clientset.RbacV1().RoleBindings(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveVacuumBroker, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if len(binding.Subjects) != 2 {
-			return fmt.Errorf("Found %d subjects in %s/%s RoleBinding after apply, expected 2", len(binding.Subjects), constants.KubeArchiveNamespace, constants.KubeArchiveVacuumBroker)
 		}
 		cbinding, err := clientset.RbacV1().ClusterRoleBindings().Get(context.Background(), constants.ClusterKubeArchiveConfigClusterRoleBindingName, metav1.GetOptions{})
 		if err != nil {
@@ -137,11 +106,6 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, deleteNS int) {
 	clientset, dynaclient := test.GetKubernetesClient(t)
 
 	err := retry.Do(func() error {
-		gvr := schema.GroupVersionResource{Group: "sources.knative.dev", Version: "v1", Resource: "apiserversources"}
-		_, err := dynaclient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
 		object, err := dynaclient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -151,18 +115,6 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, deleteNS int) {
 			return err
 		} else if len(sf.Spec.Namespaces) != deleteNS {
 			return fmt.Errorf("Found %d namespaces in SinkFilter, expected %d", len(sf.Spec.Namespaces), deleteNS)
-		}
-		_, err = clientset.CoreV1().ServiceAccounts(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		_, err = clientset.RbacV1().ClusterRoles().Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		_, err = clientset.RbacV1().RoleBindings(namespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
-		if !errs.IsNotFound(err) {
-			return errors.New("Unexpectedly found Rolebinding " + constants.KubeArchiveApiServerSourceName + " in namespace " + namespace + ".")
 		}
 		_, err = clientset.RbacV1().Roles(namespace).Get(context.Background(), constants.KubeArchiveSinkName, metav1.GetOptions{})
 		if !errs.IsNotFound(err) {
@@ -179,13 +131,6 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, deleteNS int) {
 		_, err = clientset.RbacV1().Roles(namespace).Get(context.Background(), constants.KubeArchiveVacuumName, metav1.GetOptions{})
 		if !errs.IsNotFound(err) {
 			return errors.New("Unexpectedly found Role " + constants.KubeArchiveVacuumName + " in namespace " + namespace + ".")
-		}
-		binding, err := clientset.RbacV1().RoleBindings(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveVacuumBroker, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if len(binding.Subjects) != 1 {
-			return fmt.Errorf("Found %d subjects in %s/%s RoleBinding after delete, expected 1", len(binding.Subjects), constants.KubeArchiveNamespace, constants.KubeArchiveVacuumBroker)
 		}
 		cbinding, err := clientset.RbacV1().ClusterRoleBindings().Get(context.Background(), constants.ClusterKubeArchiveConfigClusterRoleBindingName, metav1.GetOptions{})
 		if err != nil {

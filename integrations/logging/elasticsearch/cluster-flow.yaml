@@ -14,7 +14,6 @@ spec:
           - cert-manager
           - cnpg-system
           - elastic-system
-          - knative-eventing
           - kube-node-lease
           - kube-public
           - kube-system

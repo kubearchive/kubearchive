@@ -103,24 +103,28 @@ func (scep *SinkCloudEventPublisher) SendByNamespace(ctx context.Context, namesp
 	allResources := mergeResources(scep.globalResources, localResources)
 
 	for avk := range allResources {
-		results[avk] = scep.SendByAPIVersionKind(ctx, namespace, &avk)
+		results[avk] = scep.sendByAPIVersionKind(ctx, namespace, localResources, &avk)
 	}
 
 	return results, nil
 }
 
 func (scep *SinkCloudEventPublisher) SendByAPIVersionKind(ctx context.Context, namespace string, avk *sourcesv1.APIVersionKind) []SinkCloudEventPublisherResult {
+	localResources, err := scep.getKubeArchiveConfigResources(namespace)
+	if err != nil {
+		slog.Error("Unable to get local KubeArchiveConfig resources", "error", err)
+		return []SinkCloudEventPublisherResult{}
+	}
+
+	return scep.sendByAPIVersionKind(ctx, namespace, localResources, avk)
+}
+
+func (scep *SinkCloudEventPublisher) sendByAPIVersionKind(ctx context.Context, namespace string, localResources map[sourcesv1.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource, avk *sourcesv1.APIVersionKind) []SinkCloudEventPublisherResult {
 	results := []SinkCloudEventPublisherResult{}
 
 	gvr, err := getGVR(scep.mapper, avk)
 	if err != nil {
 		slog.Error("Unable to get GVR", "error", err)
-		return results
-	}
-
-	localResources, err := scep.getKubeArchiveConfigResources(namespace)
-	if err != nil {
-		slog.Error("Unable to get local KubeArchiveConfig resources", "error", err)
 		return results
 	}
 

@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -637,17 +638,25 @@ func GetVacuumResults(t testing.TB, clientset *kubernetes.Clientset, namespace s
 	}
 
 	//t.Log(buf.String())
-	regex := regexp.MustCompile("(?s)^.*(Cluster|Namespace) vacuum results:\n")
-	results := regex.ReplaceAllString(buf.String(), "")
-
-	return cleanResults(results)
+	return cleanResults(buf.String())
 }
 
 func cleanResults(results string) string {
-	nameRegex := regexp.MustCompile("\"Name\": \"[^\"]+\"")
-	namespaceRegex := regexp.MustCompile("\"test-[^\"]+\"")
-	return namespaceRegex.ReplaceAllString(nameRegex.ReplaceAllString(results, "\"Name\": \"<name-scrubbed>\""), "\"<namespace-scrubbed>\"")
-
+	dateTimeRegex := regexp.MustCompile(`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}`)
+	namespaceRegex := regexp.MustCompile(`test-\d{3}-[a-z0-9]{8}`)
+	jobRegex := regexp.MustCompile("generate-log-[a-z0-9]{8}")
+	jobpRegex := regexp.MustCompile("generate-log-[a-z0-9]{8}-[a-z0-9]{5}")
+	vacRegex := regexp.MustCompile("(namespace|cluster)-vacuum-[a-z0-9]{8}")
+	vacpRegex := regexp.MustCompile("(namespace|cluster)-vacuum-[a-z0-9]{8}-[a-z0-9]{5}")
+	buffer := dateTimeRegex.ReplaceAllString(results, "yyyy/mm/dd hh:mm:ss")
+	buffer = namespaceRegex.ReplaceAllString(buffer, "test-xxx-xxxxxxxx")
+	buffer = jobpRegex.ReplaceAllString(buffer, "generate-log-xxxxxxxx-xxxxx")
+	buffer = jobRegex.ReplaceAllString(buffer, "generate-log-xxxxxxxx")
+	buffer = vacpRegex.ReplaceAllString(buffer, "$1-vacuum-xxxxxxxx-xxxxx")
+	buffer = vacRegex.ReplaceAllString(buffer, "$1-vacuum-xxxxxxxx")
+	data := strings.Split(buffer, "\n")
+	sort.Strings(data)
+	return strings.Join(data, "\n")
 }
 
 func ReadExpected(t testing.TB, file string) string {

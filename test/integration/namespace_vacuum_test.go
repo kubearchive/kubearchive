@@ -36,25 +36,25 @@ func TestNamespaceVacuum(t *testing.T) {
 		vacuumRes string
 	}{
 		"no-resources": {
-			expected:  "testdata/nvac-no-resources.json",
+			expected:  "testdata/nvac-no-resources.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: "testdata/vac-no-resources.yaml",
 		},
 		"ckac-resource": {
-			expected:  "testdata/nvac-ckac-resource.json",
+			expected:  "testdata/nvac-ckac-resource.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: "testdata/vac-pod-resource.yaml",
 		},
 		"kac-resource": {
-			expected:  "testdata/nvac-kac-resource.json",
+			expected:  "testdata/nvac-kac-resource.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: "testdata/vac-job-resource.yaml",
 		},
 		"all-resources": {
-			expected:  "testdata/nvac-all-resources.json",
+			expected:  "testdata/nvac-all-resources.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: "testdata/vac-job-pod-resources.yaml",

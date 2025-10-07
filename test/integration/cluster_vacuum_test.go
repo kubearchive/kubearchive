@@ -44,35 +44,35 @@ func TestClusterVacuum(t *testing.T) {
 		allRes    string
 	}{
 		"no-resources": {
-			expected:  "testdata/cvac-no-resources.json",
+			expected:  "testdata/cvac-no-resources.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "testdata/vac-no-resources.yaml", addNS: true}},
 			allRes:    "",
 		},
 		"ckac-resource": {
-			expected:  "testdata/cvac-ckac-resource.json",
+			expected:  "testdata/cvac-ckac-resource.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "testdata/vac-pod-resource.yaml", addNS: true}},
 			allRes:    "",
 		},
 		"kac-resource": {
-			expected:  "testdata/cvac-kac-resource.json",
+			expected:  "testdata/cvac-kac-resource.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "testdata/vac-job-resource.yaml", addNS: true}},
 			allRes:    "",
 		},
 		"both-resources": {
-			expected:  "testdata/cvac-both-resources.json",
+			expected:  "testdata/cvac-both-resources.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "testdata/vac-job-pod-resources.yaml", addNS: true}},
 			allRes:    "",
 		},
 		"two-namespaces": {
-			expected: "testdata/cvac-two-namespaces.json",
+			expected: "testdata/cvac-two-namespaces.txt",
 			ckac:     "testdata/ckac-with-pod.yaml",
 			kac:      "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{
@@ -82,14 +82,14 @@ func TestClusterVacuum(t *testing.T) {
 			allRes: "",
 		},
 		"all-only": {
-			expected:  "testdata/cvac-ckac-resource.json",
+			expected:  "testdata/cvac-ckac-resource.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "", addNS: false}},
 			allRes:    "testdata/vac-pod-resource.yaml",
 		},
 		"all-one-and-one": {
-			expected:  "testdata/cvac-two-namespaces.json",
+			expected:  "testdata/cvac-two-namespaces.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "", addNS: false}, {filename: "testdata/vac-job-resource.yaml", addNS: true}},

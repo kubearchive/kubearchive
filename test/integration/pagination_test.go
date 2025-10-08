@@ -167,6 +167,7 @@ func TestPaginationNoContinue(t *testing.T) {
 	}
 
 	assert.Equal(t, 30, len(list.Items))
+	// Limit is bigger than the existing amount
 	assert.Empty(t, list.GetContinue())
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?limit=20", port, namespaceName)
@@ -187,6 +188,7 @@ func TestPaginationNoContinue(t *testing.T) {
 	}
 
 	assert.Equal(t, 20, len(list.Items))
+	// Limit is lower than the existing amount
 	assert.NotEmpty(t, list.GetContinue())
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?limit=30", port, namespaceName)
@@ -207,7 +209,6 @@ func TestPaginationNoContinue(t *testing.T) {
 	}
 
 	assert.Equal(t, 30, len(list.Items))
-	// ideally `continue` would be empty but it is not, you can read why in the function
-	// that returns the resources
-	assert.NotEmpty(t, list.GetContinue())
+	// Limit is equal to the existing amount
+	assert.Empty(t, list.GetContinue())
 }

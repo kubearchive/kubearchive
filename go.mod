@@ -1,6 +1,8 @@
 module github.com/kubearchive/kubearchive
 
-go 1.23.9
+go 1.24.0
+
+toolchain go1.24.8
 
 require (
 	github.com/Cyprinus12138/otelgin v1.0.3
@@ -37,7 +39,7 @@ require (
 	go.opentelemetry.io/otel/sdk/log v0.14.0
 	go.opentelemetry.io/otel/sdk/metric v1.38.0
 	go.opentelemetry.io/otel/trace v1.38.0
-	google.golang.org/grpc v1.75.1
+	google.golang.org/grpc v1.76.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.32.9
 	k8s.io/apimachinery v0.32.9

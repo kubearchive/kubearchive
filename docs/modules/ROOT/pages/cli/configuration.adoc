@@ -1,6 +1,6 @@
 = CLI Configuration
 
-The kubectl-archive plugin supports configuration through environment variables and CLI flags, following the same pattern as kubectl and other plugins.
+The kubectl-ka plugin supports configuration through environment variables and CLI flags, following the same pattern as kubectl and other plugins.
 
 == Configuration Precedence
 
@@ -12,28 +12,28 @@ Configuration values are resolved in the following order (highest to lowest prio
 
 == Global Configuration Parameters
 
-All configuration can be set using environment variables with the prefix `KUBECTL_PLUGIN_ARCHIVE_`:
+All configuration can be set using environment variables with the prefix `KUBECTL_PLUGIN_KA_`:
 
 [cols="1,2,1,1"]
 |===
 |Environment Variable |Description |Default |CLI Flag
 
-|`KUBECTL_PLUGIN_ARCHIVE_HOST`
+|`KUBECTL_PLUGIN_KA_HOST`
 |KubeArchive API host:port
 |`https://localhost:8081`
 |`--host`
 
-|`KUBECTL_PLUGIN_ARCHIVE_CERT_PATH`
+|`KUBECTL_PLUGIN_KA_CERT_PATH`
 |Path to KubeArchive API certificate file
 |(none)
 |`--kubearchive-certificate-authority`
 
-|`KUBECTL_PLUGIN_ARCHIVE_TLS_INSECURE`
+|`KUBECTL_PLUGIN_KA_TLS_INSECURE`
 |Skip TLS certificate verification for the KubeArchive API server
 |`false`
 |`--kubearchive-insecure-skip-tls-verify`
 
-|`KUBECTL_PLUGIN_ARCHIVE_TOKEN`
+|`KUBECTL_PLUGIN_KA_TOKEN`
 |Bearer token for KubeArchive API authentication
 |(from kubeconfig)
 |(uses kubectl's `--token` flag)
@@ -69,26 +69,26 @@ The Kubernetes cluster certificate continues to use kubectl's standard
 
 [source,bash]
 ----
-KUBECTL_PLUGIN_ARCHIVE_TOKEN=$(kubectl -n test create token default) kubectl archive get v1 pods
+KUBECTL_PLUGIN_KA_TOKEN=$(kubectl -n test create token default) kubectl ka get v1 pods
 ----
 
 === Use insecure TLS for KubeArchive API
 
 [source,bash]
 ----
-kubectl archive get v1 pods --kubearchive-insecure-skip-tls-verify
+kubectl ka get v1 pods --kubearchive-insecure-skip-tls-verify
 ----
 
 === Use a certificate file for KubeArchive API
 
 [source,bash]
 ----
-KUBECTL_PLUGIN_ARCHIVE_CERT_PATH="/path/to/ca.crt" kubectl archive get v1 pods
+KUBECTL_PLUGIN_KA_CERT_PATH="/path/to/ca.crt" kubectl ka get v1 pods
 ----
 
 === Use a host different from a portforwarded one
 
 [source,bash]
 ----
-KUBECTL_PLUGIN_ARCHIVE_HOST="https://kubearchive.apps.example.com" kubectl archive get v1 pods
+KUBECTL_PLUGIN_KA_HOST="https://kubearchive.apps.example.com" kubectl ka get v1 pods
 ----

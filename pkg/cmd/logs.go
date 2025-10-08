@@ -30,16 +30,16 @@ chain are archived, you can also retrieve the logs of one of the containers in t
 
 var logsExample = `
 # Return logs from pod nginx with only one container
-kubectl archive logs nginx
+kubectl ka logs nginx
 
 # Return logs from pod nginx by specifying the container name
-kubectl archive logs nginx -c my-container
+kubectl ka logs nginx -c my-container
 
 # Return logs from a resource different from a pod. It will pick one of the pod's logs.
-kubectl archive logs apps/v1 deployments nginx
+kubectl ka logs apps/v1 deployments nginx
 
 # Return logs from a custom resource
-kubectl archive logs tekton.dev/v1 taskrun my-task
+kubectl ka logs tekton.dev/v1 taskrun my-task
 `
 
 func NewLogsOptions() *LogsOptions {

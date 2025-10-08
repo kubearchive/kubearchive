@@ -1,0 +1,103 @@
+= kubectl-ka Plugin Installation
+
+ifeval::["{page-component-display-version}" == "main"]
+:download-path: https://github.com/kubearchive/kubearchive/releases/latest/download
+endif::[]
+ifeval::["{page-component-display-version}" != "main"]
+:download-path: https://github.com/kubearchive/kubearchive/releases/download/{page-component-display-version}
+endif::[]
+
+The `kubectl-ka` plugin provides a command-line interface to interact with KubeArchive, allowing you to retrieve
+archived Kubernetes resources and logs from your KubeArchive installation.
+
+== Prerequisites
+
+* `kubectl` installed and configured to access your Kubernetes cluster
+* A running
+xref:getting-started/installation.adoc[KubeArchive installation]
+in your cluster
+* Appropriate
+xref:getting-started/kubearchive-api.adoc#_authentication_and_authorization[RBAC permissions]
+to access the KubeArchive API
+
+== Installation Methods
+
+=== Download from GitHub Releases
+
+The easiest way to install the kubectl plugin is to download a pre-built binary from the GitHub releases page.
+
+1. **Download the binary for your platform:**
++
+[source,bash]
+----
+# For Linux AMD64
+curl -LO {download-path}/kubectl-ka-linux-amd64
+
+# For Linux ARM64
+curl -LO {download-path}/kubectl-ka-linux-arm64
+----
+
+2. **Make the binary executable:**
++
+[source,bash]
+----
+chmod +x kubectl-ka-*
+----
+
+3. **Move the binary to your PATH:**
++
+[source,bash]
+----
+# Example: move to /usr/local/bin (requires sudo)
+sudo mv kubectl-ka-linux-amd64 /usr/local/bin/kubectl-ka
+
+# Or move to a directory in your user PATH
+mkdir -p ~/.local/bin
+mv kubectl-ka-linux-amd64 ~/.local/bin/kubectl-ka
+----
+
+4. **Verify the installation:**
++
+[source,bash]
+----
+kubectl ka version
+----
+
+=== Build from Source
+
+If you prefer to build the plugin from source:
+
+1. **Clone the repository:**
++
+[source,bash]
+----
+git clone https://github.com/kubearchive/kubearchive.git
+cd kubearchive
+----
+
+2. **Build the plugin:**
++
+[source,bash]
+----
+go build -o kubectl-ka ./cmd/kubectl-ka/
+----
+
+3. **Move the binary to your PATH:**
++
+[source,bash]
+----
+mv kubectl-ka ~/.local/bin/
+# or
+sudo mv kubectl-ka /usr/local/bin/
+----
+
+== Plugin Discovery
+
+Once installed, kubectl will automatically discover the plugin if the binary is named `kubectl-ka` and is in your PATH. You can verify this by running:
+
+[source,bash]
+----
+kubectl plugin list
+----
+
+The output should include `kubectl-ka` in the list of available plugins.

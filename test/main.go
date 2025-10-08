@@ -655,6 +655,12 @@ func cleanResults(results string) string {
 	buffer = vacpRegex.ReplaceAllString(buffer, "$1-vacuum-xxxxxxxx-xxxxx")
 	buffer = vacRegex.ReplaceAllString(buffer, "$1-vacuum-xxxxxxxx")
 	data := strings.Split(buffer, "\n")
+	for i, v := range data {
+		if strings.Contains(v, "INFOxx Using sink service URL url=") {
+			data = append(data[:i], data[i+1:]...)
+			break
+		}
+	}
 	sort.Strings(data)
 	return strings.Join(data, "\n")
 }

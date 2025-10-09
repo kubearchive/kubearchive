@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kubearchive/kubearchive/cmd/api/pagination"
 	"github.com/kubearchive/kubearchive/pkg/database/fake"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/stretchr/testify/assert"
@@ -45,6 +46,8 @@ func setupRouter(db interfaces.DBReader, core bool) *gin.Engine {
 			c.Set("apiResourceKind", "Crontab")
 		}
 	})
+
+	router.Use(pagination.Middleware())
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetResources)
 	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType", ctrl.GetResources)
 	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/:name", ctrl.GetResources)

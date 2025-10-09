@@ -23,7 +23,7 @@ import (
 
 func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *models.LabelFilters,
-	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]string, int64, string, error) {
+	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error) {
 	sb := db.selector.ResourceSelector()
 	sb.Where(db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion))
 	if namespace != "" {
@@ -90,17 +90,17 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 	}
 	logQueryPerformer := newQueryPerformer[logURLJsonPath](db.db, db.flavor)
 
-	podString, _, _, err := db.performResourceQuery(ctx, sb)
+	resources, err := db.performResourceQuery(ctx, sb)
 	if err != nil {
 		return "", "", fmt.Errorf("could not retrieve resource '%s/%s': %s", namespace, name, err.Error())
 	}
 
-	if len(podString) == 0 {
+	if len(resources) == 0 {
 		return "", "", dbErrors.ErrResourceNotFound
 	}
 
 	var pod corev1.Pod
-	err = json.Unmarshal([]byte(podString[0]), &pod)
+	err = json.Unmarshal([]byte(resources[0].Data), &pod)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to deserialize pod '%s/%s': %s", namespace, name, err.Error())
 	}
@@ -224,30 +224,24 @@ func (db *sqlDatabaseImpl) getOwnedPodsUuids(ctx context.Context, ownersUuids []
 	}
 }
 
-func (db *sqlDatabaseImpl) performResourceQuery(ctx context.Context, sb *sqlbuilder.SelectBuilder) ([]string, int64, string, error) {
+func (db *sqlDatabaseImpl) performResourceQuery(ctx context.Context, sb *sqlbuilder.SelectBuilder) ([]models.Resource, error) {
 	type resourceFields struct {
 		Date     string `db:"created_at"`
 		Id       int64  `db:"id"`
 		Resource string `db:"data"`
 	}
 
-	var resources []string
-
 	parsedRows, err := newQueryPerformer[resourceFields](db.db, db.flavor).performQuery(ctx, sb)
-
+	var resources []models.Resource
 	if err != nil {
-		return resources, 0, "", err
+		return resources, err
 	}
-
-	if len(parsedRows) == 0 {
-		return resources, 0, "", err
-	}
-	lastRow := parsedRows[len(parsedRows)-1]
 
 	for _, parsedRow := range parsedRows {
-		resources = append(resources, parsedRow.Resource)
+		resources = append(resources, models.Resource{Date: parsedRow.Date, Id: parsedRow.Id, Data: parsedRow.Resource})
 	}
-	return resources, lastRow.Id, lastRow.Date, nil
+
+	return resources, nil
 }
 
 func (db *sqlDatabaseImpl) getSelector() facade.DBSelector {

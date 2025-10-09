@@ -49,12 +49,14 @@ func TestNewFakeDatabase(t *testing.T) {
 func TestQueryResourcesWithoutNamespace(t *testing.T) {
 	existingKind := testResources[1].GetKind()
 	existingVersion := testResources[1].GetAPIVersion()
+	existingNamespace := testResources[1].GetNamespace()
 
 	tests := []struct {
-		name     string
-		kind     string
-		version  string
-		expected []*unstructured.Unstructured
+		name      string
+		kind      string
+		namespace string
+		version   string
+		expected  []*unstructured.Unstructured
 	}{
 		{
 			name:     "No matching resources by kind",
@@ -74,41 +76,6 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 			version:  existingVersion,
 			expected: testResources[0:4],
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
-			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, "", "", "", "", &models.LabelFilters{}, nil, nil, 100)
-			expected := make([]string, 0)
-			if len(tt.expected) != 0 {
-				for _, resource := range tt.expected {
-					b, jsonErr := json.Marshal(resource)
-					if jsonErr != nil {
-						t.Fatal(jsonErr)
-					}
-					expected = append(expected, string(b))
-				}
-			}
-
-			assert.Equal(t, expected, filteredResources)
-			assert.Nil(t, err)
-		})
-	}
-}
-
-func TestQueryResources(t *testing.T) {
-	existingKind := testResources[1].GetKind()
-	existingVersion := testResources[1].GetAPIVersion()
-	existingNamespace := testResources[1].GetNamespace()
-
-	tests := []struct {
-		name      string
-		kind      string
-		version   string
-		namespace string
-		expected  []*unstructured.Unstructured
-	}{
 		{
 			name:      "No matching resources by kind",
 			kind:      "NotFound",
@@ -138,23 +105,28 @@ func TestQueryResources(t *testing.T) {
 			expected:  testResources[0:4],
 		},
 	}
-	db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace,
-				"", "", "", &models.LabelFilters{}, nil, nil, 100)
-			expected := make([]string, 0)
-			if len(tt.expected) != 0 {
-				for _, resource := range tt.expected {
-					b, jsonErr := json.Marshal(resource)
-					if jsonErr != nil {
-						t.Fatal(jsonErr)
-					}
-					expected = append(expected, string(b))
-				}
+			db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
+			filteredResources, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace, "", "", "", &models.LabelFilters{}, nil, nil, 100)
+			expectedUids := make([]string, 0)
+			for _, resource := range tt.expected {
+				expectedUids = append(expectedUids, string(resource.GetUID()))
 			}
-			assert.Equal(t, expected, filteredResources)
+
+			returnedUids := make([]string, 0)
+			for _, resource := range filteredResources {
+				var resourceObj unstructured.Unstructured
+				deserializeErr := json.Unmarshal([]byte(resource.Data), &resourceObj)
+				if deserializeErr != nil {
+					t.Fatal(deserializeErr)
+				}
+
+				returnedUids = append(returnedUids, string(resourceObj.GetUID()))
+			}
+
+			assert.Equal(t, expectedUids, returnedUids)
 			assert.Nil(t, err)
 		})
 	}
@@ -231,20 +203,26 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(tt.testData, testLogUrls, testJsonPath)
-			filteredResources, _, _, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace,
+			filteredResources, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace,
 				tt.resourceName, "", "", &models.LabelFilters{}, nil, nil, 100)
-			expected := make([]string, 0)
-			if tt.expected != nil {
-				for _, exp := range tt.expected {
-					b, jsonErr := json.Marshal(exp)
-					if jsonErr != nil {
-						t.Fatal(jsonErr)
-					}
-					expected = append(expected, string(b))
-				}
+
+			expectedUids := make([]string, 0)
+			for _, resource := range tt.expected {
+				expectedUids = append(expectedUids, string(resource.GetUID()))
 			}
 
-			assert.Equal(t, expected, filteredResources)
+			returnedUids := make([]string, 0)
+			for _, resource := range filteredResources {
+				var resourceObj unstructured.Unstructured
+				deserializeErr := json.Unmarshal([]byte(resource.Data), &resourceObj)
+				if deserializeErr != nil {
+					t.Fatal(deserializeErr)
+				}
+
+				returnedUids = append(returnedUids, string(resourceObj.GetUID()))
+			}
+
+			assert.Equal(t, expectedUids, returnedUids)
 			assert.Equal(t, tt.err, err)
 		})
 	}
@@ -449,7 +427,7 @@ func TestQueryResourcesWithWildcardName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.namePattern, func(t *testing.T) {
 			db := NewFakeDatabase(testResources, []LogUrlRow{}, "$.")
-			resources, _, _, err := db.QueryResources(context.TODO(), "Pod", "v1", "test",
+			resources, err := db.QueryResources(context.TODO(), "Pod", "v1", "test",
 				tt.namePattern, "", "", &models.LabelFilters{}, nil, nil, 100)
 
 			assert.NoError(t, err)

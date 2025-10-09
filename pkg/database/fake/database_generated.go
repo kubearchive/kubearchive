@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
@@ -92,7 +93,7 @@ func (f *fakeDatabase) QueryDatabaseSchemaVersion(ctx context.Context) (string, 
 	return f.CurrentSchemaVersion, nil
 }
 
-func (f *fakeDatabase) queryResources(_ context.Context, kind, version, _, _ string, _ int) []*unstructured.Unstructured {
+func (f *fakeDatabase) queryResources(_ context.Context, kind, version, _, _ string, _ int) []models.Resource {
 	return f.filterResourcesByKindAndApiVersion(kind, version)
 }
 
@@ -105,8 +106,8 @@ func (f *fakeDatabase) QueryLogURL(_ context.Context, _, _, _, _, _ string) (str
 
 func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namespace, name,
 	continueId, continueDate string, _ *models.LabelFilters,
-	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]string, int64, string, error) {
-	var resources []*unstructured.Unstructured
+	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error) {
+	var resources []models.Resource
 
 	if name != "" {
 		resources = f.queryNamespacedResourceByName(ctx, kind, version, namespace, name)
@@ -121,33 +122,19 @@ func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namesp
 		resources = f.filterResourcesByTimestamp(resources, creationTimestampAfter, creationTimestampBefore)
 	}
 
-	var date string
-	var id int64
-	if len(resources) > 0 {
-		date = resources[len(resources)-1].GetCreationTimestamp().Format(time.RFC3339)
-		id = int64(len(resources))
-	}
-
-	stringResources := make([]string, len(resources))
-	for ix, resource := range resources {
-		stringResource, err := json.Marshal(resource)
-		if err != nil {
-			// We can panic because this is meant for testing
-			panic(err.Error())
-		}
-		stringResources[ix] = string(stringResource)
-	}
-
-	return stringResources, id, date, f.err
+	return resources, f.err
 }
 
 // filterResourcesByTimestamp filters resources based on creation timestamp
-func (f *fakeDatabase) filterResourcesByTimestamp(resources []*unstructured.Unstructured,
-	creationTimestampAfter, creationTimestampBefore *time.Time) []*unstructured.Unstructured {
-	var filteredResources []*unstructured.Unstructured
+func (f *fakeDatabase) filterResourcesByTimestamp(resources []models.Resource,
+	creationTimestampAfter, creationTimestampBefore *time.Time) []models.Resource {
+	var filteredResources []models.Resource
 
 	for _, resource := range resources {
-		creationTime := resource.GetCreationTimestamp().Time
+		creationTime, err := time.Parse(time.RFC3339, resource.Date)
+		if err != nil {
+			panic(fmt.Sprintf("error while deserializing timestamp: %s", err))
+		}
 
 		// Apply after filter
 		if creationTimestampAfter != nil && creationTime.Before(*creationTimestampAfter) {
@@ -166,35 +153,47 @@ func (f *fakeDatabase) filterResourcesByTimestamp(resources []*unstructured.Unst
 }
 
 func (f *fakeDatabase) queryNamespacedResourceByName(_ context.Context, kind, version, namespace, name string,
-) []*unstructured.Unstructured {
+) []models.Resource {
 	return f.filterResourceByKindApiVersionNamespaceAndName(kind, version, namespace, name)
 }
 
-func (f *fakeDatabase) filterResourcesByKindAndApiVersion(kind, apiVersion string) []*unstructured.Unstructured {
-	var filteredResources []*unstructured.Unstructured
+func (f *fakeDatabase) filterResourcesByKindAndApiVersion(kind, apiVersion string) []models.Resource {
+	var filteredResources []models.Resource
 	for _, resource := range f.resources {
 		if resource.GetKind() == kind && resource.GetAPIVersion() == apiVersion {
-			filteredResources = append(filteredResources, resource)
+			resourceString, err := json.Marshal(resource)
+			if err != nil {
+				panic(fmt.Sprintf("error while serializing resource: %s", resource))
+			}
+			filteredResources = append(filteredResources, models.Resource{Id: 0, Data: string(resourceString), Date: resource.GetCreationTimestamp().GoString()})
 		}
 	}
 	return filteredResources
 }
 
-func (f *fakeDatabase) filterResourcesByKindApiVersionAndNamespace(kind, apiVersion, namespace string) []*unstructured.Unstructured {
-	var filteredResources []*unstructured.Unstructured
+func (f *fakeDatabase) filterResourcesByKindApiVersionAndNamespace(kind, apiVersion, namespace string) []models.Resource {
+	var filteredResources []models.Resource
 	for _, resource := range f.resources {
 		if resource.GetKind() == kind && resource.GetAPIVersion() == apiVersion && resource.GetNamespace() == namespace {
-			filteredResources = append(filteredResources, resource)
+			resourceString, err := json.Marshal(resource)
+			if err != nil {
+				panic(fmt.Sprintf("error while serializing resource: %s", resource))
+			}
+			filteredResources = append(filteredResources, models.Resource{Id: 0, Data: string(resourceString), Date: resource.GetCreationTimestamp().GoString()})
 		}
 	}
 	return filteredResources
 }
 
-func (f *fakeDatabase) filterResourceByKindApiVersionNamespaceAndName(kind, apiVersion, namespace, name string) []*unstructured.Unstructured {
-	var filteredResources []*unstructured.Unstructured
+func (f *fakeDatabase) filterResourceByKindApiVersionNamespaceAndName(kind, apiVersion, namespace, name string) []models.Resource {
+	var filteredResources []models.Resource
 	for _, resource := range f.resources {
 		if resource.GetKind() == kind && resource.GetAPIVersion() == apiVersion && resource.GetNamespace() == namespace && resource.GetName() == name {
-			filteredResources = append(filteredResources, resource)
+			resourceString, err := json.Marshal(resource)
+			if err != nil {
+				panic(fmt.Sprintf("error while serializing resource: %s", resource))
+			}
+			filteredResources = append(filteredResources, models.Resource{Id: 0, Data: string(resourceString), Date: resource.GetCreationTimestamp().GoString()})
 		}
 	}
 	return filteredResources

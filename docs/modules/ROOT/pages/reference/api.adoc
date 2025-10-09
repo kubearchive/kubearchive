@@ -39,6 +39,7 @@ of the returned `List` resource. An empty string if there are no more pages rema
 * `labelSelector`: allows filtering resources based on label filtering.
 * `creationTimestampAfter`: filters resources created after the specified timestamp (RFC3339 format, e.g., `2023-01-01T12:00:00Z`).
 * `creationTimestampBefore`: filters resources created before the specified timestamp (RFC3339 format, e.g., `2023-12-31T23:59:59Z`).
+* `name`: allows filtering resources by name with wildcard support (see Name Filtering section below).
 
 === Timestamp Filters
 
@@ -105,6 +106,56 @@ The API call is:
 ----
 /api/v1/namespaces/default/pods?labelSelector=app%3Dkubearchive%2C+env+in+%28stage%2C+dev%29%2C+release%21%3Dstable
 ----
+====
+
+=== Name Filtering
+
+The `name` parameter supports wildcard pattern matching for filtering resources by name.
+The filtering is case-insensitive and supports the following wildcard patterns:
+
+Exact match::
+    `name=my-deployment` - Matches resources with exactly the name "my-deployment"
+
+Prefix match::
+    `name=test-*` - Matches resources whose names start with "test-"
+
+Suffix match::
+    `name=*-job` - Matches resources whose names end with "-job"
+
+Contains match::
+    `name=*e2e*` - Matches resources whose names contain "e2e" anywhere
+
+Examples:
+
+[source,text]
+----
+# Find all deployments containing "e2e" in their name
+/apis/apps/v1/namespaces/default/deployments?name=*e2e*
+
+# Find all pods starting with "test-"
+/api/v1/namespaces/default/pods?name=test-*
+
+# Find all services ending with "-api"
+/api/v1/namespaces/default/services?name=*-api
+
+# Exact match (same as before, no wildcards)
+/api/v1/namespaces/default/pods?name=my-exact-pod-name
+
+# Invalid: Both path and query name parameters (returns 400)
+/api/v1/namespaces/default/pods/existing-pod?name=*e2e*
+
+# Invalid: Wildcard in path parameter (returns 400)
+/api/v1/namespaces/default/pods/*e2e*
+----
+
+[NOTE]
+====
+- Wildcard queries return a list of matching resources with pagination support
+- Exact name queries (without wildcards) return a single resource object
+- Name filtering is case-insensitive: `*E2E*` matches "test-e2e-pod"
+- Name filtering can be combined with `labelSelector` for more precise filtering
+- Cannot specify both path name parameter and query name parameter (returns 400 Bad Request)
+- Wildcard characters (*) are not allowed in path parameters, use query parameters instead (returns 400 Bad Request)
 ====
 
 == Individual Resources

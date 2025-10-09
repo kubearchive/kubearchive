@@ -552,6 +552,81 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 	}
 }
 
+func TestQueryResourcesWithWildcardName(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, mock := NewMock()
+			tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+			filter := tt.database.getFilter()
+			selector := tt.database.getSelector()
+			sorter := tt.database.getSorter()
+
+			wildcardTests := []struct {
+				testName              string
+				namePattern           string
+				expectsWildcardFilter bool
+				sqlPattern            string
+			}{
+				{
+					testName:              "middle wildcard",
+					namePattern:           "*e2e*",
+					expectsWildcardFilter: true,
+					sqlPattern:            "%e2e%",
+				},
+				{
+					testName:              "prefix wildcard",
+					namePattern:           "*-job",
+					expectsWildcardFilter: true,
+					sqlPattern:            "%-job",
+				},
+				{
+					testName:              "suffix wildcard",
+					namePattern:           "test-*",
+					expectsWildcardFilter: true,
+					sqlPattern:            "test-%",
+				},
+				{
+					testName:              "exact match",
+					namePattern:           "exact-name",
+					expectsWildcardFilter: false,
+					sqlPattern:            "", // not used
+				},
+			}
+
+			for _, wt := range wildcardTests {
+				t.Run(wt.testName, func(t *testing.T) {
+					sb := selector.ResourceSelector()
+					sb.Where(filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion))
+					sb.Where(filter.NamespaceFilter(sb.Cond, namespace))
+
+					if wt.expectsWildcardFilter {
+						sb.Where(filter.NameWildcardFilter(sb.Cond, wt.sqlPattern))
+						sb = sorter.CreationTSAndIDSorter(sb)
+						sb.Limit(100)
+					} else {
+						sb.Where(filter.NameFilter(sb.Cond, wt.namePattern))
+					}
+
+					query, args := sb.BuildWithFlavor(tt.database.getFlavor())
+
+					rows := sqlmock.NewRows(resourceQueryColumns)
+					rows.AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource))
+					mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+					defer cancel()
+
+					resources, _, _, err := tt.database.QueryResources(ctx, podKind, podApiVersion, namespace,
+						wt.namePattern, "", "", &models.LabelFilters{}, nil, nil, 100)
+
+					assert.NoError(t, err)
+					assert.Equal(t, 1, len(resources))
+				})
+			}
+		})
+	}
+}
+
 func TestQueryResourcesWithTimestampFilters(t *testing.T) {
 	timestampTests := []struct {
 		name                    string

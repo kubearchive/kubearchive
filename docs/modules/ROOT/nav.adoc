@@ -35,6 +35,7 @@
 
 * Design
 ** xref:design/decisions.adoc[]
+** xref:design/operator.adoc[]
 ** xref:design/logging-integration.adoc[]
 ** xref:design/database-interface.adoc[]
 ** xref:design/database-migrations.adoc[]

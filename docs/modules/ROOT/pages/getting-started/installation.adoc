@@ -14,8 +14,6 @@ This document explains how to install and configure KubeArchive in your Kubernet
 * A PostgreSQL instance (+v16.6) protected with TLS (can be self-signed, KubeArchive does not verify it)
 // renovate: datasource=github-releases depName=cert-manager packageName=cert-manager/cert-manager
 * CertManager is installed on the Kubernetes cluster (+v1.17.2)
-// renovate: datasource=github-releases depName=knative-eventing packageName=knative/eventing
-* Knative Eventing is installed on the Kubernetes cluster (+v1.17.4)
 
 == Prepare the Database
 
@@ -46,18 +44,6 @@ section.
 ====
 A Kubernetes Job named `kubearchive-schema-migration` is installed in the `kubearchive` namespace.
 Use this as an example to build your migration automations.
-====
-
-== Configure Knative Eventing
-
-KubeArchive uses a broker to avoid missing Kubernetes resource updates. By default, it is an `MTChannelBasedBroker`, but
-the broker type can be changed if desired.
-
-[IMPORTANT]
-====
-Knative Eventing strongly recommends using one of the
-link:https://knative.dev/docs/eventing/brokers/broker-types/[other broker types]
-in production environments.
 ====
 
 [_install_and_configure_kubearchive]

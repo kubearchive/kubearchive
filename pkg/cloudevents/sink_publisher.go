@@ -51,7 +51,7 @@ func NewSinkCloudEventPublisher(source string) (*SinkCloudEventPublisher, error)
 	}
 
 	// Always use sink service URL since we're no longer using Knative
-	scep.target = getSinkServiceUrl()
+	scep.target = GetSinkServiceUrl()
 
 	var discoveryClient *discovery.DiscoveryClient
 	if discoveryClient, err = k8sclient.NewInstrumentedDiscoveryClient(); err != nil {
@@ -250,8 +250,8 @@ func shouldSend(avk *sourcesv1.APIVersionKind, globalResources map[sourcesv1.API
 	return false
 }
 
-// getSinkServiceUrl constructs the URL for the local sink service
-func getSinkServiceUrl() string {
+// GetSinkServiceUrl constructs the URL for the local sink service
+func GetSinkServiceUrl() string {
 	// Construct the service URL: http://<service-name>.<namespace>.svc.cluster.local:<port>
 	// The sink service runs on port 80 by default
 	serviceUrl := fmt.Sprintf("http://%s.%s.svc.cluster.local:80", constants.KubeArchiveSinkName, constants.KubeArchiveNamespace)

@@ -18,6 +18,7 @@ const (
 	ClusterVacuumAllNamespaces                     = "___all-namespaces___"
 	KubeArchiveVacuumName                          = "kubearchive-vacuum"
 	KubeArchiveClusterVacuumName                   = "kubearchive-cluster-vacuum"
+	TektonResultsImportEventType                   = "kubearchive.org.tekton-results.import.resource.update"
 )
 
 var (

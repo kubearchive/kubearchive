@@ -200,7 +200,7 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 		attribute.String("name", k8sObj.GetName()),
 	)
 
-	if !c.Filters.IsConfigured(ctx.Request.Context(), k8sObj) {
+	if !c.Filters.IsConfigured(ctx.Request.Context(), k8sObj) && event.Type() != constants.TektonResultsImportEventType {
 		CEMetricAttrs["result"] = string(observability.CEResultNoConfiguration)
 		slog.WarnContext(
 			ctx.Request.Context(),
@@ -251,7 +251,7 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 	}
 
 	// If resource does not match archival, we exit early
-	if !c.Filters.MustArchive(ctx.Request.Context(), k8sObj) {
+	if !c.Filters.MustArchive(ctx.Request.Context(), k8sObj) && event.Type() != constants.TektonResultsImportEventType {
 		slog.InfoContext(
 			ctx.Request.Context(),
 			"Resource update received, no archive needed",

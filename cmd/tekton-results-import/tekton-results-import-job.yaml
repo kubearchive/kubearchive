@@ -1,0 +1,66 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tekton-results-import
+  namespace: kubearchive
+spec:
+  # Allow the job to run for a long time (up to 72 hours) for large datasets
+  activeDeadlineSeconds: 259200
+  # Don't retry on failure to avoid duplicate imports
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: kubearchive-cluster-vacuum
+      containers:
+        - name: tekton-results-import
+          image: quay.io/gallen/tekton-results-import:latest
+          imagePullPolicy: Always
+          env:
+            # Database connection configuration from secret
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tekton-results-import
+                  key: DATABASE_URL
+            - name: DATABASE_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: tekton-results-import
+                  key: DATABASE_PORT
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tekton-results-import
+                  key: DATABASE_USER
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: tekton-results-import
+                  key: DATABASE_PASSWORD
+            - name: DATABASE_DB
+              valueFrom:
+                secretKeyRef:
+                  name: tekton-results-import
+                  key: DATABASE_DB
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2"
+          # Add readiness/liveness probes to monitor progress
+          # Since this is a batch job, we'll rely on logging for monitoring
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            seccompProfile:
+              type: RuntimeDefault

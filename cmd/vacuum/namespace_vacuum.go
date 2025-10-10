@@ -16,6 +16,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	namespaceVacuumEventType = "kubearchive.org.vacuum.namespace.resource.update"
+)
+
 func namespaceVacuum(configName string) error {
 	namespace := os.Getenv("NAMESPACE")
 	if namespace == "" {
@@ -27,7 +31,7 @@ func namespaceVacuum(configName string) error {
 		return fmt.Errorf("unable to get client: %v", err)
 	}
 
-	scep, err := publisher.NewSinkCloudEventPublisher("localhost:8080:/foo", "org.kubearchive.vacuum.update")
+	scep, err := publisher.NewSinkCloudEventPublisher("kubearchive.org/namespace-vacuum")
 	if err != nil {
 		return fmt.Errorf("unable to create sink cloudevent publisher: %v", err)
 	}
@@ -44,13 +48,13 @@ func namespaceVacuum(configName string) error {
 
 	slog.Info("Started publishing sink events", "namespace", namespace)
 	if len(config.Spec.Resources) == 0 {
-		_, err = scep.SendByNamespace(context.Background(), namespace)
+		_, err = scep.SendByNamespace(context.Background(), namespaceVacuumEventType, namespace)
 		if err != nil {
 			slog.Error("Unable to send events for NamespaceVacuumConfig", "error", err, "namespace", namespace, "config", configName)
 		}
 	} else {
 		for _, avk := range config.Spec.Resources {
-			scep.SendByAPIVersionKind(context.Background(), namespace, &avk)
+			scep.SendByAPIVersionKind(context.Background(), namespaceVacuumEventType, namespace, &avk)
 		}
 	}
 	slog.Info("Finished publishing sink events", "namespace", namespace)

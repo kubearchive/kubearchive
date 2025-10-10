@@ -3,9 +3,6 @@
 
 package controller
 
-// a13e => shorthand for ApiServerSource
-// k9e  => shorthand for KubeArchive
-
 import (
 	"context"
 
@@ -22,7 +19,6 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/constants"
 )
 
-// ClusterKubeArchiveConfigReconciler reconciles a ClusterKubeArchiveConfig object
 type ClusterKubeArchiveConfigReconciler struct {
 	Client client.Client
 	Scheme *runtime.Scheme
@@ -34,7 +30,6 @@ type ClusterKubeArchiveConfigReconciler struct {
 //+kubebuilder:rbac:groups=kubearchive.org,resources=clusterkubearchiveconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings;clusterroles;roles;rolebindings,verbs=bind;create;delete;escalate;get;list;update;watch
-//+kubebuilder:rbac:groups=sources.knative.dev,resources=apiserversources,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;update;watch
 
 func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -64,7 +59,7 @@ func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req 
 
 			log.Info("Deleting ClusterKubeArchiveConfig")
 
-			if _, err := reconcileAllCommonResources(ctx, r.Client, r.Mapper, constants.SinkFilterGlobalNamespace, nil); err != nil {
+			if err := reconcileSinkFilter(ctx, r.Client, constants.SinkFilterGlobalNamespace, nil); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -79,14 +74,13 @@ func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req 
 		return ctrl.Result{}, nil
 	}
 
-	if _, err := reconcileAllCommonResources(ctx, r.Client, r.Mapper, constants.SinkFilterGlobalNamespace, ckaconfig.Spec.Resources); err != nil {
+	if err := reconcileSinkFilter(ctx, r.Client, constants.SinkFilterGlobalNamespace, ckaconfig.Spec.Resources); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	return ctrl.Result{}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
 func (r *ClusterKubeArchiveConfigReconciler) SetupClusterKubeArchiveConfigWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kubearchivev1.ClusterKubeArchiveConfig{}).

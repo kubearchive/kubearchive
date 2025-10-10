@@ -45,8 +45,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
 const (
@@ -460,17 +458,7 @@ func createAKAC(t testing.TB, filename string, namespace string, resources strin
 	if haveResources {
 		_, dynamicClient := GetKubernetesClient(t)
 
-		// If we have resources, make sure ApiServerSource is created and there are sink filters before returning.
-		a13eGvr := sourcesv1.SchemeGroupVersion.WithResource("apiserversources")
 		err := retry.Do(func() error {
-			_, retryErr := dynamicClient.Resource(a13eGvr).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.KubeArchiveApiServerSourceName, metav1.GetOptions{})
-			return retryErr
-		}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = retry.Do(func() error {
 			obj, retryErr := dynamicClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 			if retryErr != nil {
 				return retryErr

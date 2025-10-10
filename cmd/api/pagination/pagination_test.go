@@ -40,7 +40,25 @@ func TestMiddleware(t *testing.T) {
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
-			expectedBody:       `{"message":"limit 'abc' could not be converted to integer"}`,
+			expectedBody:       `{"message":"bad limit parameter"}`,
+		},
+		{
+			name:               "negative limit",
+			query:              "/?limit=-100",
+			expectedLimit:      0,
+			expectedInt64:      "",
+			expectedDate:       "",
+			expectedStatusCode: http.StatusBadRequest,
+			expectedBody:       `{"message":"bad limit parameter"}`,
+		},
+		{
+			name:               "hexadecimal limit",
+			query:              "/?limit=0xFA",
+			expectedLimit:      0,
+			expectedInt64:      "",
+			expectedDate:       "",
+			expectedStatusCode: http.StatusBadRequest,
+			expectedBody:       `{"message":"bad limit parameter"}`,
 		},
 		{
 			name:               "valid limit",
@@ -58,7 +76,7 @@ func TestMiddleware(t *testing.T) {
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
-			expectedBody:       `{"message":"limit '2000' exceeds the maximum allowed '1000'"}`,
+			expectedBody:       `{"message":"bad limit parameter"}`,
 		},
 		{
 			name:               "invalid continue",
@@ -67,7 +85,7 @@ func TestMiddleware(t *testing.T) {
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
-			expectedBody:       `{"message":"could not decode the continuation token"}`,
+			expectedBody:       `{"message":"bad continue token"}`,
 		},
 		{
 			name:               "invalid first part of continue",
@@ -76,7 +94,7 @@ func TestMiddleware(t *testing.T) {
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
-			expectedBody:       `{"message":"first element of the continue token is not a valid int64"}`,
+			expectedBody:       `{"message":"bad continue token"}`,
 		},
 		{
 			name:               "invalid second part of continue",
@@ -85,7 +103,7 @@ func TestMiddleware(t *testing.T) {
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusBadRequest,
-			expectedBody:       `{"message":"second element of the continue token '2024-11-08' does not match '2006-01-02T15:04:05Z07:00'"}`,
+			expectedBody:       `{"message":"bad continue token"}`,
 		},
 		{
 			name:               "valid limit and continue",

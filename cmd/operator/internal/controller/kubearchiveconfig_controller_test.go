@@ -18,7 +18,6 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
 var _ = Describe("KubeArchiveConfig Controller", func() {
@@ -97,14 +96,14 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 		jobResource := kubearchivev1.KubeArchiveConfigResource{
 			ArchiveWhen: "status.state != 'Completed'",
 			DeleteWhen:  "status.state == 'Completed'",
-			Selector: sourcesv1.APIVersionKindSelector{
+			Selector: kubearchivev1.APIVersionKind{
 				APIVersion: "batch/v1",
 				Kind:       "Job",
 			},
 		}
 		podResource := kubearchivev1.KubeArchiveConfigResource{
 			ArchiveOnDelete: "true",
-			Selector: sourcesv1.APIVersionKindSelector{
+			Selector: kubearchivev1.APIVersionKind{
 				APIVersion: "v1",
 				Kind:       "Pod",
 			},

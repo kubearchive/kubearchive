@@ -12,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic/fake"
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
 func TestNamespaceVacuumConfigCustomDefaulter(t *testing.T) {
@@ -36,13 +35,13 @@ func TestNamespaceVacuumConfigValidateResources(t *testing.T) {
 		},
 		{
 			name:      "Empty resources",
-			spec:      NamespaceVacuumConfigSpec{Resources: []sourcesv1.APIVersionKind{}},
+			spec:      NamespaceVacuumConfigSpec{Resources: []APIVersionKind{}},
 			validated: true,
 		},
 		{
 			name: "One resource",
 			spec: NamespaceVacuumConfigSpec{
-				Resources: []sourcesv1.APIVersionKind{
+				Resources: []APIVersionKind{
 					{APIVersion: "tekton.dev/v1", Kind: "PipelineRun"},
 				}},
 			validated: true,
@@ -50,7 +49,7 @@ func TestNamespaceVacuumConfigValidateResources(t *testing.T) {
 		{
 			name: "Muliple resources",
 			spec: NamespaceVacuumConfigSpec{
-				Resources: []sourcesv1.APIVersionKind{
+				Resources: []APIVersionKind{
 					{APIVersion: "tekton.dev/v1", Kind: "PipelineRun"},
 					{APIVersion: "tekton.dev/v1", Kind: "TaskRun"},
 				}},
@@ -59,7 +58,7 @@ func TestNamespaceVacuumConfigValidateResources(t *testing.T) {
 		{
 			name: "Non configured resource",
 			spec: NamespaceVacuumConfigSpec{
-				Resources: []sourcesv1.APIVersionKind{
+				Resources: []APIVersionKind{
 					{APIVersion: "v1", Kind: "Event"},
 				}},
 			validated: false,
@@ -70,7 +69,7 @@ func TestNamespaceVacuumConfigValidateResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: constants.KubeArchiveConfigResourceName},
 		Spec: ClusterKubeArchiveConfigSpec{
 			Resources: []KubeArchiveConfigResource{{
-				Selector: sourcesv1.APIVersionKindSelector{
+				Selector: APIVersionKind{
 					APIVersion: "tekton.dev/v1",
 					Kind:       "TaskRun",
 				},
@@ -81,7 +80,7 @@ func TestNamespaceVacuumConfigValidateResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: constants.KubeArchiveConfigResourceName, Namespace: "default"},
 		Spec: KubeArchiveConfigSpec{
 			Resources: []KubeArchiveConfigResource{{
-				Selector: sourcesv1.APIVersionKindSelector{
+				Selector: APIVersionKind{
 					APIVersion: "tekton.dev/v1",
 					Kind:       "PipelineRun",
 				},

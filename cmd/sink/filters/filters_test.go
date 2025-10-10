@@ -24,7 +24,6 @@ import (
 	"k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/tools/cache"
 	toolsWatch "k8s.io/client-go/tools/watch"
-	sourcev1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
 // nolint:staticcheck
@@ -56,7 +55,7 @@ func TestHandleUpdates(t *testing.T) {
 	f := NewFilters(fake.NewSimpleDynamicClient(runtime.NewScheme(), unstruct))
 	fooCfg := []kubearchiveapi.KubeArchiveConfigResource{
 		{
-			Selector: sourcev1.APIVersionKindSelector{
+			Selector: kubearchiveapi.APIVersionKind{
 				APIVersion: "batch/v1",
 				Kind:       "Job",
 			},
@@ -67,7 +66,7 @@ func TestHandleUpdates(t *testing.T) {
 	}
 	barCfg := []kubearchiveapi.KubeArchiveConfigResource{
 		{
-			Selector: sourcev1.APIVersionKindSelector{
+			Selector: kubearchiveapi.APIVersionKind{
 				APIVersion: "batch/v1",
 				Kind:       "Job",
 			},
@@ -77,7 +76,7 @@ func TestHandleUpdates(t *testing.T) {
 	}
 	bazCfg := []kubearchiveapi.KubeArchiveConfigResource{
 		{
-			Selector: sourcev1.APIVersionKindSelector{
+			Selector: kubearchiveapi.APIVersionKind{
 				APIVersion: "batch/v1",
 				Kind:       "Job",
 			},

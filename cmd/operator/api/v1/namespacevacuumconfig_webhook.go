@@ -14,7 +14,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -100,7 +99,7 @@ func (nvcv *NamespaceVacuumConfigCustomValidator) validateNamespaceVacuumConfig(
 	return nil, errors.Join(errList...)
 }
 
-func validateResources(client dynamic.Interface, namespace string, resources []sourcesv1.APIVersionKind) error {
+func validateResources(client dynamic.Interface, namespace string, resources []APIVersionKind) error {
 	gres, err := getGlobalResourceSet(client)
 	if err != nil {
 		return err
@@ -122,8 +121,8 @@ func validateResources(client dynamic.Interface, namespace string, resources []s
 	return errors.Join(errList...)
 }
 
-func getGlobalResourceSet(client dynamic.Interface) (map[sourcesv1.APIVersionKind]struct{}, error) {
-	resources := map[sourcesv1.APIVersionKind]struct{}{}
+func getGlobalResourceSet(client dynamic.Interface) (map[APIVersionKind]struct{}, error) {
+	resources := map[APIVersionKind]struct{}{}
 
 	object, err := client.Resource(ClusterKubeArchiveConfigGVR).Get(context.Background(), constants.KubeArchiveConfigResourceName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
@@ -137,13 +136,13 @@ func getGlobalResourceSet(client dynamic.Interface) (map[sourcesv1.APIVersionKin
 	}
 
 	for _, resource := range ckac.Spec.Resources {
-		resources[sourcesv1.APIVersionKind{APIVersion: resource.Selector.APIVersion, Kind: resource.Selector.Kind}] = struct{}{}
+		resources[APIVersionKind{APIVersion: resource.Selector.APIVersion, Kind: resource.Selector.Kind}] = struct{}{}
 	}
 
 	return resources, nil
 }
 
-func getNamespaceResourceSet(client dynamic.Interface, namespace string) (map[sourcesv1.APIVersionKind]struct{}, error) {
+func getNamespaceResourceSet(client dynamic.Interface, namespace string) (map[APIVersionKind]struct{}, error) {
 	object, err := client.Resource(KubeArchiveConfigGVR).Namespace(namespace).Get(context.Background(), constants.KubeArchiveConfigResourceName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("in namespace '%s': %v", namespace, err)
@@ -153,9 +152,9 @@ func getNamespaceResourceSet(client dynamic.Interface, namespace string) (map[so
 		return nil, fmt.Errorf("in namespace '%s': %v", namespace, err)
 	}
 
-	resources := map[sourcesv1.APIVersionKind]struct{}{}
+	resources := map[APIVersionKind]struct{}{}
 	for _, resource := range kac.Spec.Resources {
-		resources[sourcesv1.APIVersionKind{APIVersion: resource.Selector.APIVersion, Kind: resource.Selector.Kind}] = struct{}{}
+		resources[APIVersionKind{APIVersion: resource.Selector.APIVersion, Kind: resource.Selector.Kind}] = struct{}{}
 	}
 
 	return resources, nil

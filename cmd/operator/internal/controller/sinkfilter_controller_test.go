@@ -7,7 +7,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/runtime"
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
@@ -33,7 +32,7 @@ var _ = Describe("SinkFilterController", func() {
 					Namespaces: map[string][]kubearchivev1.KubeArchiveConfigResource{
 						constants.SinkFilterGlobalNamespace: {
 							{
-								Selector: sourcesv1.APIVersionKindSelector{
+								Selector: kubearchivev1.APIVersionKind{
 									APIVersion: "apps/v1",
 									Kind:       "Deployment",
 								},
@@ -42,7 +41,7 @@ var _ = Describe("SinkFilterController", func() {
 						},
 						"test-namespace1": {
 							{
-								Selector: sourcesv1.APIVersionKindSelector{
+								Selector: kubearchivev1.APIVersionKind{
 									APIVersion: "v1",
 									Kind:       "Pod",
 								},
@@ -51,14 +50,14 @@ var _ = Describe("SinkFilterController", func() {
 						},
 						"test-namespace2": {
 							{
-								Selector: sourcesv1.APIVersionKindSelector{
+								Selector: kubearchivev1.APIVersionKind{
 									APIVersion: "v1",
 									Kind:       "Pod",
 								},
 								ArchiveWhen: "true",
 							},
 							{
-								Selector: sourcesv1.APIVersionKindSelector{
+								Selector: kubearchivev1.APIVersionKind{
 									APIVersion: "v1",
 									Kind:       "Service",
 								},

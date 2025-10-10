@@ -23,7 +23,6 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/restmapper"
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
 type SinkCloudEventPublisherResult struct {
@@ -38,7 +37,7 @@ type SinkCloudEventPublisher struct {
 	mapper          meta.RESTMapper
 	target          string
 	source          string
-	globalResources map[sourcesv1.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource
+	globalResources map[kubearchiveapi.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource
 }
 
 func NewSinkCloudEventPublisher(source string) (*SinkCloudEventPublisher, error) {
@@ -80,12 +79,12 @@ func NewSinkCloudEventPublisher(source string) (*SinkCloudEventPublisher, error)
 	return scep, nil
 }
 
-func (scep *SinkCloudEventPublisher) SendByGVK(ctx context.Context, eventType string, avk *sourcesv1.APIVersionKind, namespace string) []SinkCloudEventPublisherResult {
+func (scep *SinkCloudEventPublisher) SendByGVK(ctx context.Context, eventType string, avk *kubearchiveapi.APIVersionKind, namespace string) []SinkCloudEventPublisherResult {
 
 	return []SinkCloudEventPublisherResult{}
 }
 
-func (scep *SinkCloudEventPublisher) SendByNamespace(ctx context.Context, eventType string, namespace string) (map[sourcesv1.APIVersionKind][]SinkCloudEventPublisherResult, error) {
+func (scep *SinkCloudEventPublisher) SendByNamespace(ctx context.Context, eventType string, namespace string) (map[kubearchiveapi.APIVersionKind][]SinkCloudEventPublisherResult, error) {
 
 	localResources, err := scep.getKubeArchiveConfigResources(namespace)
 	if err != nil {
@@ -93,7 +92,7 @@ func (scep *SinkCloudEventPublisher) SendByNamespace(ctx context.Context, eventT
 		return nil, err
 	}
 
-	results := map[sourcesv1.APIVersionKind][]SinkCloudEventPublisherResult{}
+	results := map[kubearchiveapi.APIVersionKind][]SinkCloudEventPublisherResult{}
 	allResources := mergeResources(scep.globalResources, localResources)
 
 	for avk := range allResources {
@@ -103,7 +102,7 @@ func (scep *SinkCloudEventPublisher) SendByNamespace(ctx context.Context, eventT
 	return results, nil
 }
 
-func (scep *SinkCloudEventPublisher) SendByAPIVersionKind(ctx context.Context, eventType string, namespace string, avk *sourcesv1.APIVersionKind) []SinkCloudEventPublisherResult {
+func (scep *SinkCloudEventPublisher) SendByAPIVersionKind(ctx context.Context, eventType string, namespace string, avk *kubearchiveapi.APIVersionKind) []SinkCloudEventPublisherResult {
 	localResources, err := scep.getKubeArchiveConfigResources(namespace)
 	if err != nil {
 		slog.Error("Unable to get local KubeArchiveConfig resources", "error", err)
@@ -113,7 +112,7 @@ func (scep *SinkCloudEventPublisher) SendByAPIVersionKind(ctx context.Context, e
 	return scep.sendByAPIVersionKind(ctx, eventType, namespace, localResources, avk)
 }
 
-func (scep *SinkCloudEventPublisher) sendByAPIVersionKind(ctx context.Context, eventType string, namespace string, localResources map[sourcesv1.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource, avk *sourcesv1.APIVersionKind) []SinkCloudEventPublisherResult {
+func (scep *SinkCloudEventPublisher) sendByAPIVersionKind(ctx context.Context, eventType string, namespace string, localResources map[kubearchiveapi.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource, avk *kubearchiveapi.APIVersionKind) []SinkCloudEventPublisherResult {
 	results := []SinkCloudEventPublisherResult{}
 
 	gvr, err := getGVR(scep.mapper, avk)
@@ -175,7 +174,7 @@ func (scep *SinkCloudEventPublisher) Send(ctx context.Context, eventType string,
 	return scep.httpClient.Send(ectx, event)
 }
 
-func (scep *SinkCloudEventPublisher) getKubeArchiveConfigResources(namespace string) (map[sourcesv1.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource, error) {
+func (scep *SinkCloudEventPublisher) getKubeArchiveConfigResources(namespace string) (map[kubearchiveapi.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource, error) {
 	var resources = []kubearchiveapi.KubeArchiveConfigResource{}
 	if namespace == "" {
 		gvr := kubearchiveapi.GroupVersion.WithResource("clusterkubearchiveconfigs")
@@ -202,16 +201,16 @@ func (scep *SinkCloudEventPublisher) getKubeArchiveConfigResources(namespace str
 		resources = kac.Spec.Resources
 	}
 
-	var resourceMap = make(map[sourcesv1.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource)
+	var resourceMap = make(map[kubearchiveapi.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource)
 	for _, resource := range resources {
-		avk := sourcesv1.APIVersionKind{APIVersion: resource.Selector.APIVersion, Kind: resource.Selector.Kind}
+		avk := kubearchiveapi.APIVersionKind{APIVersion: resource.Selector.APIVersion, Kind: resource.Selector.Kind}
 		resourceMap[avk] = resource
 	}
 	return resourceMap, nil
 }
 
-func mergeResources(globalRes map[sourcesv1.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource, localRes map[sourcesv1.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource) map[sourcesv1.APIVersionKind]struct{} {
-	var resourceMap = make(map[sourcesv1.APIVersionKind]struct{})
+func mergeResources(globalRes map[kubearchiveapi.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource, localRes map[kubearchiveapi.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource) map[kubearchiveapi.APIVersionKind]struct{} {
+	var resourceMap = make(map[kubearchiveapi.APIVersionKind]struct{})
 	for avk := range globalRes {
 		resourceMap[avk] = struct{}{}
 	}
@@ -221,7 +220,7 @@ func mergeResources(globalRes map[sourcesv1.APIVersionKind]kubearchiveapi.KubeAr
 	return resourceMap
 }
 
-func getGVR(mapper meta.RESTMapper, avk *sourcesv1.APIVersionKind) (schema.GroupVersionResource, error) {
+func getGVR(mapper meta.RESTMapper, avk *kubearchiveapi.APIVersionKind) (schema.GroupVersionResource, error) {
 	apiGroup := ""
 	apiVersion := avk.APIVersion
 	data := strings.Split(apiVersion, "/")
@@ -236,7 +235,7 @@ func getGVR(mapper meta.RESTMapper, avk *sourcesv1.APIVersionKind) (schema.Group
 	return mapping.Resource, nil
 }
 
-func shouldSend(avk *sourcesv1.APIVersionKind, globalResources map[sourcesv1.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource, localResources map[sourcesv1.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource) bool {
+func shouldSend(avk *kubearchiveapi.APIVersionKind, globalResources map[kubearchiveapi.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource, localResources map[kubearchiveapi.APIVersionKind]kubearchiveapi.KubeArchiveConfigResource) bool {
 	resource, ok := globalResources[*avk]
 	if ok && (resource.ArchiveWhen != "" || resource.DeleteWhen != "") {
 		return true

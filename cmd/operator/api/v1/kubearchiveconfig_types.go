@@ -9,16 +9,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
+
+// +kubebuilder:object:generate=true
+type APIVersionKind struct {
+	Kind       string `json:"kind" yaml:"kind"`
+	APIVersion string `json:"apiVersion" yaml:"apiVersion"`
+}
 
 var KubeArchiveConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1", Resource: "kubearchiveconfigs"}
 
 type KubeArchiveConfigResource struct {
-	Selector        sourcesv1.APIVersionKindSelector `json:"selector,omitempty" yaml:"selector,omitempty"`
-	ArchiveWhen     string                           `json:"archiveWhen,omitempty" yaml:"archiveWhen,omitempty"`
-	DeleteWhen      string                           `json:"deleteWhen,omitempty" yaml:"deleteWhen,omitempty"`
-	ArchiveOnDelete string                           `json:"archiveOnDelete,omitempty" yaml:"archiveOnDelete,omitempty"`
+	Selector        APIVersionKind `json:"selector,omitempty" yaml:"selector,omitempty"`
+	ArchiveWhen     string         `json:"archiveWhen,omitempty" yaml:"archiveWhen,omitempty"`
+	DeleteWhen      string         `json:"deleteWhen,omitempty" yaml:"deleteWhen,omitempty"`
+	ArchiveOnDelete string         `json:"archiveOnDelete,omitempty" yaml:"archiveOnDelete,omitempty"`
 }
 
 // KubeArchiveConfigSpec defines the desired state of KubeArchiveConfig

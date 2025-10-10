@@ -12,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic/fake"
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
 func TestClusterVacuumConfigCustomDefaulter(t *testing.T) {
@@ -110,7 +109,7 @@ func TestClusterVacuumConfigValidateResources(t *testing.T) {
 					"namespace-1": {},
 					"namespace-2": {
 						NamespaceVacuumConfigSpec: NamespaceVacuumConfigSpec{
-							Resources: []sourcesv1.APIVersionKind{
+							Resources: []APIVersionKind{
 								{APIVersion: "tekton.dev/v1", Kind: "PipelineRun"},
 							},
 						},
@@ -126,7 +125,7 @@ func TestClusterVacuumConfigValidateResources(t *testing.T) {
 					"namespace-1": {},
 					"namespace-2": {
 						NamespaceVacuumConfigSpec: NamespaceVacuumConfigSpec{
-							Resources: []sourcesv1.APIVersionKind{
+							Resources: []APIVersionKind{
 								{APIVersion: "tekton.dev/v1", Kind: "PipelineRun"},
 								{APIVersion: "tekton.dev/v1", Kind: "TaskRun"},
 							},
@@ -143,7 +142,7 @@ func TestClusterVacuumConfigValidateResources(t *testing.T) {
 					"namespace-1": {},
 					"namespace-2": {
 						NamespaceVacuumConfigSpec: NamespaceVacuumConfigSpec{
-							Resources: []sourcesv1.APIVersionKind{
+							Resources: []APIVersionKind{
 								{APIVersion: "v1", Kind: "Event"},
 							},
 						},
@@ -158,7 +157,7 @@ func TestClusterVacuumConfigValidateResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: constants.KubeArchiveConfigResourceName},
 		Spec: ClusterKubeArchiveConfigSpec{
 			Resources: []KubeArchiveConfigResource{{
-				Selector: sourcesv1.APIVersionKindSelector{
+				Selector: APIVersionKind{
 					APIVersion: "tekton.dev/v1",
 					Kind:       "PipelineRun",
 				},
@@ -169,7 +168,7 @@ func TestClusterVacuumConfigValidateResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: constants.KubeArchiveConfigResourceName, Namespace: "namespace-1"},
 		Spec: KubeArchiveConfigSpec{
 			Resources: []KubeArchiveConfigResource{{
-				Selector: sourcesv1.APIVersionKindSelector{
+				Selector: APIVersionKind{
 					APIVersion: "tekton.dev/v1",
 					Kind:       "TaskRun",
 				},
@@ -180,7 +179,7 @@ func TestClusterVacuumConfigValidateResources(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: constants.KubeArchiveConfigResourceName, Namespace: "namespace-2"},
 		Spec: KubeArchiveConfigSpec{
 			Resources: []KubeArchiveConfigResource{{
-				Selector: sourcesv1.APIVersionKindSelector{
+				Selector: APIVersionKind{
 					APIVersion: "tekton.dev/v1",
 					Kind:       "TaskRun",
 				},

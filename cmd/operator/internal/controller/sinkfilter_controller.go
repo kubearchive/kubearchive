@@ -9,17 +9,20 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	ce "github.com/cloudevents/sdk-go/v2"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -57,8 +60,8 @@ type SinkFilterReconciler struct {
 //+kubebuilder:rbac:groups=kubearchive.org,resources=sinkfilters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=kubearchive.org,resources=sinkfilters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=kubearchive.org,resources=sinkfilters/finalizers,verbs=update
-//+kubebuilder:rbac:groups="*",resources="*",verbs=get;list;watch
 //+kubebuilder:rbac:groups=kubearchive.org,resources=kubearchiveconfigs;clusterkubearchiveconfigs,verbs=get;list;watch
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
@@ -78,6 +81,17 @@ func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			return ctrl.Result{}, nil
 		}
 		log.Error(err, "Failed to get SinkFilter")
+		return ctrl.Result{}, err
+	}
+
+	// Reconcile RBAC resources
+	if err := r.reconcileClusterRole(ctx, sinkFilter); err != nil {
+		log.Error(err, "Failed to reconcile ClusterRole")
+		return ctrl.Result{}, err
+	}
+
+	if err := r.reconcileClusterRoleBinding(ctx); err != nil {
+		log.Error(err, "Failed to reconcile ClusterRoleBinding")
 		return ctrl.Result{}, err
 	}
 
@@ -467,6 +481,99 @@ func (r *SinkFilterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kubearchivev1.SinkFilter{}).
 		Complete(r)
+}
+
+func (r *SinkFilterReconciler) extractResources(sinkFilter *kubearchivev1.SinkFilter) []kubearchivev1.APIVersionKind {
+	resourcesMap := make(map[kubearchivev1.APIVersionKind]struct{})
+
+	for _, namespaceResources := range sinkFilter.Spec.Namespaces {
+		for _, resource := range namespaceResources {
+			resourcesMap[resource.Selector] = struct{}{}
+		}
+	}
+
+	resources := make([]kubearchivev1.APIVersionKind, 0, len(resourcesMap))
+	for resource := range resourcesMap {
+		resources = append(resources, resource)
+	}
+
+	return resources
+}
+
+func (r *SinkFilterReconciler) reconcileClusterRole(ctx context.Context, sinkFilter *kubearchivev1.SinkFilter) error {
+	log := log.FromContext(ctx)
+
+	resources := r.extractResources(sinkFilter)
+	rules := createPolicyRules(ctx, r.Mapper, resources, []string{"get", "list", "watch"})
+
+	desired := desiredClusterRole(constants.KubeArchiveSinkFilterName, rules)
+
+	existing := &rbacv1.ClusterRole{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: constants.KubeArchiveSinkFilterName}, existing)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Creating ClusterRole", "name", constants.KubeArchiveSinkFilterName)
+			return r.Client.Create(ctx, desired)
+		}
+		return fmt.Errorf("failed to get ClusterRole: %w", err)
+	}
+
+	if !equalPolicyRules(existing.Rules, rules) {
+		log.Info("Updating ClusterRole", "name", constants.KubeArchiveSinkFilterName)
+		existing.Rules = rules
+		return r.Client.Update(ctx, existing)
+	}
+
+	return nil
+}
+
+func (r *SinkFilterReconciler) reconcileClusterRoleBinding(ctx context.Context) error {
+	log := log.FromContext(ctx)
+
+	subjects := []rbacv1.Subject{
+		{
+			Kind:      "ServiceAccount",
+			Name:      constants.KubeArchiveOperatorName,
+			Namespace: constants.KubeArchiveNamespace,
+		},
+	}
+
+	desired := desiredClusterRoleBinding(constants.KubeArchiveSinkFilterName, "ClusterRole", subjects...)
+
+	existing := &rbacv1.ClusterRoleBinding{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: constants.KubeArchiveSinkFilterName}, existing)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Creating ClusterRoleBinding", "name", constants.KubeArchiveSinkFilterName)
+			return r.Client.Create(ctx, desired)
+		}
+		return fmt.Errorf("failed to get ClusterRoleBinding: %w", err)
+	}
+
+	if !slices.Equal(existing.Subjects, desired.Subjects) ||
+		existing.RoleRef != desired.RoleRef {
+		log.Info("Updating ClusterRoleBinding", "name", constants.KubeArchiveSinkFilterName)
+		existing.Subjects = desired.Subjects
+		existing.RoleRef = desired.RoleRef
+		return r.Client.Update(ctx, existing)
+	}
+
+	return nil
+}
+
+func equalPolicyRules(a, b []rbacv1.PolicyRule) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	for i := range a {
+		if !slices.Equal(a[i].APIGroups, b[i].APIGroups) ||
+			!slices.Equal(a[i].Resources, b[i].Resources) ||
+			!slices.Equal(a[i].Verbs, b[i].Verbs) {
+			return false
+		}
+	}
+	return true
 }
 
 func randomTimeout() *int64 {

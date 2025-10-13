@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 
 	otelObs "github.com/cloudevents/sdk-go/observability/opentelemetry/v2/client"
@@ -43,13 +44,31 @@ type SinkCloudEventPublisher struct {
 func NewSinkCloudEventPublisher(source string) (*SinkCloudEventPublisher, error) {
 	scep := &SinkCloudEventPublisher{source: source}
 
+	// Overrides defaultRetriableErrors in
+	// https://github.com/cloudevents/sdk-go/blob/main/v2/protocol/http/protocol.go
+	var retriableStatuses = map[int]bool{
+		http.StatusNotFound:              true, // 404
+		http.StatusRequestEntityTooLarge: true, // 413
+		http.StatusTooEarly:              true, // 425
+		http.StatusTooManyRequests:       true, // 429
+		http.StatusInternalServerError:   true, // 500
+		http.StatusBadGateway:            true, // 502
+		http.StatusServiceUnavailable:    true, // 503
+		http.StatusGatewayTimeout:        true, // 504
+	}
+	var ceOption = []cehttp.Option{
+		cehttp.WithIsRetriableFunc(func(statusCode int) bool {
+			_, retriable := retriableStatuses[statusCode]
+			return retriable
+		},
+		)}
+
 	var err error
-	if scep.httpClient, err = otelObs.NewClientHTTP([]cehttp.Option{}, []client.Option{}); err != nil {
+	if scep.httpClient, err = otelObs.NewClientHTTP(ceOption, []client.Option{}); err != nil {
 		slog.Error("Failed to create client", "error", err)
 		return nil, err
 	}
 
-	// Always use sink service URL since we're no longer using Knative
 	scep.target = getSinkServiceUrl()
 
 	var discoveryClient *discovery.DiscoveryClient

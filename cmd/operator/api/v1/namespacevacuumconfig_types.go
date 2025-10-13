@@ -10,14 +10,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 )
 
 var NamespaceVacuumConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1", Resource: "namespacevacuumconfigs"}
 
 // VacuumListSpec defines the desired state of VacuumList resource
 type NamespaceVacuumConfigSpec struct {
-	Resources []sourcesv1.APIVersionKind `json:"resources,omitempty" yaml:"resources"`
+	Resources []APIVersionKind `json:"resources,omitempty" yaml:"resources"`
 }
 
 // NamespaceVacuumConfigStatus defines the observed state of NamespaceVacuumConfig resource

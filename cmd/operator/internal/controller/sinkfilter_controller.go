@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -35,7 +34,7 @@ import (
 
 type WatchInfo struct {
 	GVR             schema.GroupVersionResource
-	KindSelector    sourcesv1.APIVersionKindSelector
+	KindSelector    kubearchivev1.APIVersionKind
 	Namespaces      map[string]struct{} // Map of namespaces this resource type is configured for
 	StopCh          chan struct{}
 	WatchInterface  watch.Interface
@@ -59,7 +58,6 @@ type SinkFilterReconciler struct {
 //+kubebuilder:rbac:groups=kubearchive.org,resources=sinkfilters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=kubearchive.org,resources=sinkfilters/finalizers,verbs=update
 //+kubebuilder:rbac:groups="*",resources="*",verbs=get;list;watch
-//+kubebuilder:rbac:groups=eventing.knative.dev,resources=brokers,verbs=get;list;watch
 //+kubebuilder:rbac:groups=kubearchive.org,resources=kubearchiveconfigs;clusterkubearchiveconfigs,verbs=get;list;watch
 
 func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -238,7 +236,7 @@ func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string
 	stopCh := make(chan struct{})
 
 	kind, apiVersion := r.parseKindAndAPIVersionFromKey(key)
-	kindSelector := sourcesv1.APIVersionKindSelector{
+	kindSelector := kubearchivev1.APIVersionKind{
 		Kind:       kind,
 		APIVersion: apiVersion,
 	}

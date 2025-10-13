@@ -12,7 +12,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
@@ -143,9 +142,9 @@ func (r *KubeArchiveConfigReconciler) SetupKubeArchiveConfigWithManager(mgr ctrl
 func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) (*rbacv1.Role, error) {
 	log := log.FromContext(ctx)
 
-	resources := make([]sourcesv1.APIVersionKindSelector, 0)
+	resources := make([]kubearchivev1.APIVersionKind, 0)
 	for _, kar := range kaconfig.Spec.Resources {
-		resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
+		resource := kubearchivev1.APIVersionKind{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
 		resources = append(resources, resource)
 	}
 
@@ -153,7 +152,7 @@ func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kac
 	err := r.Client.Get(ctx, types.NamespacedName{Name: constants.KubeArchiveConfigResourceName}, ckac)
 	if err == nil {
 		for _, kar := range ckac.Spec.Resources {
-			resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
+			resource := kubearchivev1.APIVersionKind{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
 			resources = append(resources, resource)
 		}
 	} else if !errors.IsNotFound(err) {
@@ -428,7 +427,7 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, k
 
 	log.Info("in reconcileVacuumRole")
 
-	resources := []sourcesv1.APIVersionKindSelector{
+	resources := []kubearchivev1.APIVersionKind{
 		{
 			APIVersion: "kubearchive.org/v1",
 			Kind:       "KubeArchiveConfig",
@@ -440,7 +439,7 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, k
 	}
 
 	for _, kar := range kaconfig.Spec.Resources {
-		resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
+		resource := kubearchivev1.APIVersionKind{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
 		resources = append(resources, resource)
 	}
 
@@ -452,7 +451,7 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, k
 		}
 	} else {
 		for _, kar := range ckac.Spec.Resources {
-			resource := sourcesv1.APIVersionKindSelector{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
+			resource := kubearchivev1.APIVersionKind{Kind: kar.Selector.Kind, APIVersion: kar.Selector.APIVersion}
 			resources = append(resources, resource)
 		}
 	}
@@ -494,7 +493,7 @@ func (r *KubeArchiveConfigReconciler) reconcileKubeArchiveClusterConfigReadClust
 	return nil
 }
 
-func createPolicyRules(ctx context.Context, mapper meta.RESTMapper, resources []sourcesv1.APIVersionKindSelector, verbs []string) []rbacv1.PolicyRule {
+func createPolicyRules(ctx context.Context, mapper meta.RESTMapper, resources []kubearchivev1.APIVersionKind, verbs []string) []rbacv1.PolicyRule {
 	log := log.FromContext(ctx)
 	groups := make(map[string][]string)
 

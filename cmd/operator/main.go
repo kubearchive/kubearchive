@@ -36,8 +36,6 @@ import (
 	"github.com/kubearchive/kubearchive/cmd/operator/internal/controller"
 	"github.com/kubearchive/kubearchive/pkg/logging"
 	"github.com/kubearchive/kubearchive/pkg/observability"
-
-	sourcesv1 "knative.dev/eventing/pkg/apis/sources/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -57,7 +55,6 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(kubearchivev1.AddToScheme(scheme))
-	utilruntime.Must(sourcesv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

@@ -13,6 +13,7 @@ const (
 	KubeArchiveNamespaceEnvVar                     = "KUBEARCHIVE_NAMESPACE"
 	SinkFilterResourceName                         = "sink-filters"
 	KubeArchiveSinkName                            = "kubearchive-sink"
+	KubeArchiveOperatorWebhooksServiceName         = "kubearchive-operator-webhooks"
 	KubeArchiveApiServerSourceName                 = "kubearchive-a13e"
 	SinkFilterGlobalNamespace                      = "___global___"
 	ClusterVacuumAllNamespaces                     = "___all-namespaces___"

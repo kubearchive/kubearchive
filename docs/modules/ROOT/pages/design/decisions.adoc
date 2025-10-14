@@ -395,3 +395,13 @@ Based on memory consumption, and given that the complexity of the better approac
 to store independently global and local rules, and then joining their results on code.
 
 See [#986](https://github.com/kubearchive/kubearchive/issues/986) for details.
+== Replace ApiServerSource with watches
+Date: 2025-10-13
+
+Status: Accepted
+
+Remove the dependency on knative-eventing and replace ApiServerSource with our own watches.
+
+See [#1355](https://github.com/kubearchive/kubearchive/issues/1355) for details.
+
+Reviewers: Hector Martinez, Greg Allen, Sam Koved, Marta Anon

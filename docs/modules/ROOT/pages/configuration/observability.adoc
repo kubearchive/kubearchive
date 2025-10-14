@@ -31,8 +31,8 @@ Tracks the total number of Cloud Events (resource updates) received aggregated b
 
 * `resource_type`: a combination of the resource `apiVersion` and `kind`. For example `apps/v1/Deployment`,
 `v1/Pods` or `tekton.dev/v1/PipelineRun`.
-* `event_type`: one of `dev.knative.apiserver.resource.new`, `dev.knative.apiserver.resource.update`
-or `dev.knative.apiserver.resource.delete`.
+* `event_type`: one of `org.kubearchive.sinkfilters.resource.add`, `org.kubearchive.sinkfilters.resource.update`
+or `org.kubearchive.sinkfilters.resource.delete`.
 
 ## Configuring Observability
 

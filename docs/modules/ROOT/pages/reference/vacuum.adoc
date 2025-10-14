@@ -1,8 +1,8 @@
 = KubeArchive Vacuums
 
 == Use Cases
-KubeArchive relies on updates to resources to work. An ApiServerSource
-instance is watching for changes to particular resources, and when those
+KubeArchive relies on Kubernetes watches. These watches
+fire when changes to resources occur, and when those
 changes occur it sends cloud events to the KubeArchive sink. Those cloud
 events are then processed by the sink, and if the criteria for archival
 and deletion are met, then those operations are performed.

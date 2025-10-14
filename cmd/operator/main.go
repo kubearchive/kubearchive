@@ -6,10 +6,13 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -40,15 +43,19 @@ import (
 )
 
 const (
-	otelServiceName = "kubearchive.operator"
+	otelServiceName          = "kubearchive.operator"
+	webhookServerPort        = "9443"
+	webhookConnectionTimeout = 5 * time.Second
 )
 
 var (
-	version = "main"
-	commit  = ""
-	date    = ""
-	scheme  = runtime.NewScheme()
-	k9eNs   = os.Getenv("KUBEARCHIVE_NAMESPACE")
+	webhookLastCheckFailed = true // Start as true to log first success
+	webhookStateMutex      sync.Mutex
+	version                = "main"
+	commit                 = ""
+	date                   = ""
+	scheme                 = runtime.NewScheme()
+	k9eNs                  = os.Getenv("KUBEARCHIVE_NAMESPACE")
 )
 
 func init() {
@@ -56,6 +63,35 @@ func init() {
 
 	utilruntime.Must(kubearchivev1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+}
+
+func webhookReadinessCheck(req *http.Request) error {
+	serverAddr := fmt.Sprintf("localhost:%s", webhookServerPort)
+
+	dialer := &net.Dialer{Timeout: webhookConnectionTimeout}
+	conn, err := tls.DialWithDialer(dialer, "tcp", serverAddr, &tls.Config{
+		InsecureSkipVerify: true, //nolint:gosec
+	})
+
+	if err != nil {
+		webhookStateMutex.Lock()
+		webhookLastCheckFailed = true
+		webhookStateMutex.Unlock()
+		slog.Info("Webhook server not ready", "address", serverAddr, "error", err)
+		return err
+	}
+
+	conn.Close()
+
+	// Only log success message the first time after a failure (or first time ever)
+	webhookStateMutex.Lock()
+	if webhookLastCheckFailed {
+		slog.Info("Webhook server ready", "address", serverAddr)
+		webhookLastCheckFailed = false
+	}
+	webhookStateMutex.Unlock()
+
+	return nil
 }
 
 func main() {
@@ -238,7 +274,7 @@ func main() {
 		slog.Error("unable to set up health check", "err", err)
 		os.Exit(1)
 	}
-	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
+	if err := mgr.AddReadyzCheck("readyz", webhookReadinessCheck); err != nil {
 		slog.Error("unable to set up ready check", "err", err)
 		os.Exit(1)
 	}

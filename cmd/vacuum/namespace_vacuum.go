@@ -11,13 +11,13 @@ import (
 	"os"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
-	publisher "github.com/kubearchive/kubearchive/pkg/cloudevents"
+	"github.com/kubearchive/kubearchive/pkg/filters"
 	"github.com/kubearchive/kubearchive/pkg/k8sclient"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
-	namespaceVacuumEventType = "kubearchive.org.vacuum.namespace.resource.update"
+	namespaceVacuumEventTypePrefix = "org.kubearchive.vacuum.namespace.resource"
 )
 
 func namespaceVacuum(configName string) error {
@@ -26,12 +26,23 @@ func namespaceVacuum(configName string) error {
 		return errors.New("no NAMESPACE environment variable set")
 	}
 
+	// Get SinkFilter data for namespace vacuum (single namespace + global)
+	filterReader, err := filters.NewSinkFilterReader()
+	if err != nil {
+		return fmt.Errorf("unable to create SinkFilter reader: %v", err)
+	}
+
+	filters, err := filterReader.ProcessSingleNamespace(context.Background(), namespace)
+	if err != nil {
+		return fmt.Errorf("unable to get SinkFilter data: %v", err)
+	}
+
 	client, err := k8sclient.NewInstrumentedDynamicClient()
 	if err != nil {
 		return fmt.Errorf("unable to get client: %v", err)
 	}
 
-	scep, err := publisher.NewSinkCloudEventPublisher("kubearchive.org/namespace-vacuum")
+	vcep, err := NewVacuumCloudEventPublisher("kubearchive.org/namespace-vacuum", filters)
 	if err != nil {
 		return fmt.Errorf("unable to create sink cloudevent publisher: %v", err)
 	}
@@ -48,13 +59,10 @@ func namespaceVacuum(configName string) error {
 
 	slog.Info("Started publishing sink events", "namespace", namespace)
 	if len(config.Spec.Resources) == 0 {
-		_, err = scep.SendByNamespace(context.Background(), namespaceVacuumEventType, namespace)
-		if err != nil {
-			slog.Error("Unable to send events for NamespaceVacuumConfig", "error", err, "namespace", namespace, "config", configName)
-		}
+		vcep.SendByNamespace(context.Background(), namespaceVacuumEventTypePrefix, namespace)
 	} else {
 		for _, avk := range config.Spec.Resources {
-			scep.SendByAPIVersionKind(context.Background(), namespaceVacuumEventType, namespace, &avk)
+			vcep.SendByAPIVersionKind(context.Background(), namespaceVacuumEventTypePrefix, namespace, &avk)
 		}
 	}
 	slog.Info("Finished publishing sink events", "namespace", namespace)

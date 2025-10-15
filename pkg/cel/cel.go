@@ -69,7 +69,7 @@ func CompileCELExpr(expr string) (*cel.Program, error) {
 // ExecuteBoolean CEL executes the cel program with obj as the input. If the program returns and error or
 // if the program returns a value that cannot be converted to bool, false is returned. Otherwise the bool
 // returned by the CEL program is returned.
-func ExecuteBooleanCEL(ctx context.Context, program cel.Program, obj *unstructured.Unstructured) bool {
+func ExecuteBooleanCEL(ctx context.Context, program *cel.Program, obj *unstructured.Unstructured) bool {
 	val := ExecuteCEL(ctx, program, obj)
 	if val == nil {
 		return false
@@ -78,11 +78,15 @@ func ExecuteBooleanCEL(ctx context.Context, program cel.Program, obj *unstructur
 	return ok && boolVal
 }
 
-func ExecuteCEL(ctx context.Context, program cel.Program, obj *unstructured.Unstructured) ref.Val {
+func ExecuteCEL(ctx context.Context, program *cel.Program, obj *unstructured.Unstructured) ref.Val {
 	tracer := otel.Tracer("kubearchive")
 	ctx, span := tracer.Start(ctx, "ExecuteCEL")
 	defer span.End()
 
-	val, _, _ := program.ContextEval(ctx, obj.Object)
+	if program == nil {
+		return nil
+	}
+
+	val, _, _ := (*program).ContextEval(ctx, obj.Object)
 	return val
 }

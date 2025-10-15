@@ -1,6 +1,6 @@
 {
   "specversion": "1.0",
-  "type": "dev.knative.apiserver.resource.update",
+  "type": "org.kubearchive.sinkfilters.resource.archive-when",
   "source": "http://localhost",
   "subject": "/apis/batch/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-28806900-sp286",
   "id": "cbec9e69-accf-4dfd-a22b-e9947376e01c",

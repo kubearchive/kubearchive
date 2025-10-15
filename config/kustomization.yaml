@@ -30,8 +30,6 @@ resources:
   - templates/operator/service_account.yaml
   - templates/operator/vacuum.yaml
   - templates/operator/webhooks.yaml
-  - templates/sink/role.yaml
-  - templates/sink/role_binding.yaml
   - templates/sink/service_account.yaml
   - templates/sink/sink.yaml
   - templates/certificates.yaml

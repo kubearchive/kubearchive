@@ -72,7 +72,7 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 				return ctrl.Result{}, err
 			}
 
-			if err := r.reconcileKubeArchiveClusterConfigReadClusterRoleBinding(ctx, kaconfig, false); err != nil {
+			if err := r.reconcileKubeArchiveVacuumRoleBinding(ctx, kaconfig, false); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -315,13 +315,14 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumResources(ctx context.Conte
 		return err
 	}
 
-	if _, err := r.reconcileVacuumRoleBinding(ctx, kaconfig, role); err != nil {
+	if _, err := r.reconcileLocalVacuumRoleBinding(ctx, kaconfig, role); err != nil {
 		return err
 	}
 
-	if err := r.reconcileKubeArchiveClusterConfigReadClusterRoleBinding(ctx, kaconfig, true); err != nil {
+	if err := r.reconcileKubeArchiveVacuumRoleBinding(ctx, kaconfig, true); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -372,10 +373,6 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, k
 	resources := []kubearchivev1.APIVersionKind{
 		{
 			APIVersion: "kubearchive.org/v1",
-			Kind:       "KubeArchiveConfig",
-		},
-		{
-			APIVersion: "kubearchive.org/v1",
 			Kind:       "NamespaceVacuumConfig",
 		},
 	}
@@ -405,10 +402,11 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, k
 	return role, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileVacuumRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, role *rbacv1.Role) (*rbacv1.RoleBinding, error) {
+// Reconcile the vacuum role binding in the KubeArchiveConfig namespace.
+func (r *KubeArchiveConfigReconciler) reconcileLocalVacuumRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, role *rbacv1.Role) (*rbacv1.RoleBinding, error) {
 	log := log.FromContext(ctx)
 
-	log.Info("in reconcileVacuumRoleBinding")
+	log.Info("in reconcileLocalVacuumRoleBinding")
 
 	ns := newSubject(kaconfig.Namespace, constants.KubeArchiveVacuumName)
 	ka := newSubject(constants.KubeArchiveNamespace, constants.KubeArchiveClusterVacuumName)
@@ -419,16 +417,18 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRoleBinding(ctx context.Con
 	return binding, nil
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileKubeArchiveClusterConfigReadClusterRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, add bool) error {
+// Reconcile the vacuum role binding in the kubearchive namespace.
+func (r *KubeArchiveConfigReconciler) reconcileKubeArchiveVacuumRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, add bool) error {
 	log := log.FromContext(ctx)
 
-	log.Info("in reconcileKubeArchiveClusterConfigReadClusterRoleBinding")
+	log.Info("in reconcileKubeArchiveVacuumRoleBinding")
 
 	subjects := []rbacv1.Subject{newSubject(kaconfig.Namespace, constants.KubeArchiveVacuumName)}
+	// Don't ever remove the cluster vacuum SA, but always make sure it is there.
 	if add {
 		subjects = append(subjects, newSubject(constants.KubeArchiveNamespace, constants.KubeArchiveClusterVacuumName))
 	}
-	_, err := r.reconcileClusterRoleBinding(ctx, constants.ClusterKubeArchiveConfigClusterRoleBindingName, "ClusterRole", add, subjects...)
+	_, err := r.reconcileRoleBinding(ctx, nil, constants.KubeArchiveNamespace, constants.KubeArchiveVacuumName, "Role", add, subjects...)
 	if err != nil {
 		return err
 	}

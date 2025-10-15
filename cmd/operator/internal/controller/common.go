@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -84,6 +85,53 @@ func createPolicyRules(ctx context.Context, mapper meta.RESTMapper, resources []
 	}
 
 	return rules
+}
+
+func equalPolicyRules(a, b []rbacv1.PolicyRule) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	// Create sorted copies of both slices
+	aCopy := make([]rbacv1.PolicyRule, len(a))
+	bCopy := make([]rbacv1.PolicyRule, len(b))
+	copy(aCopy, a)
+	copy(bCopy, b)
+
+	// Sort the individual string slices within each PolicyRule and then sort the PolicyRules
+	for i := range aCopy {
+		slices.Sort(aCopy[i].APIGroups)
+		slices.Sort(aCopy[i].Resources)
+		slices.Sort(aCopy[i].Verbs)
+	}
+	for i := range bCopy {
+		slices.Sort(bCopy[i].APIGroups)
+		slices.Sort(bCopy[i].Resources)
+		slices.Sort(bCopy[i].Verbs)
+	}
+
+	// Sort both copies before comparison
+	slices.SortFunc(aCopy, comparePolicyRules)
+	slices.SortFunc(bCopy, comparePolicyRules)
+
+	for i := range aCopy {
+		if !slices.Equal(aCopy[i].APIGroups, bCopy[i].APIGroups) ||
+			!slices.Equal(aCopy[i].Resources, bCopy[i].Resources) ||
+			!slices.Equal(aCopy[i].Verbs, bCopy[i].Verbs) {
+			return false
+		}
+	}
+	return true
+}
+
+func comparePolicyRules(a, b rbacv1.PolicyRule) int {
+	if cmp := slices.Compare(a.APIGroups, b.APIGroups); cmp != 0 {
+		return cmp
+	}
+	if cmp := slices.Compare(a.Resources, b.Resources); cmp != 0 {
+		return cmp
+	}
+	return slices.Compare(a.Verbs, b.Verbs)
 }
 
 func reconcileSinkFilter(ctx context.Context, client client.Client, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) error {

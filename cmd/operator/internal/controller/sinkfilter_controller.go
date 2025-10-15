@@ -30,18 +30,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
+	kcel "github.com/kubearchive/kubearchive/pkg/cel"
 	"github.com/kubearchive/kubearchive/pkg/cloudevents"
 	"github.com/kubearchive/kubearchive/pkg/constants"
+	"github.com/kubearchive/kubearchive/pkg/filters"
 	"github.com/kubearchive/kubearchive/pkg/k8sclient"
 )
 
 type WatchInfo struct {
 	GVR             schema.GroupVersionResource
 	KindSelector    kubearchivev1.APIVersionKind
-	Namespaces      map[string]struct{} // Map of namespaces this resource type is configured for
+	Namespaces      map[string]filters.CelExpressions
 	StopCh          chan struct{}
 	WatchInterface  watch.Interface
-	ResourceVersion string // Current resource version for efficient reconnections
+	ResourceVersion string
 }
 
 type SinkFilterReconciler struct {
@@ -74,7 +76,7 @@ func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if errors.IsNotFound(err) {
 			log.Info("SinkFilter resource not found. Ignoring since object must be deleted")
 			// Clear all watches when the resource is deleted by calling generateWatches with empty maps.
-			if err = r.generateWatches(ctx, map[string]map[string]struct{}{}); err != nil {
+			if err = r.generateWatches(ctx, map[string]map[string]filters.CelExpressions{}); err != nil {
 				log.Error(err, "Failed to clear watches on delete")
 				return ctrl.Result{}, err
 			}
@@ -95,7 +97,7 @@ func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	namespacesByKinds := r.extractNamespacesByKinds(sinkFilter)
+	namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter)
 
 	if err := r.generateWatches(ctx, namespacesByKinds); err != nil {
 		log.Error(err, "Failed to generate watches")
@@ -104,24 +106,6 @@ func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	log.Info("Successfully reconciled SinkFilter", "namespacesByKinds", len(namespacesByKinds))
 	return ctrl.Result{}, nil
-}
-
-func (r *SinkFilterReconciler) extractNamespacesByKinds(sinkFilter *kubearchivev1.SinkFilter) map[string]map[string]struct{} {
-	namespacesByKinds := make(map[string]map[string]struct{})
-
-	for namespaceName, resources := range sinkFilter.Spec.Namespaces {
-		for _, resource := range resources {
-			key := resource.Selector.Kind + "-" + resource.Selector.APIVersion
-
-			if namespaces, exists := namespacesByKinds[key]; exists {
-				namespaces[namespaceName] = struct{}{}
-			} else {
-				namespacesByKinds[key] = map[string]struct{}{namespaceName: struct{}{}}
-			}
-		}
-	}
-
-	return namespacesByKinds
 }
 
 func (r *SinkFilterReconciler) parseKindAndAPIVersionFromKey(key string) (string, string) {
@@ -135,7 +119,7 @@ func (r *SinkFilterReconciler) parseKindAndAPIVersionFromKey(key string) (string
 	return "", ""
 }
 
-func (r *SinkFilterReconciler) generateWatches(ctx context.Context, namespacesByKinds map[string]map[string]struct{}) error {
+func (r *SinkFilterReconciler) generateWatches(ctx context.Context, namespacesByKinds map[string]map[string]filters.CelExpressions) error {
 	log := log.FromContext(ctx)
 
 	r.mu.Lock()
@@ -184,7 +168,7 @@ func (r *SinkFilterReconciler) generateWatches(ctx context.Context, namespacesBy
 	return nil
 }
 
-func (r *SinkFilterReconciler) findWatchesToStop(namespacesByKinds map[string]map[string]struct{}) map[string]struct{} {
+func (r *SinkFilterReconciler) findWatchesToStop(namespacesByKinds map[string]map[string]filters.CelExpressions) map[string]struct{} {
 	toStop := make(map[string]struct{})
 	for existingKey := range r.watches {
 		if _, stillNeeded := namespacesByKinds[existingKey]; !stillNeeded {
@@ -194,7 +178,7 @@ func (r *SinkFilterReconciler) findWatchesToStop(namespacesByKinds map[string]ma
 	return toStop
 }
 
-func (r *SinkFilterReconciler) findWatchesToCreate(namespacesByKinds map[string]map[string]struct{}) map[string]struct{} {
+func (r *SinkFilterReconciler) findWatchesToCreate(namespacesByKinds map[string]map[string]filters.CelExpressions) map[string]struct{} {
 	toCreate := make(map[string]struct{})
 	for newKey := range namespacesByKinds {
 		if _, exists := r.watches[newKey]; !exists {
@@ -204,7 +188,7 @@ func (r *SinkFilterReconciler) findWatchesToCreate(namespacesByKinds map[string]
 	return toCreate
 }
 
-func (r *SinkFilterReconciler) findWatchesToUpdate(namespacesByKinds map[string]map[string]struct{}, toStop map[string]struct{}) map[string]struct{} {
+func (r *SinkFilterReconciler) findWatchesToUpdate(namespacesByKinds map[string]map[string]filters.CelExpressions, toStop map[string]struct{}) map[string]struct{} {
 	toUpdate := make(map[string]struct{})
 
 	for existingKey := range r.watches {
@@ -246,7 +230,7 @@ func (r *SinkFilterReconciler) getGVRFromKindAndAPIVersion(kind, apiVersion stri
 	return mapping.Resource, kind, apiVersion, nil
 }
 
-func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string, gvr schema.GroupVersionResource, namespaces map[string]struct{}) {
+func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string, gvr schema.GroupVersionResource, namespaces map[string]filters.CelExpressions) {
 	stopCh := make(chan struct{})
 
 	kind, apiVersion := r.parseKindAndAPIVersionFromKey(key)
@@ -403,39 +387,42 @@ func (r *SinkFilterReconciler) handleWatchEvent(ctx context.Context, event watch
 	}
 
 	objNamespace := unstructuredObj.GetNamespace()
-	_, globalExists := watchInfo.Namespaces[constants.SinkFilterGlobalNamespace]
-	_, namespaceExists := watchInfo.Namespaces[objNamespace]
+	globalCel, globalExists := watchInfo.Namespaces[constants.SinkFilterGlobalNamespace]
+	namespaceCel, namespaceExists := watchInfo.Namespaces[objNamespace]
 
-	if globalExists || namespaceExists {
-		r.sendCloudEvent(ctx, event, watchInfo)
+	if !globalExists && !namespaceExists {
+		return nil
 	}
-	return nil
+
+	switch event.Type {
+	case watch.Added, watch.Modified:
+		// First check deleteWhen CEL expressions
+		if (globalExists && kcel.ExecuteBooleanCEL(ctx, globalCel.DeleteWhen, unstructuredObj)) ||
+			(namespaceExists && kcel.ExecuteBooleanCEL(ctx, namespaceCel.DeleteWhen, unstructuredObj)) {
+			r.sendCloudEvent(ctx, "delete-when", unstructuredObj, watchInfo)
+		} else if (globalExists && kcel.ExecuteBooleanCEL(ctx, globalCel.ArchiveWhen, unstructuredObj)) ||
+			(namespaceExists && kcel.ExecuteBooleanCEL(ctx, namespaceCel.ArchiveWhen, unstructuredObj)) {
+			r.sendCloudEvent(ctx, "archive-when", unstructuredObj, watchInfo)
+		}
+		return nil
+	case watch.Deleted:
+		// For delete events, only send if ArchiveOnDelete CEL expressions return true
+		if (globalExists && kcel.ExecuteBooleanCEL(ctx, globalCel.ArchiveOnDelete, unstructuredObj)) ||
+			(namespaceExists && kcel.ExecuteBooleanCEL(ctx, namespaceCel.ArchiveOnDelete, unstructuredObj)) {
+			r.sendCloudEvent(ctx, "archive-on-delete", unstructuredObj, watchInfo)
+		}
+		return nil
+	default:
+		log.FromContext(ctx).Error(nil, "Ignoring unknown watch event type", "type", event.Type)
+		return nil
+	}
 }
 
-func (r *SinkFilterReconciler) sendCloudEvent(ctx context.Context, event watch.Event, watchInfo *WatchInfo) {
+func (r *SinkFilterReconciler) sendCloudEvent(ctx context.Context, eventType string, unstructuredObj *unstructured.Unstructured, watchInfo *WatchInfo) {
 	log := log.FromContext(ctx)
 
 	if r.cloudEventPublisher == nil {
-		log.Error(nil, "CloudEvent publisher not available, skipping event", "eventType", event.Type, "gvr", watchInfo.GVR.String())
-		return
-	}
-
-	unstructuredObj, ok := event.Object.(*unstructured.Unstructured)
-	if !ok {
-		log.Error(nil, "Unexpected object type in watch event", "objectType", fmt.Sprintf("%T", event.Object))
-		return
-	}
-
-	var eventType string
-	switch event.Type {
-	case watch.Added:
-		eventType = "add"
-	case watch.Modified:
-		eventType = "update"
-	case watch.Deleted:
-		eventType = "delete"
-	default:
-		log.Error(nil, "Ignoring unknown watch event type", "type", event.Type)
+		log.Error(nil, "CloudEvent publisher not available, skipping event", "eventType", eventType, "gvr", watchInfo.GVR.String())
 		return
 	}
 
@@ -454,11 +441,11 @@ func (r *SinkFilterReconciler) sendCloudEvent(ctx context.Context, event watch.E
 
 	result := r.cloudEventPublisher.Send(ctx, "org.kubearchive.sinkfilters.resource."+eventType, resource)
 	if !ce.IsACK(result) {
+		message := "Cloud event send failed"
 		if ce.IsNACK(result) {
-			log.Error(nil, "Cloud event was not acknowledged", "eventType", eventType, "gvr", watchInfo.GVR.String(), "kind", watchInfo.KindSelector.Kind, "result", result)
-		} else {
-			log.Error(nil, "Cloud event send failed", "eventType", eventType, "gvr", watchInfo.GVR.String(), "kind", watchInfo.KindSelector.Kind, "result", result)
+			message = "Cloud event was not acknowledged"
 		}
+		log.Error(nil, message, "eventType", eventType, "gvr", watchInfo.GVR.String(), "kind", watchInfo.KindSelector.Kind, "result", result)
 	}
 }
 
@@ -469,9 +456,7 @@ func (r *SinkFilterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return fmt.Errorf("failed to create dynamic client: %w", err)
 	}
 
-	r.cloudEventPublisher, err = cloudevents.NewSinkCloudEventPublisher(
-		"kubearchive.org/sinkfilter-controller",
-	)
+	r.cloudEventPublisher, err = cloudevents.NewSinkCloudEventPublisher("kubearchive.org/sinkfilter-controller")
 	if err != nil {
 		return fmt.Errorf("failed to create cloud event publisher: %w", err)
 	}
@@ -559,21 +544,6 @@ func (r *SinkFilterReconciler) reconcileClusterRoleBinding(ctx context.Context) 
 	}
 
 	return nil
-}
-
-func equalPolicyRules(a, b []rbacv1.PolicyRule) bool {
-	if len(a) != len(b) {
-		return false
-	}
-
-	for i := range a {
-		if !slices.Equal(a[i].APIGroups, b[i].APIGroups) ||
-			!slices.Equal(a[i].Resources, b[i].Resources) ||
-			!slices.Equal(a[i].Verbs, b[i].Verbs) {
-			return false
-		}
-	}
-	return true
 }
 
 func randomTimeout() *int64 {

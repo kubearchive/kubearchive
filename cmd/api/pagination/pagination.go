@@ -7,7 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -24,7 +24,11 @@ const (
 	continueIdKey   = "continueId"
 	defaultLimit    = "100"
 	maxAllowedLimit = 1000
+	minAllowedLimit = 1
 )
+
+var ErrBadLimit = errors.New("bad limit parameter")
+var ErrBadContinue = errors.New("bad continue token")
 
 // GetValuesFromContext is a helper function for routes to retrieve the
 // information needed. This is kept here, so it's close to the function
@@ -56,11 +60,18 @@ func Middleware() gin.HandlerFunc {
 
 		limitInteger, err := strconv.Atoi(limitString)
 		if err != nil {
-			abort.Abort(context, fmt.Errorf("limit '%s' could not be converted to integer", limitString), http.StatusBadRequest)
+			slog.Error("limit parameter could not be converted", "value", limitString)
+			abort.Abort(context, ErrBadLimit, http.StatusBadRequest)
 			return
 		}
 		if limitInteger > maxAllowedLimit {
-			abort.Abort(context, fmt.Errorf("limit '%s' exceeds the maximum allowed '%d'", limitString, maxAllowedLimit), http.StatusBadRequest)
+			slog.Error("limit parameter is bigger than the maximum allowed", "value", limitInteger, "max", maxAllowedLimit)
+			abort.Abort(context, ErrBadLimit, http.StatusBadRequest)
+			return
+		}
+		if limitInteger < minAllowedLimit {
+			slog.Error("limit parameter is smaller than the maximum allowed", "value", limitInteger, "min", minAllowedLimit)
+			abort.Abort(context, ErrBadLimit, http.StatusBadRequest)
 			return
 		}
 
@@ -69,13 +80,15 @@ func Middleware() gin.HandlerFunc {
 		if continueToken != "" {
 			continueBytes, err := base64.StdEncoding.DecodeString(continueToken)
 			if err != nil {
-				abort.Abort(context, errors.New("could not decode the continuation token"), http.StatusBadRequest)
+				slog.Error("could not decode the continue token", "token", continueToken, "error", err.Error())
+				abort.Abort(context, ErrBadContinue, http.StatusBadRequest)
 				return
 			}
 
 			continueParts := strings.Split(string(continueBytes), " ")
 			if len(continueParts) != 2 {
-				abort.Abort(context, errors.New("expected two elements on the continue token, received a different amount"), http.StatusBadRequest)
+				slog.Error("expected two elements on the continue token, received a different amount", "token", string(continueBytes))
+				abort.Abort(context, ErrBadContinue, http.StatusBadRequest)
 				return
 			}
 
@@ -83,16 +96,16 @@ func Middleware() gin.HandlerFunc {
 			// Because the id is an int64 we need to use `ParseInt`
 			_, err = strconv.ParseInt(continueId, 10, 64)
 			if err != nil {
-				abort.Abort(context, errors.New("first element of the continue token is not a valid int64"), http.StatusBadRequest)
+				slog.Error("id of the continue token is not a valid int64", "id", continueId, "error", err.Error())
+				abort.Abort(context, ErrBadContinue, http.StatusBadRequest)
 				return
 			}
 
 			continueDate = continueParts[1]
 			continueTimestamp, err := time.Parse(time.RFC3339, continueDate)
 			if err != nil {
-				log.Printf("Error: %s", err)
-				abort.Abort(context, fmt.Errorf("second element of the continue token '%s' does not match '%s'",
-					continueDate, time.RFC3339), http.StatusBadRequest)
+				slog.Error("date of the continue token does not match RFC3339", "date", continueDate, "error", err.Error())
+				abort.Abort(context, ErrBadContinue, http.StatusBadRequest)
 				return
 			}
 
@@ -102,7 +115,6 @@ func Middleware() gin.HandlerFunc {
 		}
 
 		// Pass the values using the context, these should be retrieved
-		// using `GetValuesFromContext`
 		context.Set(limitKey, limitInteger)
 		context.Set(continueDateKey, continueDate)
 		context.Set(continueIdKey, continueId)

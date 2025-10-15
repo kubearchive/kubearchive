@@ -1,0 +1,432 @@
+{
+    "apiVersion": "v1",
+    "kind": "Pod",
+    "metadata": {
+        "annotations": {
+            "pipeline.tekton.dev/release": "81db63a",
+            "tekton.dev/ready": "READY"
+        },
+        "creationTimestamp": "2025-10-15T12:28:02Z",
+        "labels": {
+            "app.kubernetes.io/managed-by": "tekton-pipelines",
+            "tekton.dev/memberOf": "tasks",
+            "tekton.dev/pipeline": "generate-logs",
+            "tekton.dev/pipelineRun": "generate-logs-7p8qg",
+            "tekton.dev/pipelineRunUID": "66fbde02-bbc8-4113-9c1c-7a40597cdf33",
+            "tekton.dev/pipelineTask": "generate",
+            "tekton.dev/task": "generate-logs-task",
+            "tekton.dev/taskRun": "generate-logs-7p8qg-generate",
+            "tekton.dev/taskRunUID": "d84878a7-2740-4077-8585-2fa6d0c425ff",
+            "triggers.tekton.dev/eventlistener": "cron-listener",
+            "triggers.tekton.dev/trigger": "cron-trig",
+            "triggers.tekton.dev/triggers-eventid": "95c1f10e-a9ef-4328-b336-610513c3eaca"
+        },
+        "name": "generate-logs-7p8qg-generate-pod",
+        "namespace": "generate-logs-pipelines",
+        "ownerReferences": [
+            {
+                "apiVersion": "tekton.dev/v1",
+                "blockOwnerDeletion": true,
+                "controller": true,
+                "kind": "TaskRun",
+                "name": "generate-logs-7p8qg-generate",
+                "uid": "d84878a7-2740-4077-8585-2fa6d0c425ff"
+            }
+        ],
+        "resourceVersion": "3697",
+        "uid": "be4d8e3f-859c-42f0-8041-8a40fdd4cc58"
+    },
+    "spec": {
+        "activeDeadlineSeconds": 5400,
+        "containers": [
+            {
+                "args": [
+                    "-wait_file",
+                    "/tekton/downward/ready",
+                    "-wait_file_content",
+                    "-post_file",
+                    "/tekton/run/0/out",
+                    "-termination_path",
+                    "/tekton/termination",
+                    "-step_metadata_dir",
+                    "/tekton/run/0/status",
+                    "--",
+                    "-n",
+                    "1024",
+                    "-d",
+                    "20ms"
+                ],
+                "command": [
+                    "/tekton/bin/entrypoint"
+                ],
+                "env": [
+                    {
+                        "name": "TEKTON_PLATFORM_COMMANDS",
+                        "value": "{\"linux/amd64\":[\"flog\"]}"
+                    }
+                ],
+                "image": "quay.io/kubearchive/mingrammer/flog@sha256:44180f8610fab7d4c29ff233a79e19cf28bd425c1737aa59c72c1f66613fdf41",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "step-generate",
+                "resources": {},
+                "terminationMessagePath": "/tekton/termination",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/tekton/downward",
+                        "name": "tekton-internal-downward",
+                        "readOnly": true
+                    },
+                    {
+                        "mountPath": "/tekton/creds",
+                        "name": "tekton-creds-init-home-0"
+                    },
+                    {
+                        "mountPath": "/tekton/run/0",
+                        "name": "tekton-internal-run-0"
+                    },
+                    {
+                        "mountPath": "/tekton/bin",
+                        "name": "tekton-internal-bin",
+                        "readOnly": true
+                    },
+                    {
+                        "mountPath": "/workspace",
+                        "name": "tekton-internal-workspace"
+                    },
+                    {
+                        "mountPath": "/tekton/home",
+                        "name": "tekton-internal-home"
+                    },
+                    {
+                        "mountPath": "/tekton/results",
+                        "name": "tekton-internal-results"
+                    },
+                    {
+                        "mountPath": "/tekton/steps",
+                        "name": "tekton-internal-steps",
+                        "readOnly": true
+                    },
+                    {
+                        "mountPath": "/tekton/artifacts",
+                        "name": "tekton-internal-artifacts"
+                    },
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-gzqlw",
+                        "readOnly": true
+                    }
+                ]
+            }
+        ],
+        "dnsPolicy": "ClusterFirst",
+        "enableServiceLinks": true,
+        "initContainers": [
+            {
+                "command": [
+                    "/ko-app/entrypoint",
+                    "init",
+                    "/ko-app/entrypoint",
+                    "/tekton/bin/entrypoint",
+                    "step-generate"
+                ],
+                "image": "ghcr.io/tektoncd/pipeline/entrypoint-bff0a22da108bc2f16c818c97641a296:v1.5.0@sha256:ff5ee925ff7b08853cc4caa93e5e3e0ee761a2db6ae0a1ae6a0f6f120f170b56",
+                "imagePullPolicy": "IfNotPresent",
+                "name": "prepare",
+                "resources": {},
+                "terminationMessagePath": "/dev/termination-log",
+                "terminationMessagePolicy": "File",
+                "volumeMounts": [
+                    {
+                        "mountPath": "/tekton/bin",
+                        "name": "tekton-internal-bin"
+                    },
+                    {
+                        "mountPath": "/tekton/steps",
+                        "name": "tekton-internal-steps"
+                    },
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-gzqlw",
+                        "readOnly": true
+                    }
+                ],
+                "workingDir": "/"
+            }
+        ],
+        "nodeName": "kind-control-plane",
+        "preemptionPolicy": "PreemptLowerPriority",
+        "priority": 0,
+        "restartPolicy": "Never",
+        "schedulerName": "default-scheduler",
+        "securityContext": {},
+        "serviceAccount": "default",
+        "serviceAccountName": "default",
+        "terminationGracePeriodSeconds": 30,
+        "tolerations": [
+            {
+                "effect": "NoExecute",
+                "key": "node.kubernetes.io/not-ready",
+                "operator": "Exists",
+                "tolerationSeconds": 300
+            },
+            {
+                "effect": "NoExecute",
+                "key": "node.kubernetes.io/unreachable",
+                "operator": "Exists",
+                "tolerationSeconds": 300
+            }
+        ],
+        "volumes": [
+            {
+                "emptyDir": {},
+                "name": "tekton-internal-workspace"
+            },
+            {
+                "emptyDir": {},
+                "name": "tekton-internal-home"
+            },
+            {
+                "emptyDir": {},
+                "name": "tekton-internal-results"
+            },
+            {
+                "emptyDir": {},
+                "name": "tekton-internal-steps"
+            },
+            {
+                "emptyDir": {},
+                "name": "tekton-internal-artifacts"
+            },
+            {
+                "emptyDir": {},
+                "name": "tekton-internal-bin"
+            },
+            {
+                "downwardAPI": {
+                    "defaultMode": 420,
+                    "items": [
+                        {
+                            "fieldRef": {
+                                "apiVersion": "v1",
+                                "fieldPath": "metadata.annotations['tekton.dev/ready']"
+                            },
+                            "path": "ready"
+                        }
+                    ]
+                },
+                "name": "tekton-internal-downward"
+            },
+            {
+                "emptyDir": {
+                    "medium": "Memory"
+                },
+                "name": "tekton-creds-init-home-0"
+            },
+            {
+                "emptyDir": {},
+                "name": "tekton-internal-run-0"
+            },
+            {
+                "name": "kube-api-access-gzqlw",
+                "projected": {
+                    "defaultMode": 420,
+                    "sources": [
+                        {
+                            "serviceAccountToken": {
+                                "expirationSeconds": 3607,
+                                "path": "token"
+                            }
+                        },
+                        {
+                            "configMap": {
+                                "items": [
+                                    {
+                                        "key": "ca.crt",
+                                        "path": "ca.crt"
+                                    }
+                                ],
+                                "name": "kube-root-ca.crt"
+                            }
+                        },
+                        {
+                            "downwardAPI": {
+                                "items": [
+                                    {
+                                        "fieldRef": {
+                                            "apiVersion": "v1",
+                                            "fieldPath": "metadata.namespace"
+                                        },
+                                        "path": "namespace"
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "status": {
+        "conditions": [
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2025-10-15T12:28:27Z",
+                "status": "False",
+                "type": "PodReadyToStartContainers"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2025-10-15T12:28:04Z",
+                "reason": "PodCompleted",
+                "status": "True",
+                "type": "Initialized"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2025-10-15T12:28:26Z",
+                "reason": "PodCompleted",
+                "status": "False",
+                "type": "Ready"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2025-10-15T12:28:26Z",
+                "reason": "PodCompleted",
+                "status": "False",
+                "type": "ContainersReady"
+            },
+            {
+                "lastProbeTime": null,
+                "lastTransitionTime": "2025-10-15T12:28:02Z",
+                "status": "True",
+                "type": "PodScheduled"
+            }
+        ],
+        "containerStatuses": [
+            {
+                "containerID": "containerd://232b6d117e04b893c6c9a0b91e998785c7d76869eb5f6f41373dfa47eb001324",
+                "image": "sha256:532396cca7b9147701d8c24b3dcaa20c14eb84c55f4de7b0d0b800b59f8fc76e",
+                "imageID": "quay.io/kubearchive/mingrammer/flog@sha256:44180f8610fab7d4c29ff233a79e19cf28bd425c1737aa59c72c1f66613fdf41",
+                "lastState": {},
+                "name": "step-generate",
+                "ready": false,
+                "restartCount": 0,
+                "started": false,
+                "state": {
+                    "terminated": {
+                        "containerID": "containerd://232b6d117e04b893c6c9a0b91e998785c7d76869eb5f6f41373dfa47eb001324",
+                        "exitCode": 0,
+                        "finishedAt": "2025-10-15T12:28:25Z",
+                        "message": "[{\"key\":\"StartedAt\",\"value\":\"2025-10-15T12:28:05.276Z\",\"type\":3}]",
+                        "reason": "Completed",
+                        "startedAt": "2025-10-15T12:28:04Z"
+                    }
+                },
+                "volumeMounts": [
+                    {
+                        "mountPath": "/tekton/downward",
+                        "name": "tekton-internal-downward",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    },
+                    {
+                        "mountPath": "/tekton/creds",
+                        "name": "tekton-creds-init-home-0"
+                    },
+                    {
+                        "mountPath": "/tekton/run/0",
+                        "name": "tekton-internal-run-0"
+                    },
+                    {
+                        "mountPath": "/tekton/bin",
+                        "name": "tekton-internal-bin",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    },
+                    {
+                        "mountPath": "/workspace",
+                        "name": "tekton-internal-workspace"
+                    },
+                    {
+                        "mountPath": "/tekton/home",
+                        "name": "tekton-internal-home"
+                    },
+                    {
+                        "mountPath": "/tekton/results",
+                        "name": "tekton-internal-results"
+                    },
+                    {
+                        "mountPath": "/tekton/steps",
+                        "name": "tekton-internal-steps",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    },
+                    {
+                        "mountPath": "/tekton/artifacts",
+                        "name": "tekton-internal-artifacts"
+                    },
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-gzqlw",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    }
+                ]
+            }
+        ],
+        "hostIP": "10.89.0.4",
+        "hostIPs": [
+            {
+                "ip": "10.89.0.4"
+            }
+        ],
+        "initContainerStatuses": [
+            {
+                "containerID": "containerd://b73e0476df276a7c87b990a6c74a4bd1c93a6da203aae781f61e54f4c42018df",
+                "image": "sha256:51ea2dba605ce67dcb8a5e31048757a5176c3fb5d9b69867a06e198cba64435e",
+                "imageID": "ghcr.io/tektoncd/pipeline/entrypoint-bff0a22da108bc2f16c818c97641a296@sha256:ff5ee925ff7b08853cc4caa93e5e3e0ee761a2db6ae0a1ae6a0f6f120f170b56",
+                "lastState": {},
+                "name": "prepare",
+                "ready": true,
+                "restartCount": 0,
+                "started": false,
+                "state": {
+                    "terminated": {
+                        "containerID": "containerd://b73e0476df276a7c87b990a6c74a4bd1c93a6da203aae781f61e54f4c42018df",
+                        "exitCode": 0,
+                        "finishedAt": "2025-10-15T12:28:03Z",
+                        "reason": "Completed",
+                        "startedAt": "2025-10-15T12:28:03Z"
+                    }
+                },
+                "volumeMounts": [
+                    {
+                        "mountPath": "/tekton/bin",
+                        "name": "tekton-internal-bin"
+                    },
+                    {
+                        "mountPath": "/tekton/steps",
+                        "name": "tekton-internal-steps"
+                    },
+                    {
+                        "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                        "name": "kube-api-access-gzqlw",
+                        "readOnly": true,
+                        "recursiveReadOnly": "Disabled"
+                    }
+                ]
+            }
+        ],
+        "phase": "Succeeded",
+        "podIP": "10.244.0.38",
+        "podIPs": [
+            {
+                "ip": "10.244.0.38"
+            }
+        ],
+        "qosClass": "BestEffort",
+        "startTime": "2025-10-15T12:28:02Z"
+    }
+}
+

@@ -1,0 +1,10 @@
+[
+  {
+    "Url": "http://127.0.0.1:8111/app/search/search?q=search * | spath \\\"kubernetes.pod_id\\\" | search \\\"kubernetes.pod_id\\\"=\\\"be4d8e3f-859c-42f0-8041-8a40fdd4cc58\\\" | spath \\\"kubernetes.container_name\\\" | search \\\"kubernetes.container_name\\\"=\\\"step-generate\\\"",
+    "ContainerName": "step-generate"
+  },
+  {
+    "Url": "http://127.0.0.1:8111/app/search/search?q=search * | spath \\\"kubernetes.pod_id\\\" | search \\\"kubernetes.pod_id\\\"=\\\"be4d8e3f-859c-42f0-8041-8a40fdd4cc58\\\" | spath \\\"kubernetes.container_name\\\" | search \\\"kubernetes.container_name\\\"=\\\"prepare\\\"",
+    "ContainerName": "prepare"
+  }
+]

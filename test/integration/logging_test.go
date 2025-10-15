@@ -219,6 +219,18 @@ func TestQueryContainer(t *testing.T) {
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyNever,
+			InitContainers: []corev1.Container{
+				{
+					Name:    "init1",
+					Image:   "quay.io/fedora/fedora:latest",
+					Command: []string{"echo", "-n", "I'm the container called init1."},
+				},
+				{
+					Name:    "init2",
+					Image:   "quay.io/fedora/fedora:latest",
+					Command: []string{"echo", "-n", "I'm the container called init2."},
+				},
+			},
 			Containers: []corev1.Container{
 				{
 					Name:    "first",
@@ -280,6 +292,58 @@ func TestQueryContainer(t *testing.T) {
 		if bodyString != "I'm the container called second." {
 			t.Logf("log does not match: %s", bodyString)
 			return fmt.Errorf("log does not match the expected 'I'm the container called second.'")
+		}
+
+		return nil
+	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+
+	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log?container=init1", port, namespaceName)
+	retryErr = retry.Do(func() error {
+		body, err := test.GetLogs(t, token.Status.Token, url)
+		if err != nil {
+			return err
+		}
+
+		if len(body) == 0 {
+			return errors.New("could not retrieve the pod log")
+		}
+		t.Log("Successfully retrieved logs")
+
+		bodyString := string(body)
+		bodyString = strings.Trim(bodyString, "\n")
+		if bodyString != "I'm the container called init1." {
+			t.Logf("log does not match: %s", bodyString)
+			return fmt.Errorf("log does not match the expected 'I'm the container called init1.'")
+		}
+
+		return nil
+	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+
+	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log?container=init2", port, namespaceName)
+	retryErr = retry.Do(func() error {
+		body, err := test.GetLogs(t, token.Status.Token, url)
+		if err != nil {
+			return err
+		}
+
+		if len(body) == 0 {
+			return errors.New("could not retrieve the pod log")
+		}
+		t.Log("Successfully retrieved logs")
+
+		bodyString := string(body)
+		bodyString = strings.Trim(bodyString, "\n")
+		if bodyString != "I'm the container called init2." {
+			t.Logf("log does not match: %s", bodyString)
+			return fmt.Errorf("log does not match the expected 'I'm the container called init2.'")
 		}
 
 		return nil

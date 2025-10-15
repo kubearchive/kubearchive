@@ -19,7 +19,7 @@ import (
 
 const (
 	celPrefix        = "cel:"
-	containerNameCel = "cel:spec.containers.map(m, m.name)"
+	containerNameCel = "cel:spec.containers.map(c, c.name) + (has(spec.initContainers) ? spec.initContainers.map(c, c.name) : [])"
 	jsonPathKey      = "LOG_URL_JSONPATH"
 )
 

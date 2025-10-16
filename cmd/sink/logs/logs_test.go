@@ -103,6 +103,12 @@ func TestUrlBuilderUrls(t *testing.T) {
 			data:             loadData(t, "testdata/test2-data.json"),
 			expected:         loadExpected(t, "testdata/es-test2-urls.json"),
 		},
+		{
+			name:             "splunk search urls for pod with container and init container",
+			loggingConfigDir: splunkWithContainerNames,
+			data:             loadData(t, "testdata/test3-data.json"),
+			expected:         loadExpected(t, "testdata/splunk-test3-urls.json"),
+		},
 	}
 
 	for _, tt := range tests {

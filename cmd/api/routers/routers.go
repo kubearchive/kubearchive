@@ -104,9 +104,12 @@ func (c *Controller) GetResources(context *gin.Context) {
 
 	// We send namespace even if it's an empty string (non-namespaced resources) the Database
 	// knows what to do
-	resources, lastId, lastDate, err := c.Database.QueryResources(
+	// We send limit+1 because we want to know if there are more resources than requested
+	// later we just returned what we were asked to return
+	newLimit := limit + 1
+	resources, err := c.Database.QueryResources(
 		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
-		creationTimestampAfter, creationTimestampBefore, limit)
+		creationTimestampAfter, creationTimestampBefore, newLimit)
 
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
@@ -121,12 +124,24 @@ func (c *Controller) GetResources(context *gin.Context) {
 			abort.Abort(context, errors.New("more than one resource found"), http.StatusInternalServerError)
 			return
 		}
-		context.String(http.StatusOK, resources[0])
+		context.String(http.StatusOK, resources[0].Data)
 		return
 	}
 
-	continueToken := pagination.CreateToken(lastId, lastDate)
-	context.String(http.StatusOK, listString, continueToken, strings.Join(resources, ","))
+	returnedResources := resources
+	continueToken := ""
+	// There are more resources in the DB than requested, so populate the continue token
+	// and modify which resources need to be returned
+	if len(resources) > limit {
+		continueToken = pagination.CreateToken(resources[len(resources)-2].Id, resources[len(resources)-2].Date)
+		returnedResources = resources[:len(resources)-1] // all but the last
+	}
+
+	resourceStrings := []string{}
+	for _, resource := range returnedResources {
+		resourceStrings = append(resourceStrings, resource.Data)
+	}
+	context.String(http.StatusOK, listString, continueToken, strings.Join(resourceStrings, ","))
 }
 
 // parseTimestampQuery parses a timestamp query parameter and returns a pointer to time.Time

@@ -179,14 +179,15 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 					defer cancel()
 
-					resources, lastId, _, err := tt.database.QueryResources(ctx, podKind, version,
-						"", "", "", "", &models.LabelFilters{}, nil, nil, 100)
+					resources, err := tt.database.QueryResources(
+						ctx, podKind, version, "", "", "", "", &models.LabelFilters{}, nil, nil, 100,
+					)
+
 					if ttt.numResources == 0 {
 						assert.Nil(t, resources)
-						assert.Equal(t, int64(0), lastId)
 					} else {
 						assert.NotNil(t, resources)
-						assert.Equal(t, int64(5), lastId)
+						assert.Equal(t, int64(5), resources[0].Id)
 					}
 					assert.Equal(t, ttt.numResources, len(resources))
 					assert.NoError(t, err)
@@ -222,7 +223,7 @@ func TestQueryResources(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 					defer cancel()
 
-					resources, _, _, err := tt.database.QueryResources(ctx, podKind, version, namespace,
+					resources, err := tt.database.QueryResources(ctx, podKind, version, namespace,
 						"", "", "", &models.LabelFilters{}, nil, nil, 100)
 					if ttt.numResources == 0 {
 						assert.Nil(t, resources)
@@ -401,7 +402,7 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
 
-				resources, _, _, err := tt.database.QueryResources(ctx, podKind, version,
+				resources, err := tt.database.QueryResources(ctx, podKind, version,
 					"", "", "", "",
 					&ttt.labelFilters, nil, nil, 100,
 				)
@@ -438,7 +439,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 					defer cancel()
 
-					resources, _, _, err := tt.database.QueryResources(ctx, kind, version, namespace, podName,
+					resources, err := tt.database.QueryResources(ctx, kind, version, namespace, podName,
 						"", "", &models.LabelFilters{}, nil, nil, 100)
 					if ttt.numResources == 0 {
 						assert.Empty(t, resources)
@@ -616,7 +617,7 @@ func TestQueryResourcesWithWildcardName(t *testing.T) {
 					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 					defer cancel()
 
-					resources, _, _, err := tt.database.QueryResources(ctx, podKind, podApiVersion, namespace,
+					resources, err := tt.database.QueryResources(ctx, podKind, podApiVersion, namespace,
 						wt.namePattern, "", "", &models.LabelFilters{}, nil, nil, 100)
 
 					assert.NoError(t, err)
@@ -707,7 +708,7 @@ func TestQueryResourcesWithTimestampFilters(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 				defer cancel()
 
-				resources, _, _, err := tt.database.QueryResources(ctx, podKind, podApiVersion, "", "",
+				resources, err := tt.database.QueryResources(ctx, podKind, podApiVersion, "", "",
 					"", "", &models.LabelFilters{}, timestampTest.creationTimestampAfter, timestampTest.creationTimestampBefore, 100)
 				assert.NotNil(t, resources)
 				assert.NoError(t, err)
@@ -779,7 +780,7 @@ func TestTimestampFilterWithLabelFilters(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 			defer cancel()
 
-			resources, _, _, err := tt.database.QueryResources(ctx, podKind, podApiVersion, "", "",
+			resources, err := tt.database.QueryResources(ctx, podKind, podApiVersion, "", "",
 				"", "", labelFilters, &testTime, nil, 100)
 			assert.NotNil(t, resources)
 			assert.NoError(t, err)

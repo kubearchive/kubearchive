@@ -154,14 +154,14 @@ func PortForwardApiServer(t testing.TB, clientset kubernetes.Interface) string {
 	forwardRequests++
 
 	t.Cleanup(func() {
-		t.Log("Cleanup")
+		t.Log("Cleanup port forward")
 		forwardRequestsMutex.Lock()
 		defer forwardRequestsMutex.Unlock()
 		forwardRequests--
 
 		// close the port if no longer needed
 		if forwardRequests == 0 {
-			t.Log("close")
+			t.Log("Closing port forward")
 			close(forwardChan)
 		}
 	})

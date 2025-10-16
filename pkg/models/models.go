@@ -42,3 +42,9 @@ type LogTuple struct {
 	ContainerName string
 	Url           string
 }
+
+type Resource struct {
+	Id   int64
+	Date string
+	Data string
+}

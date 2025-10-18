@@ -6,11 +6,10 @@ package controller
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
+	"github.com/kubearchive/kubearchive/pkg/filters"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -68,33 +67,23 @@ var _ = Describe("SinkFilterController", func() {
 				},
 			}
 
-			scheme := runtime.NewScheme()
-			kubearchivev1.AddToScheme(scheme) //nolint:errcheck
-
-			client := fake.NewClientBuilder().WithScheme(scheme).Build()
-			reconciler := &SinkFilterReconciler{
-				Client: client,
-				Scheme: scheme,
-				// cloudEventPublisher is nil in tests - controller handles this gracefully
-			}
-
-			// Test extractNamespacesByKinds
-			namespacesByKinds := reconciler.extractNamespacesByKinds(sinkFilter)
+			// Test ExtractAllNamespacesByKinds
+			namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter)
 
 			// Should have 3 unique kinds: Deployment-apps/v1, Pod-v1, Service-v1
 			Expect(len(namespacesByKinds)).To(Equal(3))
 
-			expectedNamespaces := map[string]map[string]struct{}{
-				"Deployment-apps/v1": {constants.SinkFilterGlobalNamespace: struct{}{}},              // Deployment is global
-				"Pod-v1":             {"test-namespace1": struct{}{}, "test-namespace2": struct{}{}}, // Pod is in both namespaces
-				"Service-v1":         {"test-namespace2": struct{}{}},                                // Service is only in test-namespace2
+			expectedNamespaces := map[string][]string{
+				"Deployment-apps/v1": {constants.SinkFilterGlobalNamespace},  // Deployment is global
+				"Pod-v1":             {"test-namespace1", "test-namespace2"}, // Pod is in both namespaces
+				"Service-v1":         {"test-namespace2"},                    // Service is only in test-namespace2
 			}
 
-			for key, expectedNsMap := range expectedNamespaces {
+			for key, expectedNsList := range expectedNamespaces {
 				actualNsMap, exists := namespacesByKinds[key]
 				Expect(exists).To(BeTrue(), "Expected kind %s to exist", key)
-				Expect(len(actualNsMap)).To(Equal(len(expectedNsMap)))
-				for expectedNs := range expectedNsMap {
+				Expect(len(actualNsMap)).To(Equal(len(expectedNsList)))
+				for _, expectedNs := range expectedNsList {
 					_, exists := actualNsMap[expectedNs]
 					Expect(exists).To(BeTrue(), "Expected namespace %s to exist for kind %s", expectedNs, key)
 				}
@@ -112,17 +101,7 @@ var _ = Describe("SinkFilterController", func() {
 				},
 			}
 
-			scheme := runtime.NewScheme()
-			kubearchivev1.AddToScheme(scheme) //nolint:errcheck
-
-			client := fake.NewClientBuilder().WithScheme(scheme).Build()
-			reconciler := &SinkFilterReconciler{
-				Client: client,
-				Scheme: scheme,
-				// cloudEventPublisher is nil in tests - controller handles this gracefully
-			}
-
-			namespacesByKinds := reconciler.extractNamespacesByKinds(sinkFilter)
+			namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter)
 			Expect(len(namespacesByKinds)).To(Equal(0))
 		})
 
@@ -141,9 +120,9 @@ var _ = Describe("SinkFilterController", func() {
 			}
 
 			// Test finding watches to stop
-			newNamespacesByKinds := map[string]map[string]struct{}{
-				"Deployment-apps/v1": {"test-namespace1": struct{}{}},                                // Keep
-				"Service-v1":         {"test-namespace1": struct{}{}, "test-namespace2": struct{}{}}, // New
+			newNamespacesByKinds := map[string]map[string]filters.CelExpressions{
+				"Deployment-apps/v1": {"test-namespace1": filters.CelExpressions{}},                                              // Keep
+				"Service-v1":         {"test-namespace1": filters.CelExpressions{}, "test-namespace2": filters.CelExpressions{}}, // New
 				// Pod-v1 is missing, so should be stopped
 			}
 

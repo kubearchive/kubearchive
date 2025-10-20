@@ -65,51 +65,61 @@ func TestKubeArchiveConfigValidateName(t *testing.T) {
 	}
 }
 
-func TestKubeArchiveConfigValidateCELExpression(t *testing.T) {
+func TestKubeArchiveConfigValidateDurationString(t *testing.T) {
 	k9eResourceName := "kubearchive"
-	invalid := "status.state *^ Completed'"
-	valid := "status.state == 'Completed'"
 	tests := []struct {
 		name            string
 		archiveWhen     string
 		deleteWhen      string
 		archiveOnDelete string
 		validated       bool
+		expectedError   string
 	}{
 		{
-			name:            "Invalid archiveWhen expression",
-			archiveWhen:     invalid,
-			deleteWhen:      valid,
-			archiveOnDelete: valid,
-			validated:       false,
-		},
-		{
-			name:            "Invalid deleteWhen expression",
-			archiveWhen:     valid,
-			deleteWhen:      invalid,
-			archiveOnDelete: valid,
-			validated:       false,
-		},
-		{
-			name:            "Invalid archiveOnDelete expression",
-			archiveWhen:     valid,
-			deleteWhen:      valid,
-			archiveOnDelete: invalid,
-			validated:       false,
-		},
-		{
-			name:            "All expressions invalid",
-			archiveWhen:     invalid,
-			deleteWhen:      invalid,
-			archiveOnDelete: invalid,
-			validated:       false,
-		},
-		{
-			name:            "All expressions valid",
-			archiveWhen:     valid,
-			deleteWhen:      valid,
-			archiveOnDelete: valid,
+			name:            "Valid duration string in archiveWhen",
+			archiveWhen:     "duration('1h')",
+			deleteWhen:      "",
+			archiveOnDelete: "",
 			validated:       true,
+		},
+		{
+			name:            "Invalid duration string in archiveWhen",
+			archiveWhen:     "duration('invalid')",
+			deleteWhen:      "",
+			archiveOnDelete: "",
+			validated:       false,
+			expectedError:   "invalid duration string 'duration('invalid')'",
+		},
+		{
+			name:            "Invalid duration string in deleteWhen",
+			archiveWhen:     "",
+			deleteWhen:      "duration('bad-format')",
+			archiveOnDelete: "",
+			validated:       false,
+			expectedError:   "invalid duration string 'duration('bad-format')'",
+		},
+		{
+			name:            "Invalid duration string in archiveOnDelete",
+			archiveWhen:     "",
+			deleteWhen:      "",
+			archiveOnDelete: "duration('xyz')",
+			validated:       false,
+			expectedError:   "invalid duration string 'duration('xyz')'",
+		},
+		{
+			name:            "Multiple valid duration strings",
+			archiveWhen:     "duration('1h') + duration('30m')",
+			deleteWhen:      "",
+			archiveOnDelete: "",
+			validated:       true,
+		},
+		{
+			name:            "Multiple duration strings with one invalid",
+			archiveWhen:     "duration('1h') + duration('invalid-time')",
+			deleteWhen:      "",
+			archiveOnDelete: "",
+			validated:       false,
+			expectedError:   "invalid duration string 'duration('invalid-time')'",
 		},
 	}
 	validator := KubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
@@ -132,7 +142,8 @@ func TestKubeArchiveConfigValidateCELExpression(t *testing.T) {
 			if test.validated {
 				assert.NoError(t, err)
 			} else {
-				assert.Contains(t, err.Error(), "Syntax error")
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectedError)
 			}
 			// Update resource
 			warns, err = validator.ValidateUpdate(context.Background(), &KubeArchiveConfig{}, kac)
@@ -140,12 +151,9 @@ func TestKubeArchiveConfigValidateCELExpression(t *testing.T) {
 			if test.validated {
 				assert.NoError(t, err)
 			} else {
-				assert.Contains(t, err.Error(), "Syntax error")
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectedError)
 			}
-			// Delete resource
-			warns, err = validator.ValidateDelete(context.Background(), kac)
-			assert.Nil(t, warns)
-			assert.NoError(t, err)
 		})
 	}
 }

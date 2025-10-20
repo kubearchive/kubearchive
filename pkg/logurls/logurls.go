@@ -39,7 +39,7 @@ func GenerateLogURLs(ctx context.Context, cm map[string]interface{}, data *unstr
 		prgmPtr, ok := value.(*cel.Program)
 		if ok {
 			// We have a CEL expression. Evaluate it and use that value.
-			value = ocel.ExecuteCEL(ctx, *prgmPtr, data)
+			value, _ = ocel.ExecuteCEL(ctx, *prgmPtr, data)
 		}
 		m[key] = value
 	}

@@ -65,6 +65,99 @@ func TestClusterKubeArchiveConfigValidateName(t *testing.T) {
 	}
 }
 
+func TestClusterKubeArchiveConfigValidateDurationString(t *testing.T) {
+	k9eResourceName := "kubearchive"
+	tests := []struct {
+		name            string
+		archiveWhen     string
+		deleteWhen      string
+		archiveOnDelete string
+		validated       bool
+		expectedError   string
+	}{
+		{
+			name:            "Valid duration string in archiveWhen",
+			archiveWhen:     "duration('1h')",
+			deleteWhen:      "",
+			archiveOnDelete: "",
+			validated:       true,
+		},
+		{
+			name:            "Invalid duration string in archiveWhen",
+			archiveWhen:     "duration('invalid')",
+			deleteWhen:      "",
+			archiveOnDelete: "",
+			validated:       false,
+			expectedError:   "invalid duration string 'duration('invalid')'",
+		},
+		{
+			name:            "Invalid duration string in deleteWhen",
+			archiveWhen:     "",
+			deleteWhen:      "duration('bad-format')",
+			archiveOnDelete: "",
+			validated:       false,
+			expectedError:   "invalid duration string 'duration('bad-format')'",
+		},
+		{
+			name:            "Invalid duration string in archiveOnDelete",
+			archiveWhen:     "",
+			deleteWhen:      "",
+			archiveOnDelete: "duration('xyz')",
+			validated:       false,
+			expectedError:   "invalid duration string 'duration('xyz')'",
+		},
+		{
+			name:            "Multiple valid duration strings",
+			archiveWhen:     "duration('1h') + duration('30m')",
+			deleteWhen:      "",
+			archiveOnDelete: "",
+			validated:       true,
+		},
+		{
+			name:            "Multiple duration strings with one invalid",
+			archiveWhen:     "duration('1h') + duration('invalid-time')",
+			deleteWhen:      "",
+			archiveOnDelete: "",
+			validated:       false,
+			expectedError:   "invalid duration string 'duration('invalid-time')'",
+		},
+	}
+	validator := ClusterKubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create resource
+			ckac := &ClusterKubeArchiveConfig{
+				ObjectMeta: metav1.ObjectMeta{Name: k9eResourceName},
+				Spec: ClusterKubeArchiveConfigSpec{
+					Resources: []KubeArchiveConfigResource{
+						{
+							ArchiveWhen:     test.archiveWhen,
+							DeleteWhen:      test.deleteWhen,
+							ArchiveOnDelete: test.archiveOnDelete,
+						},
+					}},
+			}
+			warns, err := validator.ValidateCreate(context.Background(), ckac)
+			assert.Nil(t, warns)
+			if test.validated {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectedError)
+			}
+			// Update resource
+			warns, err = validator.ValidateUpdate(context.Background(), &ClusterKubeArchiveConfig{}, ckac)
+			assert.Nil(t, warns)
+			if test.validated {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectedError)
+			}
+		})
+	}
+}
+
 func TestClusterKubeArchiveConfigValidateCELExpression(t *testing.T) {
 	k9eResourceName := "kubearchive"
 	invalid := "status.state *^ Completed'"

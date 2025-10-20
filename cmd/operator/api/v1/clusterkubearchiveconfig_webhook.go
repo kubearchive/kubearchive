@@ -95,18 +95,24 @@ func (ckaccv *ClusterKubeArchiveConfigCustomValidator) validateKAC(ckac *Cluster
 			_, err := cel.CompileCELExpr(resource.ArchiveWhen)
 			if err != nil {
 				errList = append(errList, err)
+			} else {
+				errList = append(errList, validateDurationString(resource.ArchiveWhen)...)
 			}
 		}
 		if resource.DeleteWhen != "" {
 			_, err := cel.CompileCELExpr(resource.DeleteWhen)
 			if err != nil {
 				errList = append(errList, err)
+			} else {
+				errList = append(errList, validateDurationString(resource.DeleteWhen)...)
 			}
 		}
 		if resource.ArchiveOnDelete != "" {
 			_, err := cel.CompileCELExpr(resource.ArchiveOnDelete)
 			if err != nil {
 				errList = append(errList, err)
+			} else {
+				errList = append(errList, validateDurationString(resource.ArchiveOnDelete)...)
 			}
 		}
 	}

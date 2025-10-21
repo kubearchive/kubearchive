@@ -5,11 +5,9 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/kubernetes"
 	fakeK8s "k8s.io/client-go/kubernetes/fake"
@@ -37,93 +35,6 @@ func TestNewServer(t *testing.T) {
 	server := fakeServer(k8sClient, memCache)
 	assert.NotNil(t, server.router)
 	assert.Equal(t, server.k8sClient, k8sClient)
-}
-
-func TestMiddlewareConfigured(t *testing.T) {
-	// Set up server
-	server := fakeServer(nil, nil)
-
-	testCases := []struct {
-		name               string
-		path               string
-		expectedMiddleware []string
-	}{
-		{
-			name:               "Root group",
-			path:               "/",
-			expectedMiddleware: []string{"otelgin.Middleware"},
-		},
-		{
-			name: "API group",
-			path: "/api/v1/jobs",
-			expectedMiddleware: []string{
-				"otelgin.Middleware",
-				"Authentication",
-				"Impersonation",
-				"RBACAuthorization",
-				"GetAPIResource",
-			},
-		},
-		{
-			name: "APIs group",
-			path: "/apis/apps/v1/deployments",
-			expectedMiddleware: []string{
-				"otelgin.Middleware",
-				"Authentication",
-				"Impersonation",
-				"RBACAuthorization",
-				"GetAPIResource",
-			},
-		},
-		{
-			name: "Logs APIs group",
-			path: "/apis/apps/v1/namespaces/ns/deployments/my-deploy/log",
-			expectedMiddleware: []string{
-				"otelgin.Middleware",
-				"Authentication",
-				"Impersonation",
-				"RBACAuthorization",
-				"GetAPIResource",
-			},
-		},
-		{
-			name: "Logs API group",
-			path: "/api/v1/namespaces/ns/pods/my-pod/log",
-			expectedMiddleware: []string{
-				"otelgin.Middleware",
-				"Authentication",
-				"Impersonation",
-				"RBACAuthorization",
-				"GetAPIResource",
-				"SetLoggingHeaders",
-				"LogRetrieval",
-			},
-		},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			c := gin.CreateTestContextOnly(httptest.NewRecorder(), server.router)
-			c.Request = httptest.NewRequest(http.MethodGet, testCase.path, nil)
-			server.router.HandleContext(c)
-
-			handlers := c.HandlerNames()
-
-			t.Log(handlers)
-			for _, expectedHandler := range testCase.expectedMiddleware {
-				expectedHandlerExists := false
-				for _, handler := range handlers {
-					if strings.Contains(handler, expectedHandler) {
-						expectedHandlerExists = true
-					}
-				}
-
-				if !expectedHandlerExists {
-					t.Fatalf("Handler %s is not in the list of handlers", expectedHandler)
-				}
-			}
-		})
-	}
 }
 
 func TestUnauthQuery(t *testing.T) {

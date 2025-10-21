@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Cyprinus12138/otelgin"
+	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/auth"
 	"github.com/kubearchive/kubearchive/cmd/api/discovery"
@@ -63,6 +64,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	groups := [...]*gin.RouterGroup{apisGroup, apiGroup}
 	// Set up middleware for each group
 	for _, group := range groups {
+		group.Use(gzip.Gzip(gzip.DefaultCompression))
 		group.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews(), cache,
 			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 		group.Use(auth.Impersonation(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache,

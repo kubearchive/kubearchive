@@ -11,9 +11,146 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest"
 )
+
+// MockDiscoveryClient implements DiscoveryInterface for testing
+type MockDiscoveryClient struct {
+	serverGroups       *metav1.APIGroupList
+	serverResources    map[string]*metav1.APIResourceList
+	serverGroupsErr    error
+	serverResourcesErr error
+}
+
+func (m *MockDiscoveryClient) ServerGroups() (*metav1.APIGroupList, error) {
+	if m.serverGroupsErr != nil {
+		return nil, m.serverGroupsErr
+	}
+	return m.serverGroups, nil
+}
+
+func (m *MockDiscoveryClient) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
+	if m.serverResourcesErr != nil {
+		return nil, nil, m.serverResourcesErr
+	}
+
+	var groups []*metav1.APIGroup
+	var resourceLists []*metav1.APIResourceList
+
+	for _, resourceList := range m.serverResources {
+		resourceLists = append(resourceLists, resourceList)
+	}
+
+	if m.serverGroups != nil {
+		for _, group := range m.serverGroups.Groups {
+			groups = append(groups, &group)
+		}
+	}
+
+	return groups, resourceLists, nil
+}
+
+// newMockDiscoveryClient creates a mock discovery client with common test resources
+func newMockDiscoveryClient() *MockDiscoveryClient {
+	return &MockDiscoveryClient{
+		serverGroups: &metav1.APIGroupList{
+			Groups: []metav1.APIGroup{
+				{
+					Name: "apps",
+					Versions: []metav1.GroupVersionForDiscovery{
+						{GroupVersion: "apps/v1beta1", Version: "v1beta1"},
+						{GroupVersion: "apps/v1beta2", Version: "v1beta2"},
+						{GroupVersion: "apps/v1", Version: "v1"},
+					},
+					PreferredVersion: metav1.GroupVersionForDiscovery{
+						GroupVersion: "apps/v1",
+						Version:      "v1",
+					},
+				},
+				{
+					Name: "batch",
+					Versions: []metav1.GroupVersionForDiscovery{
+						{GroupVersion: "batch/v1", Version: "v1"},
+					},
+					PreferredVersion: metav1.GroupVersionForDiscovery{
+						GroupVersion: "batch/v1",
+						Version:      "v1",
+					},
+				},
+			},
+		},
+		serverResources: map[string]*metav1.APIResourceList{
+			"v1": {
+				GroupVersion: "v1",
+				APIResources: []metav1.APIResource{
+					{
+						Name:         "pods",
+						SingularName: "pod",
+						Namespaced:   true,
+						Kind:         "Pod",
+						ShortNames:   []string{"po"},
+					},
+					{
+						Name:         "services",
+						SingularName: "service",
+						Namespaced:   true,
+						Kind:         "Service",
+						ShortNames:   []string{"svc"},
+					},
+				},
+			},
+			"apps/v1beta1": {
+				GroupVersion: "apps/v1beta1",
+				APIResources: []metav1.APIResource{
+					{
+						Name:         "deployments",
+						SingularName: "deployment",
+						Namespaced:   true,
+						Kind:         "Deployment",
+						ShortNames:   []string{"deploy"},
+					},
+				},
+			},
+			"apps/v1beta2": {
+				GroupVersion: "apps/v1beta2",
+				APIResources: []metav1.APIResource{
+					{
+						Name:         "deployments",
+						SingularName: "deployment",
+						Namespaced:   true,
+						Kind:         "Deployment",
+						ShortNames:   []string{"deploy"},
+					},
+				},
+			},
+			"apps/v1": {
+				GroupVersion: "apps/v1",
+				APIResources: []metav1.APIResource{
+					{
+						Name:         "deployments",
+						SingularName: "deployment",
+						Namespaced:   true,
+						Kind:         "Deployment",
+						ShortNames:   []string{"deploy"},
+					},
+				},
+			},
+			"batch/v1": {
+				GroupVersion: "batch/v1",
+				APIResources: []metav1.APIResource{
+					{
+						Name:         "jobs",
+						SingularName: "job",
+						Namespaced:   true,
+						Kind:         "Job",
+					},
+				},
+			},
+		},
+	}
+}
 
 // withMultipleEnv sets multiple environment variables for the duration of the test.
 func withMultipleEnv(t *testing.T, envVars map[string]string, testFunc func()) {
@@ -381,6 +518,133 @@ func TestGetFromAPI(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedBody, string(result))
+			}
+		})
+	}
+}
+
+func TestResolveResourceSpec(t *testing.T) {
+	testCases := []struct {
+		name             string
+		resourceSpec     string
+		expectedResource string
+		expectedVersion  string
+		expectedGroup    string
+		expectedKind     string
+		expectError      bool
+		errorContains    string
+	}{
+		{
+			name:             "core resource only",
+			resourceSpec:     "pods",
+			expectedResource: "pods",
+			expectedVersion:  "v1",
+			expectedGroup:    "",
+			expectedKind:     "Pod",
+		},
+		{
+			name:             "core resource short name",
+			resourceSpec:     "po",
+			expectedResource: "pods",
+			expectedVersion:  "v1",
+			expectedGroup:    "",
+			expectedKind:     "Pod",
+		},
+		{
+			name:             "core resource singular name",
+			resourceSpec:     "pod",
+			expectedResource: "pods",
+			expectedVersion:  "v1",
+			expectedGroup:    "",
+			expectedKind:     "Pod",
+		},
+		{
+			name:             "non-core resource with group",
+			resourceSpec:     "deployments.apps",
+			expectedResource: "deployments",
+			expectedVersion:  "v1",
+			expectedGroup:    "apps",
+			expectedKind:     "Deployment",
+		},
+		{
+			name:             "non-core resource short name",
+			resourceSpec:     "deploy",
+			expectedResource: "deployments",
+			expectedVersion:  "v1",
+			expectedGroup:    "apps",
+			expectedKind:     "Deployment",
+		},
+		{
+			name:             "resource with version and group",
+			resourceSpec:     "jobs.v1.batch",
+			expectedResource: "jobs",
+			expectedVersion:  "v1",
+			expectedGroup:    "batch",
+			expectedKind:     "Job",
+		},
+		{
+			name:             "specific beta version requested",
+			resourceSpec:     "deployments.v1beta2.apps",
+			expectedResource: "deployments",
+			expectedVersion:  "v1beta2",
+			expectedGroup:    "apps",
+			expectedKind:     "Deployment",
+		},
+		{
+			name:             "older beta version requested",
+			resourceSpec:     "deployments.v1beta1.apps",
+			expectedResource: "deployments",
+			expectedVersion:  "v1beta1",
+			expectedGroup:    "apps",
+			expectedKind:     "Deployment",
+		},
+		{
+			name:             "group only - should use preferred version",
+			resourceSpec:     "deployments.apps",
+			expectedResource: "deployments",
+			expectedVersion:  "v1",
+			expectedGroup:    "apps",
+			expectedKind:     "Deployment",
+		},
+		{
+			name:          "empty resource",
+			resourceSpec:  "",
+			expectError:   true,
+			errorContains: "resource name cannot be empty",
+		},
+		{
+			name:          "too many parts",
+			resourceSpec:  "pods.v1.core.extra",
+			expectError:   true,
+			errorContains: "invalid resource specification format",
+		},
+		{
+			name:          "resource not found",
+			resourceSpec:  "nonexistent",
+			expectError:   true,
+			errorContains: "resource \"nonexistent\" not found",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			opts := NewKAOptions()
+			opts.discoveryClient = newMockDiscoveryClient()
+
+			resourceInfo, err := opts.ResolveResourceSpec(tc.resourceSpec)
+
+			if tc.expectError {
+				assert.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, resourceInfo)
+				assert.Equal(t, tc.expectedResource, resourceInfo.Resource)
+				assert.Equal(t, tc.expectedVersion, resourceInfo.Version)
+				assert.Equal(t, tc.expectedGroup, resourceInfo.Group)
+				assert.Equal(t, tc.expectedKind, resourceInfo.Kind)
 			}
 		})
 	}

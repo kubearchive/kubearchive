@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/avast/retry-go/v4"
 	"github.com/kubearchive/kubearchive/test"
+	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -501,5 +503,93 @@ func TestLogRetrievalConsecutiveNumbers(t *testing.T) {
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
+	}
+}
+
+func TestLogGzipCompression(t *testing.T) {
+	t.Parallel()
+
+	clientset, _ := test.GetKubernetesClient(t)
+	port := test.PortForwardApiServer(t, clientset)
+	namespaceName, token := test.CreateTestNamespaceWithClusterAccess(t, false, true)
+
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Use RunLogGeneratorWithLines to create a job that generates 100 log lines
+	jobName := test.RunLogGeneratorWithLines(t, namespaceName, 100)
+	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespaceName, jobName)
+
+	tests := []struct {
+		name           string
+		headers        map[string][]string
+		expectGzip     bool
+		expectEncoding string
+	}{
+		{
+			name:           "without gzip compression",
+			headers:        map[string][]string{},
+			expectGzip:     false,
+			expectEncoding: "",
+		},
+		{
+			name: "with gzip compression",
+			headers: map[string][]string{
+				"Accept-Encoding": {"gzip"},
+			},
+			expectGzip:     true,
+			expectEncoding: "gzip",
+		},
+	}
+
+	var uncompressedLogs []byte
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			var logs []byte
+			var actuallyGzipped bool
+			var contentEncoding string
+
+			retryErr := retry.Do(func() error {
+				body, gzipped, encoding, err := test.GetLogsWithGzipCheck(t, token.Status.Token, url, testCase.headers)
+				if err != nil {
+					return err
+				}
+
+				if len(body) == 0 {
+					return errors.New("could not retrieve the pod log")
+				}
+
+				// Count lines to ensure we have the expected 100 log entries
+				lines := strings.Split(strings.TrimSpace(string(body)), "\n")
+				if len(lines) != 100 {
+					return fmt.Errorf("expected 100 log lines, got %d", len(lines))
+				}
+
+				logs = body
+				actuallyGzipped = gzipped
+				contentEncoding = encoding
+				t.Logf("Successfully retrieved logs %s", testCase.name)
+				return nil
+			}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+
+			if retryErr != nil {
+				t.Fatalf("✗ Failed to retrieve logs %s: %v", testCase.name, retryErr)
+			}
+
+			// Verify compression behavior immediately
+			assert.Equal(t, testCase.expectGzip, actuallyGzipped)
+			assert.Equal(t, testCase.expectEncoding, contentEncoding)
+			assert.GreaterOrEqual(t, len(logs), 1000)
+
+			// Store uncompressed logs for comparison
+			if !testCase.expectGzip {
+				uncompressedLogs = logs
+			} else {
+				// Verify that the decompressed content matches uncompressed content
+				assert.True(t, bytes.Equal(uncompressedLogs, logs), "✗ Decompressed log content should match uncompressed log content")
+			}
+
+			t.Logf("✓ Log gzip compression verification passed %s - %d bytes of log content", testCase.name, len(logs))
+		})
 	}
 }

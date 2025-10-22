@@ -4,6 +4,7 @@ package test
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
@@ -233,8 +234,7 @@ func GetPodName(t testing.TB, clientset *kubernetes.Clientset, namespace, prefix
 }
 
 func GetUrl(t testing.TB, token string, url string, extraHeaders map[string][]string) (*unstructured.UnstructuredList, error) {
-	client := getHTTPClient(t)
-	body, err := getUrl(t, &client, token, url, extraHeaders)
+	body, err := getUrl(t, token, url, extraHeaders)
 	if err != nil {
 		return nil, err
 	}
@@ -250,8 +250,7 @@ func GetUrl(t testing.TB, token string, url string, extraHeaders map[string][]st
 }
 
 func GetLogs(t testing.TB, token string, url string) ([]byte, error) {
-	client := getHTTPClient(t)
-	return getUrl(t, &client, token, url, map[string][]string{})
+	return getUrl(t, token, url, map[string][]string{})
 }
 
 func getHTTPClient(t testing.TB) http.Client {
@@ -281,8 +280,21 @@ func getHTTPClient(t testing.TB) http.Client {
 	}
 }
 
-func getUrl(t testing.TB, client *http.Client, token string, url string, extraHeaders map[string][]string) ([]byte, error) {
+// HTTPResponse contains the raw HTTP response data and metadata
+type HTTPResponse struct {
+	Body            []byte
+	StatusCode      int
+	ContentEncoding string
+}
+
+// makeHTTPRequest is a common helper that makes HTTP requests and returns raw response data
+func makeHTTPRequest(t testing.TB, token string, url string, extraHeaders map[string][]string) (*HTTPResponse, error) {
 	t.Helper()
+
+	// Get HTTP client (reusing the existing helper)
+	client := getHTTPClient(t)
+
+	// Make the request
 	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		t.Logf("Could not create a request, %s", err)
@@ -294,6 +306,7 @@ func getUrl(t testing.TB, client *http.Client, token string, url string, extraHe
 			request.Header.Add(key, value)
 		}
 	}
+
 	response, err := client.Do(request)
 	if err != nil {
 		t.Logf("Could not get an HTTP response, %s", err)
@@ -301,28 +314,144 @@ func getUrl(t testing.TB, client *http.Client, token string, url string, extraHe
 	}
 	defer response.Body.Close()
 
+	// Read the raw response body
 	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Logf("Could not read body, %s", err)
 		return nil, err
 	}
 
-	if response.StatusCode != http.StatusOK {
-		t.Logf("HTTP status: %s, response: %s", response.Status, string(body))
-		if response.StatusCode == http.StatusUnauthorized {
-			return nil, ErrUnauth
-		}
-		return nil, fmt.Errorf("%d", response.StatusCode)
+	return &HTTPResponse{
+		Body:            body,
+		StatusCode:      response.StatusCode,
+		ContentEncoding: response.Header.Get("Content-Encoding"),
+	}, nil
+}
+
+func getUrl(t testing.TB, token string, url string, extraHeaders map[string][]string) ([]byte, error) {
+	t.Helper()
+
+	httpResp, err := makeHTTPRequest(t, token, url, extraHeaders)
+	if err != nil {
+		return nil, err
 	}
 
-	return body, nil
+	if httpResp.StatusCode != http.StatusOK {
+		t.Logf("HTTP status: %d, response: %s", httpResp.StatusCode, string(httpResp.Body))
+		if httpResp.StatusCode == http.StatusUnauthorized {
+			return nil, ErrUnauth
+		}
+		return nil, fmt.Errorf("%d", httpResp.StatusCode)
+	}
+
+	return httpResp.Body, nil
+}
+
+// GzipTestResponse contains the response data and metadata for gzip compression testing
+type GzipTestResponse struct {
+	Body              []byte
+	ContentEncoding   string
+	IsActuallyGzipped bool
+	DecompressedSize  int
+	CompressedSize    int
+}
+
+// GetUrlWithGzipCheck makes an HTTP request and checks if the response is actually gzip compressed
+func GetUrlWithGzipCheck(t testing.TB, token string, url string, extraHeaders map[string][]string) (*GzipTestResponse, *unstructured.UnstructuredList, error) {
+	t.Helper()
+
+	// Make the HTTP request with gzip checking
+	gzipResp, err := makeGzipRequest(t, token, url, extraHeaders)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Parse the response as JSON for API endpoints
+	var data unstructured.UnstructuredList
+	err = json.Unmarshal(gzipResp.Body, &data)
+	if err != nil {
+		t.Logf("Could not unmarshal JSON, %s", err)
+		return gzipResp, nil, err
+	}
+
+	t.Logf("HTTP status: 200 OK, returned %d items", len(data.Items))
+	return gzipResp, &data, nil
+}
+
+// GetLogsWithGzipCheck makes an HTTP request to log endpoint and checks if the response is actually gzip compressed
+func GetLogsWithGzipCheck(t testing.TB, token string, url string, extraHeaders map[string][]string) ([]byte, bool, string, error) {
+	t.Helper()
+
+	// Make the HTTP request with gzip checking
+	gzipResp, err := makeGzipRequest(t, token, url, extraHeaders)
+	if err != nil {
+		return nil, false, "", err
+	}
+
+	return gzipResp.Body, gzipResp.IsActuallyGzipped, gzipResp.ContentEncoding, nil
+}
+
+// makeGzipRequest is a common helper that makes HTTP requests and handles gzip decompression
+func makeGzipRequest(t testing.TB, token string, url string, extraHeaders map[string][]string) (*GzipTestResponse, error) {
+	t.Helper()
+
+	// Make the HTTP request using the common helper
+	httpResp, err := makeHTTPRequest(t, token, url, extraHeaders)
+	if err != nil {
+		return nil, err
+	}
+
+	if httpResp.StatusCode != http.StatusOK {
+		if httpResp.StatusCode == http.StatusUnauthorized {
+			return nil, ErrUnauth
+		}
+		return nil, fmt.Errorf("HTTP %d: %s", httpResp.StatusCode, string(httpResp.Body))
+	}
+
+	// Check if the content is actually gzip compressed by trying to decompress it
+	isActuallyGzipped := false
+	body := httpResp.Body
+	originalBody := body
+	compressedSize := len(originalBody)
+
+	if len(body) > 0 {
+		// Try to decompress as gzip
+		gzipReader, gzipErr := gzip.NewReader(bytes.NewReader(body))
+		if gzipErr == nil {
+			decompressed, decompErr := io.ReadAll(gzipReader)
+			gzipReader.Close()
+			if decompErr == nil {
+				isActuallyGzipped = true
+				// Use the decompressed content as the final body
+				body = decompressed
+			}
+		}
+	}
+
+	decompressedSize := len(body)
+
+	t.Logf("Response - Content-Encoding: %s, Actually compressed: %v, Original size: %d, Final size: %d",
+		httpResp.ContentEncoding, isActuallyGzipped, compressedSize, decompressedSize)
+
+	return &GzipTestResponse{
+		Body:              body,
+		ContentEncoding:   httpResp.ContentEncoding,
+		IsActuallyGzipped: isActuallyGzipped,
+		DecompressedSize:  decompressedSize,
+		CompressedSize:    compressedSize,
+	}, nil
 }
 
 // Run a job to generate a log. Returns the job name.
 func RunLogGenerator(t testing.TB, namespace string) string {
+	return RunLogGeneratorWithLines(t, namespace, 10)
+}
+
+// Run a job to generate a log with specified number of lines. Returns the job name.
+func RunLogGeneratorWithLines(t testing.TB, namespace string, lines int) string {
 	clientset, _ := GetKubernetesClient(t)
 	name := fmt.Sprintf("generate-log-%s", RandomString())
-	t.Logf("Running job '%s/%s'", namespace, name)
+	t.Logf("Running job '%s/%s' with %d log lines", namespace, name, lines)
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -335,7 +464,7 @@ func RunLogGenerator(t testing.TB, namespace string) string {
 					Containers: []corev1.Container{
 						{
 							Name:    "flog",
-							Command: []string{"flog", "-n", "10", "-d", "1ms"},
+							Command: []string{"flog", "-n", fmt.Sprintf("%d", lines), "-d", "1ms"},
 							Image:   "quay.io/kubearchive/mingrammer/flog",
 						},
 					},
@@ -353,6 +482,10 @@ func RunLogGenerator(t testing.TB, namespace string) string {
 
 // Create a test namespace, returning the namespace name and the SA token.
 func CreateTestNamespace(t testing.TB, customCleanup bool) (string, *authenticationv1.TokenRequest) {
+	return CreateTestNamespaceWithClusterAccess(t, customCleanup, false)
+}
+
+func CreateTestNamespaceWithClusterAccess(t testing.TB, customCleanup bool, clusterAccess bool) (string, *authenticationv1.TokenRequest) {
 	// Create a random name testing namespace and return the name.
 	t.Helper()
 
@@ -374,7 +507,11 @@ func CreateTestNamespace(t testing.TB, customCleanup bool) (string, *authenticat
 
 	if !customCleanup {
 		t.Cleanup(func() {
-			DeleteTestNamespace(t, namespace)
+			if clusterAccess {
+				DeleteTestNamespaceWithClusterAccess(t, namespace)
+			} else {
+				DeleteTestNamespace(t, namespace)
+			}
 		})
 	}
 
@@ -393,26 +530,51 @@ func CreateTestNamespace(t testing.TB, customCleanup bool) (string, *authenticat
 		t.Fatal(err)
 	}
 
-	_, err = clientset.RbacV1().RoleBindings(namespace).Create(context.Background(), &rbacv1.RoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "view-default-test",
-		},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind:      "ServiceAccount",
-				Name:      "default",
-				Namespace: namespace,
+	if clusterAccess {
+		// Create ClusterRoleBinding for cluster-wide access
+		_, err = clientset.RbacV1().ClusterRoleBindings().Create(context.Background(), &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("view-default-test-%s", namespace),
 			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     "view",
-		},
-	},
-		metav1.CreateOptions{})
-	if err != nil {
-		t.Fatal(err)
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Name:      "default",
+					Namespace: namespace,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     "view",
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("Created ClusterRoleBinding for cluster-wide access in namespace '%s'", namespace)
+	} else {
+		// Create namespace-scoped RoleBinding
+		_, err = clientset.RbacV1().RoleBindings(namespace).Create(context.Background(), &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "view-default-test",
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Name:      "default",
+					Namespace: namespace,
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "ClusterRole",
+				Name:     "view",
+			},
+		}, metav1.CreateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	return namespace, token
@@ -553,6 +715,40 @@ func DeleteTestNamespace(t testing.TB, namespace string) {
 
 	clientset, _ := GetKubernetesClient(t)
 
+	errNamespace := clientset.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
+	if errNamespace != nil {
+		t.Fatal(errNamespace)
+	}
+
+	retryErr := retry.Do(func() error {
+		_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+		if !errs.IsNotFound(getErr) {
+			return errors.New("Waiting for namespace " + namespace + " to be deleted")
+		}
+		return nil
+	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+
+	if retryErr != nil {
+		t.Log(retryErr)
+	}
+}
+
+func DeleteTestNamespaceWithClusterAccess(t testing.TB, namespace string) {
+	// Delete the ClusterRoleBinding first, then the namespace
+	t.Helper()
+
+	t.Log("Deleting test namespace with cluster access '" + namespace + "'")
+
+	clientset, _ := GetKubernetesClient(t)
+
+	// Delete ClusterRoleBinding
+	clusterRoleBindingName := fmt.Sprintf("view-default-test-%s", namespace)
+	errClusterRoleBinding := clientset.RbacV1().ClusterRoleBindings().Delete(context.Background(), clusterRoleBindingName, metav1.DeleteOptions{})
+	if errClusterRoleBinding != nil {
+		t.Logf("Warning: Could not delete ClusterRoleBinding '%s': %v", clusterRoleBindingName, errClusterRoleBinding)
+	}
+
+	// Delete the namespace
 	errNamespace := clientset.CoreV1().Namespaces().Delete(context.Background(), namespace, metav1.DeleteOptions{})
 	if errNamespace != nil {
 		t.Fatal(errNamespace)

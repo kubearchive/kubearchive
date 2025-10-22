@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -18,8 +17,7 @@ type LogsOptions struct {
 	config.KACLICommand
 	ContainerName string
 	Name          string
-	Resource      string
-	GroupVersion  string
+	ResourceInfo  *config.ResourceInfo
 	LabelSelector string
 }
 
@@ -31,15 +29,19 @@ chain are archived, you can also retrieve the logs of one of the containers in t
 var logsExample = `
 # Return logs from pod nginx with only one container
 kubectl ka logs nginx
+kubectl ka logs pod/nginx
 
 # Return logs from pod nginx by specifying the container name
 kubectl ka logs nginx -c my-container
+kubectl ka logs pod/nginx -c my-container
 
-# Return logs from a resource different from a pod. It will pick one of the pod's logs.
-kubectl ka logs apps/v1 deployments nginx
+# Return logs from a deployment (it will pick one of the pod's logs)
+kubectl ka logs deployment/nginx
+kubectl ka logs deploy/nginx
 
-# Return logs from a custom resource
-kubectl ka logs tekton.dev/v1 taskrun my-task
+# Return logs using label selector
+kubectl ka logs pods -l app=nginx
+kubectl ka logs deployments -l app=nginx
 `
 
 func NewLogsOptions() *LogsOptions {
@@ -52,11 +54,11 @@ func NewLogCmd() *cobra.Command {
 	o := NewLogsOptions()
 
 	cmd := &cobra.Command{
-		Use:     "logs [GROUPVERSION] [RESOURCE] [NAME]",
+		Use:     "logs ([RESOURCE[.VERSION[.GROUP]]/NAME] | [RESOURCE[.VERSION[.GROUP]]] | [NAME])",
 		Short:   "Command to get logs resources from KubeArchive",
 		Long:    logsLong,
 		Example: logsExample,
-		Args:    cobra.RangeArgs(0, 3),
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			err = o.Complete(args)
@@ -85,39 +87,29 @@ func (o *LogsOptions) Complete(args []string) error {
 	if err != nil {
 		return fmt.Errorf("error completing the args: %w", err)
 	}
-	switch len(args) {
-	case 0:
-		if o.LabelSelector == "" {
-			return errors.New("specify a resource or use -l/--selector")
-		}
 
-		o.GroupVersion = "v1"
-		o.Resource = "pods"
+	arg := args[0]
+
+	// Split resource/name format: "deploy/nginx" -> "deploy", "nginx"
+	parts := strings.SplitN(arg, "/", 2)
+	resourceSpec := "pods"
+	switch len(parts) {
 	case 1:
 		if o.LabelSelector != "" {
-			return errors.New("can't specify resource AND a label selector, use just one")
+			resourceSpec = parts[0]
+		} else {
+			o.Name = parts[0]
 		}
-
-		o.GroupVersion = "v1"
-		o.Resource = "pods"
-		o.Name = args[0]
 	case 2:
-		if o.LabelSelector == "" {
-			return errors.New("invalid number of arguments")
-		}
-
-		o.GroupVersion = args[0]
-		o.Resource = args[1]
-	case 3:
-		if o.LabelSelector != "" {
-			return errors.New("can't specify resource AND a label selector, use just one")
-		}
-
-		o.GroupVersion = args[0]
-		o.Resource = args[1]
-		o.Name = args[2]
+		resourceSpec = parts[0]
+		o.Name = parts[1]
 	default:
-		return errors.New("error scanning arguments")
+		return fmt.Errorf("invalid resource/name format: %s", arg)
+	}
+
+	o.ResourceInfo, err = o.ResolveResourceSpec(resourceSpec)
+	if err != nil {
+		return fmt.Errorf("error resolving resource spec: %w", err)
 	}
 
 	return nil
@@ -125,7 +117,7 @@ func (o *LogsOptions) Complete(args []string) error {
 
 func (o *LogsOptions) Run(cmd *cobra.Command) error {
 	apiPrefix := "/apis"
-	if strings.HasPrefix(o.GroupVersion, "v1") {
+	if o.ResourceInfo.Group == "" {
 		apiPrefix = "/api"
 	}
 
@@ -136,7 +128,7 @@ func (o *LogsOptions) Run(cmd *cobra.Command) error {
 
 	names := make([]string, 0)
 	if o.LabelSelector != "" {
-		apiPath := fmt.Sprintf("%s/%s/namespaces/%s/%s?labelSelector=%s", apiPrefix, o.GroupVersion, ns, o.Resource, url.QueryEscape(o.LabelSelector))
+		apiPath := fmt.Sprintf("%s/%s/namespaces/%s/%s?labelSelector=%s", apiPrefix, o.ResourceInfo.GroupVersion, ns, o.ResourceInfo.Resource, url.QueryEscape(o.LabelSelector))
 		bodyBytes, err := o.GetFromAPI(config.KubeArchive, apiPath)
 		if err != nil {
 			return fmt.Errorf("error while retrieving resources with labelSelector: %w", err)
@@ -160,7 +152,7 @@ func (o *LogsOptions) Run(cmd *cobra.Command) error {
 	}
 
 	for _, name := range names {
-		apiPath := fmt.Sprintf("%s/%s/namespaces/%s/%s/%s/log", apiPrefix, o.GroupVersion, ns, o.Resource, name)
+		apiPath := fmt.Sprintf("%s/%s/namespaces/%s/%s/%s/log", apiPrefix, o.ResourceInfo.GroupVersion, ns, o.ResourceInfo.Resource, name)
 		if o.ContainerName != "" {
 			apiPath = fmt.Sprintf("%s?container=%s", apiPath, o.ContainerName)
 		}

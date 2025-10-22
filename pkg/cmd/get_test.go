@@ -68,13 +68,26 @@ func createPodListJSON(podName, timestamp string) string {
 
 // MockKACLICommand implements the KACLICommand interface for testing
 type MockKACLICommand struct {
-	k8sResponse    string
-	k9eResponse    string
-	k8sError       error
-	k9eError       error
-	completeError  error
-	namespaceValue string
-	namespaceError error
+	k8sResponse      string
+	k9eResponse      string
+	k8sError         error
+	k9eError         error
+	completeError    error
+	namespaceValue   string
+	namespaceError   error
+	mockResourceInfo *config.ResourceInfo
+}
+
+func NewMockKACLICommand(mockErr error, resourceInfo *config.ResourceInfo) *MockKACLICommand {
+	return &MockKACLICommand{
+		completeError:    mockErr,
+		mockResourceInfo: resourceInfo,
+	}
+}
+
+// ResolveResourceSpec overrides the KAOptions method to return mock ResourceInfo
+func (m *MockKACLICommand) ResolveResourceSpec(resourceSpec string) (*config.ResourceInfo, error) {
+	return m.mockResourceInfo, nil
 }
 
 func (m *MockKACLICommand) GetFromAPI(api config.API, _ string) ([]byte, error) {
@@ -110,9 +123,10 @@ func (m *MockKACLICommand) GetNamespace() (string, error) {
 	return "default", nil
 }
 
-// NewTestGetOptions creates GetOptions with a mock for testing
+// NewTestGetOptions creates GetOptions with mocks for testing
 func NewTestGetOptions(mockCLI config.KACLICommand) *GetOptions {
 	outputFormat := ""
+
 	return &GetOptions{
 		KACLICommand:       mockCLI,
 		OutputFormat:       &outputFormat,
@@ -130,32 +144,69 @@ func TestGetComplete(t *testing.T) {
 		name            string
 		allNamespaces   bool
 		args            []string
+		resourceInfo    *config.ResourceInfo
 		expectedApiPath string
 		mockError       error
 		expectError     bool
 		errorContains   string
 	}{
 		{
-			name:            "core resource",
-			allNamespaces:   false,
-			args:            []string{"v1", "pods"},
+			name:          "core resource",
+			allNamespaces: false,
+			args:          []string{"pods"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+			},
 			expectedApiPath: "/api/v1/namespaces/default/pods",
 		},
 		{
-			name:            "non-core resource",
-			allNamespaces:   false,
-			args:            []string{"batch/v1", "jobs"},
+			name:          "non-core resource with version and group",
+			allNamespaces: false,
+			args:          []string{"jobs.v1.batch"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "jobs", Version: "v1", Group: "batch", GroupVersion: "batch/v1", Kind: "Job",
+			},
 			expectedApiPath: "/apis/batch/v1/namespaces/default/jobs",
 		},
 		{
-			name:            "all namespaces",
-			allNamespaces:   true,
-			args:            []string{"v1", "pods"},
+			name:          "non-core resource with group only",
+			allNamespaces: false,
+			args:          []string{"deployments.apps"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment",
+			},
+			expectedApiPath: "/apis/apps/v1/namespaces/default/deployments",
+		},
+		{
+			name:          "short name resource",
+			allNamespaces: false,
+			args:          []string{"deploy"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment",
+			},
+			expectedApiPath: "/apis/apps/v1/namespaces/default/deployments", // Should use actual resource name
+		},
+		{
+			name:          "singular name resource",
+			allNamespaces: false,
+			args:          []string{"pod"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+			},
+			expectedApiPath: "/api/v1/namespaces/default/pods", // Should use actual resource name
+		},
+		{
+			name:          "all namespaces",
+			allNamespaces: true,
+			args:          []string{"pods"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+			},
 			expectedApiPath: "/api/v1/pods",
 		},
 		{
 			name:          "complete error",
-			args:          []string{"v1", "pods"},
+			args:          []string{"pods"},
 			mockError:     fmt.Errorf("mock complete failed"),
 			expectError:   true,
 			errorContains: "error completing the args: mock complete failed",
@@ -165,14 +216,8 @@ func TestGetComplete(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			var options *GetOptions
-			if tc.mockError != nil {
-				mockCLI := &MockKACLICommand{
-					completeError: tc.mockError,
-				}
-				options = NewTestGetOptions(mockCLI)
-			} else {
-				options = NewGetOptions()
-			}
+			mockCli := NewMockKACLICommand(tc.mockError, tc.resourceInfo)
+			options = NewTestGetOptions(mockCli)
 			options.AllNamespaces = tc.allNamespaces
 
 			err := options.Complete(tc.args)
@@ -185,8 +230,7 @@ func TestGetComplete(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedApiPath, options.APIPath)
-				assert.Equal(t, tc.args[0], options.GroupVersion)
-				assert.Equal(t, tc.args[1], options.Resource)
+				assert.NotNil(t, options.ResourceInfo)
 			}
 		})
 	}

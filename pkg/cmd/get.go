@@ -22,8 +22,7 @@ type GetOptions struct {
 	config.KACLICommand
 	AllNamespaces      bool
 	APIPath            string
-	Resource           string
-	GroupVersion       string
+	ResourceInfo       *config.ResourceInfo
 	OutputFormat       *string
 	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
 	IsValidOutput      bool
@@ -47,9 +46,9 @@ func NewGetCmd() *cobra.Command {
 	o := NewGetOptions()
 
 	cmd := &cobra.Command{
-		Use:   "get [GROUPVERSION] [RESOURCE]",
+		Use:   "get [RESOURCE[.VERSION[.GROUP]]]",
 		Short: "Command to get resources from KubeArchive",
-		Args:  cobra.ExactArgs(2),
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var err error
 			err = o.Complete(args)
@@ -79,22 +78,29 @@ func (o *GetOptions) Complete(args []string) error {
 		return fmt.Errorf("error completing the args: %w", err)
 	}
 
-	o.GroupVersion = args[0]
+	// Parse and resolve resource specification using discovery
+	resourceInfo, err := o.ResolveResourceSpec(args[0])
+	if err != nil {
+		return fmt.Errorf("error resolving resource specification: %w", err)
+	}
+	o.ResourceInfo = resourceInfo
 
-	o.Resource = args[1]
-	APIPathWithoutRoot := fmt.Sprintf("%s/%s", o.GroupVersion, o.Resource)
+	// Build API path
+	APIPathWithoutRoot := fmt.Sprintf("%s/%s", o.ResourceInfo.GroupVersion, o.ResourceInfo.Resource)
 
 	if !o.AllNamespaces {
 		namespace, nsErr := o.GetNamespace()
 		if nsErr != nil {
 			return nsErr
 		}
-		APIPathWithoutRoot = fmt.Sprintf("%s/namespaces/%s/%s", o.GroupVersion, namespace, o.Resource)
+		APIPathWithoutRoot = fmt.Sprintf("%s/namespaces/%s/%s", o.ResourceInfo.GroupVersion, namespace, o.ResourceInfo.Resource)
 	}
 
-	o.APIPath = fmt.Sprintf("/apis/%s", APIPathWithoutRoot)
-	if strings.HasPrefix(o.GroupVersion, "v1") {
+	// Determine if this is a core resource (no group or empty group)
+	if o.ResourceInfo.Group == "" {
 		o.APIPath = fmt.Sprintf("/api/%s", APIPathWithoutRoot)
+	} else {
+		o.APIPath = fmt.Sprintf("/apis/%s", APIPathWithoutRoot)
 	}
 
 	return nil

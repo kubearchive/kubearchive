@@ -13,12 +13,9 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/gin-gonic/gin"
-	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
-	"github.com/kubearchive/kubearchive/cmd/sink/filters"
 	"github.com/kubearchive/kubearchive/cmd/sink/k8s"
 	"github.com/kubearchive/kubearchive/cmd/sink/logs"
 	"github.com/kubearchive/kubearchive/pkg/abort"
-	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/kubearchive/kubearchive/pkg/observability"
@@ -35,16 +32,15 @@ import (
 
 type Controller struct {
 	Db            interfaces.DBWriter
-	Filters       filters.Interface
 	K8sClient     dynamic.Interface
 	LogUrlBuilder *logs.UrlBuilder
 }
 
 func NewController(
-	db interfaces.DBWriter, filter filters.Interface, k8sClient dynamic.Interface, urlBuilder *logs.UrlBuilder,
+	db interfaces.DBWriter, k8sClient dynamic.Interface, urlBuilder *logs.UrlBuilder,
 ) *Controller {
 	return &Controller{
-		Db: db, Filters: filter, K8sClient: k8sClient, LogUrlBuilder: urlBuilder,
+		Db: db, K8sClient: k8sClient, LogUrlBuilder: urlBuilder,
 	}
 }
 
@@ -200,11 +196,16 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 		attribute.String("name", k8sObj.GetName()),
 	)
 
-	if !c.Filters.IsConfigured(ctx.Request.Context(), k8sObj) {
+	eventType := event.Type()
+	isDeleteWhen := strings.HasSuffix(eventType, ".delete-when")
+	isArchiveWhen := strings.HasSuffix(eventType, ".archive-when")
+	isArchiveOnDelete := strings.HasSuffix(eventType, ".archive-on-delete")
+
+	if !isDeleteWhen && !isArchiveWhen && !isArchiveOnDelete {
 		CEMetricAttrs["result"] = string(observability.CEResultNoConfiguration)
 		slog.WarnContext(
 			ctx.Request.Context(),
-			"Resource update received, resource is not configured",
+			"Resource update received, unsupported event type",
 			"event-id", event.ID(),
 			"event-type", event.Type(),
 			"id", string(k8sObj.GetUID()),
@@ -212,57 +213,6 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 			"apiVersion", k8sObj.GetAPIVersion(),
 			"namespace", k8sObj.GetNamespace(),
 			"name", k8sObj.GetName())
-		ctx.Status(http.StatusAccepted)
-		span.SetStatus(codes.Ok, "successful")
-		return
-	}
-
-	// If message is of type delete we end early
-	if strings.HasSuffix(event.Type(), ".delete") {
-		logMsg := "Resource deletion received, resource archived"
-		if c.Filters.MustArchiveOnDelete(ctx.Request.Context(), k8sObj) {
-			result, writeErr := c.writeResource(ctx.Request.Context(), k8sObj, event)
-			if writeErr != nil {
-				ctx.Status(http.StatusInternalServerError)
-				span.SetStatus(codes.Error, "failed")
-				span.RecordError(writeErr)
-				return
-			}
-
-			CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
-		} else {
-			CEMetricAttrs["result"] = string(observability.CEResultNoMatch)
-			logMsg = "Resource deletion received, resource did not match for archive on deletion"
-		}
-
-		slog.InfoContext(
-			ctx.Request.Context(),
-			logMsg,
-			"event-id", event.ID(),
-			"event-type", event.Type(),
-			"id", string(k8sObj.GetUID()),
-			"kind", k8sObj.GetKind(),
-			"namespace", k8sObj.GetNamespace(),
-			"name", k8sObj.GetName(),
-		)
-		ctx.Status(http.StatusAccepted)
-		span.SetStatus(codes.Ok, "successful")
-		return
-	}
-
-	// If resource does not match archival, we exit early
-	if !c.Filters.MustArchive(ctx.Request.Context(), k8sObj) {
-		slog.InfoContext(
-			ctx.Request.Context(),
-			"Resource update received, no archive needed",
-			"event-id", event.ID(),
-			"event-type", event.Type(),
-			"id", string(k8sObj.GetUID()),
-			"kind", k8sObj.GetKind(),
-			"namespace", k8sObj.GetNamespace(),
-			"name", k8sObj.GetName(),
-		)
-		CEMetricAttrs["result"] = string(observability.CEResultNoMatch)
 		ctx.Status(http.StatusAccepted)
 		span.SetStatus(codes.Ok, "successful")
 		return
@@ -277,11 +227,18 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 	}
 
 	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
-	// If after archiving the resource does not need to be deleted we exit early
-	if !c.Filters.MustDelete(ctx.Request.Context(), k8sObj) {
+
+	if !isDeleteWhen {
+		var logMsg string
+		if isArchiveOnDelete {
+			logMsg = "Resource archived on deletion"
+		} else {
+			logMsg = "Resource archived"
+		}
+
 		slog.InfoContext(
 			ctx.Request.Context(),
-			"Resource was updated and archived",
+			logMsg,
 			"event-id", event.ID(),
 			"event-type", event.Type(),
 			"id", string(k8sObj.GetUID()),
@@ -359,7 +316,7 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
 	slog.InfoContext(
 		ctx.Request.Context(),
-		"Resource was updated, archived and deleted from the cluster",
+		"Resource archived and deleted",
 		"event-id", event.ID(),
 		"event-type", event.Type(),
 		"id", string(k8sObj.GetUID()),
@@ -388,11 +345,6 @@ func (c *Controller) Readyz(ctx *gin.Context) {
 	if err != nil {
 		abort.Abort(ctx, err, http.StatusServiceUnavailable)
 		return
-	}
-
-	_, err = c.K8sClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(ctx.Request.Context(), constants.SinkFilterResourceName, metav1.GetOptions{})
-	if err != nil && !errs.IsNotFound(err) {
-		abort.Abort(ctx, err, http.StatusServiceUnavailable)
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "ready"})
 }

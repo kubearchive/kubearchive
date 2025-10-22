@@ -42,6 +42,15 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 			Name:      constants.SinkFilterResourceName,
 			Namespace: constants.KubeArchiveNamespace,
 		}
+		installRoleRef := rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     constants.KubeArchiveVacuumName,
+		}
+		installRoleBindingName := types.NamespacedName{
+			Name:      constants.KubeArchiveVacuumName,
+			Namespace: constants.KubeArchiveNamespace,
+		}
 
 		localVacSA := rbacv1.Subject{
 			Kind:      "ServiceAccount",
@@ -59,11 +68,6 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 			Namespace: constants.KubeArchiveNamespace,
 		}
 
-		ckacRoleRef := rbacv1.RoleRef{
-			APIGroup: "rbac.authorization.k8s.io",
-			Kind:     "ClusterRole",
-			Name:     constants.ClusterKubeArchiveConfigClusterRoleBindingName,
-		}
 		sinkRoleRef := rbacv1.RoleRef{
 			APIGroup: "rbac.authorization.k8s.io",
 			Kind:     "Role",
@@ -74,8 +78,6 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 			Kind:     "Role",
 			Name:     constants.KubeArchiveVacuumName,
 		}
-
-		clusterCKACName := types.NamespacedName{Name: constants.ClusterKubeArchiveConfigClusterRoleBindingName}
 
 		sinkJobsPolicyRule := rbacv1.PolicyRule{
 			APIGroups: []string{"batch"},
@@ -89,7 +91,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 		}
 		vacPolicyRule := rbacv1.PolicyRule{
 			APIGroups: []string{"kubearchive.org"},
-			Resources: []string{"kubearchiveconfigs", "namespacevacuumconfigs"},
+			Resources: []string{"namespacevacuumconfigs"},
 			Verbs:     []string{"get", "list"},
 		}
 
@@ -227,20 +229,20 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 					Expect(roleBinding.RoleRef).To(Equal(vacRoleRef))
 					Expect(roleBinding.Subjects).Should(ContainElement(localVacSA))
 					Expect(roleBinding.Subjects).Should(ContainElement(installClusterVacSA))
-
 				}
 
-				// Check for the ClusterKubeArchiveConfig cluster role binding.
-				clusterRoleBinding := &rbacv1.ClusterRoleBinding{}
-				err = k8sClient.Get(ctx, clusterCKACName, clusterRoleBinding)
+				// Check for the vacuum role binding in the kubearchive namespace.
+				roleBinding := &rbacv1.RoleBinding{}
+				err = k8sClient.Get(ctx, installRoleBindingName, roleBinding)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(clusterRoleBinding.RoleRef).To(Equal(ckacRoleRef))
+				Expect(roleBinding.RoleRef).To(Equal(installRoleRef))
 				if op != "delete" {
-					Expect(clusterRoleBinding.Subjects).Should(ContainElement(localVacSA))
+					Expect(roleBinding.Subjects).Should(ContainElement(localVacSA))
 				} else {
-					Expect(clusterRoleBinding.Subjects).Should(Not(ContainElement(localVacSA)))
+					Expect(roleBinding.Subjects).Should(Not(ContainElement(localVacSA)))
 				}
-				Expect(clusterRoleBinding.Subjects).Should(ContainElement(installClusterVacSA))
+				Expect(roleBinding.Subjects).Should(ContainElement(installClusterVacSA))
+
 			}
 		})
 	})

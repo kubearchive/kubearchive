@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 
-	"github.com/kubearchive/kubearchive/cmd/sink/filters"
 	"github.com/kubearchive/kubearchive/cmd/sink/logs"
 	"github.com/kubearchive/kubearchive/cmd/sink/routers"
 	"github.com/kubearchive/kubearchive/cmd/sink/server"
@@ -62,18 +61,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	filter := filters.NewFilters(dynClient)
-	stopUpdating, err := filter.Update()
-	if err != nil {
-		slog.Error("Could not listen for updates to filters:", "error", err)
-		os.Exit(1)
-	}
-	defer stopUpdating()
 	builder, err := logs.NewUrlBuilder()
 	if err != nil {
 		slog.Error("Could not enable log url creation", "error", err)
 	}
-	controller := routers.NewController(db, filter, dynClient, builder)
+	controller := routers.NewController(db, dynClient, builder)
 	server := server.NewServer(controller)
 	server.Serve()
 }

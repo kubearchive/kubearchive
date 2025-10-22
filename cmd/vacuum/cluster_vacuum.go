@@ -9,24 +9,35 @@ import (
 	"log/slog"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
-	publisher "github.com/kubearchive/kubearchive/pkg/cloudevents"
 	"github.com/kubearchive/kubearchive/pkg/constants"
+	"github.com/kubearchive/kubearchive/pkg/filters"
 	"github.com/kubearchive/kubearchive/pkg/k8sclient"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 )
 
 const (
-	clusterVacuumEventType = "kubearchive.org.vacuum.cluster.resource.update"
+	clusterVacuumEventTypePrefix = "org.kubearchive.vacuum.cluster.resource"
 )
 
 func clusterVacuum(configName string) error {
+	// Get SinkFilter data for cluster vacuum (all namespaces)
+	filterReader, err := filters.NewSinkFilterReader()
+	if err != nil {
+		return fmt.Errorf("unable to create SinkFilter reader: %v", err)
+	}
+
+	filters, err := filterReader.ProcessAllNamespaces(context.Background())
+	if err != nil {
+		return fmt.Errorf("unable to get SinkFilter data: %v", err)
+	}
+
 	client, err := k8sclient.NewInstrumentedDynamicClient()
 	if err != nil {
 		return fmt.Errorf("unable to get client: %v", err)
 	}
 
-	scep, err := publisher.NewSinkCloudEventPublisher("kubearchive.org/cluster-vacuum")
+	vcep, err := NewVacuumCloudEventPublisher("kubearchive.org/cluster-vacuum", filters)
 	if err != nil {
 		return fmt.Errorf("unable to create sink cloudevent publisher: %v", err)
 	}
@@ -57,25 +68,19 @@ func clusterVacuum(configName string) error {
 		if ok {
 			// Namespace explicitly specified in VacuumClusterConfig
 			if len(value.Resources) == 0 {
-				_, err = scep.SendByNamespace(context.Background(), clusterVacuumEventType, namespace)
-				if err != nil {
-					slog.Error("Unable to send messages for namespace '" + namespace + "'")
-				}
+				vcep.SendByNamespace(context.Background(), clusterVacuumEventTypePrefix, namespace)
 			} else {
 				for _, avk := range value.Resources {
-					scep.SendByAPIVersionKind(context.Background(), clusterVacuumEventType, namespace, &avk)
+					vcep.SendByAPIVersionKind(context.Background(), clusterVacuumEventTypePrefix, namespace, &avk)
 				}
 			}
 		} else {
 			// Only way to get here is if allNS is true.
 			if len(allResources.Resources) == 0 {
-				_, err = scep.SendByNamespace(context.Background(), clusterVacuumEventType, namespace)
-				if err != nil {
-					slog.Error("Unable to send messages for namespace '" + namespace + "'")
-				}
+				vcep.SendByNamespace(context.Background(), clusterVacuumEventTypePrefix, namespace)
 			} else {
 				for _, avk := range allResources.Resources {
-					scep.SendByAPIVersionKind(context.Background(), clusterVacuumEventType, namespace, &avk)
+					vcep.SendByAPIVersionKind(context.Background(), clusterVacuumEventTypePrefix, namespace, &avk)
 				}
 			}
 		}

@@ -10,6 +10,7 @@ import (
 	"regexp"
 
 	"github.com/kubearchive/kubearchive/pkg/cel"
+	"github.com/kubearchive/kubearchive/pkg/constants"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -88,6 +89,9 @@ func (kaccv *KubeArchiveConfigCustomValidator) ValidateDelete(_ context.Context,
 
 func (kaccv *KubeArchiveConfigCustomValidator) validateKAC(kac *KubeArchiveConfig) (admission.Warnings, error) {
 	errList := make([]error, 0)
+	if kac.Namespace == constants.KubeArchiveNamespace {
+		return nil, fmt.Errorf("cannot create KubeArchiveConfig in the '%s' namespace", kac.Namespace)
+	}
 	if kac.Name != kaccv.kubearchiveResourceName {
 		errList = append(errList, fmt.Errorf("invalid resource name '%s', resource must be named '%s'",
 			kac.Name, kaccv.kubearchiveResourceName))
@@ -137,7 +141,7 @@ func validateDurationString(expr string) []error {
 		if err != nil {
 			errList = append(errList, err)
 		} else {
-			_, err := cel.ExecuteCEL(context.Background(), *prg, &emptyObj)
+			_, err := cel.ExecuteCEL(context.Background(), prg, &emptyObj)
 			if errors.Is(err, BadConversion) {
 				errList = append(errList, fmt.Errorf("invalid duration string '%s'", match))
 			}

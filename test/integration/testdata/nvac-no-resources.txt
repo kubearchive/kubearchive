@@ -1,7 +1,7 @@
-yyyy/mm/dd hh:mm:ss INFO Event sent successfully apiversion=batch/v1 kind=Job namespace=test-xxx-xxxxxxxx name=generate-log-xxxxxxxx code=202
-yyyy/mm/dd hh:mm:ss INFO Event sent successfully apiversion=batch/v1 kind=Job namespace=test-xxx-xxxxxxxx name=namespace-vacuum-xxxxxxxx code=202
-yyyy/mm/dd hh:mm:ss INFO Event sent successfully apiversion=v1 kind=Pod namespace=test-xxx-xxxxxxxx name=generate-log-xxxxxxxx-xxxxx code=202
-yyyy/mm/dd hh:mm:ss INFO Event sent successfully apiversion=v1 kind=Pod namespace=test-xxx-xxxxxxxx name=namespace-vacuum-xxxxxxxx-xxxxx code=202
+yyyy/mm/dd hh:mm:ss INFO Event sent successfully apiversion=batch/v1 kind=Job namespace=test-xxx-xxxxxxxx name=generate-log-xxxxxxxx eventType=org.kubearchive.vacuum.namespace.resource.archive-when code=202
+yyyy/mm/dd hh:mm:ss INFO Event sent successfully apiversion=v1 kind=Pod namespace=test-xxx-xxxxxxxx name=generate-log-xxxxxxxx-xxxxx eventType=org.kubearchive.vacuum.namespace.resource.archive-when code=202
 yyyy/mm/dd hh:mm:ss INFO Finished publishing sink events namespace=test-xxx-xxxxxxxx
+yyyy/mm/dd hh:mm:ss INFO No event sent apiversion=batch/v1 kind=Job namespace=test-xxx-xxxxxxxx name=namespace-vacuum-xxxxxxxx
+yyyy/mm/dd hh:mm:ss INFO No event sent apiversion=v1 kind=Pod namespace=test-xxx-xxxxxxxx name=namespace-vacuum-xxxxxxxx-xxxxx
 yyyy/mm/dd hh:mm:ss INFO Started publishing sink events namespace=test-xxx-xxxxxxxx
 yyyy/mm/dd hh:mm:ss INFO Using sink service URL url=http://kubearchive-sink.kubearchive.svc.cluster.local:80

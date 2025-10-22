@@ -8,19 +8,18 @@ import (
 )
 
 const (
-	ClusterKubeArchiveConfigClusterRoleBindingName = "clusterkubearchiveconfig-read"
-	KubeArchiveConfigResourceName                  = "kubearchive"
-	KubeArchiveNamespaceEnvVar                     = "KUBEARCHIVE_NAMESPACE"
-	SinkFilterResourceName                         = "sink-filters"
-	KubeArchiveSinkName                            = "kubearchive-sink"
-	KubeArchiveOperatorWebhooksServiceName         = "kubearchive-operator-webhooks"
-	KubeArchiveSinkFilterName                      = "kubearchive-sinkfilter"
-	KubeArchiveOperatorName                        = "kubearchive-operator"
-	KubeArchiveApiServerSourceName                 = "kubearchive-a13e"
-	SinkFilterGlobalNamespace                      = "___global___"
-	ClusterVacuumAllNamespaces                     = "___all-namespaces___"
-	KubeArchiveVacuumName                          = "kubearchive-vacuum"
-	KubeArchiveClusterVacuumName                   = "kubearchive-cluster-vacuum"
+	KubeArchiveConfigResourceName          = "kubearchive"
+	KubeArchiveNamespaceEnvVar             = "KUBEARCHIVE_NAMESPACE"
+	SinkFilterResourceName                 = "sink-filters"
+	KubeArchiveSinkName                    = "kubearchive-sink"
+	KubeArchiveOperatorWebhooksServiceName = "kubearchive-operator-webhooks"
+	KubeArchiveSinkFilterName              = "kubearchive-sinkfilter"
+	KubeArchiveOperatorName                = "kubearchive-operator"
+	KubeArchiveApiServerSourceName         = "kubearchive-a13e"
+	SinkFilterGlobalNamespace              = "___global___"
+	ClusterVacuumAllNamespaces             = "___all-namespaces___"
+	KubeArchiveVacuumName                  = "kubearchive-vacuum"
+	KubeArchiveClusterVacuumName           = "kubearchive-cluster-vacuum"
 )
 
 var (

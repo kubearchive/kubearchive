@@ -97,11 +97,14 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 				sf := &kubearchivev1.SinkFilter{}
 				err = k8sClient.Get(ctx, installSFName, sf)
 				Expect(err).NotTo(HaveOccurred())
-				if op == "delete" {
-					Expect(len(sf.Spec.Namespaces)).To(Equal(0))
-				} else {
+				if op == "update-add-resouce" {
+					Expect(len(sf.Spec.Namespaces)).To(Equal(2))
+					Expect(sf.Spec.Namespaces).Should(HaveKey(constants.SinkFilterGlobalNamespace))
+				} else if op == "update-remove-resource" {
 					Expect(len(sf.Spec.Namespaces)).To(Equal(1))
 					Expect(sf.Spec.Namespaces).Should(HaveKey(constants.SinkFilterGlobalNamespace))
+				} else if op == "delete" {
+					Expect(len(sf.Spec.Namespaces)).To(Equal(0))
 				}
 			}
 		})

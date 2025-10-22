@@ -85,13 +85,6 @@ func checkResourcesAfterApply(t testing.TB, namespace string, applyNS int) {
 		if err != nil {
 			return err
 		}
-		cbinding, err := clientset.RbacV1().ClusterRoleBindings().Get(context.Background(), constants.ClusterKubeArchiveConfigClusterRoleBindingName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if len(cbinding.Subjects) != 2 {
-			return fmt.Errorf("Found %d subjects in %s ClusterRoleBinding after apply, expected 2", len(cbinding.Subjects), constants.ClusterKubeArchiveConfigClusterRoleBindingName)
-		}
 		return nil
 	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
 
@@ -131,13 +124,6 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, deleteNS int) {
 		_, err = clientset.RbacV1().Roles(namespace).Get(context.Background(), constants.KubeArchiveVacuumName, metav1.GetOptions{})
 		if !errs.IsNotFound(err) {
 			return errors.New("Unexpectedly found Role " + constants.KubeArchiveVacuumName + " in namespace " + namespace + ".")
-		}
-		cbinding, err := clientset.RbacV1().ClusterRoleBindings().Get(context.Background(), constants.ClusterKubeArchiveConfigClusterRoleBindingName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		if len(cbinding.Subjects) != 1 {
-			return fmt.Errorf("Found %d subjects in %s ClusterRoleBinding after delete, expected 1", len(cbinding.Subjects), constants.ClusterKubeArchiveConfigClusterRoleBindingName)
 		}
 		return nil
 	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))

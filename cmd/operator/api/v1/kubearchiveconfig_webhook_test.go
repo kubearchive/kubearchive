@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -20,7 +21,6 @@ func TestKubeArchiveConfigCustomDefaulter(t *testing.T) {
 }
 
 func TestKubeArchiveConfigValidateName(t *testing.T) {
-	k9eResourceName := "kubearchive"
 	tests := []struct {
 		name      string
 		kacName   string
@@ -28,7 +28,7 @@ func TestKubeArchiveConfigValidateName(t *testing.T) {
 	}{
 		{
 			name:      "Valid name",
-			kacName:   k9eResourceName,
+			kacName:   constants.KubeArchiveConfigResourceName,
 			validated: true,
 		},
 		{
@@ -37,7 +37,7 @@ func TestKubeArchiveConfigValidateName(t *testing.T) {
 			validated: false,
 		},
 	}
-	validator := KubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
+	validator := KubeArchiveConfigCustomValidator{kubearchiveResourceName: constants.KubeArchiveConfigResourceName}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			// Create resource
@@ -56,6 +56,57 @@ func TestKubeArchiveConfigValidateName(t *testing.T) {
 				assert.NoError(t, err)
 			} else {
 				assert.Errorf(t, err, "invalid resource name %s", test.kacName)
+			}
+			// Delete resource
+			warns, err = validator.ValidateDelete(context.Background(), kac)
+			assert.Nil(t, warns)
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestKubeArchiveConfigValidateNamespace(t *testing.T) {
+	tests := []struct {
+		name         string
+		kacNamespace string
+		validated    bool
+	}{
+		{
+			name:         "Valid namespace",
+			kacNamespace: "my-namespace",
+			validated:    true,
+		},
+		{
+			name:         "Invalid namespace",
+			kacNamespace: constants.KubeArchiveNamespace,
+			validated:    false,
+		},
+	}
+	validator := KubeArchiveConfigCustomValidator{kubearchiveResourceName: constants.KubeArchiveConfigResourceName}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create resource
+			kac := &KubeArchiveConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      constants.KubeArchiveConfigResourceName,
+					Namespace: test.kacNamespace,
+				},
+			}
+
+			warns, err := validator.ValidateCreate(context.Background(), kac)
+			assert.Nil(t, warns)
+			if test.validated {
+				assert.NoError(t, err)
+			} else {
+				assert.Errorf(t, err, "cannot create KubeArchiveConfig in the '%s' namespace", test.kacNamespace)
+			}
+			// Update resource
+			warns, err = validator.ValidateUpdate(context.Background(), &KubeArchiveConfig{}, kac)
+			assert.Nil(t, warns)
+			if test.validated {
+				assert.NoError(t, err)
+			} else {
+				assert.Errorf(t, err, "cannot create KubeArchiveConfig in the '%s' namespace", test.kacNamespace)
 			}
 			// Delete resource
 			warns, err = validator.ValidateDelete(context.Background(), kac)
@@ -154,6 +205,90 @@ func TestKubeArchiveConfigValidateDurationString(t *testing.T) {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), test.expectedError)
 			}
+		})
+	}
+}
+
+func TestKubeArchiveConfigValidateCELExpression(t *testing.T) {
+	invalid := "status.state *^ Completed'"
+	valid := "status.state == 'Completed'"
+	tests := []struct {
+		name            string
+		archiveWhen     string
+		deleteWhen      string
+		archiveOnDelete string
+		validated       bool
+	}{
+		{
+			name:            "Invalid archiveWhen expression",
+			archiveWhen:     invalid,
+			deleteWhen:      valid,
+			archiveOnDelete: valid,
+			validated:       false,
+		},
+		{
+			name:            "Invalid deleteWhen expression",
+			archiveWhen:     valid,
+			deleteWhen:      invalid,
+			archiveOnDelete: valid,
+			validated:       false,
+		},
+		{
+			name:            "Invalid archiveOnDelete expression",
+			archiveWhen:     valid,
+			deleteWhen:      valid,
+			archiveOnDelete: invalid,
+			validated:       false,
+		},
+		{
+			name:            "All expressions invalid",
+			archiveWhen:     invalid,
+			deleteWhen:      invalid,
+			archiveOnDelete: invalid,
+			validated:       false,
+		},
+		{
+			name:            "All expressions valid",
+			archiveWhen:     valid,
+			deleteWhen:      valid,
+			archiveOnDelete: valid,
+			validated:       true,
+		},
+	}
+	validator := KubeArchiveConfigCustomValidator{kubearchiveResourceName: constants.KubeArchiveConfigResourceName}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create resource
+			kac := &KubeArchiveConfig{
+				ObjectMeta: metav1.ObjectMeta{Name: constants.KubeArchiveConfigResourceName},
+				Spec: KubeArchiveConfigSpec{
+					Resources: []KubeArchiveConfigResource{
+						{
+							ArchiveWhen:     test.archiveWhen,
+							DeleteWhen:      test.deleteWhen,
+							ArchiveOnDelete: test.archiveOnDelete,
+						},
+					}},
+			}
+			warns, err := validator.ValidateCreate(context.Background(), kac)
+			assert.Nil(t, warns)
+			if test.validated {
+				assert.NoError(t, err)
+			} else {
+				assert.Contains(t, err.Error(), "Syntax error")
+			}
+			// Update resource
+			warns, err = validator.ValidateUpdate(context.Background(), &KubeArchiveConfig{}, kac)
+			assert.Nil(t, warns)
+			if test.validated {
+				assert.NoError(t, err)
+			} else {
+				assert.Contains(t, err.Error(), "Syntax error")
+			}
+			// Delete resource
+			warns, err = validator.ValidateDelete(context.Background(), kac)
+			assert.Nil(t, warns)
+			assert.NoError(t, err)
 		})
 	}
 }

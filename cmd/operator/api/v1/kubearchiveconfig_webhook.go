@@ -7,8 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/kubearchive/kubearchive/pkg/cel"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -90,25 +92,56 @@ func (kaccv *KubeArchiveConfigCustomValidator) validateKAC(kac *KubeArchiveConfi
 		errList = append(errList, fmt.Errorf("invalid resource name '%s', resource must be named '%s'",
 			kac.Name, kaccv.kubearchiveResourceName))
 	}
+
 	for _, resource := range kac.Spec.Resources {
 		if resource.ArchiveWhen != "" {
 			_, err := cel.CompileCELExpr(resource.ArchiveWhen)
 			if err != nil {
 				errList = append(errList, err)
+			} else {
+				errList = append(errList, validateDurationString(resource.ArchiveWhen)...)
 			}
 		}
 		if resource.DeleteWhen != "" {
 			_, err := cel.CompileCELExpr(resource.DeleteWhen)
 			if err != nil {
 				errList = append(errList, err)
+			} else {
+				errList = append(errList, validateDurationString(resource.DeleteWhen)...)
 			}
 		}
 		if resource.ArchiveOnDelete != "" {
 			_, err := cel.CompileCELExpr(resource.ArchiveOnDelete)
 			if err != nil {
 				errList = append(errList, err)
+			} else {
+				errList = append(errList, validateDurationString(resource.ArchiveOnDelete)...)
 			}
 		}
 	}
 	return nil, errors.Join(errList...)
+}
+
+func validateDurationString(expr string) []error {
+	emptyObj := unstructured.Unstructured{
+		Object: map[string]interface{}{},
+	}
+	var BadConversion = errors.New("type conversion error from 'string' to 'google.protobuf.Duration'")
+
+	re := regexp.MustCompile(`(duration *\([^)]+\))`)
+	matches := re.FindAllString(expr, -1)
+
+	errList := make([]error, 0)
+	for _, match := range matches {
+		prg, err := cel.CompileCELExpr(match)
+		if err != nil {
+			errList = append(errList, err)
+		} else {
+			_, err := cel.ExecuteCEL(context.Background(), *prg, &emptyObj)
+			if errors.Is(err, BadConversion) {
+				errList = append(errList, fmt.Errorf("invalid duration string '%s'", match))
+			}
+		}
+	}
+	return errList
 }

@@ -27,7 +27,7 @@ func TestMiddleware(t *testing.T) {
 		{
 			name:               "default limit is applied",
 			query:              "/",
-			expectedLimit:      100,
+			expectedLimit:      30,
 			expectedInt64:      "",
 			expectedDate:       "",
 			expectedStatusCode: http.StatusOK,

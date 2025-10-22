@@ -51,6 +51,8 @@ gnuplot -e "name='Memory during GET'; filename='merge/get-memory.csv'; outfile='
 gnuplot -e "name='Memory during POST'; filename='merge/create-memory.csv'; outfile='create-memory.png'" test/performance/memory.gnuplot
 gnuplot -e "name='CPU during GET'; filename='merge/get-cpu.csv'; outfile='get-cpu.png'" test/performance/cpu.gnuplot
 gnuplot -e "name='CPU during POST'; filename='merge/create-cpu.csv'; outfile='create-cpu.png'" test/performance/cpu.gnuplot
+gnuplot -e "name='Requests during GET'; filename='merge/get-req.csv'; outfile='get-req.png'" test/performance/req.gnuplot
+gnuplot -e "name='Requests during POST'; filename='merge/create-req.csv'; outfile='create-req.png'" test/performance/req.gnuplot
 ```
 
 This will create four PNGs in the root of the repository. Results may vary but you should see

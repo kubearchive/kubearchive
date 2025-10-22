@@ -22,7 +22,7 @@ const (
 	continueKey     = "continue"
 	continueDateKey = "continueDate"
 	continueIdKey   = "continueId"
-	defaultLimit    = "100"
+	defaultLimit    = "30"
 	maxAllowedLimit = 1000
 	minAllowedLimit = 1
 )

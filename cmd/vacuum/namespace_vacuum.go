@@ -11,7 +11,6 @@ import (
 	"os"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
-	"github.com/kubearchive/kubearchive/pkg/filters"
 	"github.com/kubearchive/kubearchive/pkg/k8sclient"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -27,7 +26,7 @@ func namespaceVacuum(configName string) error {
 	}
 
 	// Get SinkFilter data for namespace vacuum (single namespace + global)
-	filterReader, err := filters.NewSinkFilterReader()
+	filterReader, err := NewSinkFilterReader()
 	if err != nil {
 		return fmt.Errorf("unable to create SinkFilter reader: %v", err)
 	}

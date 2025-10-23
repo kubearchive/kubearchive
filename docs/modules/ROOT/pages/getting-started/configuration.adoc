@@ -137,7 +137,8 @@ are not needed anymore. To enable deletion of resources use the `deleteWhen` key
 
 [IMPORTANT]
 ====
-KubeArchive archives resources deleted using `deleteWhen`.
+* KubeArchive archives resources deleted using `deleteWhen`.
+* Only one of `deleteWhen` or `keepLastWhen` may be specified for a resource, not both.
 ====
 
 The following KubeArchiveConfig configures KubeArchive to delete (and archive)
@@ -193,6 +194,71 @@ $ curl --insecure \
 ...
 "auto-deleted","64c48176-ba8c-4f2a-a662-1fd660f7a3b6"
 ----
+
+== `keepLastWhen`: Keeping the Last N Resources
+
+The `keepLastWhen` key provides a way to automatically maintain only the most recent N resources that match specific criteria, while deleting older ones. This is particularly useful for managing resources like completed jobs, where you want to keep only the latest few for reference while cleaning up older ones.
+
+[IMPORTANT]
+====
+* Only one of `deleteWhen` or `keepLastWhen` may be specified for a resource, not both.
+* `keepLastWhen` is only executed by vacuum operations, not during normal resource processing.
+* KubeArchive archives resources deleted using `keepLastWhen`.
+====
+
+The `keepLastWhen` configuration consists of an array of rules, each with:
+
+* `when` - CEL expression defining which resources to consider
+* `count` - Number of resources to keep (must be greater than 0)
+* `sort` - (optional) Field to sort by (defaults to `metadata.creationTimestamp`)
+
+The following KubeArchiveConfig configures KubeArchive to keep only the last 3 completed jobs, sorted by creation time:
+
+[source,yaml]
+----
+---
+apiVersion: kubearchive.org/v1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+  namespace: default
+spec:
+  resources:
+    - selector:
+        apiVersion: batch/v1
+        kind: Job
+      keepLastWhen:
+        - when: "has(status.completionTime) && metadata.name.startsWith('backup-')"
+          count: 3
+----
+
+You can also sort by other fields, such as the resource name:
+
+[source,yaml]
+----
+keepLastWhen:
+  - when: "has(status.completionTime)"
+    count: 5
+    sort: "metadata.name"
+----
+
+Multiple rules can be specified to handle different types of resources with different retention policies:
+
+[source,yaml]
+----
+keepLastWhen:
+  - when: "metadata.name.startsWith('daily-backup-')"
+    count: 7
+  - when: "metadata.name.startsWith('weekly-backup-')"
+    count: 4
+----
+
+When a vacuum operation runs, it will:
+
+1. Find all resources matching the `when` condition
+2. Sort them by the specified `sort` field
+3. Keep the last `count` resources (highest values after sorting)
+4. Delete and archive the remaining older resources
 
 == `archiveOnDelete`: Archiving on Deletion From the Cluster
 

@@ -1,11 +1,18 @@
 = Configuring Global Filters on KubeArchive
 
-KubeArchive allows cluster owners to configure global filters. These are applied
-to any KubeArchive namespace containing a `KubeArchiveConfig` custom resource.
+KubeArchive allows cluster owners to configure global filters using the `ClusterKubeArchiveConfig` custom resource.
+These filters apply to all namespaces that have a `KubeArchiveConfig` resource.
 
-To configure the global filters create a `ClusterKubeArchiveConfig` custom resource.
-Only one `ClusterKubeArchiveConfig` resource is allowed, and it must be named
-"kubearchive".  When it is created namespace these filters are considered global:
+[NOTE]
+====
+For detailed information about ClusterKubeArchiveConfig, including examples and field descriptions,
+see xref:configuration/clusterkubearchiveconfig.adoc[Configuring Cluster-Wide KubeArchive Policies].
+====
+
+== Quick Start
+
+To configure global filters create a `ClusterKubeArchiveConfig` custom resource.
+Only one `ClusterKubeArchiveConfig` resource is allowed, and it must be named "kubearchive":
 
 [source,yaml]
 ----
@@ -21,6 +28,18 @@ spec:
         kind: Pod
       archiveOnDelete: "true"
 ----
+
+== Supported Fields
+
+ClusterKubeArchiveConfig supports these fields for defining cluster-wide policies:
+
+* `archiveWhen` - CEL expression for when to archive resources (processed by controller and vacuums)
+* `deleteWhen` - CEL expression for when to delete resources (processed by controller only)
+* `archiveOnDelete` - CEL expression for archiving resources on deletion (processed by controller only)
+* `keepLastWhen` - Array of rules for keeping only the last N resources (processed by vacuums only)
+
+See xref:configuration/clusterkubearchiveconfig.adoc[Configuring Cluster-Wide KubeArchive Policies]
+for detailed descriptions, examples, and usage notes for each field.
 
 == Interaction With Local Filters
 

@@ -68,7 +68,7 @@ func TestNamespaceVacuumConfigValidateResources(t *testing.T) {
 	ckac := &ClusterKubeArchiveConfig{
 		ObjectMeta: metav1.ObjectMeta{Name: constants.KubeArchiveConfigResourceName},
 		Spec: ClusterKubeArchiveConfigSpec{
-			Resources: []KubeArchiveConfigResource{{
+			Resources: []ClusterKubeArchiveConfigResource{{
 				Selector: APIVersionKind{
 					APIVersion: "tekton.dev/v1",
 					Kind:       "TaskRun",

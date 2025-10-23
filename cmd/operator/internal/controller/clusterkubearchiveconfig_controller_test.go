@@ -31,7 +31,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 			Name: constants.KubeArchiveConfigResourceName,
 		}
 
-		jobResource := kubearchivev1.KubeArchiveConfigResource{
+		jobResource := kubearchivev1.ClusterKubeArchiveConfigResource{
 			ArchiveWhen: "status.state != 'Completed'",
 			DeleteWhen:  "status.state == 'Completed'",
 			Selector: kubearchivev1.APIVersionKind{
@@ -39,7 +39,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 				Kind:       "Job",
 			},
 		}
-		podResource := kubearchivev1.KubeArchiveConfigResource{
+		podResource := kubearchivev1.ClusterKubeArchiveConfigResource{
 			ArchiveOnDelete: "true",
 			Selector: kubearchivev1.APIVersionKind{
 				APIVersion: "v1",
@@ -51,7 +51,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 				Name: constants.KubeArchiveConfigResourceName,
 			},
 			Spec: kubearchivev1.ClusterKubeArchiveConfigSpec{
-				Resources: []kubearchivev1.KubeArchiveConfigResource{jobResource},
+				Resources: []kubearchivev1.ClusterKubeArchiveConfigResource{jobResource},
 			},
 		}
 
@@ -77,7 +77,7 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 					Expect(k8sClient.Update(ctx, ckac)).To(Succeed())
 				} else if op == "remove-resource" {
 					Expect(k8sClient.Get(ctx, clusterKACName, ckac)).To(Succeed())
-					ckac.Spec.Resources = []kubearchivev1.KubeArchiveConfigResource{jobResource}
+					ckac.Spec.Resources = []kubearchivev1.ClusterKubeArchiveConfigResource{jobResource}
 					Expect(k8sClient.Update(ctx, ckac)).To(Succeed())
 				} else if op == "delete" {
 					Expect(k8sClient.Delete(ctx, ckac)).To(Succeed())

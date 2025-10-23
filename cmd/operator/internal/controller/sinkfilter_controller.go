@@ -100,8 +100,8 @@ func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	clusterFilters := filters.ExtractClusterCELExpressionsByKind(sinkFilter)
-	namespacesByKinds := filters.ExtractNamespacesByKind(sinkFilter)
+	clusterFilters := filters.ExtractClusterCELExpressionsByKind(sinkFilter, filters.Controller)
+	namespacesByKinds := filters.ExtractNamespacesByKind(sinkFilter, filters.Controller)
 
 	if err := r.generateWatches(ctx, clusterFilters, namespacesByKinds); err != nil {
 		log.Error(err, "Failed to generate watches")

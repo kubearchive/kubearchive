@@ -29,6 +29,7 @@ func SetupCKACWebhookWithManager(mgr ctrl.Manager) error {
 
 //+kubebuilder:webhook:path=/mutate-kubearchive-org-v1-clusterkubearchiveconfig,mutating=true,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=clusterkubearchiveconfig,verbs=create;update,versions=v1,name=mclusterkubearchiveconfig.kb.io,admissionReviewVersions=v1
 
+// +kubebuilder:object:generate=false
 type ClusterKubeArchiveConfigCustomDefaulter struct{}
 
 var _ webhook.CustomDefaulter = &ClusterKubeArchiveConfigCustomDefaulter{}
@@ -40,11 +41,22 @@ func (ckaccd *ClusterKubeArchiveConfigCustomDefaulter) Default(_ context.Context
 		return fmt.Errorf("expected an ClusterKubeArchiveConfig object but got %T", obj)
 	}
 	ckaclog.Info("default", "name", ckac.Name)
+
+	// Set default values for KeepLastWhen rules
+	for i := range ckac.Spec.Resources {
+		for j := range ckac.Spec.Resources[i].KeepLastWhen {
+			if ckac.Spec.Resources[i].KeepLastWhen[j].SortBy == "" {
+				ckac.Spec.Resources[i].KeepLastWhen[j].SortBy = "metadata.creationTimestamp"
+			}
+		}
+	}
+
 	return nil
 }
 
 //+kubebuilder:webhook:path=/validate-kubearchive-org-v1-clusterkubearchiveconfig,mutating=false,failurePolicy=fail,sideEffects=None,groups=kubearchive.org,resources=clusterkubearchiveconfig,verbs=create;update,versions=v1,name=vclusterkubearchiveconfig.kb.io,admissionReviewVersions=v1
 
+// +kubebuilder:object:generate=false
 type ClusterKubeArchiveConfigCustomValidator struct {
 	kubearchiveResourceName string
 }
@@ -113,6 +125,44 @@ func (ckaccv *ClusterKubeArchiveConfigCustomValidator) validateKAC(ckac *Cluster
 				errList = append(errList, err)
 			} else {
 				errList = append(errList, validateDurationString(resource.ArchiveOnDelete)...)
+			}
+		}
+
+		// Validate KeepLastWhen rules
+		seenCELExpressions := make(map[string]string)
+		seenNames := make(map[string]int)
+		for i, rule := range resource.KeepLastWhen {
+			if rule.Name == "" {
+				errList = append(errList, fmt.Errorf("keepLastWhen[%d].name is required", i))
+			} else {
+				if existingIdx, exists := seenNames[rule.Name]; exists {
+					errList = append(errList, fmt.Errorf("keepLastWhen[%d].name '%s' duplicates keepLastWhen[%d].name; duplicate names are not allowed", i, rule.Name, existingIdx))
+				} else {
+					seenNames[rule.Name] = i
+				}
+			}
+			when := normalizeString(rule.When)
+			if when == "" {
+				errList = append(errList, fmt.Errorf("keepLastWhen[%d].when is required", i))
+			} else {
+				_, err := cel.CompileCELExpr(when)
+				if err != nil {
+					errList = append(errList, fmt.Errorf("keepLastWhen[%d].when: %w", i, err))
+				} else {
+					durErrors := validateDurationString(when)
+					for _, durErr := range durErrors {
+						errList = append(errList, fmt.Errorf("keepLastWhen[%d].when: %w", i, durErr))
+					}
+				}
+
+				if existingRuleName, exists := seenCELExpressions[when]; exists {
+					errList = append(errList, fmt.Errorf("keepLastWhen[%d].when CEL expression duplicates rule '%s'; duplicate expressions are not allowed", i, existingRuleName))
+				} else {
+					seenCELExpressions[when] = rule.Name
+				}
+			}
+			if rule.Count < 0 {
+				errList = append(errList, fmt.Errorf("keepLastWhen[%d].count must be greater than or equal to 0", i))
 			}
 		}
 	}

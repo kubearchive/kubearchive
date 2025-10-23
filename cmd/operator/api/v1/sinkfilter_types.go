@@ -17,7 +17,7 @@ var SinkFilterGVR = schema.GroupVersionResource{Group: "kubearchive.org", Versio
 // SinkFilterSpec defines the desired state of SinkFilter resource
 type SinkFilterSpec struct {
 	Namespaces map[string][]KubeArchiveConfigResource `json:"namespaces" yaml:"namespaces"`
-	Cluster    []KubeArchiveConfigResource            `json:"cluster,omitempty" yaml:"cluster,omitempty"`
+	Cluster    []ClusterKubeArchiveConfigResource     `json:"cluster,omitempty" yaml:"cluster,omitempty"`
 }
 
 // SinkFilterStatus defines the observed state of SinkFilter resource

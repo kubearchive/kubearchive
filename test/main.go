@@ -18,7 +18,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+
+	//"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -464,8 +465,13 @@ func RunLogGenerator(t testing.TB, namespace string) string {
 
 // Run a job to generate a log with specified number of lines. Returns the job name.
 func RunLogGeneratorWithLines(t testing.TB, namespace string, lines int) string {
-	clientset, _ := GetKubernetesClient(t)
 	name := fmt.Sprintf("generate-log-%s", RandomString())
+	return RunLogGeneratorWithLinesWithName(t, namespace, lines, name)
+}
+
+// Run a job to generate a log with specified number of lines and job name. Returns the job name.
+func RunLogGeneratorWithLinesWithName(t testing.TB, namespace string, lines int, name string) string {
+	clientset, _ := GetKubernetesClient(t)
 	t.Logf("Running job '%s/%s' with %d log lines", namespace, name, lines)
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -496,18 +502,29 @@ func RunLogGeneratorWithLines(t testing.TB, namespace string, lines int) string 
 }
 
 // Create a test namespace, returning the namespace name and the SA token.
+func CreateTestNamespaceWithName(t testing.TB, customCleanup bool, name string) (string, *authenticationv1.TokenRequest) {
+	return CreateTestNamespaceWithClusterAccessWithName(t, customCleanup, false, name)
+}
+
 func CreateTestNamespace(t testing.TB, customCleanup bool) (string, *authenticationv1.TokenRequest) {
-	return CreateTestNamespaceWithClusterAccess(t, customCleanup, false)
+	namespace := fmt.Sprintf("test-%03d-%s", namespaceIndex, RandomString())
+	namespaceIndex = namespaceIndex + 1
+	return CreateTestNamespaceWithName(t, customCleanup, namespace)
 }
 
 func CreateTestNamespaceWithClusterAccess(t testing.TB, customCleanup bool, clusterAccess bool) (string, *authenticationv1.TokenRequest) {
-	// Create a random name testing namespace and return the name.
+	namespace := fmt.Sprintf("test-%03d-%s", namespaceIndex, RandomString())
+	namespaceIndex = namespaceIndex + 1
+	return CreateTestNamespaceWithClusterAccessWithName(t, customCleanup, clusterAccess, namespace)
+}
+
+func CreateTestNamespaceWithClusterAccessWithName(t testing.TB, customCleanup bool, clusterAccess bool, name string) (string, *authenticationv1.TokenRequest) {
+	// Create a testing namespace with the provided name and return the name.
 	t.Helper()
 
 	clientset, _ := GetKubernetesClient(t)
 
-	namespace := fmt.Sprintf("test-%03d-%s", namespaceIndex, RandomString())
-	namespaceIndex = namespaceIndex + 1
+	namespace := name
 	t.Log("Creating test namespace '" + namespace + "'")
 
 	_, err := clientset.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
@@ -651,7 +668,7 @@ func CreateKAC(t testing.TB, filename string, namespace string) *kubearchiveapi.
 				return fmt.Errorf("SinkFilter "+constants.SinkFilterResourceName+" does not yet have filters for the namespace %s", namespace)
 			}
 			return nil
-		}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+		}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -845,20 +862,24 @@ func GetVacuumResults(t testing.TB, clientset *kubernetes.Clientset, namespace s
 
 func cleanResults(results string) string {
 	dateTimeRegex := regexp.MustCompile(`\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}`)
-	namespaceRegex := regexp.MustCompile(`test-\d{3}-[a-z0-9]{8}`)
-	jobRegex := regexp.MustCompile("generate-log-[a-z0-9]{8}")
-	jobpRegex := regexp.MustCompile("generate-log-[a-z0-9]{8}-[a-z0-9]{5}")
-	vacRegex := regexp.MustCompile("(namespace|cluster)-vacuum-[a-z0-9]{8}")
-	vacpRegex := regexp.MustCompile("(namespace|cluster)-vacuum-[a-z0-9]{8}-[a-z0-9]{5}")
+	podNameRegex := regexp.MustCompile(`name=([a-zA-Z0-9-]+)[a-zA-Z0-9]{5}(\s|$)`)
 	buffer := dateTimeRegex.ReplaceAllString(results, "yyyy/mm/dd hh:mm:ss")
-	buffer = namespaceRegex.ReplaceAllString(buffer, "test-xxx-xxxxxxxx")
-	buffer = jobpRegex.ReplaceAllString(buffer, "generate-log-xxxxxxxx-xxxxx")
-	buffer = jobRegex.ReplaceAllString(buffer, "generate-log-xxxxxxxx")
-	buffer = vacpRegex.ReplaceAllString(buffer, "$1-vacuum-xxxxxxxx-xxxxx")
-	buffer = vacRegex.ReplaceAllString(buffer, "$1-vacuum-xxxxxxxx")
-	data := strings.Split(buffer, "\n")
-	sort.Strings(data)
-	return strings.Join(data, "\n")
+
+	lines := strings.Split(buffer, "\n")
+	var filteredLines []string
+	for _, line := range lines {
+		if strings.Contains(line, "Using sink service URL") {
+			continue
+		}
+
+		if strings.Contains(line, "kind=Pod") {
+			line = podNameRegex.ReplaceAllString(line, "name=${1}xxxxx${2}")
+		}
+
+		filteredLines = append(filteredLines, line)
+	}
+
+	return strings.Join(filteredLines, "\n")
 }
 
 func ReadExpected(t testing.TB, file string) string {

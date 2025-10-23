@@ -13,8 +13,27 @@ import (
 
 var ClusterKubeArchiveConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1", Resource: "clusterkubearchiveconfigs"}
 
+// +kubebuilder:object:generate=true
+type ClusterKeepLastRule struct {
+	Name  string `json:"name" yaml:"name"`
+	Count int    `json:"count" yaml:"count"`
+	When  string `json:"when" yaml:"when"`
+	// +kubebuilder:default="metadata.creationTimestamp"
+	SortBy string `json:"sortBy,omitempty" yaml:"sortBy,omitempty"`
+}
+
+type ClusterKubeArchiveConfigResource struct {
+	Selector        APIVersionKind        `json:"selector,omitempty" yaml:"selector,omitempty"`
+	ArchiveWhen     string                `json:"archiveWhen,omitempty" yaml:"archiveWhen,omitempty"`
+	DeleteWhen      string                `json:"deleteWhen,omitempty" yaml:"deleteWhen,omitempty"`
+	ArchiveOnDelete string                `json:"archiveOnDelete,omitempty" yaml:"archiveOnDelete,omitempty"`
+	KeepLastWhen    []ClusterKeepLastRule `json:"keepLastWhen,omitempty" yaml:"keepLastWhen,omitempty"`
+}
+
 // ClusterKubeArchiveConfigSpec defines the desired state of ClusterKubeArchiveConfig
-type ClusterKubeArchiveConfigSpec KubeArchiveConfigSpec
+type ClusterKubeArchiveConfigSpec struct {
+	Resources []ClusterKubeArchiveConfigResource `json:"resources" yaml:"resources"`
+}
 
 // ClusterKubeArchiveConfigStatus defines the observed state of ClusterKubeArchiveConfig
 type ClusterKubeArchiveConfigStatus KubeArchiveConfigStatus

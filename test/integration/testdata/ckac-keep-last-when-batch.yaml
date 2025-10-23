@@ -1,0 +1,17 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: kubearchive.org/v1
+kind: ClusterKubeArchiveConfig
+metadata:
+  name: kubearchive
+spec:
+  resources:
+    - selector:
+        apiVersion: batch/v1
+        kind: Job
+      keepLastWhen:
+        - name: vacuum-job-rule
+          when: "has(status.completionTime) && metadata.name.startsWith('vacuum-job-')"
+          count: 3
+          sortBy: "metadata.creationTimestamp"

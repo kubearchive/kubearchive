@@ -1,41 +1,35 @@
-= Configuring Namespace-Specific KubeArchive Policies
+= Configuring Cluster-Wide KubeArchive Policies
 
-This document explains how to configure namespace-specific policies using KubeArchiveConfig.
-These policies apply only to the namespace where the KubeArchiveConfig is created.
-
-[NOTE]
-====
-For a comprehensive guide with more examples, see
-xref:getting-started/configuration.adoc[Configuring KubeArchive].
-====
+This document explains how to configure cluster-wide policies using ClusterKubeArchiveConfig.
+These policies apply to all namespaces that have a KubeArchiveConfig resource.
 
 == Prerequisites
 * KubeArchive installed and running in a cluster (xref:getting-started/installation.adoc[])
-* Appropriate permissions to create resources in the target namespace
+* Cluster administrator permissions
+* Familiarity with basic KubeArchiveConfig concepts (xref:getting-started/configuration.adoc[])
 
-== The KubeArchiveConfig Resource
+== The ClusterKubeArchiveConfig Resource
 
-To configure namespace-specific KubeArchive policies create a KubeArchiveConfig custom resource.
-Only one KubeArchiveConfig is allowed per namespace and it must be named `kubearchive`.
-KubeArchiveConfigs have this general form:
+To configure cluster-wide KubeArchive policies create a ClusterKubeArchiveConfig custom resource.
+Only one ClusterKubeArchiveConfig is allowed per cluster and it must be named `kubearchive`.
+ClusterKubeArchiveConfigs have this general form:
 
 [source,yaml]
 ----
 ---
 apiVersion: kubearchive.org/v1
-kind: KubeArchiveConfig
+kind: ClusterKubeArchiveConfig
 metadata:
   name: kubearchive
-  namespace: default
 spec:
   resources: [...] <1>
 ----
 
-<1> `spec.resources` is a list of elements, each defining namespace-specific rules for a specific kind.
+<1> `spec.resources` is a list of elements, each defining cluster-wide rules for a specific kind.
 
 ==  `selector`: Selecting Resources
 
-The key `selector` within KubeArchiveConfigs define resources.
+The key `selector` within ClusterKubeArchiveConfigs define resources.
 It requires two keys: `kind` and `apiVersion`.
 Each entry on `spec.resources` requires a `selector`:
 
@@ -43,10 +37,9 @@ Each entry on `spec.resources` requires a `selector`:
 ----
 ---
 apiVersion: kubearchive.org/v1
-kind: KubeArchiveConfig
+kind: ClusterKubeArchiveConfig
 metadata:
   name: kubearchive
-  namespace: default
 spec:
   resources:
     - selector:
@@ -63,7 +56,7 @@ spec:
       ...
 ----
 
-With each entry on `spec.resources` KubeArchiveConfig supports
+With each entry on `spec.resources` ClusterKubeArchiveConfig supports
 `archiveWhen`, `deleteWhen`, `archiveOnDelete`, and `keepLastWhen`.
 These keys accept a string which is an expression in the
 link:https://cel.dev[CEL language format].
@@ -72,18 +65,17 @@ evaluates the expressions. They must evaluate to either true or false.
 
 == `archiveWhen`: Archiving Resources
 
-The `archiveWhen` key defines when KubeArchive should archive resources in this namespace.
-The following example configures KubeArchive to archive pods when they match the
+The `archiveWhen` key defines when KubeArchive should archive resources cluster-wide.
+The following example configures KubeArchive to archive all pods when they match the
 `status.phase == "Succeeded"` condition:
 
 [source,yaml]
 ----
 ---
 apiVersion: kubearchive.org/v1
-kind: KubeArchiveConfig
+kind: ClusterKubeArchiveConfig
 metadata:
   name: kubearchive
-  namespace: default
 spec:
   resources:
     - selector:
@@ -104,6 +96,9 @@ to archive the resource every time its updated.
 Resources processed by the controller are handled immediately after Kubernetes sends the event.
 Resources processed by vacuums are handled based on how often the vacuum operations are scheduled to run.
 ====
+
+This policy will apply to all namespaces that have a KubeArchiveConfig resource,
+in addition to any namespace-specific `archiveWhen` rules.
 
 == `deleteWhen`: Deleting Resources
 
@@ -138,32 +133,31 @@ Using `keepLastWhen` (processed during vacuum operations):
 [source,yaml]
 ----
 keepLastWhen:
-  keep:
-    - when: "has(status.completionTime)"
-      count: 0
+  - name: delete-completed
+    when: "has(status.completionTime)"
+    count: 0
 ----
 
 The `deleteWhen` approach deletes resources immediately when they match the condition,
 while the `keepLastWhen` approach with count 0 deletes matching resources only when vacuums run.
 ====
 
-The following KubeArchiveConfig configures KubeArchive to delete (and archive)
-completed pods in the namespace:
+The following ClusterKubeArchiveConfig configures KubeArchive to delete (and archive)
+all completed jobs across the cluster:
 
 [source,yaml]
 ----
 ---
 apiVersion: kubearchive.org/v1
-kind: KubeArchiveConfig
+kind: ClusterKubeArchiveConfig
 metadata:
   name: kubearchive
-  namespace: default
 spec:
   resources:
     - selector:
-        apiVersion: v1
-        kind: Pod
-      deleteWhen: status.phase == "Succeeded"
+        apiVersion: batch/v1
+        kind: Job
+      deleteWhen: has(status.completionTime)
 ----
 
 == `keepLastWhen`: Keeping the Last N Resources
@@ -185,79 +179,22 @@ Resources are handled based on how often the vacuum operations are scheduled to 
 not immediately after Kubernetes sends events.
 ====
 
-The `keepLastWhen` configuration has two sections:
+Unlike the other fields, `keepLastWhen` consists of an array of rules, each with:
 
-=== The `keep` Section
-
-The `keep` section contains an array of rules for defining retention policies.
-Each rule in the `keep` array has:
-
-* `when` - CEL expression defining which resources to consider
+* `name` - A unique identifier for the rule that namespaces can reference for overrides
+* `when` - A CEL expression defining which resources to consider
 * `count` - Number of resources to keep (must be greater than or equal to 0; when 0,
 all matching resources are deleted)
 * `sortBy` - (optional) Field to sort by (defaults to `metadata.creationTimestamp`)
 
-The following KubeArchiveConfig configures KubeArchive to keep only the last 3 completed jobs
-in the namespace:
+=== Basic Example
+
+The following ClusterKubeArchiveConfig configures KubeArchive to keep only the last 10 completed jobs
+cluster-wide:
 
 [source,yaml]
 ----
 ---
-apiVersion: kubearchive.org/v1
-kind: KubeArchiveConfig
-metadata:
-  name: kubearchive
-  namespace: default
-spec:
-  resources:
-    - selector:
-        apiVersion: batch/v1
-        kind: Job
-      keepLastWhen:
-        keep:
-          - when: "has(status.completionTime) && metadata.name.startsWith('backup-')"
-            count: 3
-----
-
-You can also sort by other fields, such as the resource name:
-
-[source,yaml]
-----
-keepLastWhen:
-  keep:
-    - when: "has(status.completionTime)"
-      count: 5
-      sortBy: "metadata.name"
-----
-
-Multiple rules can be specified in the `keep` section to handle different types of resources
-with different retention policies:
-
-[source,yaml]
-----
-keepLastWhen:
-  keep:
-    - when: "metadata.name.startsWith('daily-backup-')"
-      count: 7
-    - when: "metadata.name.startsWith('weekly-backup-')"
-      count: 4
-----
-
-=== The `override` Section
-
-When a `ClusterKubeArchiveConfig` defines `keepLastWhen` rules,
-namespaces can override those rules to apply stricter retention policies.
-This is done using the `override` section within `keepLastWhen`.
-
-Each override must reference a cluster rule by its `name` and specify a `count`
-that is less than or equal to the cluster rule's count.
-This allows individual namespaces to keep fewer resources than the cluster-wide default
-while preventing them from keeping more resources than the cluster policy allows.
-
-For example, if a `ClusterKubeArchiveConfig` has this rule:
-
-[source,yaml]
-----
 apiVersion: kubearchive.org/v1
 kind: ClusterKubeArchiveConfig
 metadata:
@@ -273,64 +210,42 @@ spec:
           count: 10
 ----
 
-A namespace can override it to keep fewer jobs:
+=== Custom Sort Field
+
+You can sort by fields other than creation timestamp, such as the resource name:
 
 [source,yaml]
 ----
-apiVersion: kubearchive.org/v1
-kind: KubeArchiveConfig
-metadata:
-  name: kubearchive
-  namespace: production
-spec:
-  resources:
-    - selector:
-        apiVersion: batch/v1
-        kind: Job
-      keepLastWhen:
-        override:
-          - name: completed-jobs
-            count: 5
+keepLastWhen:
+  - name: completed-jobs-by-name
+    when: "has(status.completionTime)"
+    count: 5
+    sortBy: "metadata.name"
 ----
 
-In this example, the cluster policy allows keeping up to 10 completed jobs,
-but the production namespace chooses to keep only 5.
+=== Multiple Rules
 
-[NOTE]
-====
-Override rules can only reduce the count, not increase it.
-If an override specifies a count greater than the cluster rule,
-the webhook will reject the configuration.
-====
-
-=== Combining `keep` and `override` Sections
-
-You can combine both `keep` and `override` sections in the same `keepLastWhen` configuration:
+Multiple rules can be specified to handle different types of resources
+with different retention policies:
 
 [source,yaml]
 ----
-apiVersion: kubearchive.org/v1
-kind: KubeArchiveConfig
-metadata:
-  name: kubearchive
-  namespace: production
-spec:
-  resources:
-    - selector:
-        apiVersion: batch/v1
-        kind: Job
-      keepLastWhen:
-        keep:
-          - when: "metadata.name.startsWith('local-job-')"
-            count: 3
-        override:
-          - name: completed-jobs
-            count: 5
+keepLastWhen:
+  - name: daily-backups
+    when: "metadata.name.startsWith('daily-backup-')"
+    count: 7
+  - name: weekly-backups
+    when: "metadata.name.startsWith('weekly-backup-')"
+    count: 4
 ----
 
-This configuration will:
-1. Apply the namespace-specific rule to keep the last 3 local jobs
-2. Override the cluster rule to keep only 5 completed jobs instead of the cluster default
+=== Namespace Overrides
+
+Namespaces can override cluster-wide `keepLastWhen` rules to apply stricter retention policies.
+The `name` field in each cluster rule allows namespaces to reference and override specific rules.
+
+See xref:configuration/kubearchiveconfig.adoc#_the_override_section[the KubeArchiveConfig documentation]
+for detailed information and examples on using overrides.
 
 == `archiveOnDelete`: Archiving on Deletion From the Cluster
 
@@ -343,7 +258,7 @@ This allows you to use specialized deletion tools while still archiving resource
 Resources are handled immediately after Kubernetes sends the event.
 ====
 
-The following KubeArchiveConfig configures KubeArchive
+The following ClusterKubeArchiveConfig configures KubeArchive
 to archive pods when they get deleted from the cluster only if they match the
 condition `status.phase == "Succeeded"`, so failed pods that get deleted
 do not get archived:
@@ -352,10 +267,9 @@ do not get archived:
 ----
 ---
 apiVersion: kubearchive.org/v1
-kind: KubeArchiveConfig
+kind: ClusterKubeArchiveConfig
 metadata:
   name: kubearchive
-  namespace: default
 spec:
   resources:
     - selector:
@@ -364,11 +278,11 @@ spec:
       archiveOnDelete: status.phase == "Succeeded"
 ----
 
-== Interaction With Cluster Filters
+== Interaction With Namespace Filters
 
-Namespace filters configured in KubeArchiveConfig work together with cluster-wide filters
-configured in ClusterKubeArchiveConfig.
-Both cluster and namespace filters are combined with an "OR" type of logic
+Global filters configured in ClusterKubeArchiveConfig only work in namespaces
+containing a `KubeArchiveConfig` custom resource.
+Both global and namespace filters are combined with an "OR" type of logic
 and used for that specific namespace.
 
 For example, if you have this ClusterKubeArchiveConfig:
@@ -382,6 +296,10 @@ metadata:
   name: kubearchive
 spec:
   resources:
+    - selector:
+        apiVersion: batch/v1
+        kind: Job
+      deleteWhen: has(status.failed)
     - selector:
         apiVersion: v1
         kind: Pod
@@ -407,19 +325,21 @@ spec:
       deleteWhen: has(status.completionTime)
 ----
 
-KubeArchive will archive jobs when they have `status.startTime` and delete them when they
-have `status.completionTime` in the "my-team" namespace.
-Additionally, KubeArchive will also archive pods when they are deleted,
-as configured in the global ClusterKubeArchiveConfig.
+In the "my-team" namespace, KubeArchive will:
+
+* Archive jobs when they have `status.startTime` (namespace rule)
+* Delete jobs when they have `status.completionTime` OR `status.failed`
+(namespace rule OR cluster rule)
+* Archive pods when they are deleted (cluster rule)
 
 == Next Steps
 
-* Learn more about cluster-wide configuration in
-xref:configuration/clusterkubearchiveconfig.adoc[Configuring Cluster-Wide KubeArchive Policies]
-* See comprehensive examples in xref:getting-started/configuration.adoc[Configuring KubeArchive]
+* Learn more about namespace-specific configuration in
+xref:getting-started/configuration.adoc[Configuring KubeArchive]
 * Explore link:https://cel.dev/[cel.dev] to learn more about the CEL expression language
 
 [NOTE]
 ====
 All `ClusterKubeArchiveConfig` and `KubeArchiveConfig` resources must be named "kubearchive".
 ====
+

@@ -4,87 +4,37 @@
 package filters
 
 import (
-	"context"
-	"fmt"
+	"strings"
 
 	"github.com/google/cel-go/cel"
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	kcel "github.com/kubearchive/kubearchive/pkg/cel"
-	"github.com/kubearchive/kubearchive/pkg/constants"
-	"github.com/kubearchive/kubearchive/pkg/k8sclient"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/dynamic"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+type FilterType int
+
+const (
+	Vacuum FilterType = iota
+	Controller
+)
+
+type KeepLastWhenRule struct {
+	Name     string
+	When     *cel.Program
+	WhenText string
+	Count    int
+	SortBy   string
+}
 
 type CelExpressions struct {
 	ArchiveWhen     *cel.Program
 	DeleteWhen      *cel.Program
 	ArchiveOnDelete *cel.Program
+	KeepLastWhen    []KeepLastWhenRule
 }
 
-type SinkFilterReader struct {
-	dynamicClient dynamic.Interface
-}
-
-func NewSinkFilterReader() (*SinkFilterReader, error) {
-	client, err := k8sclient.NewInstrumentedDynamicClient()
-	if err != nil {
-		return nil, fmt.Errorf("unable to get dynamic client: %v", err)
-	}
-
-	return &SinkFilterReader{
-		dynamicClient: client,
-	}, nil
-}
-
-func (r *SinkFilterReader) GetSinkFilter(ctx context.Context) (*kubearchivev1.SinkFilter, error) {
-	obj, err := r.dynamicClient.Resource(kubearchivev1.SinkFilterGVR).
-		Namespace(constants.KubeArchiveNamespace).
-		Get(ctx, constants.SinkFilterResourceName, metav1.GetOptions{})
-	if err != nil {
-		if errors.IsNotFound(err) {
-			return nil, nil //nolint:nilnil
-		}
-		return nil, fmt.Errorf("failed to get SinkFilter: %v", err)
-	}
-
-	sinkFilter, err := kubearchivev1.ConvertUnstructuredToSinkFilter(obj)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert to SinkFilter: %v", err)
-	}
-
-	return sinkFilter, nil
-}
-
-func (r *SinkFilterReader) ProcessAllNamespaces(ctx context.Context) (map[string]map[string]CelExpressions, error) {
-	sinkFilter, err := r.GetSinkFilter(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if sinkFilter == nil {
-		return map[string]map[string]CelExpressions{}, nil
-	}
-
-	return ExtractNamespacesByKind(sinkFilter), nil
-}
-
-func (r *SinkFilterReader) ProcessSingleNamespace(ctx context.Context, targetNamespace string) (map[string]map[string]CelExpressions, error) {
-	sinkFilter, err := r.GetSinkFilter(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if sinkFilter == nil {
-		return map[string]map[string]CelExpressions{}, nil
-	}
-
-	return ExtractNamespaceByKind(sinkFilter, targetNamespace), nil
-}
-
-func ExtractClusterCELExpressionsByKind(sinkFilter *kubearchivev1.SinkFilter) map[string]CelExpressions {
+func ExtractClusterCELExpressionsByKind(sinkFilter *kubearchivev1.SinkFilter, filterType FilterType) map[string]CelExpressions {
 	expressionsByKind := make(map[string]CelExpressions)
 
 	if len(sinkFilter.Spec.Cluster) == 0 {
@@ -95,30 +45,40 @@ func ExtractClusterCELExpressionsByKind(sinkFilter *kubearchivev1.SinkFilter) ma
 		key := res.Selector.Kind + "-" + res.Selector.APIVersion
 
 		celExpr := CelExpressions{
-			ArchiveWhen:     CompileCELExpression(res.ArchiveWhen, "ArchiveWhen", "ckac"),
-			DeleteWhen:      CompileCELExpression(res.DeleteWhen, "DeleteWhen", "ckac"),
-			ArchiveOnDelete: CompileCELExpression(res.ArchiveOnDelete, "ArchiveOnDelete", "ckac"),
+			ArchiveWhen: CompileCELExpression(res.ArchiveWhen, "ArchiveWhen", "ckac"),
 		}
+
+		// Compile different expressions based on filter type
+		switch filterType {
+		case Vacuum:
+			// For vacuum: compile keepLastWhen only
+			celExpr.KeepLastWhen = compileClusterKeepLastWhenRules(res.KeepLastWhen, "ckac")
+		case Controller:
+			// For controller: compile deleteWhen and archiveOnDelete only
+			celExpr.DeleteWhen = CompileCELExpression(res.DeleteWhen, "DeleteWhen", "ckac")
+			celExpr.ArchiveOnDelete = CompileCELExpression(res.ArchiveOnDelete, "ArchiveOnDelete", "ckac")
+		}
+
 		expressionsByKind[key] = celExpr
 	}
 
 	return expressionsByKind
 }
 
-func ExtractNamespacesByKind(sinkFilter *kubearchivev1.SinkFilter) map[string]map[string]CelExpressions {
+func ExtractNamespacesByKind(sinkFilter *kubearchivev1.SinkFilter, filterType FilterType) map[string]map[string]CelExpressions {
 	var namespacesToProcess []string
 	for ns := range sinkFilter.Spec.Namespaces {
 		namespacesToProcess = append(namespacesToProcess, ns)
 	}
 
-	return extractNamespacesByKindsList(sinkFilter, namespacesToProcess)
+	return extractNamespacesByKindsList(sinkFilter, namespacesToProcess, filterType)
 }
 
-func ExtractNamespaceByKind(sinkFilter *kubearchivev1.SinkFilter, namespace string) map[string]map[string]CelExpressions {
-	return extractNamespacesByKindsList(sinkFilter, []string{namespace})
+func ExtractNamespaceByKind(sinkFilter *kubearchivev1.SinkFilter, namespace string, filterType FilterType) map[string]map[string]CelExpressions {
+	return extractNamespacesByKindsList(sinkFilter, []string{namespace}, filterType)
 }
 
-func extractNamespacesByKindsList(sinkFilter *kubearchivev1.SinkFilter, namespacesToProcess []string) map[string]map[string]CelExpressions {
+func extractNamespacesByKindsList(sinkFilter *kubearchivev1.SinkFilter, namespacesToProcess []string, filterType FilterType) map[string]map[string]CelExpressions {
 	namespacesByKinds := make(map[string]map[string]CelExpressions)
 
 	for _, ns := range namespacesToProcess {
@@ -131,9 +91,18 @@ func extractNamespacesByKindsList(sinkFilter *kubearchivev1.SinkFilter, namespac
 			key := res.Selector.Key()
 
 			celExpr := CelExpressions{
-				ArchiveWhen:     CompileCELExpression(res.ArchiveWhen, "ArchiveWhen", ns),
-				DeleteWhen:      CompileCELExpression(res.DeleteWhen, "DeleteWhen", ns),
-				ArchiveOnDelete: CompileCELExpression(res.ArchiveOnDelete, "ArchiveOnDelete", ns),
+				ArchiveWhen: CompileCELExpression(res.ArchiveWhen, "ArchiveWhen", ns),
+			}
+
+			// Compile different expressions based on filter type
+			switch filterType {
+			case Vacuum:
+				// For vacuum: compile keepLastWhen only
+				celExpr.KeepLastWhen = compileKeepLastWhenRules(res.KeepLastWhen, ns)
+			case Controller:
+				// For controller: compile deleteWhen and archiveOnDelete only
+				celExpr.DeleteWhen = CompileCELExpression(res.DeleteWhen, "DeleteWhen", ns)
+				celExpr.ArchiveOnDelete = CompileCELExpression(res.ArchiveOnDelete, "ArchiveOnDelete", ns)
 			}
 
 			if namespaces, exists := namespacesByKinds[key]; exists {
@@ -159,4 +128,53 @@ func CompileCELExpression(expression, expressionType, namespace string) *cel.Pro
 	}
 
 	return compiled
+}
+
+func compileKeepLastWhenRules(keepLastWhen *kubearchivev1.KeepLastWhenConfig, namespace string) []KeepLastWhenRule {
+	var compiledRules []KeepLastWhenRule
+
+	if keepLastWhen == nil {
+		return compiledRules
+	}
+
+	for _, rule := range keepLastWhen.Keep {
+		compiledRule := KeepLastWhenRule{
+			When:     CompileCELExpression(rule.When, "KeepLastWhen.Keep.When", namespace),
+			WhenText: strings.TrimSpace(rule.When),
+			Count:    rule.Count,
+			SortBy:   rule.SortBy,
+		}
+		compiledRules = append(compiledRules, compiledRule)
+	}
+
+	for _, rule := range keepLastWhen.Override {
+		compiledRule := KeepLastWhenRule{
+			Name:  rule.Name,
+			Count: rule.Count,
+		}
+		compiledRules = append(compiledRules, compiledRule)
+	}
+
+	return compiledRules
+}
+
+func compileClusterKeepLastWhenRules(keepLastWhen []kubearchivev1.ClusterKeepLastRule, namespace string) []KeepLastWhenRule {
+	var compiledRules []KeepLastWhenRule
+
+	if len(keepLastWhen) == 0 {
+		return compiledRules
+	}
+
+	for _, rule := range keepLastWhen {
+		compiledRule := KeepLastWhenRule{
+			Name:     rule.Name,
+			When:     CompileCELExpression(rule.When, "KeepLastWhen.When", namespace),
+			WhenText: strings.TrimSpace(rule.When),
+			Count:    rule.Count,
+			SortBy:   rule.SortBy,
+		}
+		compiledRules = append(compiledRules, compiledRule)
+	}
+
+	return compiledRules
 }

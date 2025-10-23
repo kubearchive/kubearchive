@@ -9,8 +9,21 @@ import (
 
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/stretchr/testify/assert"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+// mockClient is a simple mock that returns NotFound for all Get calls
+type mockClient struct {
+	client.Client
+}
+
+func (m *mockClient) Get(ctx context.Context, key types.NamespacedName, obj client.Object, opts ...client.GetOption) error {
+	return apierrors.NewNotFound(schema.GroupResource{}, key.Name)
+}
 
 func TestKubeArchiveConfigCustomDefaulter(t *testing.T) {
 	defaulter := KubeArchiveConfigCustomDefaulter{}
@@ -289,6 +302,256 @@ func TestKubeArchiveConfigValidateCELExpression(t *testing.T) {
 			warns, err = validator.ValidateDelete(context.Background(), kac)
 			assert.Nil(t, warns)
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestKubeArchiveConfigValidateKeepLastWhenKeep(t *testing.T) {
+	k9eResourceName := "kubearchive"
+	validWhen := "has(status.completionTime)"
+	invalidCEL := "status.state *^ 'Completed'"
+	invalidDuration := "duration('invalid')"
+
+	tests := []struct {
+		name          string
+		keepRules     []KeepLastKeepRule
+		validated     bool
+		expectedError string
+	}{
+		{
+			name: "Valid keep rule",
+			keepRules: []KeepLastKeepRule{
+				{
+					When:  validWhen,
+					Count: 5,
+				},
+			},
+			validated: true,
+		},
+		{
+			name: "Missing when",
+			keepRules: []KeepLastKeepRule{
+				{
+					When:  "",
+					Count: 5,
+				},
+			},
+			validated:     false,
+			expectedError: "keepLastWhen.keep[0].when is required",
+		},
+		{
+			name: "Invalid CEL expression in when",
+			keepRules: []KeepLastKeepRule{
+				{
+					When:  invalidCEL,
+					Count: 5,
+				},
+			},
+			validated:     false,
+			expectedError: "keepLastWhen.keep[0].when:",
+		},
+		{
+			name: "Invalid duration in when",
+			keepRules: []KeepLastKeepRule{
+				{
+					When:  invalidDuration,
+					Count: 5,
+				},
+			},
+			validated:     false,
+			expectedError: "keepLastWhen.keep[0].when:",
+		},
+		{
+			name: "Negative count",
+			keepRules: []KeepLastKeepRule{
+				{
+					When:  validWhen,
+					Count: -1,
+				},
+			},
+			validated:     false,
+			expectedError: "keepLastWhen.keep[0].count must be greater than or equal to 0",
+		},
+		{
+			name: "Zero count is valid",
+			keepRules: []KeepLastKeepRule{
+				{
+					When:  validWhen,
+					Count: 0,
+				},
+			},
+			validated: true,
+		},
+		{
+			name: "Duplicate CEL expression in keep rules",
+			keepRules: []KeepLastKeepRule{
+				{
+					When:  validWhen,
+					Count: 5,
+				},
+				{
+					When:  validWhen,
+					Count: 3,
+				},
+			},
+			validated:     false,
+			expectedError: "keepLastWhen.keep[1].when CEL expression duplicates keep[0]",
+		},
+		{
+			name: "Multiple valid rules with different CEL expressions",
+			keepRules: []KeepLastKeepRule{
+				{
+					When:  "has(status.completionTime)",
+					Count: 5,
+				},
+				{
+					When:  "has(status.startTime)",
+					Count: 3,
+				},
+			},
+			validated: true,
+		},
+	}
+
+	validator := KubeArchiveConfigCustomValidator{
+		kubearchiveResourceName: k9eResourceName,
+		client:                  &mockClient{},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			kac := &KubeArchiveConfig{
+				ObjectMeta: metav1.ObjectMeta{Name: k9eResourceName},
+				Spec: KubeArchiveConfigSpec{
+					Resources: []KubeArchiveConfigResource{
+						{
+							Selector: APIVersionKind{
+								Kind:       "Job",
+								APIVersion: "batch/v1",
+							},
+							KeepLastWhen: &KeepLastWhenConfig{
+								Keep: test.keepRules,
+							},
+						},
+					},
+				},
+			}
+
+			warns, err := validator.ValidateCreate(context.Background(), kac)
+			assert.Nil(t, warns)
+			if test.validated {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectedError)
+			}
+
+			warns, err = validator.ValidateUpdate(context.Background(), &KubeArchiveConfig{}, kac)
+			assert.Nil(t, warns)
+			if test.validated {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectedError)
+			}
+		})
+	}
+}
+
+func TestKubeArchiveConfigValidateKeepLastWhenOverride(t *testing.T) {
+	k9eResourceName := "kubearchive"
+
+	tests := []struct {
+		name          string
+		overrideRules []KeepLastOverrideRule
+		validated     bool
+		expectedError string
+	}{
+		{
+			name: "Override without ClusterKubeArchiveConfig",
+			overrideRules: []KeepLastOverrideRule{
+				{
+					Name:  "test-rule",
+					Count: 2,
+				},
+			},
+			validated:     false,
+			expectedError: "keepLastWhen.override specified but ClusterKubeArchiveConfig",
+		},
+		{
+			name: "Missing override name",
+			overrideRules: []KeepLastOverrideRule{
+				{
+					Name:  "",
+					Count: 2,
+				},
+			},
+			validated:     false,
+			expectedError: "keepLastWhen.override specified but ClusterKubeArchiveConfig",
+		},
+		{
+			name: "Negative count in override",
+			overrideRules: []KeepLastOverrideRule{
+				{
+					Name:  "test-rule",
+					Count: -1,
+				},
+			},
+			validated:     false,
+			expectedError: "keepLastWhen.override specified but ClusterKubeArchiveConfig",
+		},
+		{
+			name: "Zero count in override",
+			overrideRules: []KeepLastOverrideRule{
+				{
+					Name:  "test-rule",
+					Count: 0,
+				},
+			},
+			validated:     false,
+			expectedError: "keepLastWhen.override specified but ClusterKubeArchiveConfig",
+		},
+	}
+
+	validator := KubeArchiveConfigCustomValidator{
+		kubearchiveResourceName: k9eResourceName,
+		client:                  &mockClient{},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			kac := &KubeArchiveConfig{
+				ObjectMeta: metav1.ObjectMeta{Name: k9eResourceName},
+				Spec: KubeArchiveConfigSpec{
+					Resources: []KubeArchiveConfigResource{
+						{
+							Selector: APIVersionKind{
+								Kind:       "Job",
+								APIVersion: "batch/v1",
+							},
+							KeepLastWhen: &KeepLastWhenConfig{
+								Override: test.overrideRules,
+							},
+						},
+					},
+				},
+			}
+
+			warns, err := validator.ValidateCreate(context.Background(), kac)
+			assert.Nil(t, warns)
+			if test.validated {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectedError)
+			}
+
+			warns, err = validator.ValidateUpdate(context.Background(), &KubeArchiveConfig{}, kac)
+			assert.Nil(t, warns)
+			if test.validated {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), test.expectedError)
+			}
 		})
 	}
 }

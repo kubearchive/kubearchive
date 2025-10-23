@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -43,35 +44,35 @@ func TestClusterVacuum(t *testing.T) {
 		vacuumRes []resourceType
 		allRes    string
 	}{
-		"no-resources": {
+		"cvac-no-resources": {
 			expected:  "testdata/cvac-no-resources.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "testdata/vac-no-resources.yaml", addNS: true}},
 			allRes:    "",
 		},
-		"ckac-resource": {
+		"cvac-ckac-resource": {
 			expected:  "testdata/cvac-ckac-resource.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "testdata/vac-pod-resource.yaml", addNS: true}},
 			allRes:    "",
 		},
-		"kac-resource": {
+		"cvac-kac-resource": {
 			expected:  "testdata/cvac-kac-resource.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "testdata/vac-job-resource.yaml", addNS: true}},
 			allRes:    "",
 		},
-		"both-resources": {
+		"cvac-both-resources": {
 			expected:  "testdata/cvac-both-resources.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "testdata/vac-job-pod-resources.yaml", addNS: true}},
 			allRes:    "",
 		},
-		"two-namespaces": {
+		"cvac-two-namespaces": {
 			expected: "testdata/cvac-two-namespaces.txt",
 			ckac:     "testdata/ckac-with-pod.yaml",
 			kac:      "testdata/kac-with-job.yaml",
@@ -81,19 +82,47 @@ func TestClusterVacuum(t *testing.T) {
 			},
 			allRes: "",
 		},
-		"all-only": {
-			expected:  "testdata/cvac-ckac-resource.txt",
+		"cvac-all-only": {
+			expected:  "testdata/cvac-all-only.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "", addNS: false}},
 			allRes:    "testdata/vac-pod-resource.yaml",
 		},
-		"all-one-and-one": {
-			expected:  "testdata/cvac-two-namespaces.txt",
+		"cvac-all-one-and-one": {
+			expected:  "testdata/cvac-all-one-and-one.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: []resourceType{{filename: "", addNS: false}, {filename: "testdata/vac-job-resource.yaml", addNS: true}},
 			allRes:    "testdata/vac-pod-resource.yaml",
+		},
+		"cvac-keep-last-when-cluster-only": {
+			expected:  "testdata/cvac-keep-last-when-cluster-only.txt",
+			ckac:      "testdata/ckac-keep-last-when-batch.yaml",
+			kac:       "testdata/kac-empty.yaml",
+			vacuumRes: []resourceType{{filename: "testdata/vac-job-resource.yaml", addNS: true}},
+			allRes:    "",
+		},
+		"cvac-keep-last-when-override": {
+			expected:  "testdata/cvac-keep-last-when-override.txt",
+			ckac:      "testdata/ckac-keep-last-when-override.yaml",
+			kac:       "testdata/kac-keep-last-when-override.yaml",
+			vacuumRes: []resourceType{{filename: "testdata/vac-job-resource.yaml", addNS: true}},
+			allRes:    "",
+		},
+		"cvac-keep-last-when-multiple-clauses": {
+			expected:  "testdata/cvac-keep-last-when-multiple-clauses.txt",
+			ckac:      "testdata/ckac-keep-last-when-multiple.yaml",
+			kac:       "testdata/kac-empty.yaml",
+			vacuumRes: []resourceType{{filename: "testdata/vac-job-resource.yaml", addNS: true}},
+			allRes:    "",
+		},
+		"cvac-keep-last-when-count-zero": {
+			expected:  "testdata/cvac-keep-last-when-count-zero.txt",
+			ckac:      "testdata/ckac-keep-last-when-count-zero.yaml",
+			kac:       "testdata/kac-empty.yaml",
+			vacuumRes: []resourceType{{filename: "testdata/vac-job-resource.yaml", addNS: true}},
+			allRes:    "",
 		},
 	}
 
@@ -110,16 +139,40 @@ func TestClusterVacuum(t *testing.T) {
 			test.CreateCKAC(t, values.ckac)
 
 			cvc := loadCVC(t, "testdata/cvc-empty.yaml", "cluster-vacuum-test")
-			for _, data := range values.vacuumRes {
-				namespace, _ := test.CreateTestNamespace(t, false)
+			for i, data := range values.vacuumRes {
+				namespace, _ := test.CreateTestNamespaceWithName(t, false, fmt.Sprintf("test-%s-%03d", name, i+1))
 				test.CreateKAC(t, values.kac, namespace)
 
 				if data.addNS {
 					cvc.Spec.Namespaces[namespace] = loadClusterVacuumConfigNamespaceSpec(t, data.filename)
 				}
 
-				jobName := test.RunLogGenerator(t, namespace)
-				test.WaitForJob(t, clientset, namespace, jobName)
+				// For keepLastWhen tests, create multiple jobs to test the functionality
+				if strings.Contains(name, "keep-last-when") {
+					var jobNames []string
+					jobCount := 5
+					if strings.Contains(name, "multiple-clauses") {
+						jobCount = 8
+					} else if strings.Contains(name, "overlapping") {
+						jobCount = 6
+					}
+
+					for i := 0; i < jobCount; i++ {
+						jobName := fmt.Sprintf("vacuum-job-%03d", i+1)
+						test.RunLogGeneratorWithLinesWithName(t, namespace, 5, jobName)
+						jobNames = append(jobNames, jobName)
+						// Sleep for a second to ensure different creation timestamps
+						time.Sleep(1 * time.Second)
+					}
+
+					// Wait for all jobs to complete
+					for _, jobName := range jobNames {
+						test.WaitForJob(t, clientset, namespace, jobName)
+					}
+				} else {
+					jobName := test.RunLogGeneratorWithLinesWithName(t, namespace, 10, "vacuum-job-001")
+					test.WaitForJob(t, clientset, namespace, jobName)
+				}
 			}
 
 			if values.allRes != "" {

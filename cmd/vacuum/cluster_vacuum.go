@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
@@ -22,7 +23,7 @@ const (
 
 func clusterVacuum(configName string) error {
 	// Get SinkFilter data for cluster vacuum (all namespaces)
-	filterReader, err := filters.NewSinkFilterReader()
+	filterReader, err := NewSinkFilterReader()
 	if err != nil {
 		return fmt.Errorf("unable to create SinkFilter reader: %v", err)
 	}
@@ -33,8 +34,8 @@ func clusterVacuum(configName string) error {
 	}
 
 	// Extract cluster and namespace filters
-	clusterFilters := filters.ExtractClusterCELExpressionsByKind(sinkFilter)
-	namespaceFilters := filters.ExtractNamespacesByKind(sinkFilter)
+	clusterFilters := filters.ExtractClusterCELExpressionsByKind(sinkFilter, filters.Vacuum)
+	namespaceFilters := filters.ExtractNamespacesByKind(sinkFilter, filters.Vacuum)
 
 	client, err := k8sclient.NewInstrumentedDynamicClient()
 	if err != nil {
@@ -65,7 +66,7 @@ func clusterVacuum(configName string) error {
 		}
 	}
 
-	for namespace := range namespaces {
+	for _, namespace := range namespaces {
 		slog.Info("Started publishing sink events", "namespace", namespace)
 
 		value, ok := config.Spec.Namespaces[namespace]
@@ -94,7 +95,7 @@ func clusterVacuum(configName string) error {
 	return nil
 }
 
-func getNamespacesFromSinkFilter(client dynamic.Interface) (map[string]struct{}, error) {
+func getNamespacesFromSinkFilter(client dynamic.Interface) ([]string, error) {
 	obj, err := client.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 	if err != nil {
 		slog.Error("Unable to get SinkFilter", "error", err, "name", constants.SinkFilterResourceName)
@@ -107,19 +108,21 @@ func getNamespacesFromSinkFilter(client dynamic.Interface) (map[string]struct{},
 		return nil, err
 	}
 
-	namespaces := map[string]struct{}{}
+	namespaces := []string{}
 	for namespace := range sf.Spec.Namespaces {
-		namespaces[namespace] = struct{}{}
+		namespaces = append(namespaces, namespace)
 	}
+	sort.Strings(namespaces)
 	return namespaces, nil
 }
 
-func getNamespacesFromClusterVacuumConfig(config *kubearchiveapi.ClusterVacuumConfig) map[string]struct{} {
-	namespaces := map[string]struct{}{}
+func getNamespacesFromClusterVacuumConfig(config *kubearchiveapi.ClusterVacuumConfig) []string {
+	namespaces := []string{}
 	for namespace := range config.Spec.Namespaces {
 		if namespace != constants.ClusterVacuumAllNamespaces {
-			namespaces[namespace] = struct{}{}
+			namespaces = append(namespaces, namespace)
 		}
 	}
+	sort.Strings(namespaces)
 	return namespaces
 }

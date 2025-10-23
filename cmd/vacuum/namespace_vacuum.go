@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/filters"
@@ -27,7 +28,7 @@ func namespaceVacuum(configName string) error {
 	}
 
 	// Get SinkFilter data for namespace vacuum (single namespace + global)
-	filterReader, err := filters.NewSinkFilterReader()
+	filterReader, err := NewSinkFilterReader()
 	if err != nil {
 		return fmt.Errorf("unable to create SinkFilter reader: %v", err)
 	}
@@ -38,8 +39,8 @@ func namespaceVacuum(configName string) error {
 	}
 
 	// Extract cluster and namespace filters
-	clusterFilters := filters.ExtractClusterCELExpressionsByKind(sinkFilter)
-	namespaceFilters := filters.ExtractNamespaceByKind(sinkFilter, namespace)
+	clusterFilters := filters.ExtractClusterCELExpressionsByKind(sinkFilter, filters.Vacuum)
+	namespaceFilters := filters.ExtractNamespaceByKind(sinkFilter, namespace, filters.Vacuum)
 
 	client, err := k8sclient.NewInstrumentedDynamicClient()
 	if err != nil {
@@ -65,7 +66,12 @@ func namespaceVacuum(configName string) error {
 	if len(config.Spec.Resources) == 0 {
 		vcep.SendByNamespace(context.Background(), namespaceVacuumEventTypePrefix, namespace)
 	} else {
-		for _, avk := range config.Spec.Resources {
+		sortedResources := make([]kubearchiveapi.APIVersionKind, len(config.Spec.Resources))
+		copy(sortedResources, config.Spec.Resources)
+		sort.Slice(sortedResources, func(i, j int) bool {
+			return sortedResources[i].Key() < sortedResources[j].Key()
+		})
+		for _, avk := range sortedResources {
 			vcep.SendByAPIVersionKind(context.Background(), namespaceVacuumEventTypePrefix, namespace, &avk)
 		}
 	}

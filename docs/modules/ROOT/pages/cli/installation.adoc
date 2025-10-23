@@ -28,7 +28,7 @@ The easiest way to install the kubectl plugin is to download a pre-built binary 
 
 1. **Download the binary for your platform:**
 +
-[source,bash]
+[source,bash,subs="attributes"]
 ----
 # For Linux AMD64
 curl -LO {download-path}/kubectl-ka-linux-amd64

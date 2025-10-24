@@ -17,7 +17,7 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/google/cel-go v0.26.1
-	github.com/huandu/go-sqlbuilder v1.38.0
+	github.com/huandu/go-sqlbuilder v1.38.1
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/ohler55/ojg v1.26.10

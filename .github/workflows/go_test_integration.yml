@@ -63,7 +63,7 @@ jobs:
         run: |
           bash test/integration/run.sh
       - name: Archive integration test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: results
           path: integration-results

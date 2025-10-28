@@ -3,6 +3,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,6 +25,17 @@ const (
 	KubeArchive
 )
 
+type APIError struct {
+	StatusCode int
+	URL        string
+	Message    string
+	Body       string
+}
+
+func (e *APIError) Error() string {
+	return e.Message
+}
+
 // DiscoveryInterface defines the methods we need from the discovery client
 type DiscoveryInterface interface {
 	ServerGroups() (*v1.APIGroupList, error)
@@ -37,12 +49,13 @@ type ResourceInfo struct {
 	Group        string
 	GroupVersion string
 	Kind         string
+	Namespaced   bool
 }
 
 type KACLICommand interface {
 	Complete() error
 	AddFlags(flags *pflag.FlagSet)
-	GetFromAPI(api API, path string) ([]byte, error)
+	GetFromAPI(api API, path string) ([]byte, *APIError)
 	GetNamespace() (string, error)
 	ResolveResourceSpec(resourceSpec string) (*ResourceInfo, error)
 }
@@ -76,8 +89,28 @@ func NewKAOptions() *KAOptions {
 	return opts
 }
 
+func extractErrorMessage(body []byte, statusCode int, url string) string {
+	// Try to parse Kubernetes Status object for cleaner error messages
+	var status struct {
+		Message string `json:"message"`
+		Reason  string `json:"reason"`
+	}
+
+	if err := json.Unmarshal(body, &status); err == nil && status.Message != "" {
+		return status.Message
+	}
+
+	// Fallback to raw body or generic message
+	bodyStr := string(body)
+	if bodyStr != "" {
+		return fmt.Sprintf("unable to get '%s': %s (%d)", url, bodyStr, statusCode)
+	}
+
+	return fmt.Sprintf("unable to get '%s': HTTP %d", url, statusCode)
+}
+
 // GetFromAPI HTTP GET request to the given endpoint
-func (opts *KAOptions) GetFromAPI(api API, path string) ([]byte, error) {
+func (opts *KAOptions) GetFromAPI(api API, path string) ([]byte, *APIError) {
 	var restConfig *rest.Config
 	var host string
 
@@ -92,30 +125,43 @@ func (opts *KAOptions) GetFromAPI(api API, path string) ([]byte, error) {
 
 	client, err := rest.HTTPClientFor(restConfig)
 	if err != nil {
-		return nil, fmt.Errorf("error creating the HTTP client from the REST config: %w", err)
+		return nil, &APIError{
+			StatusCode: 0, // No HTTP response
+			URL:        fmt.Sprintf("%s%s", host, path),
+			Message:    fmt.Sprintf("error creating the HTTP client from the REST config: %v", err),
+			Body:       "",
+		}
 	}
 	url := fmt.Sprintf("%s%s", host, path)
 	response, err := client.Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("error on GET to '%s': %w", url, err)
+		return nil, &APIError{
+			StatusCode: 0, // No HTTP response
+			URL:        url,
+			Message:    fmt.Sprintf("error on GET to '%s': %v", url, err),
+			Body:       "",
+		}
 	}
 	defer response.Body.Close()
 
 	bodyBytes, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error deserializing the body: %w", err)
-	}
-
-	if response.StatusCode == http.StatusUnauthorized {
-		return nil, fmt.Errorf("unable to get '%s': unauthorized", url)
-	}
-
-	if response.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("unable to get '%s': not found", url)
+		return nil, &APIError{
+			StatusCode: response.StatusCode,
+			URL:        url,
+			Message:    fmt.Sprintf("error reading response body from '%s': %v", url, err),
+			Body:       "",
+		}
 	}
 
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unable to get '%s': unknown error: %s (%d)", url, string(bodyBytes), response.StatusCode)
+		message := extractErrorMessage(bodyBytes, response.StatusCode, url)
+		return nil, &APIError{
+			StatusCode: response.StatusCode,
+			URL:        url,
+			Message:    message,
+			Body:       string(bodyBytes),
+		}
 	}
 
 	return bodyBytes, nil
@@ -270,6 +316,7 @@ func (opts *KAOptions) findResourceInfo(resourceName, requestedVersion, requeste
 					Group:        gv.Group,
 					GroupVersion: apiResourceList.GroupVersion,
 					Kind:         apiResource.Kind,
+					Namespaced:   apiResource.Namespaced,
 				}
 				candidates = append(candidates, resourceInfo)
 			}

@@ -15,8 +15,8 @@ import (
 
 // MockKACLICommandForLogs implements the KACLICommand interface for logs testing
 type MockKACLICommandForLogs struct {
-	responses        map[string]string // Path -> response
-	errors           map[string]error  // Path -> error
+	responses        map[string]string           // Path -> response
+	errors           map[string]*config.APIError // Path -> error
 	completeError    error
 	namespaceValue   string
 	namespaceError   error
@@ -28,11 +28,11 @@ func NewMockKACLICommandForLogs(completeErr error, resourceInfo *config.Resource
 		completeError:    completeErr,
 		mockResourceInfo: resourceInfo,
 		responses:        make(map[string]string),
-		errors:           make(map[string]error),
+		errors:           make(map[string]*config.APIError),
 	}
 }
 
-func (m *MockKACLICommandForLogs) GetFromAPI(_ config.API, path string) ([]byte, error) {
+func (m *MockKACLICommandForLogs) GetFromAPI(_ config.API, path string) ([]byte, *config.APIError) {
 	// Check for errors first
 	if err, exists := m.errors[path]; exists {
 		return nil, err
@@ -44,7 +44,12 @@ func (m *MockKACLICommandForLogs) GetFromAPI(_ config.API, path string) ([]byte,
 	}
 
 	// If no response is configured, return an error
-	return nil, fmt.Errorf("unexpected API call to path: %s", path)
+	return nil, &config.APIError{
+		StatusCode: 500,
+		URL:        path,
+		Message:    fmt.Sprintf("unexpected API call to path: %s", path),
+		Body:       "",
+	}
 }
 
 func (m *MockKACLICommandForLogs) Complete() error {
@@ -89,7 +94,7 @@ func TestLogsComplete(t *testing.T) {
 			name: "resource/name format",
 			args: []string{"pod/test-pod"},
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedName: "test-pod", // Fixed implementation: parts[1] becomes Name
 		},
@@ -98,7 +103,7 @@ func TestLogsComplete(t *testing.T) {
 			args:          []string{"pods"},
 			labelSelector: "app=test",
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedName: "", // With labelSelector, single arg becomes resourceSpec, Name stays empty
 		},
@@ -106,7 +111,7 @@ func TestLogsComplete(t *testing.T) {
 			name: "pod name only (no labelSelector)",
 			args: []string{"pods"},
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedName: "pods", // Without labelSelector, single arg becomes Name, resourceSpec defaults to "pods"
 		},
@@ -114,7 +119,7 @@ func TestLogsComplete(t *testing.T) {
 			name: "pod name only",
 			args: []string{"test-pod"},
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedName: "test-pod", // Single arg becomes Name when no labelSelector
 		},
@@ -122,9 +127,16 @@ func TestLogsComplete(t *testing.T) {
 			name: "non-core resource",
 			args: []string{"job/test-job"},
 			resourceInfo: &config.ResourceInfo{
-				Resource: "jobs", Version: "v1", Group: "batch", GroupVersion: "batch/v1", Kind: "Job",
+				Resource: "jobs", Version: "v1", Group: "batch", GroupVersion: "batch/v1", Kind: "Job", Namespaced: true,
 			},
 			expectedName: "test-job", // Fixed implementation: parts[1] becomes Name
+		},
+		{
+			name:          "name and label selector together",
+			args:          []string{"pod/my-pod"},
+			labelSelector: "app=nginx",
+			expectError:   true,
+			errorContains: "cannot specify both a resource name and a label selector",
 		},
 		{
 			name:          "complete error",
@@ -176,7 +188,7 @@ func TestLogsRun(t *testing.T) {
 		labelSelector  string
 		namespace      string
 		responses      map[string]string
-		errors         map[string]error
+		errors         map[string]*config.APIError
 		namespaceError error
 		expectError    bool
 		errorContains  string
@@ -185,7 +197,7 @@ func TestLogsRun(t *testing.T) {
 		{
 			name: "single pod logs from pods.json",
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			resourceName: "generate-log-1-29141722-k7s8m",
 			namespace:    "generate-logs-cronjobs",
@@ -197,7 +209,7 @@ func TestLogsRun(t *testing.T) {
 		{
 			name: "pod logs with container from pods.json",
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			resourceName:  "generate-log-1-29141722-k7s8m",
 			containerName: "generate3",
@@ -210,7 +222,7 @@ func TestLogsRun(t *testing.T) {
 		{
 			name: "job logs from jobs.json",
 			resourceInfo: &config.ResourceInfo{
-				Resource: "jobs", Version: "v1", Group: "batch", GroupVersion: "batch/v1", Kind: "Job",
+				Resource: "jobs", Version: "v1", Group: "batch", GroupVersion: "batch/v1", Kind: "Job", Namespaced: true,
 			},
 			resourceName: "generate-log-1-29141722",
 			namespace:    "generate-logs-cronjobs",
@@ -222,7 +234,7 @@ func TestLogsRun(t *testing.T) {
 		{
 			name: "pods with label selector from pods.json",
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			labelSelector: "batch.kubernetes.io/job-name=generate-log-1-29141722",
 			namespace:     "generate-logs-cronjobs",
@@ -236,20 +248,25 @@ func TestLogsRun(t *testing.T) {
 		{
 			name: "API error",
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			resourceName: "generate-log-1-29141722-k7s8m",
 			namespace:    "generate-logs-cronjobs",
-			errors: map[string]error{
-				"/api/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-29141722-k7s8m/log": fmt.Errorf("connection failed"),
+			errors: map[string]*config.APIError{
+				"/api/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-29141722-k7s8m/log": &config.APIError{
+					StatusCode: 500,
+					URL:        "/api/v1/namespaces/generate-logs-cronjobs/pods/generate-log-1-29141722-k7s8m/log",
+					Message:    "connection failed",
+					Body:       "",
+				},
 			},
 			expectError:   true,
-			errorContains: "error retrieving resources from the KubeArchive API",
+			errorContains: "connection failed",
 		},
 		{
 			name: "namespace error",
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			resourceName:   "generate-log-1-29141722-k7s8m",
 			namespaceError: fmt.Errorf("namespace error"),
@@ -259,7 +276,7 @@ func TestLogsRun(t *testing.T) {
 		{
 			name: "no resources found with label selector",
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			labelSelector: "app=nonexistent",
 			namespace:     "generate-logs-cronjobs",
@@ -267,12 +284,12 @@ func TestLogsRun(t *testing.T) {
 				"/api/v1/namespaces/generate-logs-cronjobs/pods?labelSelector=app%3Dnonexistent": `{"apiVersion":"v1","kind":"List","metadata":{},"items":[]}`,
 			},
 			expectError:   true,
-			errorContains: "no resources found in the generate-logs-cronjobs namespace",
+			errorContains: "no resources found in generate-logs-cronjobs namespace",
 		},
 		{
 			name: "cronjob to jobs to pods to container logs flow",
 			resourceInfo: &config.ResourceInfo{
-				Resource: "jobs", Version: "v1", Group: "batch", GroupVersion: "batch/v1", Kind: "Job",
+				Resource: "jobs", Version: "v1", Group: "batch", GroupVersion: "batch/v1", Kind: "Job", Namespaced: true,
 			},
 			labelSelector: "job-name=generate-log-1-29141722",
 			containerName: "generate1",

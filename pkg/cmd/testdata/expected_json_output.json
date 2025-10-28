@@ -6,8 +6,9 @@
       "kind": "Pod",
       "metadata": {
         "creationTimestamp": "2025-07-08T09:54:00Z",
-        "name": "test-pod-1",
-        "namespace": "default"
+        "name": "archived-pod-1",
+        "namespace": "default",
+        "uid": "archived-pod-1-uid-12345678-1234-1234-1234-123456789abc"
       }
     },
     {
@@ -15,8 +16,9 @@
       "kind": "Pod",
       "metadata": {
         "creationTimestamp": "2025-07-08T09:54:00Z",
-        "name": "archived-pod-1",
-        "namespace": "default"
+        "name": "test-pod-1",
+        "namespace": "default",
+        "uid": "test-pod-1-uid-12345678-1234-1234-1234-123456789abc"
       }
     }
   ],

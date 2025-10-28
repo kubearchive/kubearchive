@@ -5,13 +5,15 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/kubearchive/kubearchive/pkg/cmd/config"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -23,6 +25,8 @@ type GetOptions struct {
 	AllNamespaces      bool
 	APIPath            string
 	ResourceInfo       *config.ResourceInfo
+	Name               string
+	LabelSelector      string
 	OutputFormat       *string
 	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
 	IsValidOutput      bool
@@ -46,25 +50,21 @@ func NewGetCmd() *cobra.Command {
 	o := NewGetOptions()
 
 	cmd := &cobra.Command{
-		Use:   "get [RESOURCE[.VERSION[.GROUP]]]",
-		Short: "Command to get resources from KubeArchive",
-		Args:  cobra.ExactArgs(1),
+		Use:           "get [RESOURCE[.VERSION[.GROUP]]] [NAME]",
+		Short:         "Command to get resources from KubeArchive",
+		Args:          cobra.RangeArgs(1, 2),
+		SilenceUsage:  true,
+		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var err error
-			err = o.Complete(args)
-			if err != nil {
-				return fmt.Errorf("error completing the args: %w", err)
+			if err := o.Complete(args); err != nil {
+				return err
 			}
-			err = o.Run()
-			if err != nil {
-				return fmt.Errorf("error running the command: %w", err)
-			}
-
-			return nil
+			return o.Run()
 		},
 	}
 
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', '!=', 'in', 'notin'.(e.g. -l key1=value1,key2=value2,key3 in (value3)). Matching objects must satisfy all of the specified label constraints.")
 	o.AddFlags(cmd.Flags())
 	o.JSONYamlPrintFlags.AddFlags(cmd)
 	cmd.Flags().StringVarP(o.OutputFormat, "output", "o", *o.OutputFormat, fmt.Sprintf(`Output format. One of: (%s).`, strings.Join(o.JSONYamlPrintFlags.AllowedFormats(), ", ")))
@@ -75,25 +75,41 @@ func NewGetCmd() *cobra.Command {
 func (o *GetOptions) Complete(args []string) error {
 	err := o.KACLICommand.Complete()
 	if err != nil {
-		return fmt.Errorf("error completing the args: %w", err)
+		return err
+	}
+
+	// Parse arguments - first is resource type, second (optional) is name
+	if len(args) >= 2 {
+		o.Name = args[1]
+	}
+
+	// Validate that name and label selector are not used together
+	if o.Name != "" && o.LabelSelector != "" {
+		return fmt.Errorf("cannot specify both a resource name and a label selector")
 	}
 
 	// Parse and resolve resource specification using discovery
 	resourceInfo, err := o.ResolveResourceSpec(args[0])
 	if err != nil {
-		return fmt.Errorf("error resolving resource specification: %w", err)
+		return err
 	}
 	o.ResourceInfo = resourceInfo
 
 	// Build API path
 	APIPathWithoutRoot := fmt.Sprintf("%s/%s", o.ResourceInfo.GroupVersion, o.ResourceInfo.Resource)
 
-	if !o.AllNamespaces {
+	// Only add namespace path for namespaced resources
+	if o.ResourceInfo.Namespaced && !o.AllNamespaces {
 		namespace, nsErr := o.GetNamespace()
 		if nsErr != nil {
 			return nsErr
 		}
 		APIPathWithoutRoot = fmt.Sprintf("%s/namespaces/%s/%s", o.ResourceInfo.GroupVersion, namespace, o.ResourceInfo.Resource)
+	}
+
+	// If a specific name is provided, append it to the path
+	if o.Name != "" {
+		APIPathWithoutRoot = fmt.Sprintf("%s/%s", APIPathWithoutRoot, o.Name)
 	}
 
 	// Determine if this is a core resource (no group or empty group)
@@ -103,51 +119,178 @@ func (o *GetOptions) Complete(args []string) error {
 		o.APIPath = fmt.Sprintf("/apis/%s", APIPathWithoutRoot)
 	}
 
+	// Add label selector as query parameter if provided
+	if o.LabelSelector != "" {
+		o.APIPath = fmt.Sprintf("%s?labelSelector=%s", o.APIPath, url.QueryEscape(o.LabelSelector))
+	}
+
 	return nil
 }
 
-func (o *GetOptions) parseResourcesFromBytes(bodyBytes []byte) ([]runtime.Object, error) {
+func (o *GetOptions) parseResourcesFromBytes(bodyBytes []byte) ([]*unstructured.Unstructured, error) {
+	// If a specific name was requested, the API returns a single resource, not a list
+	if o.Name != "" {
+		var resource unstructured.Unstructured
+		err := json.Unmarshal(bodyBytes, &resource)
+		if err != nil {
+			return nil, fmt.Errorf("error deserializing the body into unstructured.Unstructured: %w", err)
+		}
+		return []*unstructured.Unstructured{&resource}, nil
+	}
+
+	// Otherwise, parse as a list
 	var list unstructured.UnstructuredList
 	err := json.Unmarshal(bodyBytes, &list)
 	if err != nil {
 		return nil, fmt.Errorf("error deserializing the body into unstructured.UnstructuredList: %w", err)
 	}
 
-	// Convert unstructured objects to runtime.Object
-	var runtimeObjects []runtime.Object
-	for _, item := range list.Items {
-		runtimeObjects = append(runtimeObjects, &item)
+	// Convert unstructured objects to slice of pointers
+	var unstructuredObjects []*unstructured.Unstructured
+	for i := range list.Items {
+		unstructuredObjects = append(unstructuredObjects, &list.Items[i])
 	}
 
-	return runtimeObjects, nil
+	return unstructuredObjects, nil
+}
+
+// sortResourcesByCreationTime sorts resources by creation timestamp (newest first)
+func sortResourcesByCreationTime(resources []*unstructured.Unstructured) {
+	sort.Slice(resources, func(i, j int) bool {
+		timeI := resources[i].GetCreationTimestamp().Time
+		timeJ := resources[j].GetCreationTimestamp().Time
+
+		// If both have timestamps, compare them (newer first)
+		if !timeI.IsZero() && !timeJ.IsZero() {
+			if timeI.After(timeJ) {
+				return true
+			}
+			if timeJ.After(timeI) {
+				return false
+			}
+			// If timestamps are equal, sort by name for stable ordering
+			return resources[i].GetName() < resources[j].GetName()
+		}
+
+		// If only one has a timestamp, prioritize the one with timestamp
+		if !timeI.IsZero() && timeJ.IsZero() {
+			return true
+		}
+		if timeI.IsZero() && !timeJ.IsZero() {
+			return false
+		}
+
+		// If neither has a timestamp, sort by name for stable ordering
+		return resources[i].GetName() < resources[j].GetName()
+	})
 }
 
 func (o *GetOptions) Run() error {
-	bodyBytes, getErr := o.GetFromAPI(config.Kubernetes, o.APIPath)
-	if getErr != nil {
-		return fmt.Errorf("error retrieving the resources from Kubernetes API server: %w", getErr)
-	}
-	clusterResources, err := o.parseResourcesFromBytes(bodyBytes)
-	if err != nil {
-		return fmt.Errorf("error retrieving resources from the cluster: %w", err)
+	var allResources []*unstructured.Unstructured
+	var k8sNotFound bool
+
+	bodyBytes, apiErr := o.GetFromAPI(config.Kubernetes, o.APIPath)
+	if apiErr != nil {
+		if apiErr.StatusCode != http.StatusNotFound {
+			return apiErr
+		}
+		k8sNotFound = true
+	} else {
+		resources, parseErr := o.parseResourcesFromBytes(bodyBytes)
+		if parseErr != nil {
+			return &config.APIError{
+				StatusCode: 200,
+				URL:        "Kubernetes API",
+				Message:    fmt.Sprintf("error parsing resources from the cluster: %v", parseErr),
+				Body:       string(bodyBytes),
+			}
+		}
+
+		if o.Name != "" && len(resources) > 0 {
+			return o.printResources(resources)
+		}
+
+		allResources = resources
 	}
 
-	bodyBytes, getErr = o.GetFromAPI(config.KubeArchive, o.APIPath)
-	if getErr != nil {
-		return fmt.Errorf("error retrieving the resources from KubeArchive API server: %w", getErr)
+	bodyBytes, apiErr = o.GetFromAPI(config.KubeArchive, o.APIPath)
+	if apiErr != nil {
+		if len(allResources) > 0 {
+			return o.printResources(allResources)
+		}
+
+		if k8sNotFound && apiErr.StatusCode == http.StatusNotFound {
+			if o.Name != "" {
+				return fmt.Errorf("resource not found in Kubernetes or KubeArchive")
+			}
+			return fmt.Errorf("no resources found in Kubernetes or KubeArchive")
+		}
+
+		return apiErr
 	}
-	kubearchiveResources, err := o.parseResourcesFromBytes(bodyBytes)
-	if err != nil {
-		return fmt.Errorf("error retrieving resources from the KubeArchive API: %w", err)
+
+	kubearchiveResources, parseErr := o.parseResourcesFromBytes(bodyBytes)
+	if parseErr != nil {
+		if len(allResources) > 0 {
+			return o.printResources(allResources)
+		}
+		return &config.APIError{
+			StatusCode: 200,
+			URL:        "KubeArchive API",
+			Message:    fmt.Sprintf("error parsing resources from KubeArchive: %v", parseErr),
+			Body:       string(bodyBytes),
+		}
 	}
-	var objs []runtime.Object
-	objs = append(objs, clusterResources...)
-	objs = append(objs, kubearchiveResources...)
+
+	if o.Name != "" && len(kubearchiveResources) > 0 {
+		return o.printResources(kubearchiveResources)
+	}
+
+	resourceMap := make(map[string]*unstructured.Unstructured)
+
+	for _, obj := range allResources {
+		key := string(obj.GetUID())
+		resourceMap[key] = obj
+	}
+
+	for _, obj := range kubearchiveResources {
+		key := string(obj.GetUID())
+		if _, exists := resourceMap[key]; !exists {
+			resourceMap[key] = obj
+		}
+	}
+
+	finalResources := make([]*unstructured.Unstructured, 0, len(resourceMap))
+	for _, obj := range resourceMap {
+		finalResources = append(finalResources, obj)
+	}
+
+	if len(finalResources) == 0 {
+		if o.Name != "" {
+			return fmt.Errorf("resource not found in Kubernetes or KubeArchive")
+		}
+		if o.AllNamespaces {
+			return fmt.Errorf("no resources found")
+		} else {
+			namespace, nsErr := o.GetNamespace()
+			if nsErr != nil {
+				return nsErr
+			}
+			return fmt.Errorf("no resources found in %s namespace", namespace)
+		}
+	}
+
+	return o.printResources(finalResources)
+}
+
+func (o *GetOptions) printResources(resources []*unstructured.Unstructured) error {
+	// Sort resources by creation timestamp (newest first)
+	sortResourcesByCreationTime(resources)
 
 	if o.OutputFormat != nil && *o.OutputFormat != "" {
 		printer, printerErr := o.JSONYamlPrintFlags.ToPrinter(*o.OutputFormat)
 		if printerErr != nil {
-			return fmt.Errorf("error getting printer: %w", printerErr)
+			return printerErr
 		}
 		list := &unstructured.UnstructuredList{
 			Object: map[string]interface{}{
@@ -159,22 +302,20 @@ func (o *GetOptions) Run() error {
 			},
 		}
 
-		for _, obj := range objs {
-			if unstructuredObj, ok := obj.(*unstructured.Unstructured); ok {
-				list.Items = append(list.Items, *unstructuredObj)
-			}
+		for _, obj := range resources {
+			list.Items = append(list.Items, *obj)
 		}
 
 		if printErr := printer.PrintObj(list, o.Out); printErr != nil {
-			return fmt.Errorf("error printing list: %w", printErr)
+			return printErr
 		}
 	} else {
 		printer := printers.NewTablePrinter(printers.PrintOptions{})
 		tabWriter := printers.GetNewTabWriter(o.Out)
 		defer tabWriter.Flush()
-		for _, obj := range objs {
+		for _, obj := range resources {
 			if printErr := printer.PrintObj(obj, tabWriter); printErr != nil {
-				return fmt.Errorf("error printing object: %w", printErr)
+				return printErr
 			}
 		}
 	}

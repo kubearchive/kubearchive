@@ -30,8 +30,9 @@ func main() {
 
 func NewRootCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "kubectl-ka",
-		Short: "kubectl plugin to interact with KubeArchive",
+		Use:           "kubectl-ka",
+		Short:         "kubectl plugin to interact with KubeArchive",
+		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("Hello from the root cmd")
 			return nil

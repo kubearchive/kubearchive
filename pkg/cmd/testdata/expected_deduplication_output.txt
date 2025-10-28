@@ -1,0 +1,2 @@
+NAME            AGE
+duplicate-pod   5m

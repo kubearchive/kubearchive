@@ -43,6 +43,9 @@ func normalizeYAML(t *testing.T, yamlStr string) string {
 
 // createPodListJSON creates a PodList JSON with the given pod name and timestamp
 func createPodListJSON(podName, timestamp string) string {
+	// Generate a unique UID for each pod name
+	uid := fmt.Sprintf("%s-uid-12345678-1234-1234-1234-123456789abc", podName)
+
 	podList := map[string]interface{}{
 		"apiVersion": "v1",
 		"kind":       "PodList",
@@ -56,7 +59,40 @@ func createPodListJSON(podName, timestamp string) string {
 				"metadata": map[string]interface{}{
 					"name":              podName,
 					"namespace":         "default",
+					"uid":               uid,
 					"creationTimestamp": timestamp,
+				},
+			},
+		},
+	}
+
+	jsonBytes, _ := json.Marshal(podList)
+	return string(jsonBytes)
+}
+
+// createPodListJSONWithStatus creates a Pod list JSON with the given pod name, timestamp, and status
+func createPodListJSONWithStatus(podName, timestamp, status string) string {
+	// Use the same UID for both live and archived versions to test deduplication
+	uid := "duplicate-pod-uid-12345678-1234-1234-1234-123456789abc"
+
+	podList := map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "PodList",
+		"metadata": map[string]interface{}{
+			"resourceVersion": "",
+		},
+		"items": []map[string]interface{}{
+			{
+				"apiVersion": "v1",
+				"kind":       "Pod",
+				"metadata": map[string]interface{}{
+					"name":              podName,
+					"namespace":         "default",
+					"uid":               uid,
+					"creationTimestamp": timestamp,
+				},
+				"status": map[string]interface{}{
+					"phase": status,
 				},
 			},
 		},
@@ -70,8 +106,8 @@ func createPodListJSON(podName, timestamp string) string {
 type MockKACLICommand struct {
 	k8sResponse      string
 	k9eResponse      string
-	k8sError         error
-	k9eError         error
+	k8sError         *config.APIError
+	k9eError         *config.APIError
 	completeError    error
 	namespaceValue   string
 	namespaceError   error
@@ -90,7 +126,7 @@ func (m *MockKACLICommand) ResolveResourceSpec(resourceSpec string) (*config.Res
 	return m.mockResourceInfo, nil
 }
 
-func (m *MockKACLICommand) GetFromAPI(api config.API, _ string) ([]byte, error) {
+func (m *MockKACLICommand) GetFromAPI(api config.API, _ string) ([]byte, *config.APIError) {
 	switch api {
 	case config.Kubernetes:
 		if m.k8sError != nil {
@@ -103,7 +139,7 @@ func (m *MockKACLICommand) GetFromAPI(api config.API, _ string) ([]byte, error) 
 		}
 		return []byte(m.k9eResponse), nil
 	default:
-		return nil, fmt.Errorf("unknown API type")
+		return nil, &config.APIError{StatusCode: 500, URL: "unknown-api", Message: "unknown API type", Body: ""}
 	}
 }
 
@@ -143,6 +179,7 @@ func TestGetComplete(t *testing.T) {
 	testCases := []struct {
 		name            string
 		allNamespaces   bool
+		labelSelector   string
 		args            []string
 		resourceInfo    *config.ResourceInfo
 		expectedApiPath string
@@ -155,7 +192,7 @@ func TestGetComplete(t *testing.T) {
 			allNamespaces: false,
 			args:          []string{"pods"},
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/namespaces/default/pods",
 		},
@@ -164,7 +201,7 @@ func TestGetComplete(t *testing.T) {
 			allNamespaces: false,
 			args:          []string{"jobs.v1.batch"},
 			resourceInfo: &config.ResourceInfo{
-				Resource: "jobs", Version: "v1", Group: "batch", GroupVersion: "batch/v1", Kind: "Job",
+				Resource: "jobs", Version: "v1", Group: "batch", GroupVersion: "batch/v1", Kind: "Job", Namespaced: true,
 			},
 			expectedApiPath: "/apis/batch/v1/namespaces/default/jobs",
 		},
@@ -173,7 +210,7 @@ func TestGetComplete(t *testing.T) {
 			allNamespaces: false,
 			args:          []string{"deployments.apps"},
 			resourceInfo: &config.ResourceInfo{
-				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment",
+				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment", Namespaced: true,
 			},
 			expectedApiPath: "/apis/apps/v1/namespaces/default/deployments",
 		},
@@ -182,7 +219,7 @@ func TestGetComplete(t *testing.T) {
 			allNamespaces: false,
 			args:          []string{"deploy"},
 			resourceInfo: &config.ResourceInfo{
-				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment",
+				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment", Namespaced: true,
 			},
 			expectedApiPath: "/apis/apps/v1/namespaces/default/deployments", // Should use actual resource name
 		},
@@ -191,7 +228,7 @@ func TestGetComplete(t *testing.T) {
 			allNamespaces: false,
 			args:          []string{"pod"},
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/namespaces/default/pods", // Should use actual resource name
 		},
@@ -200,16 +237,60 @@ func TestGetComplete(t *testing.T) {
 			allNamespaces: true,
 			args:          []string{"pods"},
 			resourceInfo: &config.ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod",
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/pods",
+		},
+		{
+			name:          "core resource with name",
+			allNamespaces: false,
+			args:          []string{"pods", "my-pod"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			},
+			expectedApiPath: "/api/v1/namespaces/default/pods/my-pod",
+		},
+		{
+			name:          "non-core resource with name",
+			allNamespaces: false,
+			args:          []string{"deployments.apps", "my-deployment"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment", Namespaced: true,
+			},
+			expectedApiPath: "/apis/apps/v1/namespaces/default/deployments/my-deployment",
+		},
+		{
+			name:          "all namespaces with name (should still include name)",
+			allNamespaces: true,
+			args:          []string{"pods", "my-pod"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			},
+			expectedApiPath: "/api/v1/pods/my-pod",
+		},
+		{
+			name:          "with label selector",
+			allNamespaces: false,
+			labelSelector: "app=nginx",
+			args:          []string{"pods"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			},
+			expectedApiPath: "/api/v1/namespaces/default/pods?labelSelector=app%3Dnginx",
+		},
+		{
+			name:          "name and label selector together",
+			labelSelector: "app=nginx",
+			args:          []string{"pods", "my-pod"},
+			expectError:   true,
+			errorContains: "cannot specify both a resource name and a label selector",
 		},
 		{
 			name:          "complete error",
 			args:          []string{"pods"},
 			mockError:     fmt.Errorf("mock complete failed"),
 			expectError:   true,
-			errorContains: "error completing the args: mock complete failed",
+			errorContains: "mock complete failed",
 		},
 	}
 
@@ -219,6 +300,7 @@ func TestGetComplete(t *testing.T) {
 			mockCli := NewMockKACLICommand(tc.mockError, tc.resourceInfo)
 			options = NewTestGetOptions(mockCli)
 			options.AllNamespaces = tc.allNamespaces
+			options.LabelSelector = tc.labelSelector
 
 			err := options.Complete(tc.args)
 
@@ -239,8 +321,8 @@ func TestGetComplete(t *testing.T) {
 func TestRun(t *testing.T) {
 	testCases := []struct {
 		name               string
-		k8sError           error
-		k9eError           error
+		k8sError           *config.APIError
+		k9eError           *config.APIError
 		outputFormat       string
 		expectError        bool
 		errorContains      string
@@ -267,29 +349,90 @@ func TestRun(t *testing.T) {
 			needsNormalization: true,
 		},
 		{
-			name:          "API error",
-			k8sError:      fmt.Errorf("connection failed"),
+			name:               "deduplication - live cluster priority",
+			outputFormat:       "",
+			expectedOutputFile: "expected_deduplication_output.txt",
+			useDynamicTime:     true,
+		},
+		{
+			name:          "no resources found in namespace",
 			expectError:   true,
-			errorContains: "error retrieving the resources from Kubernetes API server",
+			errorContains: "no resources found in default namespace",
+		},
+		{
+			name:          "no resources found all namespaces",
+			expectError:   true,
+			errorContains: "no resources found",
+		},
+		{
+			name: "API error",
+			k8sError: &config.APIError{
+				StatusCode: 500,
+				URL:        "mock-k8s-url",
+				Message:    "connection failed",
+				Body:       "",
+			},
+			k9eError: &config.APIError{
+				StatusCode: 500,
+				URL:        "mock-k9e-url",
+				Message:    "network timeout",
+				Body:       "",
+			},
+			expectError:   true,
+			errorContains: "connection failed",
 		},
 		{
 			name:          "invalid output format",
 			outputFormat:  "invalid",
 			expectError:   true,
-			errorContains: "error getting printer",
+			errorContains: "unable to match a printer suitable for the output format",
 		},
 		{
 			name:          "invalid JSON response",
 			outputFormat:  "",
 			expectError:   true,
-			errorContains: "error retrieving resources from the cluster",
+			errorContains: "error parsing resources from the cluster",
+		},
+		{
+			name: "both APIs not found",
+			k8sError: &config.APIError{
+				StatusCode: 404,
+				URL:        "https://k8s/api/v1/pods",
+				Message:    "unable to get 'https://k8s/api/v1/pods': not found",
+				Body:       "",
+			},
+			k9eError: &config.APIError{
+				StatusCode: 404,
+				URL:        "https://ka/api/v1/pods",
+				Message:    "unable to get 'https://ka/api/v1/pods': not found",
+				Body:       "",
+			},
+			expectError:   true,
+			errorContains: "no resources found in Kubernetes or KubeArchive",
+		},
+		{
+			name: "kubernetes forbidden, kubearchive not found",
+			k8sError: &config.APIError{
+				StatusCode: 403,
+				URL:        "https://k8s/api/v1/clusterrolebindings",
+				Message:    "clusterrolebindings.rbac.authorization.k8s.io is forbidden: User \"manon\" cannot list resource \"clusterrolebindings\" in API group \"rbac.authorization.k8s.io\" at the cluster scope",
+				Body:       "",
+			},
+			k9eError: &config.APIError{
+				StatusCode: 404,
+				URL:        "https://ka/api/v1/clusterrolebindings",
+				Message:    "unable to get 'https://ka/api/v1/clusterrolebindings': not found",
+				Body:       "",
+			},
+			expectError:   true,
+			errorContains: "clusterrolebindings.rbac.authorization.k8s.io is forbidden: User \"manon\" cannot list resource \"clusterrolebindings\"",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			var k8sResponse, k9eResponse string
-			if !tc.expectError || tc.name == "invalid JSON response" || tc.name == "invalid output format" {
+			if !tc.expectError || tc.name == "invalid JSON response" || tc.name == "invalid output format" || tc.name == "no resources found in namespace" || tc.name == "no resources found all namespaces" || tc.name == "deduplication - live cluster priority" {
 				var timestamp string
 				if tc.useDynamicTime {
 					timestamp = time.Now().Add(-5 * time.Minute).Format(time.RFC3339)
@@ -299,7 +442,16 @@ func TestRun(t *testing.T) {
 
 				if tc.name == "invalid JSON response" {
 					k8sResponse = `invalid json`
-					k9eResponse = createPodListJSON("archived-pod-1", timestamp)
+					k9eResponse = `invalid json`
+				} else if tc.name == "no resources found in namespace" || tc.name == "no resources found all namespaces" {
+					// Return empty lists from both APIs
+					k8sResponse = `{"apiVersion": "v1", "kind": "PodList", "metadata": {"resourceVersion": ""}, "items": []}`
+					k9eResponse = `{"apiVersion": "v1", "kind": "PodList", "metadata": {"resourceVersion": ""}, "items": []}`
+				} else if tc.name == "deduplication - live cluster priority" {
+					// Both APIs return the same pod name but with different statuses
+					// The live cluster version should be kept (Running status)
+					k8sResponse = createPodListJSONWithStatus("duplicate-pod", timestamp, "Running")
+					k9eResponse = createPodListJSONWithStatus("duplicate-pod", timestamp, "Succeeded")
 				} else {
 					k8sResponse = createPodListJSON("test-pod-1", timestamp)
 					k9eResponse = createPodListJSON("archived-pod-1", timestamp)
@@ -317,6 +469,11 @@ func TestRun(t *testing.T) {
 			opts := NewTestGetOptions(mockCLI)
 			opts.APIPath = "/api/v1/pods"
 			opts.OutputFormat = &tc.outputFormat
+
+			// Set AllNamespaces flag for the all-namespaces test case
+			if tc.name == "no resources found all namespaces" {
+				opts.AllNamespaces = true
+			}
 
 			var outBuf bytes.Buffer
 			opts.IOStreams = genericiooptions.IOStreams{Out: &outBuf}

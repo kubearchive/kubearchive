@@ -452,7 +452,7 @@ func TestGetFromAPI(t *testing.T) {
 				w.WriteHeader(http.StatusUnauthorized)
 			},
 			expectError:   true,
-			errorContains: "unauthorized",
+			errorContains: "HTTP 401",
 		},
 		{
 			name: "not found response",
@@ -462,7 +462,7 @@ func TestGetFromAPI(t *testing.T) {
 				w.WriteHeader(http.StatusNotFound)
 			},
 			expectError:   true,
-			errorContains: "not found",
+			errorContains: "HTTP 404",
 		},
 		{
 			name: "server error with body",
@@ -473,7 +473,7 @@ func TestGetFromAPI(t *testing.T) {
 				_, _ = w.Write([]byte(`Error details`))
 			},
 			expectError:   true,
-			errorContains: "unknown error: Error details (500)",
+			errorContains: "Error details (500)",
 		},
 		{
 			name:          "network error",
@@ -508,15 +508,15 @@ func TestGetFromAPI(t *testing.T) {
 				},
 			}
 
-			result, err := opts.GetFromAPI(tc.api, tc.path)
+			result, apiErr := opts.GetFromAPI(tc.api, tc.path)
 
 			if tc.expectError {
-				assert.Error(t, err)
+				assert.NotNil(t, apiErr)
 				if tc.errorContains != "" {
-					assert.Contains(t, err.Error(), tc.errorContains)
+					assert.Contains(t, apiErr.Error(), tc.errorContains)
 				}
 			} else {
-				assert.NoError(t, err)
+				assert.Nil(t, apiErr)
 				assert.Equal(t, tc.expectedBody, string(result))
 			}
 		})

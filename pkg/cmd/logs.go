@@ -54,24 +54,18 @@ func NewLogCmd() *cobra.Command {
 	o := NewLogsOptions()
 
 	cmd := &cobra.Command{
-		Use:     "logs ([RESOURCE[.VERSION[.GROUP]]/NAME] | [RESOURCE[.VERSION[.GROUP]]] | [NAME])",
-		Short:   "Command to get logs resources from KubeArchive",
-		Long:    logsLong,
-		Example: logsExample,
-		Args:    cobra.ExactArgs(1),
+		Use:           "logs ([RESOURCE[.VERSION[.GROUP]]/NAME] | [RESOURCE[.VERSION[.GROUP]]] | [NAME])",
+		Short:         "Command to get logs resources from KubeArchive",
+		Long:          logsLong,
+		Example:       logsExample,
+		Args:          cobra.ExactArgs(1),
+		SilenceUsage:  true,
+		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var err error
-			err = o.Complete(args)
-			if err != nil {
-				return fmt.Errorf("error completing the args: %w", err)
+			if err := o.Complete(args); err != nil {
+				return err
 			}
-
-			err = o.Run(cmd)
-			if err != nil {
-				return fmt.Errorf("error running the command: %w", err)
-			}
-
-			return nil
+			return o.Run(cmd)
 		},
 	}
 
@@ -85,7 +79,7 @@ func NewLogCmd() *cobra.Command {
 func (o *LogsOptions) Complete(args []string) error {
 	err := o.KACLICommand.Complete()
 	if err != nil {
-		return fmt.Errorf("error completing the args: %w", err)
+		return err
 	}
 
 	arg := args[0]
@@ -107,9 +101,14 @@ func (o *LogsOptions) Complete(args []string) error {
 		return fmt.Errorf("invalid resource/name format: %s", arg)
 	}
 
+	// Validate that name and label selector are not used together
+	if o.Name != "" && o.LabelSelector != "" {
+		return fmt.Errorf("cannot specify both a resource name and a label selector")
+	}
+
 	o.ResourceInfo, err = o.ResolveResourceSpec(resourceSpec)
 	if err != nil {
-		return fmt.Errorf("error resolving resource spec: %w", err)
+		return err
 	}
 
 	return nil
@@ -129,19 +128,24 @@ func (o *LogsOptions) Run(cmd *cobra.Command) error {
 	names := make([]string, 0)
 	if o.LabelSelector != "" {
 		apiPath := fmt.Sprintf("%s/%s/namespaces/%s/%s?labelSelector=%s", apiPrefix, o.ResourceInfo.GroupVersion, ns, o.ResourceInfo.Resource, url.QueryEscape(o.LabelSelector))
-		bodyBytes, err := o.GetFromAPI(config.KubeArchive, apiPath)
-		if err != nil {
-			return fmt.Errorf("error while retrieving resources with labelSelector: %w", err)
+		bodyBytes, apiErr := o.GetFromAPI(config.KubeArchive, apiPath)
+		if apiErr != nil {
+			return apiErr
 		}
 
 		var list unstructured.UnstructuredList
-		err = json.Unmarshal(bodyBytes, &list)
+		err := json.Unmarshal(bodyBytes, &list)
 		if err != nil {
-			return fmt.Errorf("error deserializing the body into unstructured.UnstructuredList: %w", err)
+			return &config.APIError{
+				StatusCode: 200,
+				URL:        "KubeArchive API",
+				Message:    fmt.Sprintf("error deserializing the body into unstructured.UnstructuredList: %v", err),
+				Body:       string(bodyBytes),
+			}
 		}
 
 		if len(list.Items) == 0 {
-			return fmt.Errorf("no resources found in the %s namespace", ns)
+			return fmt.Errorf("no resources found in %s namespace", ns)
 		}
 
 		for _, resource := range list.Items {
@@ -157,9 +161,9 @@ func (o *LogsOptions) Run(cmd *cobra.Command) error {
 			apiPath = fmt.Sprintf("%s?container=%s", apiPath, o.ContainerName)
 		}
 
-		kubearchiveLog, err := o.GetFromAPI(config.KubeArchive, apiPath)
-		if err != nil {
-			return fmt.Errorf("error retrieving resources from the KubeArchive API: %w", err)
+		kubearchiveLog, apiErr := o.GetFromAPI(config.KubeArchive, apiPath)
+		if apiErr != nil {
+			return apiErr
 		}
 
 		fmt.Fprintln(cmd.OutOrStdout(), string(kubearchiveLog))

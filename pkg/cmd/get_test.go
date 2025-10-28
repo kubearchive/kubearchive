@@ -41,39 +41,31 @@ func normalizeYAML(t *testing.T, yamlStr string) string {
 	return string(normalized)
 }
 
-// createPodListJSON creates a PodList JSON with the given pod name and timestamp
-func createPodListJSON(podName, timestamp string) string {
-	// Generate a unique UID for each pod name
-	uid := fmt.Sprintf("%s-uid-12345678-1234-1234-1234-123456789abc", podName)
+// createPodListJSON creates a PodList JSON with the given pod name, timestamp, and optional status
+// If status is empty, no status field is added. If uid is empty, a unique UID is generated based on pod name.
+func createPodListJSON(podName, timestamp, status, uid string) string {
+	// Generate a unique UID if not provided
+	if uid == "" {
+		uid = fmt.Sprintf("%s-uid-12345678-1234-1234-1234-123456789abc", podName)
+	}
 
-	podList := map[string]interface{}{
+	pod := map[string]interface{}{
 		"apiVersion": "v1",
-		"kind":       "PodList",
+		"kind":       "Pod",
 		"metadata": map[string]interface{}{
-			"resourceVersion": "",
-		},
-		"items": []map[string]interface{}{
-			{
-				"apiVersion": "v1",
-				"kind":       "Pod",
-				"metadata": map[string]interface{}{
-					"name":              podName,
-					"namespace":         "default",
-					"uid":               uid,
-					"creationTimestamp": timestamp,
-				},
-			},
+			"name":              podName,
+			"namespace":         "default",
+			"uid":               uid,
+			"creationTimestamp": timestamp,
 		},
 	}
 
-	jsonBytes, _ := json.Marshal(podList)
-	return string(jsonBytes)
-}
-
-// createPodListJSONWithStatus creates a Pod list JSON with the given pod name, timestamp, and status
-func createPodListJSONWithStatus(podName, timestamp, status string) string {
-	// Use the same UID for both live and archived versions to test deduplication
-	uid := "duplicate-pod-uid-12345678-1234-1234-1234-123456789abc"
+	// Add status if provided
+	if status != "" {
+		pod["status"] = map[string]interface{}{
+			"phase": status,
+		}
+	}
 
 	podList := map[string]interface{}{
 		"apiVersion": "v1",
@@ -81,21 +73,7 @@ func createPodListJSONWithStatus(podName, timestamp, status string) string {
 		"metadata": map[string]interface{}{
 			"resourceVersion": "",
 		},
-		"items": []map[string]interface{}{
-			{
-				"apiVersion": "v1",
-				"kind":       "Pod",
-				"metadata": map[string]interface{}{
-					"name":              podName,
-					"namespace":         "default",
-					"uid":               uid,
-					"creationTimestamp": timestamp,
-				},
-				"status": map[string]interface{}{
-					"phase": status,
-				},
-			},
-		},
+		"items": []map[string]interface{}{pod},
 	}
 
 	jsonBytes, _ := json.Marshal(podList)
@@ -172,6 +150,8 @@ func NewTestGetOptions(mockCLI config.KACLICommand) *GetOptions {
 			Out:    nil,
 			ErrOut: nil,
 		},
+		InCluster: true,
+		Archived:  true,
 	}
 }
 
@@ -186,6 +166,10 @@ func TestGetComplete(t *testing.T) {
 		mockError       error
 		expectError     bool
 		errorContains   string
+		inCluster       bool
+		archived        bool
+		setInCluster    bool
+		setArchived     bool
 	}{
 		{
 			name:          "core resource",
@@ -286,6 +270,52 @@ func TestGetComplete(t *testing.T) {
 			errorContains: "cannot specify both a resource name and a label selector",
 		},
 		{
+			name: "both flags true - valid",
+			args: []string{"pods"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			},
+			inCluster:       true,
+			archived:        true,
+			setInCluster:    true,
+			setArchived:     true,
+			expectedApiPath: "/api/v1/namespaces/default/pods",
+		},
+		{
+			name: "in-cluster true, archived false - valid",
+			args: []string{"pods"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			},
+			inCluster:       true,
+			archived:        false,
+			setInCluster:    true,
+			setArchived:     true,
+			expectedApiPath: "/api/v1/namespaces/default/pods",
+		},
+		{
+			name: "in-cluster false, archived true - valid",
+			args: []string{"pods"},
+			resourceInfo: &config.ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			},
+			inCluster:       false,
+			archived:        true,
+			setInCluster:    true,
+			setArchived:     true,
+			expectedApiPath: "/api/v1/namespaces/default/pods",
+		},
+		{
+			name:          "both flags false - invalid",
+			args:          []string{"pods"},
+			inCluster:     false,
+			archived:      false,
+			setInCluster:  true,
+			setArchived:   true,
+			expectError:   true,
+			errorContains: "at least one of --in-cluster or --archived must be true",
+		},
+		{
 			name:          "complete error",
 			args:          []string{"pods"},
 			mockError:     fmt.Errorf("mock complete failed"),
@@ -301,6 +331,14 @@ func TestGetComplete(t *testing.T) {
 			options = NewTestGetOptions(mockCli)
 			options.AllNamespaces = tc.allNamespaces
 			options.LabelSelector = tc.labelSelector
+
+			// Set flags if specified in test case
+			if tc.setInCluster {
+				options.InCluster = tc.inCluster
+			}
+			if tc.setArchived {
+				options.Archived = tc.archived
+			}
 
 			err := options.Complete(tc.args)
 
@@ -319,8 +357,25 @@ func TestGetComplete(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
+	// Pre-calculate timestamp for consistent testing
+	timestamp := time.Now().Add(-5 * time.Minute).Format(time.RFC3339)
+	staticTimestamp := "2025-07-08T09:54:00Z"
+
+	// Pre-generate common responses
+	emptyPodList := `{"apiVersion": "v1", "kind": "PodList", "metadata": {"resourceVersion": ""}, "items": []}`
+	testPod1 := createPodListJSON("test-pod-1", timestamp, "", "")
+	archivedPod1 := createPodListJSON("archived-pod-1", timestamp, "", "")
+	clusterOnlyPod := createPodListJSON("cluster-only-pod", timestamp, "", "")
+	archiveOnlyPod := createPodListJSON("archive-only-pod", timestamp, "", "")
+	duplicateUID := "duplicate-pod-uid-12345678-1234-1234-1234-123456789abc"
+	duplicatePodK8s := createPodListJSON("duplicate-pod", timestamp, "Running", duplicateUID)
+	duplicatePodArchive := createPodListJSON("duplicate-pod", timestamp, "Succeeded", duplicateUID)
+	invalidJSON := `invalid json`
+
 	testCases := []struct {
 		name               string
+		k8sResponse        string
+		k9eResponse        string
 		k8sError           *config.APIError
 		k9eError           *config.APIError
 		outputFormat       string
@@ -328,41 +383,92 @@ func TestRun(t *testing.T) {
 		errorContains      string
 		expectedOutputFile string
 		needsNormalization bool
-		useDynamicTime     bool
+		inCluster          bool
+		archived           bool
+		setInCluster       bool
+		setArchived        bool
+		allNamespaces      bool
 	}{
 		{
-			name:               "table output",
+			name:               "table output with availability columns",
+			k8sResponse:        testPod1,
+			k9eResponse:        archivedPod1,
 			outputFormat:       "",
 			expectedOutputFile: "expected_table_output.txt",
-			useDynamicTime:     true,
 		},
 		{
 			name:               "JSON output",
+			k8sResponse:        createPodListJSON("test-pod-1", staticTimestamp, "", ""),
+			k9eResponse:        createPodListJSON("archived-pod-1", staticTimestamp, "", ""),
 			outputFormat:       "json",
 			expectedOutputFile: "expected_json_output.json",
 			needsNormalization: true,
 		},
 		{
 			name:               "YAML output",
+			k8sResponse:        createPodListJSON("test-pod-1", staticTimestamp, "", ""),
+			k9eResponse:        createPodListJSON("archived-pod-1", staticTimestamp, "", ""),
 			outputFormat:       "yaml",
 			expectedOutputFile: "expected_yaml_output.yaml",
 			needsNormalization: true,
 		},
 		{
-			name:               "deduplication - live cluster priority",
+			name:               "deduplication - live cluster priority with availability",
+			k8sResponse:        duplicatePodK8s,
+			k9eResponse:        duplicatePodArchive,
 			outputFormat:       "",
 			expectedOutputFile: "expected_deduplication_output.txt",
-			useDynamicTime:     true,
+		},
+		{
+			name:               "only in cluster",
+			k8sResponse:        clusterOnlyPod,
+			k9eResponse:        emptyPodList,
+			outputFormat:       "",
+			expectedOutputFile: "expected_only_in_cluster.txt",
+		},
+		{
+			name:               "only in archive",
+			k8sResponse:        emptyPodList,
+			k9eResponse:        archiveOnlyPod,
+			outputFormat:       "",
+			expectedOutputFile: "expected_only_in_archive.txt",
+		},
+		{
+			name:               "in-cluster flag only",
+			k8sResponse:        clusterOnlyPod,
+			k9eResponse:        emptyPodList,
+			outputFormat:       "",
+			expectedOutputFile: "expected_only_in_cluster.txt",
+			inCluster:          true,
+			archived:           false,
+			setInCluster:       true,
+			setArchived:        true,
+		},
+		{
+			name:               "archived flag only",
+			k8sResponse:        emptyPodList,
+			k9eResponse:        archiveOnlyPod,
+			outputFormat:       "",
+			expectedOutputFile: "expected_only_in_archive.txt",
+			inCluster:          false,
+			archived:           true,
+			setInCluster:       true,
+			setArchived:        true,
 		},
 		{
 			name:          "no resources found in namespace",
+			k8sResponse:   emptyPodList,
+			k9eResponse:   emptyPodList,
 			expectError:   true,
 			errorContains: "no resources found in default namespace",
 		},
 		{
 			name:          "no resources found all namespaces",
+			k8sResponse:   emptyPodList,
+			k9eResponse:   emptyPodList,
 			expectError:   true,
 			errorContains: "no resources found",
+			allNamespaces: true,
 		},
 		{
 			name: "API error",
@@ -383,12 +489,16 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name:          "invalid output format",
+			k8sResponse:   testPod1,
+			k9eResponse:   archivedPod1,
 			outputFormat:  "invalid",
 			expectError:   true,
 			errorContains: "unable to match a printer suitable for the output format",
 		},
 		{
 			name:          "invalid JSON response",
+			k8sResponse:   invalidJSON,
+			k9eResponse:   invalidJSON,
 			outputFormat:  "",
 			expectError:   true,
 			errorContains: "error parsing resources from the cluster",
@@ -431,36 +541,9 @@ func TestRun(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var k8sResponse, k9eResponse string
-			if !tc.expectError || tc.name == "invalid JSON response" || tc.name == "invalid output format" || tc.name == "no resources found in namespace" || tc.name == "no resources found all namespaces" || tc.name == "deduplication - live cluster priority" {
-				var timestamp string
-				if tc.useDynamicTime {
-					timestamp = time.Now().Add(-5 * time.Minute).Format(time.RFC3339)
-				} else {
-					timestamp = "2025-07-08T09:54:00Z"
-				}
-
-				if tc.name == "invalid JSON response" {
-					k8sResponse = `invalid json`
-					k9eResponse = `invalid json`
-				} else if tc.name == "no resources found in namespace" || tc.name == "no resources found all namespaces" {
-					// Return empty lists from both APIs
-					k8sResponse = `{"apiVersion": "v1", "kind": "PodList", "metadata": {"resourceVersion": ""}, "items": []}`
-					k9eResponse = `{"apiVersion": "v1", "kind": "PodList", "metadata": {"resourceVersion": ""}, "items": []}`
-				} else if tc.name == "deduplication - live cluster priority" {
-					// Both APIs return the same pod name but with different statuses
-					// The live cluster version should be kept (Running status)
-					k8sResponse = createPodListJSONWithStatus("duplicate-pod", timestamp, "Running")
-					k9eResponse = createPodListJSONWithStatus("duplicate-pod", timestamp, "Succeeded")
-				} else {
-					k8sResponse = createPodListJSON("test-pod-1", timestamp)
-					k9eResponse = createPodListJSON("archived-pod-1", timestamp)
-				}
-			}
-
 			mockCLI := &MockKACLICommand{
-				k8sResponse:    k8sResponse,
-				k9eResponse:    k9eResponse,
+				k8sResponse:    tc.k8sResponse,
+				k9eResponse:    tc.k9eResponse,
 				k8sError:       tc.k8sError,
 				k9eError:       tc.k9eError,
 				namespaceValue: "default",
@@ -469,10 +552,14 @@ func TestRun(t *testing.T) {
 			opts := NewTestGetOptions(mockCLI)
 			opts.APIPath = "/api/v1/pods"
 			opts.OutputFormat = &tc.outputFormat
+			opts.AllNamespaces = tc.allNamespaces
 
-			// Set AllNamespaces flag for the all-namespaces test case
-			if tc.name == "no resources found all namespaces" {
-				opts.AllNamespaces = true
+			// Set flags if specified in test case
+			if tc.setInCluster {
+				opts.InCluster = tc.inCluster
+			}
+			if tc.setArchived {
+				opts.Archived = tc.archived
 			}
 
 			var outBuf bytes.Buffer

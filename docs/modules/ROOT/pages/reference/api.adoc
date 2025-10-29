@@ -1,7 +1,18 @@
 = API reference
 
-This document contains the endpoints of the KubeArchive API and
-the query parameters they support.
+This document contains the endpoints and features supported
+by the KubeArchive API. It also lists the query parameters each
+endpoint supports.
+
+== General Features
+
+=== gzip Compression
+
+The KubeArchive API supports gzip compression using the
+link:https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Compression[standard headers for compression].
+To receive compressed content, the client should send an `Accept-Encoding`
+header with `gzip` among its values. KubeArchive response will contain a
+`Content-Encoding: gzip` header. Note that error responses are not compressed.
 
 == Related to Kubernetes
 
@@ -191,6 +202,7 @@ Examples:
 ----
 
 Parameters allowed:
+
 * `container`: name of the container to select the log from, defaults to an
 empty string.
 

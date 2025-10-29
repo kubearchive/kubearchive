@@ -15,6 +15,7 @@ import (
 	"time"
 
 	ce "github.com/cloudevents/sdk-go/v2"
+	cehttp "github.com/cloudevents/sdk-go/v2/protocol/http"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
@@ -295,8 +296,9 @@ func (r *SinkFilterReconciler) watchLoop(ctx context.Context, watchInfo *WatchIn
 }
 
 func (r *SinkFilterReconciler) createWatch(ctx context.Context, gvr schema.GroupVersionResource, resourceVersion string) (watch.Interface, error) {
+	timeoutSeconds := int64(240)
 	listOptions := metav1.ListOptions{
-		TimeoutSeconds:  randomTimeout(), // Timeout between 5-10 minutes
+		TimeoutSeconds:  &timeoutSeconds,
 		ResourceVersion: resourceVersion,
 	}
 
@@ -439,14 +441,29 @@ func (r *SinkFilterReconciler) sendCloudEvent(ctx context.Context, eventType str
 		resource["kind"] = watchInfo.KindSelector.Kind
 	}
 
-	result := r.cloudEventPublisher.Send(ctx, "org.kubearchive.sinkfilters.resource."+eventType, resource)
-	if !ce.IsACK(result) {
-		message := "Cloud event send failed"
-		if ce.IsNACK(result) {
-			message = "Cloud event was not acknowledged"
-		}
-		log.Error(nil, message, "eventType", eventType, "gvr", watchInfo.GVR.String(), "kind", watchInfo.KindSelector.Kind, "result", result)
+	fullEventType := "org.kubearchive.sinkfilters.resource." + eventType
+	result := r.cloudEventPublisher.Send(ctx, fullEventType, resource)
+
+	var httpResult *cehttp.Result
+	statusCode := 0
+	if ce.ResultAs(result, &httpResult) {
+		statusCode = httpResult.StatusCode
 	}
+
+	var msg string
+	if ce.IsACK(result) {
+		msg = "Event sent successfully"
+	} else {
+		msg = "Event send failed"
+	}
+
+	log.Info(msg,
+		"apiversion", watchInfo.KindSelector.APIVersion,
+		"kind", watchInfo.KindSelector.Kind,
+		"namespace", unstructuredObj.GetNamespace(),
+		"name", unstructuredObj.GetName(),
+		"eventType", fullEventType,
+		"code", statusCode)
 }
 
 func (r *SinkFilterReconciler) SetupWithManager(mgr ctrl.Manager) error {

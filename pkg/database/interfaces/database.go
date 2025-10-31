@@ -24,7 +24,8 @@ type DBReader interface {
 	QueryResources(ctx context.Context, kind, apiVersion, namespace,
 		name, continueId, continueDate string, labelFilters *models.LabelFilters,
 		creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error)
-	QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (string, string, error)
+	QueryResourceByUID(ctx context.Context, uid string) (*models.Resource, error)
+	QueryLogURL(ctx context.Context, kind, apiVersion, namespace, identifier, containerName string, useUID bool) (string, string, error)
 	Ping(ctx context.Context) error
 	QueryDatabaseSchemaVersion(ctx context.Context) (string, error)
 	CloseDB() error

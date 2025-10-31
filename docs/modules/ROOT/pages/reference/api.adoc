@@ -1,8 +1,11 @@
 = API reference
 
-This document contains the endpoints and features supported
-by the KubeArchive API. It also lists the query parameters each
-endpoint supports.
+The design of the KubeArchive API makes it offer the same experience
+than the Kubernetes API, so it is compatible with the tools that
+call the Kubernetes API. In addition, the KubeArchive API provides
+some features that make sense for databases: search by `uid`, search
+using wildcard, ... This document contains the endpoints, query paramaters
+and features the KubeArchive API supports.
 
 == General Features
 
@@ -171,6 +174,8 @@ Examples:
 
 == Individual Resources
 
+=== By Name
+
 [source,text]
 ----
 /apis/:group/:version/namespaces/:namespace/:resourceType/:name
@@ -185,12 +190,32 @@ Examples:
 /api/v1/namespaces/default/pods/busybox-tooling
 ----
 
+=== By UID
+
+[source,text]
+----
+/apis/:group/:version/namespaces/:namespace/:resourceType/uid/:uid
+/api/:version/namespaces/:namespace/:resourceType/uid/:uid
+----
+
+Examples:
+
+[source,text]
+----
+/apis/batch/v1/namespaces/default/cronjobs/uid/ee275be0-cd4c-4aad-b8c3-710670f9c8e5
+/api/v1/namespaces/default/pods/uid/1d39c207-e5f9-4ba1-8fa9-49bb2f8545f3
+----
+
 === Logs
+
+Retrieving logs is supported in both "by name" and "by uid" endpoints:
 
 [source,text]
 ----
 /apis/:group/:version/namespaces/:namespace/:resourceType/:name/log
 /api/:version/namespaces/:namespace/:resourceType/:name/log
+/apis/:group/:version/namespaces/:namespace/:resourceType/uid/:uid/log
+/api/:version/namespaces/:namespace/:resourceType/uid/:uid/log
 ----
 
 Examples:
@@ -199,6 +224,8 @@ Examples:
 ----
 /apis/batch/v1/namespaces/default/cronjobs/cleanup-tasks/log
 /api/v1/namespaces/default/pods/busybox-tooling/log
+/apis/batch/v1/namespaces/default/cronjobs/uid/94620f8e-3623-46ce-b6e6-d21342ed1857/log
+/api/v1/namespaces/default/pods/uid/ea68b462-9725-4e67-a96f-b4b9d3bed25c/log
 ----
 
 Parameters allowed:

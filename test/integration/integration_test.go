@@ -13,9 +13,11 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	"github.com/google/uuid"
 	"github.com/kubearchive/kubearchive/test"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // TestKubeArchiveDeployments is redundant with the kubectl rollout status from the hack/quick-install.sh
@@ -63,10 +65,8 @@ func TestNormalOperation(t *testing.T) {
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 	test.RunLogGenerator(t, namespaceName)
 
-	// Retrieve the objects from the DB using the API.
+	t.Log("Getting list of jobs")
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs", port, namespaceName)
-
-	// Retrieve the objects from the DB using the API.
 	retryErr := retry.Do(func() error {
 		list, getUrlErr := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
@@ -78,6 +78,136 @@ func TestNormalOperation(t *testing.T) {
 			return nil
 		}
 		return errors.New("could not retrieve a Job from the API")
+	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+
+	t.Log("Getting list of pods")
+	var pod unstructured.Unstructured
+	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods", port, namespaceName)
+	retryErr = retry.Do(func() error {
+		list, getUrlErr := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
+		if getUrlErr != nil {
+			return getUrlErr
+		}
+
+		if len(list.Items) <= 0 {
+			return errors.New("expected some pods, got 0")
+		}
+
+		pod = list.Items[0]
+
+		return nil
+	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+
+	t.Log("Retrieving pod by name")
+	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/%s", port, namespaceName, pod.GetName())
+	retryErr = retry.Do(func() error {
+		resource, getUrlErr := test.GetResource(t, token.Status.Token, url, map[string][]string{})
+		if getUrlErr != nil {
+			return getUrlErr
+		}
+
+		if resource == nil {
+			return errors.New("expected a pod, got none")
+		}
+
+		return nil
+	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+
+	t.Log("Retrieving pod log by name")
+	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/%s/log", port, namespaceName, pod.GetName())
+	retryErr = retry.Do(func() error {
+		logBytes, getUrlErr := test.GetLogs(t, token.Status.Token, url)
+		if getUrlErr != nil {
+			return getUrlErr
+		}
+
+		if len(logBytes) == 0 {
+			return errors.New("expected some bytes in the log")
+		}
+
+		return nil
+	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+
+	t.Log("Retrieving pod by uid")
+	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/uid/%s/", port, namespaceName, string(pod.GetUID()))
+	retryErr = retry.Do(func() error {
+		resource, getUrlErr := test.GetResource(t, token.Status.Token, url, map[string][]string{})
+		if getUrlErr != nil {
+			return getUrlErr
+		}
+
+		if resource == nil {
+			return errors.New("expected a single resource")
+		}
+
+		if string(resource.GetUID()) != string(pod.GetUID()) {
+			return errors.New("expected UIDs to be the same")
+		}
+
+		return nil
+	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+
+	t.Log("Retrieving pod log by uid")
+	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/uid/%s/log", port, namespaceName, string(pod.GetUID()))
+	retryErr = retry.Do(func() error {
+		logBytes, getUrlErr := test.GetLogs(t, token.Status.Token, url)
+		if getUrlErr != nil {
+			return getUrlErr
+		}
+
+		if len(logBytes) == 0 {
+			return errors.New("expected some log content")
+		}
+
+		return nil
+	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+
+	t.Log("Retrieving unexistent pod by uid")
+	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/uid/%s/", port, namespaceName, uuid.New().String())
+	retryErr = retry.Do(func() error {
+		_, getUrlErr := test.GetResource(t, token.Status.Token, url, map[string][]string{})
+		if getUrlErr.Error() != "404" {
+			return errors.New("expected 404 error for unexistent pod")
+		}
+		return nil
+	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
+	}
+
+	t.Log("Retrieving unexistent pod log by uid")
+	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/uid/%s/log", port, namespaceName, uuid.New().String())
+	retryErr = retry.Do(func() error {
+		_, getUrlErr := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
+		if getUrlErr.Error() != "404" {
+			return errors.New("expected 404 error for unexistent pod")
+		}
+		return nil
 	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
 
 	if retryErr != nil {

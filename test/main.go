@@ -233,6 +233,21 @@ func GetPodName(t testing.TB, clientset *kubernetes.Clientset, namespace, prefix
 	return podName
 }
 
+func GetResource(t testing.TB, token string, url string, extraHeaders map[string][]string) (*unstructured.Unstructured, error) {
+	body, err := getUrl(t, token, url, extraHeaders)
+	if err != nil {
+		return nil, err
+	}
+
+	var resource unstructured.Unstructured
+	err = json.Unmarshal(body, &resource)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resource, nil
+}
+
 func GetUrl(t testing.TB, token string, url string, extraHeaders map[string][]string) (*unstructured.UnstructuredList, error) {
 	body, err := getUrl(t, token, url, extraHeaders)
 	if err != nil {

@@ -68,7 +68,7 @@ var _ = Describe("SinkFilterController", func() {
 			}
 
 			// Test ExtractAllNamespacesByKinds
-			namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter)
+			namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter, filters.Controller)
 
 			// Should have 3 unique kinds: Deployment-apps/v1, Pod-v1, Service-v1
 			Expect(len(namespacesByKinds)).To(Equal(3))
@@ -101,7 +101,7 @@ var _ = Describe("SinkFilterController", func() {
 				},
 			}
 
-			namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter)
+			namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter, filters.Controller)
 			Expect(len(namespacesByKinds)).To(Equal(0))
 		})
 

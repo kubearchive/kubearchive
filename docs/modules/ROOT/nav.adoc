@@ -6,6 +6,7 @@
 * CLI
 ** xref:cli/installation.adoc[Installation]
 ** xref:cli/configuration.adoc[Configuration]
+** xref:cli/usage.adoc[Usage]
 
 * Configuration
 ** xref:configuration/kubearchiveconfig.adoc[KubeArchiveConfig CRD]

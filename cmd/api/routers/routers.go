@@ -166,6 +166,7 @@ func parseTimestampQuery(context *gin.Context, paramName string) (*time.Time, er
 }
 
 func (c *Controller) GetLogURL(context *gin.Context) {
+	var err error
 	kind, err := discovery.GetAPIResourceKind(context)
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
@@ -176,6 +177,7 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 	version := context.Param("version")
 	namespace := context.Param("namespace")
 	name := context.Param("name")
+	uid := context.Param("uid")
 	containerName := context.Query("container")
 
 	if strings.HasPrefix(context.Request.URL.Path, "/apis/") && group == "" {
@@ -188,8 +190,14 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
-	logURL, jsonPath, err := c.Database.QueryLogURL(
-		context.Request.Context(), kind, apiVersion, namespace, name, containerName)
+	var logURL, jsonPath string
+	if name != "" {
+		logURL, jsonPath, err = c.Database.QueryLogURLByName(
+			context.Request.Context(), kind, apiVersion, namespace, name, containerName)
+	} else {
+		logURL, jsonPath, err = c.Database.QueryLogURLByUID(
+			context.Request.Context(), kind, apiVersion, namespace, uid, containerName)
+	}
 
 	if errors.Is(err, dbErrors.ErrResourceNotFound) {
 		abort.Abort(context, err, http.StatusNotFound)
@@ -202,6 +210,42 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 
 	context.Set("logURL", logURL)
 	context.Set("jsonPath", jsonPath)
+}
+
+func (c *Controller) GetResourceByUID(context *gin.Context) {
+	kind, err := discovery.GetAPIResourceKind(context) // Not used but required for validation
+	if err != nil {
+		abort.Abort(context, err, http.StatusInternalServerError)
+		return
+	}
+
+	group := context.Param("group")
+	version := context.Param("version")
+	namespace := context.Param("namespace")
+	uid := context.Param("uid")
+
+	apiVersion := version
+	if group != "" {
+		apiVersion = fmt.Sprintf("%s/%s", group, version)
+	}
+
+	if strings.HasPrefix(context.Request.URL.Path, "/apis/") && group == "" {
+		abort.Abort(context, errors.New(http.StatusText(http.StatusNotFound)), http.StatusNotFound)
+		return
+	}
+
+	resource, err := c.Database.QueryResourceByUID(context.Request.Context(), kind, apiVersion, namespace, uid)
+	if err != nil {
+		abort.Abort(context, err, http.StatusInternalServerError)
+		return
+	}
+
+	if resource == nil {
+		abort.Abort(context, errors.New("resource not found"), http.StatusNotFound)
+		return
+	}
+
+	context.String(http.StatusOK, resource.Data)
 }
 
 // Livez returns current server configuration as we don't have a clear deadlock indicator

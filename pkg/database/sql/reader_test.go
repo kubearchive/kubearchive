@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/uuid"
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -62,10 +63,90 @@ func TestLogURLsFromNonExistentResource(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrl, jp, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName, "")
+			logUrl, jp, err := tt.database.QueryLogURLByName(ctx, kind, cronJobApiVersion, namespace, cronJobName, "")
 			assert.Equal(t, "", logUrl)
 			assert.Equal(t, "", jp)
 			assert.ErrorContains(t, err, "resource not found")
+		})
+	}
+}
+
+func TestCronJobQueryLogURLsByUID(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cronJobUID := uuid.New().String()
+			jobUID := uuid.New().String()
+			pod1UID := "42422d92-1a72-418d-97cf-97019c2d56e8"
+			pod2UID := uuid.New().String()
+
+			db, mock := NewMock()
+			tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+			filter := tt.database.getFilter()
+			selector := tt.database.getSelector()
+			flavor := tt.database.getFlavor()
+
+			// Get UUID query
+			sb := selector.UUIDResourceSelector()
+			sb = tt.database.getSorter().CreationTSAndIDSorter(sb)
+			sb.Where(
+				filter.KindApiVersionFilter(sb.Cond, kind, cronJobApiVersion),
+				filter.NamespaceFilter(sb.Cond, namespace),
+				filter.UuidFilter(sb.Cond, cronJobUID),
+			)
+			query, args := sb.BuildWithFlavor(flavor)
+
+			rows := sqlmock.NewRows([]string{"uuid"})
+			rows.AddRow(cronJobUID)
+			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+			// Get owned Job by the CronJob
+			sb = selector.OwnedResourceSelector()
+			sb.Where(filter.OwnerFilter(sb.Cond, []string{cronJobUID}))
+			query, args = sb.BuildWithFlavor(flavor)
+
+			rows = sqlmock.NewRows([]string{"kind", "uuid"})
+			rows.AddRow("Job", jobUID)
+			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+			// Get owned Pods by the Job
+			sb = selector.OwnedResourceSelector()
+			sb.Where(filter.OwnerFilter(sb.Cond, []string{jobUID}))
+			query, args = sb.BuildWithFlavor(flavor)
+
+			rows = sqlmock.NewRows([]string{"kind", "uuid"})
+			rows.AddRow("Pod", pod1UID)
+			rows.AddRow("Pod", pod2UID)
+			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+			sb = selector.ResourceSelector()
+			sb.Where(filter.UuidFilter(sb.Cond, pod1UID))
+			query, args = sb.BuildWithFlavor(flavor)
+
+			rows = sqlmock.NewRows([]string{"created_at", "id", "data"})
+			rows.AddRow("YYYY-MM-DDTHH:MM:SS+00", 0, testPodResource)
+			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+			// Get pods log urls
+			sb = selector.UrlSelector()
+			sb.Where(
+				filter.UuidFilter(sb.Cond, pod1UID),
+				filter.ContainerNameFilter(sb.Cond, "test-pod"),
+			)
+			query, args = sb.BuildWithFlavor(flavor)
+
+			rows = sqlmock.NewRows([]string{"url", "json_path"})
+			rows.AddRow("mock-log-url-pod1-container1", jsonPath)
+			rows.AddRow("mock-log-url-pod1-container2", jsonPath)
+			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			logUrl, jp, err := tt.database.QueryLogURLByUID(ctx, kind, cronJobApiVersion, namespace, cronJobUID, "")
+			assert.NoError(t, err)
+			assert.Equal(t, "mock-log-url-pod1-container1", logUrl)
+			assert.Equal(t, jsonPath, jp)
+
 		})
 	}
 }
@@ -136,7 +217,7 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrl, jp, err := tt.database.QueryLogURL(ctx, kind, cronJobApiVersion, namespace, cronJobName, "")
+			logUrl, jp, err := tt.database.QueryLogURLByName(ctx, kind, cronJobApiVersion, namespace, cronJobName, "")
 			assert.NoError(t, err)
 			assert.Equal(t, "mock-log-url-pod1-container1", logUrl)
 			assert.Equal(t, jsonPath, jp)
@@ -544,7 +625,7 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 				rows.AddRow(innerTest.expectedLogUrl, "")
 				mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
-				logUrl, jp, err := tt.database.QueryLogURL(context.Background(), pod.Kind, pod.APIVersion, pod.Namespace, pod.Name, "")
+				logUrl, jp, err := tt.database.QueryLogURLByName(context.Background(), pod.Kind, pod.APIVersion, pod.Namespace, pod.Name, "")
 				assert.NoError(t, err)
 				assert.Equal(t, innerTest.expectedLogUrl, logUrl)
 				assert.Equal(t, "", jp)
@@ -784,6 +865,47 @@ func TestTimestampFilterWithLabelFilters(t *testing.T) {
 				"", "", labelFilters, &testTime, nil, 100)
 			assert.NotNil(t, resources)
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestQueryResourceByUID(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			podUUID := uuid.New().String()
+			filter := tt.database.getFilter()
+			sb := tt.database.getSelector().ResourceSelector()
+			sb.Where(
+				filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion),
+				filter.NamespaceFilter(sb.Cond, namespace),
+				filter.UuidFilter(sb.Cond, podUUID),
+			)
+			query, _ := sb.BuildWithFlavor(tt.database.getFlavor())
+
+			for _, ttt := range subtests {
+				t.Run(ttt.name, func(t *testing.T) {
+					db, mock := NewMock()
+					tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+
+					rows := sqlmock.NewRows(resourceQueryColumns)
+					if ttt.data {
+						rows.AddRow("2025-10-29T15:07:00Z", 1, json.RawMessage(testPodResource))
+					}
+					mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(podKind, podApiVersion, namespace, podUUID).WillReturnRows(rows)
+
+					ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+
+					resource, err := tt.database.QueryResourceByUID(ctx, podKind, podApiVersion, namespace, podUUID)
+					if ttt.numResources == 0 {
+						assert.Nil(t, resource)
+					} else {
+						assert.NotNil(t, resource)
+					}
+
+					assert.NoError(t, err)
+				})
+			}
 		})
 	}
 }

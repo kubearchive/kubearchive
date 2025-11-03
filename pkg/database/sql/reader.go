@@ -21,6 +21,27 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
+func (db *sqlDatabaseImpl) QueryResourceByUID(ctx context.Context, kind, apiVersion, namespace, uid string) (*models.Resource, error) {
+	sb := db.selector.ResourceSelector()
+	sb.Where(
+		db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion),
+		db.filter.NamespaceFilter(sb.Cond, namespace),
+		db.filter.UuidFilter(sb.Cond, uid))
+
+	resources, err := db.performResourceQuery(ctx, sb)
+	if err != nil {
+		return nil, err
+	}
+
+	// QueryResources does not send an error if no resources are found
+	// here we want to replicate the same behaviour.
+	if len(resources) == 0 {
+		return nil, nil //nolint:nilnil
+	}
+
+	return &resources[0], nil
+}
+
 func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *models.LabelFilters,
 	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error) {
@@ -141,34 +162,50 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 	}
 }
 
-func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (string, string, error) {
+func (db *sqlDatabaseImpl) QueryLogURLByUID(ctx context.Context, kind, apiVersion, namespace, uid, containerName string) (string, string, error) {
+	return db.queryLogURL(ctx, kind, apiVersion, namespace, uid, containerName, true)
+}
+
+func (db *sqlDatabaseImpl) QueryLogURLByName(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (string, string, error) {
+	return db.queryLogURL(ctx, kind, apiVersion, namespace, name, containerName, false)
+}
+
+func (db *sqlDatabaseImpl) queryLogURL(ctx context.Context, kind, apiVersion, namespace, identifier, containerName string, useUID bool) (string, string, error) {
 	if kind == "Pod" {
 		sb := db.selector.ResourceSelector()
 		sb = db.sorter.CreationTSAndIDSorter(sb) // If resources are named the same, select the newest
 		sb.Where(
 			db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion),
 			db.filter.NamespaceFilter(sb.Cond, namespace),
-			db.filter.NameFilter(sb.Cond, name),
 		)
 
-		return db.getLogsForPodSelector(ctx, sb, namespace, name, containerName)
+		if useUID {
+			sb.Where(db.filter.UuidFilter(sb.Cond, identifier))
+		} else {
+			sb.Where(db.filter.NameFilter(sb.Cond, identifier))
+		}
+
+		return db.getLogsForPodSelector(ctx, sb, namespace, identifier, containerName)
 	}
 
-	// Not a Pod
 	sb := db.selector.UUIDResourceSelector()
 	sb = db.sorter.CreationTSAndIDSorter(sb) // If resources are named the same, select the newest
 	sb.Where(
 		db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion),
 		db.filter.NamespaceFilter(sb.Cond, namespace),
-		db.filter.NameFilter(sb.Cond, name),
 	)
+
+	if useUID {
+		sb.Where(db.filter.UuidFilter(sb.Cond, identifier))
+	} else {
+		sb.Where(db.filter.NameFilter(sb.Cond, identifier))
+	}
 
 	strQueryPerformer := newQueryPerformer[string](db.db, db.flavor)
 	uuid, err := strQueryPerformer.performSingleRowQuery(ctx, sb)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", "", dbErrors.ErrResourceNotFound
 	}
-
 	if err != nil {
 		return "", "", err
 	}
@@ -178,9 +215,10 @@ func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, na
 		"getting owned pods for resource",
 		"kind", kind,
 		"namespace", namespace,
-		"name", name,
+		"identifier", identifier,
 		"uuid", uuid,
 	)
+
 	pods, err := db.getOwnedPodsUuids(ctx, []string{uuid}, []uuidKindDate{})
 	if err != nil {
 		return "", "", err
@@ -189,7 +227,6 @@ func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, na
 		return "", "", dbErrors.ErrResourceNotFound
 	}
 
-	// Get the most recent pod from owned by the provided resource
 	slices.SortFunc(pods, func(a, b uuidKindDate) int {
 		return strings.Compare(b.Date, a.Date)
 	})
@@ -197,7 +234,7 @@ func (db *sqlDatabaseImpl) QueryLogURL(ctx context.Context, kind, apiVersion, na
 	sb = db.selector.ResourceSelector()
 	sb.Where(db.filter.UuidFilter(sb.Cond, pods[0].Uuid))
 
-	return db.getLogsForPodSelector(ctx, sb, namespace, name, containerName)
+	return db.getLogsForPodSelector(ctx, sb, namespace, uuid, containerName)
 }
 
 func (db *sqlDatabaseImpl) getOwnedPodsUuids(ctx context.Context, ownersUuids []string, podUuids []uuidKindDate,

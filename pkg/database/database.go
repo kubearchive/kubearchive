@@ -13,7 +13,7 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/database/sql"
 )
 
-var CurrentDatabaseSchemaVersion = "2"
+var CurrentDatabaseSchemaVersion = "3"
 var RegisteredDatabases = map[string]interfaces.Database{
 	"postgresql": sql.NewPostgreSQLDatabase(),
 	"mariadb":    sql.NewMariaDBDatabase(),

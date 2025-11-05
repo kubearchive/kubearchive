@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -214,6 +215,11 @@ func main() {
 	mgr, err := ctrl.NewManager(config, mgrOptions)
 	if err != nil {
 		slog.Error("unable to start operator", "err", err)
+		os.Exit(1)
+	}
+
+	if err = controller.LoadConfiguration(context.Background()); err != nil {
+		slog.Error("unable to load operator configuration", "err", err)
 		os.Exit(1)
 	}
 

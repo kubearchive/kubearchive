@@ -409,6 +409,68 @@ The controller integrates with the CloudEvent system:
 //+kubebuilder:rbac:groups=kubearchive.org,resources=kubearchiveconfigs;clusterkubearchiveconfigs,verbs=get;list;watch
 ----
 
+== Operator Configuration
+
+The operator can be configured through a ConfigMap that controls operational parameters such as the number of worker threads allocated to process events for each resource type.
+
+=== Configuration ConfigMap
+
+**Name:** `kubearchive-operator` +
+**Namespace:** `kubearchive` +
+**Mount Path:** `/etc/kubearchive/config/resources.yaml`
+
+The configuration is provided as a YAML list under the `resources.yaml` key in the ConfigMap. Each entry defines the worker count for a specific resource type.
+
+==== Configuration Structure
+
+[source,yaml]
+----
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-operator
+  namespace: kubearchive
+data:
+  resources.yaml: |
+    - selector:
+        kind: "--all--"
+        apiVersion: "--all--"
+      workers: 3
+    - selector:
+        kind: "Pod"
+        apiVersion: "v1"
+      workers: 5
+    - selector:
+        kind: "Deployment"
+        apiVersion: "apps/v1"
+      workers: 2
+----
+
+==== Configuration Fields
+
+* `selector.kind` - The Kubernetes resource Kind
+* `selector.apiVersion` - The API version for the resource
+* `workers` - Number of worker goroutines to spawn for processing events for this resource type
+
+==== Default Configuration
+
+The special selector with `kind: "--all--"` and `apiVersion: "--all--"` serves as the default configuration. Any resource type that doesn't have a specific configuration entry will use this default. The operator ships with a default configuration of 3 workers for all resources.
+
+==== Worker Behavior
+
+Workers are responsible for:
+
+* Processing watch events from the workqueue
+* Evaluating CEL expressions for archival and deletion conditions
+* Generating and sending CloudEvents to the sink service
+* Handling transient errors with rate limiting
+
+The number of workers directly impacts throughput for each resource type. Resources with high event rates may benefit from more workers, while less active resources can use fewer workers to conserve system resources.
+
+==== Configuration Loading
+
+The configuration is loaded once during operator startup from the mounted ConfigMap. To apply configuration changes, the operator pod must be restarted.
+
 == Best Practices
 
 === Resource Configuration
@@ -422,6 +484,10 @@ The controller integrates with the CloudEvent system:
 1. **Watch Efficiency:** Minimize the number of resource types being watched
 2. **Namespace Filtering:** Use specific namespace configurations rather than global watches when possible
 3. **Resource Version Tracking:** The controller automatically optimizes watch resumption
+4. **Worker Configuration:** Adjust the number of workers per resource type based on event volume
+   - High-traffic resources (e.g., Pods, Events) may benefit from more workers
+   - Low-traffic resources can use fewer workers to conserve resources
+   - Start with the default (3 workers) and tune based on observed performance
 
 === Security Considerations
 

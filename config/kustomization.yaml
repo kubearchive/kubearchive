@@ -32,6 +32,7 @@ resources:
   - templates/operator/webhooks.yaml
   - templates/sink/service_account.yaml
   - templates/sink/sink.yaml
+  - templates/operator/configmap.yaml
   - templates/certificates.yaml
   - templates/clusterroles.yaml
   - templates/namespace.yaml

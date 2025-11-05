@@ -73,6 +73,9 @@ spec:
             - mountPath: /tmp/k8s-webhook-server/serving-certs
               name: cert
               readOnly: true
+            - mountPath: /etc/kubearchive/config
+              name: operator-config
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /readyz
@@ -101,3 +104,7 @@ spec:
           secret:
             defaultMode: 420
             secretName: kubearchive-operator-tls
+        - name: operator-config
+          configMap:
+            name: kubearchive-operator
+            defaultMode: 420

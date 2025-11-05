@@ -93,6 +93,7 @@ spec:
                 - ALL
       securityContext:
         runAsNonRoot: true
+        runAsUser: 1000
       serviceAccountName: kubearchive-operator
       terminationGracePeriodSeconds: 10
       volumes:

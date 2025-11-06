@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/gin-gonic/gin"
@@ -50,7 +49,7 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 	defer span.End()
 
 	lastUpdateTs := k8s.GetLastUpdateTs(obj)
-	dbCtx, cancel := context.WithTimeout(ctx, time.Second*5)
+	dbCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	var urls []models.LogTuple
@@ -257,7 +256,7 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 	propagationPolicy := metav1.DeletePropagationBackground // can't get address of a const
 
 	childSpanCtx, childSpan = tracer.Start(ctx.Request.Context(), "delete resource")
-	deleteCtx, deleteCtxCancel := context.WithTimeout(childSpanCtx, time.Second*5)
+	deleteCtx, deleteCtxCancel := context.WithCancel(childSpanCtx)
 	defer deleteCtxCancel()
 
 	err = c.K8sClient.Resource(resource).Namespace(k8sObj.GetNamespace()).Delete(

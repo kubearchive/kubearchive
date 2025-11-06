@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -43,7 +44,9 @@ type WatchInfo struct {
 	Namespaces      map[string]filters.CelExpressions
 	StopCh          chan struct{}
 	WatchInterface  watch.Interface
-	ResourceVersion string
+	ResourceVersion string // Current resource version for efficient reconnections
+	Queue           workqueue.TypedRateLimitingInterface[watch.Event]
+	WorkerWg        sync.WaitGroup
 }
 
 type SinkFilterReconciler struct {
@@ -86,7 +89,6 @@ func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	// Reconcile RBAC resources
 	if err := r.reconcileClusterRole(ctx, sinkFilter); err != nil {
 		log.Error(err, "Failed to reconcile ClusterRole")
 		return ctrl.Result{}, err
@@ -135,6 +137,8 @@ func (r *SinkFilterReconciler) generateWatches(ctx context.Context, namespacesBy
 			if watchInfo.WatchInterface != nil {
 				watchInfo.WatchInterface.Stop()
 			}
+			watchInfo.Queue.ShutDown()
+			watchInfo.WorkerWg.Wait()
 			delete(r.watches, key)
 			log.Info("Stopped watch for resource", "key", key)
 		}
@@ -239,15 +243,29 @@ func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string
 		APIVersion: apiVersion,
 	}
 
+	queue := workqueue.NewTypedRateLimitingQueueWithConfig(
+		workqueue.DefaultTypedControllerRateLimiter[watch.Event](),
+		workqueue.TypedRateLimitingQueueConfig[watch.Event]{
+			Name: key,
+		},
+	)
+
 	watchInfo := &WatchInfo{
 		GVR:             gvr,
 		KindSelector:    kindSelector,
 		Namespaces:      namespaces,
 		StopCh:          stopCh,
 		ResourceVersion: "",
+		Queue:           queue,
 	}
 
 	r.watches[key] = watchInfo
+
+	numWorkers := 3
+	for i := 0; i < numWorkers; i++ {
+		watchInfo.WorkerWg.Add(1)
+		go r.runWorker(ctx, watchInfo, key)
+	}
 
 	go r.watchLoop(ctx, watchInfo, key)
 }
@@ -338,9 +356,37 @@ func (r *SinkFilterReconciler) processWatchEvents(ctx context.Context, watchInte
 				}
 			}
 
-			if err := r.handleWatchEvent(ctx, event, watchInfo); err != nil {
-				log.Error(err, "Failed to handle watch event", "key", key)
+			watchInfo.Queue.Add(event)
+		}
+	}
+}
+
+func (r *SinkFilterReconciler) runWorker(ctx context.Context, watchInfo *WatchInfo, key string) {
+	defer watchInfo.WorkerWg.Done()
+	log := log.FromContext(ctx)
+
+	for {
+		select {
+		case <-watchInfo.StopCh:
+			log.Info("Stopping worker", "key", key)
+			return
+		default:
+			event, shutdown := watchInfo.Queue.Get()
+			if shutdown {
+				return
 			}
+
+			func() {
+				defer watchInfo.Queue.Done(event)
+
+				if err := r.handleWatchEvent(ctx, event, watchInfo); err != nil {
+					log.Error(err, "Failed to handle watch event", "key", key)
+					watchInfo.Queue.AddRateLimited(event)
+					return
+				}
+
+				watchInfo.Queue.Forget(event)
+			}()
 		}
 	}
 }
@@ -399,17 +445,16 @@ func (r *SinkFilterReconciler) handleWatchEvent(ctx context.Context, event watch
 		// First check deleteWhen CEL expressions
 		if (globalExists && kcel.ExecuteBooleanCEL(ctx, globalCel.DeleteWhen, unstructuredObj)) ||
 			(namespaceExists && kcel.ExecuteBooleanCEL(ctx, namespaceCel.DeleteWhen, unstructuredObj)) {
-			r.sendCloudEvent(ctx, "delete-when", unstructuredObj, watchInfo)
+			return r.sendCloudEvent(ctx, "delete-when", event, watchInfo)
 		} else if (globalExists && kcel.ExecuteBooleanCEL(ctx, globalCel.ArchiveWhen, unstructuredObj)) ||
 			(namespaceExists && kcel.ExecuteBooleanCEL(ctx, namespaceCel.ArchiveWhen, unstructuredObj)) {
-			r.sendCloudEvent(ctx, "archive-when", unstructuredObj, watchInfo)
+			return r.sendCloudEvent(ctx, "archive-when", event, watchInfo)
 		}
 		return nil
 	case watch.Deleted:
-		// For delete events, only send if ArchiveOnDelete CEL expressions return true
 		if (globalExists && kcel.ExecuteBooleanCEL(ctx, globalCel.ArchiveOnDelete, unstructuredObj)) ||
 			(namespaceExists && kcel.ExecuteBooleanCEL(ctx, namespaceCel.ArchiveOnDelete, unstructuredObj)) {
-			r.sendCloudEvent(ctx, "archive-on-delete", unstructuredObj, watchInfo)
+			return r.sendCloudEvent(ctx, "archive-on-delete", event, watchInfo)
 		}
 		return nil
 	default:
@@ -418,15 +463,18 @@ func (r *SinkFilterReconciler) handleWatchEvent(ctx context.Context, event watch
 	}
 }
 
-func (r *SinkFilterReconciler) sendCloudEvent(ctx context.Context, eventType string, unstructuredObj *unstructured.Unstructured, watchInfo *WatchInfo) {
+func (r *SinkFilterReconciler) sendCloudEvent(ctx context.Context, eventType string, event watch.Event, watchInfo *WatchInfo) error {
 	log := log.FromContext(ctx)
 
 	if r.cloudEventPublisher == nil {
-		log.Error(nil, "CloudEvent publisher not available, skipping event", "eventType", eventType, "gvr", watchInfo.GVR.String())
-		return
+		err := fmt.Errorf("CloudEvent publisher not available")
+		log.Error(err, "Skipping event", "eventType", event.Type, "gvr", watchInfo.GVR.String())
+		return err
 	}
 
+	unstructuredObj := event.Object.(*unstructured.Unstructured)
 	resource := unstructuredObj.Object
+
 	if resource["apiVersion"] == nil {
 		if watchInfo.GVR.Group == "" {
 			resource["apiVersion"] = watchInfo.GVR.Version
@@ -439,14 +487,48 @@ func (r *SinkFilterReconciler) sendCloudEvent(ctx context.Context, eventType str
 		resource["kind"] = watchInfo.KindSelector.Kind
 	}
 
-	result := r.cloudEventPublisher.Send(ctx, "org.kubearchive.sinkfilters.resource."+eventType, resource)
-	if !ce.IsACK(result) {
-		message := "Cloud event send failed"
-		if ce.IsNACK(result) {
-			message = "Cloud event was not acknowledged"
-		}
-		log.Error(nil, message, "eventType", eventType, "gvr", watchInfo.GVR.String(), "kind", watchInfo.KindSelector.Kind, "result", result)
+	uid := string(unstructuredObj.GetUID())
+	namespace := unstructuredObj.GetNamespace()
+	name := unstructuredObj.GetName()
+
+	// Extract owner UUID from ownerReferences if present
+	var owner string
+	ownerRefs := unstructuredObj.GetOwnerReferences()
+	if len(ownerRefs) > 0 {
+		owner = string(ownerRefs[0].UID)
 	}
+
+	fullEventType := "org.kubearchive.sinkfilters.resource." + eventType
+	result := r.cloudEventPublisher.Send(ctx, fullEventType, resource)
+
+	if !ce.IsACK(result) {
+		var err error
+		if ce.IsNACK(result) {
+			err = fmt.Errorf("cloud event was not acknowledged: %w", result)
+		} else {
+			err = fmt.Errorf("cloud event send failed: %w", result)
+		}
+
+		log.Error(err, "Failed to send cloud event",
+			"uid", uid,
+			"namespace", namespace,
+			"name", name,
+			"owner", owner,
+			"eventType", eventType,
+			"api_version", watchInfo.KindSelector.APIVersion,
+			"kind", watchInfo.KindSelector.Kind)
+		return err
+	}
+
+	log.V(1).Info("Cloud event sent successfully",
+		"uid", uid,
+		"namespace", namespace,
+		"name", name,
+		"owner", owner,
+		"eventType", fullEventType,
+		"api_version", watchInfo.KindSelector.APIVersion,
+		"kind", watchInfo.KindSelector.Kind)
+	return nil
 }
 
 func (r *SinkFilterReconciler) SetupWithManager(mgr ctrl.Manager) error {

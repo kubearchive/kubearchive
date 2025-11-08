@@ -1,6 +1,6 @@
 {
   "devDependencies": {
-    "@antora/lunr-extension": "1.0.0-alpha.10",
+    "@antora/lunr-extension": "1.0.0-alpha.11",
     "antora": "3.1.14",
     "http-server": "14.1.1"
   },

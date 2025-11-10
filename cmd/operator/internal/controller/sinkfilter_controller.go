@@ -41,6 +41,7 @@ import (
 type WatchInfo struct {
 	GVR             schema.GroupVersionResource
 	KindSelector    kubearchivev1.APIVersionKind
+	ClusterCel      *filters.CelExpressions
 	Namespaces      map[string]filters.CelExpressions
 	StopCh          chan struct{}
 	WatchInterface  watch.Interface
@@ -79,7 +80,7 @@ func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if errors.IsNotFound(err) {
 			log.Info("SinkFilter resource not found. Ignoring since object must be deleted")
 			// Clear all watches when the resource is deleted by calling generateWatches with empty maps.
-			if err = r.generateWatches(ctx, map[string]map[string]filters.CelExpressions{}); err != nil {
+			if err = r.generateWatches(ctx, map[string]filters.CelExpressions{}, map[string]map[string]filters.CelExpressions{}); err != nil {
 				log.Error(err, "Failed to clear watches on delete")
 				return ctrl.Result{}, err
 			}
@@ -99,9 +100,10 @@ func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter)
+	clusterFilters := filters.ExtractClusterCELExpressionsByKind(sinkFilter)
+	namespacesByKinds := filters.ExtractNamespacesByKind(sinkFilter)
 
-	if err := r.generateWatches(ctx, namespacesByKinds); err != nil {
+	if err := r.generateWatches(ctx, clusterFilters, namespacesByKinds); err != nil {
 		log.Error(err, "Failed to generate watches")
 		return ctrl.Result{}, err
 	}
@@ -121,15 +123,23 @@ func (r *SinkFilterReconciler) parseKindAndAPIVersionFromKey(key string) (string
 	return "", ""
 }
 
-func (r *SinkFilterReconciler) generateWatches(ctx context.Context, namespacesByKinds map[string]map[string]filters.CelExpressions) error {
+func (r *SinkFilterReconciler) generateWatches(ctx context.Context, clusterFilters map[string]filters.CelExpressions, namespacesByKinds map[string]map[string]filters.CelExpressions) error {
 	log := log.FromContext(ctx)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	toStop := r.findWatchesToStop(namespacesByKinds)
-	toCreate := r.findWatchesToCreate(namespacesByKinds)
-	toUpdate := r.findWatchesToUpdate(namespacesByKinds, toStop)
+	allKinds := make(map[string]struct{})
+	for key := range clusterFilters {
+		allKinds[key] = struct{}{}
+	}
+	for key := range namespacesByKinds {
+		allKinds[key] = struct{}{}
+	}
+
+	toStop := r.findWatchesToStop(allKinds)
+	toCreate := r.findWatchesToCreate(allKinds)
+	toUpdate := r.findWatchesToUpdate(allKinds, toStop)
 
 	for key := range toStop {
 		if watchInfo, exists := r.watches[key]; exists {
@@ -146,9 +156,13 @@ func (r *SinkFilterReconciler) generateWatches(ctx context.Context, namespacesBy
 
 	for key := range toUpdate {
 		if watchInfo, exists := r.watches[key]; exists {
-			// Update the namespaces for this watch
+			if clusterCel, ok := clusterFilters[key]; ok {
+				watchInfo.ClusterCel = &clusterCel
+			} else {
+				watchInfo.ClusterCel = nil
+			}
 			watchInfo.Namespaces = namespacesByKinds[key]
-			log.Info("Updated watch namespaces", "key", key, "namespaceCount", len(watchInfo.Namespaces))
+			log.Info("Updated watch filters", "key", key, "hasCluster", watchInfo.ClusterCel != nil, "namespaceCount", len(watchInfo.Namespaces))
 		}
 	}
 
@@ -160,7 +174,11 @@ func (r *SinkFilterReconciler) generateWatches(ctx context.Context, namespacesBy
 			continue
 		}
 
-		r.createWatchForGVR(ctx, key, gvr, namespacesByKinds[key])
+		var clusterCel *filters.CelExpressions
+		if cel, ok := clusterFilters[key]; ok {
+			clusterCel = &cel
+		}
+		r.createWatchForGVR(ctx, key, gvr, clusterCel, namespacesByKinds[key])
 		log.Info("Created watch for resource", "gvr", gvr.String())
 	}
 
@@ -172,19 +190,19 @@ func (r *SinkFilterReconciler) generateWatches(ctx context.Context, namespacesBy
 	return nil
 }
 
-func (r *SinkFilterReconciler) findWatchesToStop(namespacesByKinds map[string]map[string]filters.CelExpressions) map[string]struct{} {
+func (r *SinkFilterReconciler) findWatchesToStop(allKinds map[string]struct{}) map[string]struct{} {
 	toStop := make(map[string]struct{})
 	for existingKey := range r.watches {
-		if _, stillNeeded := namespacesByKinds[existingKey]; !stillNeeded {
+		if _, stillNeeded := allKinds[existingKey]; !stillNeeded {
 			toStop[existingKey] = struct{}{}
 		}
 	}
 	return toStop
 }
 
-func (r *SinkFilterReconciler) findWatchesToCreate(namespacesByKinds map[string]map[string]filters.CelExpressions) map[string]struct{} {
+func (r *SinkFilterReconciler) findWatchesToCreate(allKinds map[string]struct{}) map[string]struct{} {
 	toCreate := make(map[string]struct{})
-	for newKey := range namespacesByKinds {
+	for newKey := range allKinds {
 		if _, exists := r.watches[newKey]; !exists {
 			toCreate[newKey] = struct{}{}
 		}
@@ -192,11 +210,11 @@ func (r *SinkFilterReconciler) findWatchesToCreate(namespacesByKinds map[string]
 	return toCreate
 }
 
-func (r *SinkFilterReconciler) findWatchesToUpdate(namespacesByKinds map[string]map[string]filters.CelExpressions, toStop map[string]struct{}) map[string]struct{} {
+func (r *SinkFilterReconciler) findWatchesToUpdate(allKinds map[string]struct{}, toStop map[string]struct{}) map[string]struct{} {
 	toUpdate := make(map[string]struct{})
 
 	for existingKey := range r.watches {
-		if _, stillNeeded := namespacesByKinds[existingKey]; stillNeeded {
+		if _, stillNeeded := allKinds[existingKey]; stillNeeded {
 			if _, stopping := toStop[existingKey]; !stopping {
 				toUpdate[existingKey] = struct{}{}
 			}
@@ -234,7 +252,7 @@ func (r *SinkFilterReconciler) getGVRFromKindAndAPIVersion(kind, apiVersion stri
 	return mapping.Resource, kind, apiVersion, nil
 }
 
-func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string, gvr schema.GroupVersionResource, namespaces map[string]filters.CelExpressions) {
+func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string, gvr schema.GroupVersionResource, clusterCel *filters.CelExpressions, namespaces map[string]filters.CelExpressions) {
 	log := log.FromContext(ctx)
 	stopCh := make(chan struct{})
 
@@ -254,6 +272,7 @@ func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string
 	watchInfo := &WatchInfo{
 		GVR:             gvr,
 		KindSelector:    kindSelector,
+		ClusterCel:      clusterCel,
 		Namespaces:      namespaces,
 		StopCh:          stopCh,
 		ResourceVersion: "",
@@ -435,26 +454,25 @@ func (r *SinkFilterReconciler) handleWatchEvent(ctx context.Context, event watch
 	}
 
 	objNamespace := unstructuredObj.GetNamespace()
-	globalCel, globalExists := watchInfo.Namespaces[constants.SinkFilterGlobalNamespace]
 	namespaceCel, namespaceExists := watchInfo.Namespaces[objNamespace]
+	clusterExists := watchInfo.ClusterCel != nil
 
-	if !globalExists && !namespaceExists {
+	if !clusterExists && !namespaceExists {
 		return nil
 	}
 
 	switch event.Type {
 	case watch.Added, watch.Modified:
-		// First check deleteWhen CEL expressions
-		if (globalExists && kcel.ExecuteBooleanCEL(ctx, globalCel.DeleteWhen, unstructuredObj)) ||
+		if (clusterExists && kcel.ExecuteBooleanCEL(ctx, watchInfo.ClusterCel.DeleteWhen, unstructuredObj)) ||
 			(namespaceExists && kcel.ExecuteBooleanCEL(ctx, namespaceCel.DeleteWhen, unstructuredObj)) {
 			return r.sendCloudEvent(ctx, "delete-when", event, watchInfo)
-		} else if (globalExists && kcel.ExecuteBooleanCEL(ctx, globalCel.ArchiveWhen, unstructuredObj)) ||
+		} else if (clusterExists && kcel.ExecuteBooleanCEL(ctx, watchInfo.ClusterCel.ArchiveWhen, unstructuredObj)) ||
 			(namespaceExists && kcel.ExecuteBooleanCEL(ctx, namespaceCel.ArchiveWhen, unstructuredObj)) {
 			return r.sendCloudEvent(ctx, "archive-when", event, watchInfo)
 		}
 		return nil
 	case watch.Deleted:
-		if (globalExists && kcel.ExecuteBooleanCEL(ctx, globalCel.ArchiveOnDelete, unstructuredObj)) ||
+		if (clusterExists && kcel.ExecuteBooleanCEL(ctx, watchInfo.ClusterCel.ArchiveOnDelete, unstructuredObj)) ||
 			(namespaceExists && kcel.ExecuteBooleanCEL(ctx, namespaceCel.ArchiveOnDelete, unstructuredObj)) {
 			return r.sendCloudEvent(ctx, "archive-on-delete", event, watchInfo)
 		}
@@ -554,6 +572,10 @@ func (r *SinkFilterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *SinkFilterReconciler) extractResources(sinkFilter *kubearchivev1.SinkFilter) []kubearchivev1.APIVersionKind {
 	resourcesMap := make(map[kubearchivev1.APIVersionKind]struct{})
+
+	for _, resource := range sinkFilter.Spec.Cluster {
+		resourcesMap[resource.Selector] = struct{}{}
+	}
 
 	for _, namespaceResources := range sinkFilter.Spec.Namespaces {
 		for _, resource := range namespaceResources {

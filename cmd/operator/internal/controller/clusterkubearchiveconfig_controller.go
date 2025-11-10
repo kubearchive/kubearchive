@@ -7,9 +7,11 @@ import (
 	"context"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-
+	"k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -59,7 +61,7 @@ func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req 
 
 			log.Info("Deleting ClusterKubeArchiveConfig")
 
-			if err := reconcileSinkFilter(ctx, r.Client, constants.SinkFilterGlobalNamespace, nil); err != nil {
+			if err := updateSinkFilterCluster(ctx, r.Client, nil); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -74,7 +76,7 @@ func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req 
 		return ctrl.Result{}, nil
 	}
 
-	if err := reconcileSinkFilter(ctx, r.Client, constants.SinkFilterGlobalNamespace, ckaconfig.Spec.Resources); err != nil {
+	if err := updateSinkFilterCluster(ctx, r.Client, ckaconfig.Spec.Resources); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -87,4 +89,69 @@ func (r *ClusterKubeArchiveConfigReconciler) SetupClusterKubeArchiveConfigWithMa
 		//Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
 		Complete(r)
+}
+
+func updateSinkFilterCluster(ctx context.Context, client client.Client, resources []kubearchivev1.KubeArchiveConfigResource) error {
+	log := log.FromContext(ctx)
+
+	log.Info("in updateSinkFilterCluster")
+
+	sf := &kubearchivev1.SinkFilter{}
+	err := client.Get(ctx, types.NamespacedName{Name: constants.SinkFilterResourceName, Namespace: constants.KubeArchiveNamespace}, sf)
+	if errors.IsNotFound(err) {
+		sf = desiredSinkFilterCluster(ctx, nil, resources)
+		err = client.Create(ctx, sf)
+		if err != nil {
+			log.Error(err, "Failed to create SinkFilter "+constants.SinkFilterResourceName)
+			return err
+		}
+		return nil
+	} else if err != nil {
+		log.Error(err, "Failed to reconcile SinkFilter "+constants.SinkFilterResourceName)
+		return err
+	}
+
+	sf = desiredSinkFilterCluster(ctx, sf, resources)
+	err = client.Update(ctx, sf)
+	if err != nil {
+		log.Error(err, "Failed to update SinkFilter "+constants.SinkFilterResourceName)
+		return err
+	}
+	return nil
+}
+
+func desiredSinkFilterCluster(ctx context.Context, sf *kubearchivev1.SinkFilter, resources []kubearchivev1.KubeArchiveConfigResource) *kubearchivev1.SinkFilter {
+	log := log.FromContext(ctx)
+
+	log.Info("in desiredSinkFilterCluster")
+
+	if sf == nil {
+		sf = &kubearchivev1.SinkFilter{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      constants.SinkFilterResourceName,
+				Namespace: constants.KubeArchiveNamespace,
+			},
+			Spec: kubearchivev1.SinkFilterSpec{
+				Namespaces: map[string][]kubearchivev1.KubeArchiveConfigResource{},
+			},
+		}
+	}
+
+	if sf.Spec.Namespaces == nil {
+		sf.Spec.Namespaces = make(map[string][]kubearchivev1.KubeArchiveConfigResource)
+	}
+
+	// Clean up older ClusterKubeArchiveConfig CEL expressions that were stored in a global namespace,
+	// since they are now stored in the Cluster field of the SinkFilter object.
+	delete(sf.Spec.Namespaces, constants.SinkFilterGlobalNamespace)
+
+	if len(resources) > 0 {
+		sf.Spec.Cluster = resources
+	} else {
+		sf.Spec.Cluster = []kubearchivev1.KubeArchiveConfigResource{}
+	}
+
+	// Note that the owner reference is NOT set on the SinkFilter resource.  It should not be deleted when
+	// the KubeArchiveConfig object is deleted.
+	return sf
 }

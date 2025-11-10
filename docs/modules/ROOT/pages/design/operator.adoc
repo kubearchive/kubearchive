@@ -83,18 +83,20 @@ This type inherits all functionality from `KubeArchiveConfig` but has cluster-wi
 *Short Names:* `sf`, `sfs` +
 *GVR:* `kubearchive.org/v1/sinkfilters`
 
-The `SinkFilter` resource controls dynamic Kubernetes resource watching and CloudEvent generation. It defines which resources should be monitored in specified namespaces and automatically creates watches for those resources.
+The `SinkFilter` resource controls dynamic Kubernetes resource watching and CloudEvent generation. It defines which resources should be monitored, both at the cluster level and in specific namespaces, and automatically creates watches for those resources.
 
 [source,go]
 ----
 type SinkFilterSpec struct {
+    Cluster    []KubeArchiveConfigResource            `json:"cluster,omitempty" yaml:"cluster,omitempty"`
     Namespaces map[string][]KubeArchiveConfigResource `json:"namespaces" yaml:"namespaces"`
 }
 ----
 
 **Fields:**
 
-* `spec.namespaces` - Map of namespace names to resource configurations
+* `spec.cluster` - Array of resource configurations for cluster-wide monitoring (from `ClusterKubeArchiveConfig`)
+* `spec.namespaces` - Map of namespace names to resource configurations (from namespace-scoped `KubeArchiveConfig` resources)
 * Each namespace entry contains an array of `KubeArchiveConfigResource` definitions
 
 **Example:**
@@ -106,21 +108,33 @@ metadata:
   name: sink-filters
   namespace: kubearchive
 spec:
+  cluster:
+  - selector:
+      apiVersion: v1
+      kind: ConfigMap
+    archiveWhen: "true"
+  - selector:
+      apiVersion: v1
+      kind: Secret
+    archiveWhen: "metadata.name != 'default'"
   namespaces:
     "production":
     - selector:
         apiVersion: v1
         kind: Pod
+      archiveWhen: "true"
     - selector:
         apiVersion: apps/v1
         kind: Deployment
-    "___global___":
+      archiveWhen: "true"
+    "staging":
     - selector:
         apiVersion: v1
-        kind: ConfigMap
+        kind: Pod
+      archiveWhen: "object.status.phase == 'Running'"
 ----
 
-NOTE: The special namespace `___global___` indicates cluster-wide resource monitoring.
+NOTE: The `SinkFilter` is automatically managed by the operator. Resources in the `cluster` field are populated from `ClusterKubeArchiveConfig` and apply across all namespaces, while resources in the `namespaces` map are populated from namespace-scoped `KubeArchiveConfig` resources.
 
 === Vacuum Configuration Types
 
@@ -266,13 +280,13 @@ The `ClusterKubeArchiveConfigReconciler` manages cluster-scoped archiving config
    - Creates cluster-level RBAC resources (ClusterRoles and ClusterRoleBindings)
    - Handles cluster-scoped ServiceAccount management
 
-2. **Global SinkFilter Coordination**
-   - Updates `SinkFilter` resources with cluster-wide resource monitoring requirements
-   - Manages the special `___global___` namespace designation for cluster resources
+2. **SinkFilter Cluster Field Management**
+   - Updates the `cluster` field in `SinkFilter` resources with cluster-wide resource monitoring requirements
+   - Maintains separation between cluster-scoped and namespace-scoped configurations
 
 3. **Namespace Integration**
    - Coordinates with namespace-specific configurations
-   - Provides fallback policies for namespaces without specific configurations
+   - Provides global policies that complement namespace-specific configurations
 
 ==== RBAC Permissions
 
@@ -318,11 +332,14 @@ The `SinkFilterReconciler` is the most complex controller, responsible for dynam
 ----
 type WatchInfo struct {
     GVR             schema.GroupVersionResource
-    KindSelector    sourcesv1.APIVersionKindSelector
-    Namespaces      map[string]struct{}
+    KindSelector    kubearchivev1.APIVersionKind
+    ClusterCel      *filters.CelExpressions
+    Namespaces      map[string]filters.CelExpressions
     StopCh          chan struct{}
     WatchInterface  watch.Interface
     ResourceVersion string
+    Queue           workqueue.TypedRateLimitingInterface[watch.Event]
+    WorkerWg        sync.WaitGroup
 }
 ----
 
@@ -330,10 +347,13 @@ type WatchInfo struct {
 
 * `GVR` - GroupVersionResource for the watched resource type
 * `KindSelector` - APIVersion and Kind specification
-* `Namespaces` - Set of namespaces this watch monitors
+* `ClusterCel` - Compiled CEL expressions for cluster-scoped filtering (from `ClusterKubeArchiveConfig`)
+* `Namespaces` - Map of namespace names to their compiled CEL expressions for namespace-scoped filtering
 * `StopCh` - Channel for signaling watch termination
 * `WatchInterface` - Active Kubernetes watch interface
 * `ResourceVersion` - Last processed resource version for efficient resumption
+* `Queue` - Rate-limited workqueue for processing watch events asynchronously
+* `WorkerWg` - WaitGroup for tracking active worker goroutines
 
 ===== Watch Management
 

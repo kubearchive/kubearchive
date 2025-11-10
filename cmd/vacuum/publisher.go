@@ -13,7 +13,6 @@ import (
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	kcel "github.com/kubearchive/kubearchive/pkg/cel"
 	publisher "github.com/kubearchive/kubearchive/pkg/cloudevents"
-	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/kubearchive/kubearchive/pkg/filters"
 	"github.com/kubearchive/kubearchive/pkg/k8sclient"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -25,15 +24,17 @@ import (
 )
 
 type VacuumCloudEventPublisher struct {
-	publisher  *publisher.SinkCloudEventPublisher
-	dynaClient *dynamic.DynamicClient
-	mapper     meta.RESTMapper
-	filters    map[string]map[string]filters.CelExpressions
+	publisher        *publisher.SinkCloudEventPublisher
+	dynaClient       *dynamic.DynamicClient
+	mapper           meta.RESTMapper
+	clusterFilters   map[string]filters.CelExpressions
+	namespaceFilters map[string]map[string]filters.CelExpressions
 }
 
-func NewVacuumCloudEventPublisher(source string, filters map[string]map[string]filters.CelExpressions) (*VacuumCloudEventPublisher, error) {
+func NewVacuumCloudEventPublisher(source string, clusterFilters map[string]filters.CelExpressions, namespaceFilters map[string]map[string]filters.CelExpressions) (*VacuumCloudEventPublisher, error) {
 	vcep := &VacuumCloudEventPublisher{
-		filters: filters,
+		clusterFilters:   clusterFilters,
+		namespaceFilters: namespaceFilters,
 	}
 
 	var err error
@@ -68,8 +69,20 @@ func (vcep *VacuumCloudEventPublisher) SendByGVK(ctx context.Context, eventTypeP
 }
 
 func (vcep *VacuumCloudEventPublisher) SendByNamespace(ctx context.Context, eventTypePrefix string, namespace string) {
-	// Iterate over filters to determine which resource types to process
-	for kindAPIVersion := range vcep.filters {
+	// Iterate over cluster and namespace filters to determine which resource types to process
+	kindAPIVersions := make(map[string]struct{})
+
+	// Add cluster filter keys
+	for kindAPIVersion := range vcep.clusterFilters {
+		kindAPIVersions[kindAPIVersion] = struct{}{}
+	}
+
+	// Add namespace filter keys
+	for kindAPIVersion := range vcep.namespaceFilters {
+		kindAPIVersions[kindAPIVersion] = struct{}{}
+	}
+
+	for kindAPIVersion := range kindAPIVersions {
 		// Parse the kindAPIVersion back into APIVersionKind
 		parts := strings.Split(kindAPIVersion, "-")
 		if len(parts) != 2 {
@@ -143,22 +156,24 @@ func getGVR(mapper meta.RESTMapper, avk *kubearchiveapi.APIVersionKind) (schema.
 
 func (vcep *VacuumCloudEventPublisher) shouldSend(avk *kubearchiveapi.APIVersionKind, resource *unstructured.Unstructured) string {
 	key := avk.Key()
-	resourceFilters, hasFilters := vcep.filters[key]
-	if hasFilters {
-		namespace := resource.GetNamespace()
+	namespace := resource.GetNamespace()
 
-		globalCel, globalExists := resourceFilters[constants.SinkFilterGlobalNamespace]
-		namespaceCel, namespaceExists := resourceFilters[namespace]
+	clusterCel, clusterExists := vcep.clusterFilters[key]
 
-		if (globalExists && kcel.ExecuteBooleanCEL(context.Background(), globalCel.DeleteWhen, resource)) ||
-			(namespaceExists && kcel.ExecuteBooleanCEL(context.Background(), namespaceCel.DeleteWhen, resource)) {
-			return "delete-when"
-		}
+	var namespaceCel filters.CelExpressions
+	namespaceExists := false
+	if resourceFilters, hasFilters := vcep.namespaceFilters[key]; hasFilters {
+		namespaceCel, namespaceExists = resourceFilters[namespace]
+	}
 
-		if (globalExists && kcel.ExecuteBooleanCEL(context.Background(), globalCel.ArchiveWhen, resource)) ||
-			(namespaceExists && kcel.ExecuteBooleanCEL(context.Background(), namespaceCel.ArchiveWhen, resource)) {
-			return "archive-when"
-		}
+	if (clusterExists && kcel.ExecuteBooleanCEL(context.Background(), clusterCel.DeleteWhen, resource)) ||
+		(namespaceExists && kcel.ExecuteBooleanCEL(context.Background(), namespaceCel.DeleteWhen, resource)) {
+		return "delete-when"
+	}
+
+	if (clusterExists && kcel.ExecuteBooleanCEL(context.Background(), clusterCel.ArchiveWhen, resource)) ||
+		(namespaceExists && kcel.ExecuteBooleanCEL(context.Background(), namespaceCel.ArchiveWhen, resource)) {
+		return "archive-when"
 	}
 
 	return ""

@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
-	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/kubearchive/kubearchive/pkg/filters"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,16 +27,16 @@ var _ = Describe("SinkFilterController", func() {
 					Namespace: SinkFilterNamespace,
 				},
 				Spec: kubearchivev1.SinkFilterSpec{
-					Namespaces: map[string][]kubearchivev1.KubeArchiveConfigResource{
-						constants.SinkFilterGlobalNamespace: {
-							{
-								Selector: kubearchivev1.APIVersionKind{
-									APIVersion: "apps/v1",
-									Kind:       "Deployment",
-								},
-								ArchiveWhen: "true",
+					Cluster: []kubearchivev1.KubeArchiveConfigResource{
+						{
+							Selector: kubearchivev1.APIVersionKind{
+								APIVersion: "apps/v1",
+								Kind:       "Deployment",
 							},
+							ArchiveWhen: "true",
 						},
+					},
+					Namespaces: map[string][]kubearchivev1.KubeArchiveConfigResource{
 						"test-namespace1": {
 							{
 								Selector: kubearchivev1.APIVersionKind{
@@ -67,16 +66,16 @@ var _ = Describe("SinkFilterController", func() {
 				},
 			}
 
-			// Test ExtractAllNamespacesByKinds
-			namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter)
+			// Test ExtractNamespacesByKind
+			namespacesByKinds := filters.ExtractNamespacesByKind(sinkFilter)
 
-			// Should have 3 unique kinds: Deployment-apps/v1, Pod-v1, Service-v1
-			Expect(len(namespacesByKinds)).To(Equal(3))
+			// Should have 2 unique kinds in namespaces: Pod-v1, Service-v1
+			// Deployment is in Cluster field, not Namespaces
+			Expect(len(namespacesByKinds)).To(Equal(2))
 
 			expectedNamespaces := map[string][]string{
-				"Deployment-apps/v1": {constants.SinkFilterGlobalNamespace},  // Deployment is global
-				"Pod-v1":             {"test-namespace1", "test-namespace2"}, // Pod is in both namespaces
-				"Service-v1":         {"test-namespace2"},                    // Service is only in test-namespace2
+				"Pod-v1":     {"test-namespace1", "test-namespace2"}, // Pod is in both namespaces
+				"Service-v1": {"test-namespace2"},                    // Service is only in test-namespace2
 			}
 
 			for key, expectedNsList := range expectedNamespaces {
@@ -101,7 +100,7 @@ var _ = Describe("SinkFilterController", func() {
 				},
 			}
 
-			namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter)
+			namespacesByKinds := filters.ExtractNamespacesByKind(sinkFilter)
 			Expect(len(namespacesByKinds)).To(Equal(0))
 		})
 
@@ -126,13 +125,19 @@ var _ = Describe("SinkFilterController", func() {
 				// Pod-v1 is missing, so should be stopped
 			}
 
-			toStop := reconciler.findWatchesToStop(newNamespacesByKinds)
+			// Create allKinds map from newNamespacesByKinds
+			allKinds := make(map[string]struct{})
+			for key := range newNamespacesByKinds {
+				allKinds[key] = struct{}{}
+			}
+
+			toStop := reconciler.findWatchesToStop(allKinds)
 			Expect(len(toStop)).To(Equal(1))
 			_, exists := toStop["Pod-v1"]
 			Expect(exists).To(BeTrue())
 
 			// Test finding watches to create
-			toCreate := reconciler.findWatchesToCreate(newNamespacesByKinds)
+			toCreate := reconciler.findWatchesToCreate(allKinds)
 			Expect(len(toCreate)).To(Equal(1))
 			_, exists = toCreate["Service-v1"]
 			Expect(exists).To(BeTrue())
@@ -140,7 +145,7 @@ var _ = Describe("SinkFilterController", func() {
 			// Verify unchanged watches are identified correctly
 			unchanged := 0
 			for key := range reconciler.watches {
-				if _, stillNeeded := newNamespacesByKinds[key]; stillNeeded {
+				if _, stillNeeded := allKinds[key]; stillNeeded {
 					unchanged++
 				}
 			}

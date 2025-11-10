@@ -27,17 +27,21 @@ func clusterVacuum(configName string) error {
 		return fmt.Errorf("unable to create SinkFilter reader: %v", err)
 	}
 
-	filters, err := filterReader.ProcessAllNamespaces(context.Background())
+	sinkFilter, err := filterReader.GetSinkFilter(context.Background())
 	if err != nil {
-		return fmt.Errorf("unable to get SinkFilter data: %v", err)
+		return fmt.Errorf("unable to get SinkFilter: %v", err)
 	}
+
+	// Extract cluster and namespace filters
+	clusterFilters := filters.ExtractClusterCELExpressionsByKind(sinkFilter)
+	namespaceFilters := filters.ExtractNamespacesByKind(sinkFilter)
 
 	client, err := k8sclient.NewInstrumentedDynamicClient()
 	if err != nil {
 		return fmt.Errorf("unable to get client: %v", err)
 	}
 
-	vcep, err := NewVacuumCloudEventPublisher("kubearchive.org/cluster-vacuum", filters)
+	vcep, err := NewVacuumCloudEventPublisher("kubearchive.org/cluster-vacuum", clusterFilters, namespaceFilters)
 	if err != nil {
 		return fmt.Errorf("unable to create sink cloudevent publisher: %v", err)
 	}
@@ -105,9 +109,7 @@ func getNamespacesFromSinkFilter(client dynamic.Interface) (map[string]struct{},
 
 	namespaces := map[string]struct{}{}
 	for namespace := range sf.Spec.Namespaces {
-		if namespace != constants.SinkFilterGlobalNamespace {
-			namespaces[namespace] = struct{}{}
-		}
+		namespaces[namespace] = struct{}{}
 	}
 	return namespaces, nil
 }

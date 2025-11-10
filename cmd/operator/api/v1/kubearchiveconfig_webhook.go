@@ -43,6 +43,16 @@ func (kaccd *KubeArchiveConfigCustomDefaulter) Default(_ context.Context, obj ru
 		return fmt.Errorf("expected an KubeArchiveConfig object but got %T", obj)
 	}
 	kaclog.Info("default", "namespace", kac.Namespace, "name", kac.Name)
+
+	// Set default values for KeepLastWhen rules
+	for i := range kac.Spec.Resources {
+		for j := range kac.Spec.Resources[i].KeepLastWhen {
+			if kac.Spec.Resources[i].KeepLastWhen[j].Sort == "" {
+				kac.Spec.Resources[i].KeepLastWhen[j].Sort = "metadata.creationTimestamp"
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -98,6 +108,11 @@ func (kaccv *KubeArchiveConfigCustomValidator) validateKAC(kac *KubeArchiveConfi
 	}
 
 	for _, resource := range kac.Spec.Resources {
+		// Check mutual exclusivity between DeleteWhen and KeepLastWhen
+		if resource.DeleteWhen != "" && len(resource.KeepLastWhen) > 0 {
+			errList = append(errList, fmt.Errorf("only one of 'deleteWhen' or 'keepLastWhen' is allowed, not both"))
+		}
+
 		if resource.ArchiveWhen != "" {
 			_, err := cel.CompileCELExpr(resource.ArchiveWhen)
 			if err != nil {
@@ -120,6 +135,26 @@ func (kaccv *KubeArchiveConfigCustomValidator) validateKAC(kac *KubeArchiveConfi
 				errList = append(errList, err)
 			} else {
 				errList = append(errList, validateDurationString(resource.ArchiveOnDelete)...)
+			}
+		}
+
+		// Validate KeepLastWhen rules
+		for i, rule := range resource.KeepLastWhen {
+			if rule.When == "" {
+				errList = append(errList, fmt.Errorf("keepLastWhen[%d].when cannot be empty", i))
+			} else {
+				_, err := cel.CompileCELExpr(rule.When)
+				if err != nil {
+					errList = append(errList, fmt.Errorf("keepLastWhen[%d].when: %w", i, err))
+				} else {
+					durErrors := validateDurationString(rule.When)
+					for _, durErr := range durErrors {
+						errList = append(errList, fmt.Errorf("keepLastWhen[%d].when: %w", i, durErr))
+					}
+				}
+			}
+			if rule.Count <= 0 {
+				errList = append(errList, fmt.Errorf("keepLastWhen[%d].count must be greater than 0", i))
 			}
 		}
 	}

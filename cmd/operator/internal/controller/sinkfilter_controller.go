@@ -99,7 +99,7 @@ func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter)
+	namespacesByKinds := filters.ExtractAllNamespacesByKinds(sinkFilter, filters.Controller)
 
 	if err := r.generateWatches(ctx, namespacesByKinds); err != nil {
 		log.Error(err, "Failed to generate watches")

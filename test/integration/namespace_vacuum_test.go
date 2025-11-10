@@ -8,7 +8,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/test"
@@ -35,29 +37,41 @@ func TestNamespaceVacuum(t *testing.T) {
 		kac       string
 		vacuumRes string
 	}{
-		"no-resources": {
+		"nvac-no-resources": {
 			expected:  "testdata/nvac-no-resources.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: "testdata/vac-no-resources.yaml",
 		},
-		"ckac-resource": {
+		"nvac-ckac-resource": {
 			expected:  "testdata/nvac-ckac-resource.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: "testdata/vac-pod-resource.yaml",
 		},
-		"kac-resource": {
+		"nvac-kac-resource": {
 			expected:  "testdata/nvac-kac-resource.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: "testdata/vac-job-resource.yaml",
 		},
-		"all-resources": {
+		"nvac-all-resources": {
 			expected:  "testdata/nvac-all-resources.txt",
 			ckac:      "testdata/ckac-with-pod.yaml",
 			kac:       "testdata/kac-with-job.yaml",
 			vacuumRes: "testdata/vac-job-pod-resources.yaml",
+		},
+		"nvac-keep-last-when-namespace-only": {
+			expected:  "testdata/nvac-keep-last-when-namespace-only.txt",
+			ckac:      "testdata/ckac-with-pod.yaml",
+			kac:       "testdata/kac-keep-last-when-task.yaml",
+			vacuumRes: "testdata/vac-job-resource.yaml",
+		},
+		"nvac-keep-last-when-name-sort": {
+			expected:  "testdata/nvac-keep-last-when-name-sort.txt",
+			ckac:      "testdata/ckac-with-pod.yaml",
+			kac:       "testdata/kac-keep-last-when-name-sort.yaml",
+			vacuumRes: "testdata/vac-job-resource.yaml",
 		},
 	}
 
@@ -69,13 +83,43 @@ func TestNamespaceVacuum(t *testing.T) {
 			})
 
 			clientset, _ := test.GetKubernetesClient(t)
-			namespace, _ := test.CreateTestNamespace(t, false)
+			namespace, _ := test.CreateTestNamespaceWithName(t, false, "test-"+name)
 
 			// Run the job before creating the KAC/CKAC so that the deleteWhen can just us the existence of
 			// completionTime for the vacuum. No waiting!
 
-			jobName := test.RunLogGenerator(t, namespace)
-			test.WaitForJob(t, clientset, namespace, jobName)
+			// For keepLastWhen tests, create multiple jobs to test the functionality
+			if strings.Contains(name, "keep-last-when") {
+				var jobNames []string
+				jobCount := 4 // For namespace test, use 4 jobs to keep last 2
+
+				// For name-sort test, create jobs in reverse order (N down to 1)
+				if strings.Contains(name, "name-sort") {
+					for i := jobCount; i >= 1; i-- {
+						jobName := fmt.Sprintf("vacuum-job-%03d", i)
+						test.RunLogGeneratorWithLinesWithName(t, namespace, 5, jobName)
+						jobNames = append(jobNames, jobName)
+						// Sleep for a second to ensure different creation timestamps
+						time.Sleep(1 * time.Second)
+					}
+				} else {
+					for i := 0; i < jobCount; i++ {
+						jobName := fmt.Sprintf("vacuum-job-%03d", i+1)
+						test.RunLogGeneratorWithLinesWithName(t, namespace, 5, jobName)
+						jobNames = append(jobNames, jobName)
+						// Sleep for a second to ensure different creation timestamps
+						time.Sleep(1 * time.Second)
+					}
+				}
+
+				// Wait for all jobs to complete
+				for _, jobName := range jobNames {
+					test.WaitForJob(t, clientset, namespace, jobName)
+				}
+			} else {
+				jobName := test.RunLogGeneratorWithLinesWithName(t, namespace, 10, "vacuum-job-001")
+				test.WaitForJob(t, clientset, namespace, jobName)
+			}
 
 			test.CreateCKAC(t, values.ckac)
 			test.CreateKAC(t, values.kac, namespace)
@@ -115,7 +159,7 @@ func createNamespaceVacuumConfig(t testing.TB, nvc *kubearchiveapi.NamespaceVacu
 }
 
 func runNamespaceVacuum(t testing.TB, clientset *kubernetes.Clientset, namespace string) string {
-	name := fmt.Sprintf("namespace-vacuum-%s", test.RandomString())
+	name := "namespace-vacuum-001"
 	t.Logf("Running job '%s/%s'", namespace, name)
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{

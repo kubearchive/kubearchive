@@ -17,6 +17,14 @@ type APIVersionKind struct {
 	APIVersion string `json:"apiVersion" yaml:"apiVersion"`
 }
 
+// +kubebuilder:object:generate=true
+type KeepLastRule struct {
+	When  string `json:"when" yaml:"when"`
+	Count int    `json:"count" yaml:"count"`
+	// +kubebuilder:default="metadata.creationTimestamp"
+	Sort string `json:"sort,omitempty" yaml:"sort,omitempty"`
+}
+
 var KubeArchiveConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1", Resource: "kubearchiveconfigs"}
 
 type KubeArchiveConfigResource struct {
@@ -24,6 +32,7 @@ type KubeArchiveConfigResource struct {
 	ArchiveWhen     string         `json:"archiveWhen,omitempty" yaml:"archiveWhen,omitempty"`
 	DeleteWhen      string         `json:"deleteWhen,omitempty" yaml:"deleteWhen,omitempty"`
 	ArchiveOnDelete string         `json:"archiveOnDelete,omitempty" yaml:"archiveOnDelete,omitempty"`
+	KeepLastWhen    []KeepLastRule `json:"keepLastWhen,omitempty" yaml:"keepLastWhen,omitempty"`
 }
 
 // KubeArchiveConfigSpec defines the desired state of KubeArchiveConfig

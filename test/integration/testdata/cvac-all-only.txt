@@ -1,0 +1,3 @@
+yyyy/mm/dd hh:mm:ss INFO Started publishing sink events namespace=test-cvac-all-only-001
+yyyy/mm/dd hh:mm:ss INFO Event sent successfully apiversion=v1 kind=Pod namespace=test-cvac-all-only-001 name=vacuum-job-001-xxxxx eventType=org.kubearchive.vacuum.cluster.resource.archive-when code=202
+yyyy/mm/dd hh:mm:ss INFO Finished publishing sink events namespace=test-cvac-all-only-001

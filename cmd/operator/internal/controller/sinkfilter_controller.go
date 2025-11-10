@@ -235,6 +235,7 @@ func (r *SinkFilterReconciler) getGVRFromKindAndAPIVersion(kind, apiVersion stri
 }
 
 func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string, gvr schema.GroupVersionResource, namespaces map[string]filters.CelExpressions) {
+	log := log.FromContext(ctx)
 	stopCh := make(chan struct{})
 
 	kind, apiVersion := r.parseKindAndAPIVersionFromKey(key)
@@ -261,11 +262,12 @@ func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string
 
 	r.watches[key] = watchInfo
 
-	numWorkers := 3
-	for i := 0; i < numWorkers; i++ {
+	resourceConfig, _ := GetResourceConfig(kindSelector)
+	for i := 0; i < resourceConfig.Workers; i++ {
 		watchInfo.WorkerWg.Add(1)
 		go r.runWorker(ctx, watchInfo, key)
 	}
+	log.Info("Started workers for resource", "apiVersion", kindSelector.APIVersion, "kind", kindSelector.Kind, "workers", resourceConfig.Workers)
 
 	go r.watchLoop(ctx, watchInfo, key)
 }

@@ -17,6 +17,10 @@ type APIVersionKind struct {
 	APIVersion string `json:"apiVersion" yaml:"apiVersion"`
 }
 
+func (a APIVersionKind) Key() string {
+	return a.Kind + "-" + a.APIVersion
+}
+
 var KubeArchiveConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1", Resource: "kubearchiveconfigs"}
 
 type KubeArchiveConfigResource struct {

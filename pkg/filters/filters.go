@@ -109,7 +109,7 @@ func extractNamespacesByKindsList(sinkFilter *kubearchivev1.SinkFilter, namespac
 		}
 
 		for _, res := range resources {
-			key := res.Selector.Kind + "-" + res.Selector.APIVersion
+			key := res.Selector.Key()
 
 			celExpr := CelExpressions{
 				ArchiveWhen:     CompileCELExpression(res.ArchiveWhen, "ArchiveWhen", ns),

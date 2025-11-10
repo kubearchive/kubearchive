@@ -142,7 +142,7 @@ func getGVR(mapper meta.RESTMapper, avk *kubearchiveapi.APIVersionKind) (schema.
 }
 
 func (vcep *VacuumCloudEventPublisher) shouldSend(avk *kubearchiveapi.APIVersionKind, resource *unstructured.Unstructured) string {
-	key := avk.Kind + "-" + avk.APIVersion
+	key := avk.Key()
 	resourceFilters, hasFilters := vcep.filters[key]
 	if hasFilters {
 		namespace := resource.GetNamespace()

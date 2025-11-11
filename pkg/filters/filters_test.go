@@ -45,6 +45,17 @@ func createTestSinkFilter() *kubearchivev1.SinkFilter {
 			Namespace: constants.KubeArchiveNamespace,
 		},
 		Spec: kubearchivev1.SinkFilterSpec{
+			Cluster: []kubearchivev1.KubeArchiveConfigResource{
+				{
+					Selector: kubearchivev1.APIVersionKind{
+						Kind:       "Deployment",
+						APIVersion: "apps/v1",
+					},
+					ArchiveWhen:     "metadata.labels.archive == 'true'",
+					DeleteWhen:      "",
+					ArchiveOnDelete: "",
+				},
+			},
 			Namespaces: map[string][]kubearchivev1.KubeArchiveConfigResource{
 				"test-namespace": {
 					{
@@ -55,17 +66,6 @@ func createTestSinkFilter() *kubearchivev1.SinkFilter {
 						ArchiveWhen:     "true",
 						DeleteWhen:      "false",
 						ArchiveOnDelete: "metadata.name == 'test'",
-					},
-				},
-				constants.SinkFilterGlobalNamespace: {
-					{
-						Selector: kubearchivev1.APIVersionKind{
-							Kind:       "Deployment",
-							APIVersion: "apps/v1",
-						},
-						ArchiveWhen:     "metadata.labels.archive == 'true'",
-						DeleteWhen:      "",
-						ArchiveOnDelete: "",
 					},
 				},
 			},
@@ -230,7 +230,7 @@ func TestSinkFilterReader_ProcessSingleNamespace(t *testing.T) {
 			expectEmpty:   false,
 		},
 		{
-			name:          "No SinkFilter found returns empty map",
+			name:          "No SinkFilter found returns empty list",
 			sinkFilter:    nil,
 			expectedError: "",
 			expectEmpty:   true,
@@ -264,7 +264,7 @@ func TestSinkFilterReader_ProcessSingleNamespace(t *testing.T) {
 	}
 }
 
-func TestExtractAllNamespacesByKinds(t *testing.T) {
+func TestExtractNamespacesByKind(t *testing.T) {
 	tests := []struct {
 		name       string
 		sinkFilter *kubearchivev1.SinkFilter
@@ -276,13 +276,6 @@ func TestExtractAllNamespacesByKinds(t *testing.T) {
 			expected: map[string]map[string]CelExpressions{
 				"Pod-v1": {
 					"test-namespace": CelExpressions{
-						ArchiveWhen:     nil,
-						DeleteWhen:      nil,
-						ArchiveOnDelete: nil,
-					},
-				},
-				"Deployment-apps/v1": {
-					constants.SinkFilterGlobalNamespace: CelExpressions{
 						ArchiveWhen:     nil,
 						DeleteWhen:      nil,
 						ArchiveOnDelete: nil,
@@ -303,7 +296,7 @@ func TestExtractAllNamespacesByKinds(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ExtractAllNamespacesByKinds(tt.sinkFilter)
+			result := ExtractNamespacesByKind(tt.sinkFilter)
 
 			assert.Equal(t, len(tt.expected), len(result))
 			for key := range tt.expected {
@@ -314,16 +307,20 @@ func TestExtractAllNamespacesByKinds(t *testing.T) {
 	}
 }
 
-func TestExtractSingleNamespaceByKinds(t *testing.T) {
+func TestExtractNamespaceByKind(t *testing.T) {
 	targetNamespace := "test-namespace"
 	sinkFilter := createTestSinkFilter()
 
-	result := ExtractSingleNamespaceByKinds(sinkFilter, targetNamespace)
+	result := ExtractNamespaceByKind(sinkFilter, targetNamespace)
 
-	assert.Contains(t, result, "Pod-v1")
-	assert.Contains(t, result, "Deployment-apps/v1")
-	assert.Contains(t, result["Pod-v1"], targetNamespace)
-	assert.Contains(t, result["Deployment-apps/v1"], constants.SinkFilterGlobalNamespace)
+	assert.Len(t, result, 1)
+	for _, nsMap := range result {
+		assert.Contains(t, nsMap, targetNamespace)
+		celExpr := nsMap[targetNamespace]
+		assert.NotNil(t, celExpr.ArchiveWhen)
+		assert.NotNil(t, celExpr.DeleteWhen)
+		assert.NotNil(t, celExpr.ArchiveOnDelete)
+	}
 }
 
 func TestCompileCELExpression(t *testing.T) {

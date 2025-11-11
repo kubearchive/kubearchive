@@ -10,16 +10,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
-	"github.com/kubearchive/kubearchive/pkg/constants"
 )
 
 const (
@@ -132,67 +128,6 @@ func comparePolicyRules(a, b rbacv1.PolicyRule) int {
 		return cmp
 	}
 	return slices.Compare(a.Verbs, b.Verbs)
-}
-
-func reconcileSinkFilter(ctx context.Context, client client.Client, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) error {
-	log := log.FromContext(ctx)
-
-	log.Info("in reconcileSinkFilter")
-
-	sf := &kubearchivev1.SinkFilter{}
-	err := client.Get(ctx, types.NamespacedName{Name: constants.SinkFilterResourceName, Namespace: constants.KubeArchiveNamespace}, sf)
-	if errors.IsNotFound(err) {
-		sf = desiredSinkFilter(ctx, nil, namespace, resources)
-		err = client.Create(ctx, sf)
-		if err != nil {
-			log.Error(err, "Failed to create SinkFilter "+constants.SinkFilterResourceName)
-			return err
-		}
-		return nil
-	} else if err != nil {
-		log.Error(err, "Failed to reconcile SinkFilter "+constants.SinkFilterResourceName)
-		return err
-	}
-
-	sf = desiredSinkFilter(ctx, sf, namespace, resources)
-	err = client.Update(ctx, sf)
-	if err != nil {
-		log.Error(err, "Failed to update SinkFilter "+constants.SinkFilterResourceName)
-		return err
-	}
-	return nil
-}
-
-func desiredSinkFilter(ctx context.Context, sf *kubearchivev1.SinkFilter, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) *kubearchivev1.SinkFilter {
-	log := log.FromContext(ctx)
-
-	log.Info("in desiredSinkFilter")
-
-	if sf == nil {
-		sf = &kubearchivev1.SinkFilter{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      constants.SinkFilterResourceName,
-				Namespace: constants.KubeArchiveNamespace,
-			},
-			Spec: kubearchivev1.SinkFilterSpec{
-				Namespaces: map[string][]kubearchivev1.KubeArchiveConfigResource{},
-			},
-		}
-	}
-
-	if sf.Spec.Namespaces == nil {
-		sf.Spec.Namespaces = make(map[string][]kubearchivev1.KubeArchiveConfigResource)
-	}
-
-	if resources != nil {
-		sf.Spec.Namespaces[namespace] = resources
-	} else {
-		delete(sf.Spec.Namespaces, namespace)
-	}
-
-	// Note that the owner reference is NOT set on the SinkFilter resource.  It should not be deleted when
-	// the KubeArchiveConfig object is deleted.
-	return sf
 }
 
 func removeSubjects(subjects []rbacv1.Subject, removals ...rbacv1.Subject) []rbacv1.Subject {

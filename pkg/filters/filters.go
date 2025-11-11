@@ -68,7 +68,7 @@ func (r *SinkFilterReader) ProcessAllNamespaces(ctx context.Context) (map[string
 		return map[string]map[string]CelExpressions{}, nil
 	}
 
-	return ExtractAllNamespacesByKinds(sinkFilter), nil
+	return ExtractNamespacesByKind(sinkFilter), nil
 }
 
 func (r *SinkFilterReader) ProcessSingleNamespace(ctx context.Context, targetNamespace string) (map[string]map[string]CelExpressions, error) {
@@ -81,10 +81,31 @@ func (r *SinkFilterReader) ProcessSingleNamespace(ctx context.Context, targetNam
 		return map[string]map[string]CelExpressions{}, nil
 	}
 
-	return ExtractSingleNamespaceByKinds(sinkFilter, targetNamespace), nil
+	return ExtractNamespaceByKind(sinkFilter, targetNamespace), nil
 }
 
-func ExtractAllNamespacesByKinds(sinkFilter *kubearchivev1.SinkFilter) map[string]map[string]CelExpressions {
+func ExtractClusterCELExpressionsByKind(sinkFilter *kubearchivev1.SinkFilter) map[string]CelExpressions {
+	expressionsByKind := make(map[string]CelExpressions)
+
+	if len(sinkFilter.Spec.Cluster) == 0 {
+		return expressionsByKind
+	}
+
+	for _, res := range sinkFilter.Spec.Cluster {
+		key := res.Selector.Kind + "-" + res.Selector.APIVersion
+
+		celExpr := CelExpressions{
+			ArchiveWhen:     CompileCELExpression(res.ArchiveWhen, "ArchiveWhen", "ckac"),
+			DeleteWhen:      CompileCELExpression(res.DeleteWhen, "DeleteWhen", "ckac"),
+			ArchiveOnDelete: CompileCELExpression(res.ArchiveOnDelete, "ArchiveOnDelete", "ckac"),
+		}
+		expressionsByKind[key] = celExpr
+	}
+
+	return expressionsByKind
+}
+
+func ExtractNamespacesByKind(sinkFilter *kubearchivev1.SinkFilter) map[string]map[string]CelExpressions {
 	var namespacesToProcess []string
 	for ns := range sinkFilter.Spec.Namespaces {
 		namespacesToProcess = append(namespacesToProcess, ns)
@@ -93,10 +114,8 @@ func ExtractAllNamespacesByKinds(sinkFilter *kubearchivev1.SinkFilter) map[strin
 	return extractNamespacesByKindsList(sinkFilter, namespacesToProcess)
 }
 
-func ExtractSingleNamespaceByKinds(sinkFilter *kubearchivev1.SinkFilter, targetNamespace string) map[string]map[string]CelExpressions {
-	namespacesToProcess := []string{targetNamespace, constants.SinkFilterGlobalNamespace}
-
-	return extractNamespacesByKindsList(sinkFilter, namespacesToProcess)
+func ExtractNamespaceByKind(sinkFilter *kubearchivev1.SinkFilter, namespace string) map[string]map[string]CelExpressions {
+	return extractNamespacesByKindsList(sinkFilter, []string{namespace})
 }
 
 func extractNamespacesByKindsList(sinkFilter *kubearchivev1.SinkFilter, namespacesToProcess []string) map[string]map[string]CelExpressions {

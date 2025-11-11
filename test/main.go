@@ -581,43 +581,45 @@ func CreateTestNamespaceWithClusterAccess(t testing.TB, customCleanup bool, clus
 }
 
 func CreateCKAC(t testing.TB, filename string) *kubearchiveapi.ClusterKubeArchiveConfig {
-	object := createAKAC(t, filename, "", "clusterkubearchiveconfigs")
+	object := CreateObjectFromFile(t, filename, "", "clusterkubearchiveconfigs")
 	ckac, err := kubearchiveapi.ConvertUnstructuredToClusterKubeArchiveConfig(object)
 	if err != nil {
 		t.Fatal("unable to convert to ClusterKubeArchiveConfig:", err)
 	}
+
+	if len(ckac.Spec.Resources) > 0 {
+		_, dynamicClient := GetKubernetesClient(t)
+
+		err := retry.Do(func() error {
+			obj, retryErr := dynamicClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
+			if retryErr != nil {
+				return retryErr
+			}
+			sinkFilter, retryErr := kubearchiveapi.ConvertObjectToSinkFilter(obj)
+			if retryErr != nil {
+				return retryErr
+			}
+			if len(sinkFilter.Spec.Cluster) == 0 {
+				return fmt.Errorf("SinkFilter " + constants.SinkFilterResourceName + " does not yet have cluster filters")
+			}
+			return nil
+		}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	return ckac
 }
 
 func CreateKAC(t testing.TB, filename string, namespace string) *kubearchiveapi.KubeArchiveConfig {
-	object := createAKAC(t, filename, namespace, "kubearchiveconfigs")
+	object := CreateObjectFromFile(t, filename, namespace, "kubearchiveconfigs")
 	kac, err := kubearchiveapi.ConvertUnstructuredToKubeArchiveConfig(object)
 	if err != nil {
 		t.Fatal("unable to convert to KubeArchiveConfig:", err)
 	}
-	return kac
-}
 
-func createAKAC(t testing.TB, filename string, namespace string, resources string) *unstructured.Unstructured {
-	object := CreateObjectFromFile(t, filename, namespace, resources)
-
-	var haveResources bool
-	if namespace == "" {
-		ckac, err := kubearchiveapi.ConvertUnstructuredToClusterKubeArchiveConfig(object)
-		if err != nil {
-			t.Fatal("unable to convert to ClusterKubeArchiveConfig:", err)
-		}
-		haveResources = len(ckac.Spec.Resources) > 0
-		namespace = constants.SinkFilterGlobalNamespace
-	} else {
-		kac, err := kubearchiveapi.ConvertUnstructuredToKubeArchiveConfig(object)
-		if err != nil {
-			t.Fatal("unable to convert to KubeArchiveConfig:", err)
-		}
-		haveResources = len(kac.Spec.Resources) > 0
-	}
-
-	if haveResources {
+	if len(kac.Spec.Resources) > 0 {
 		_, dynamicClient := GetKubernetesClient(t)
 
 		err := retry.Do(func() error {
@@ -639,7 +641,8 @@ func createAKAC(t testing.TB, filename string, namespace string, resources strin
 			t.Fatal(err)
 		}
 	}
-	return object
+
+	return kac
 }
 
 func DeleteCKAC(t testing.TB) {

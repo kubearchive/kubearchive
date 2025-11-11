@@ -71,11 +71,11 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 			By("Reconciling the created resource")
 			for _, op := range []string{"create", "add-resource", "remove-resource", "delete"} {
 				By(op)
-				if op == "update-add-resouce" {
+				if op == "add-resource" {
 					Expect(k8sClient.Get(ctx, clusterKACName, ckac)).To(Succeed())
 					ckac.Spec.Resources = append(ckac.Spec.Resources, podResource)
 					Expect(k8sClient.Update(ctx, ckac)).To(Succeed())
-				} else if op == "update-remove-resource" {
+				} else if op == "remove-resource" {
 					Expect(k8sClient.Get(ctx, clusterKACName, ckac)).To(Succeed())
 					ckac.Spec.Resources = []kubearchivev1.KubeArchiveConfigResource{jobResource}
 					Expect(k8sClient.Update(ctx, ckac)).To(Succeed())
@@ -93,18 +93,17 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 				})
 				Expect(err).NotTo(HaveOccurred())
 
-				// Check that SinkFilters exists and has the namespace in it.
 				sf := &kubearchivev1.SinkFilter{}
 				err = k8sClient.Get(ctx, installSFName, sf)
 				Expect(err).NotTo(HaveOccurred())
-				if op == "update-add-resouce" {
-					Expect(len(sf.Spec.Namespaces)).To(Equal(2))
-					Expect(sf.Spec.Namespaces).Should(HaveKey(constants.SinkFilterGlobalNamespace))
-				} else if op == "update-remove-resource" {
-					Expect(len(sf.Spec.Namespaces)).To(Equal(1))
-					Expect(sf.Spec.Namespaces).Should(HaveKey(constants.SinkFilterGlobalNamespace))
+				if op == "create" {
+					Expect(len(sf.Spec.Cluster)).To(Equal(1))
+				} else if op == "add-resource" {
+					Expect(len(sf.Spec.Cluster)).To(Equal(2))
+				} else if op == "remove-resource" {
+					Expect(len(sf.Spec.Cluster)).To(Equal(1))
 				} else if op == "delete" {
-					Expect(len(sf.Spec.Namespaces)).To(Equal(0))
+					Expect(len(sf.Spec.Cluster)).To(Equal(0))
 				}
 			}
 		})

@@ -68,7 +68,7 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 			log.Info("Deleting KubeArchiveConfig")
 
-			if err := reconcileSinkFilter(ctx, r.Client, kaconfig.Namespace, nil); err != nil {
+			if err := updateSinkFilterNamespace(ctx, r.Client, kaconfig.Namespace, nil); err != nil {
 				return ctrl.Result{}, err
 			}
 
@@ -87,7 +87,7 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		return ctrl.Result{}, nil
 	}
 
-	if err := reconcileSinkFilter(ctx, r.Client, kaconfig.Namespace, kaconfig.Spec.Resources); err != nil {
+	if err := updateSinkFilterNamespace(ctx, r.Client, kaconfig.Namespace, kaconfig.Spec.Resources); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -433,4 +433,65 @@ func (r *KubeArchiveConfigReconciler) reconcileKubeArchiveVacuumRoleBinding(ctx 
 		return err
 	}
 	return nil
+}
+
+func updateSinkFilterNamespace(ctx context.Context, client client.Client, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) error {
+	log := log.FromContext(ctx)
+
+	log.Info("in updateSinkFilterNamespace")
+
+	sf := &kubearchivev1.SinkFilter{}
+	err := client.Get(ctx, types.NamespacedName{Name: constants.SinkFilterResourceName, Namespace: constants.KubeArchiveNamespace}, sf)
+	if errors.IsNotFound(err) {
+		sf = desiredSinkFilterNamespace(ctx, nil, namespace, resources)
+		err = client.Create(ctx, sf)
+		if err != nil {
+			log.Error(err, "Failed to create SinkFilter "+constants.SinkFilterResourceName)
+			return err
+		}
+		return nil
+	} else if err != nil {
+		log.Error(err, "Failed to reconcile SinkFilter "+constants.SinkFilterResourceName)
+		return err
+	}
+
+	sf = desiredSinkFilterNamespace(ctx, sf, namespace, resources)
+	err = client.Update(ctx, sf)
+	if err != nil {
+		log.Error(err, "Failed to update SinkFilter "+constants.SinkFilterResourceName)
+		return err
+	}
+	return nil
+}
+
+func desiredSinkFilterNamespace(ctx context.Context, sf *kubearchivev1.SinkFilter, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) *kubearchivev1.SinkFilter {
+	log := log.FromContext(ctx)
+
+	log.Info("in desiredSinkFilterNamespace")
+
+	if sf == nil {
+		sf = &kubearchivev1.SinkFilter{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      constants.SinkFilterResourceName,
+				Namespace: constants.KubeArchiveNamespace,
+			},
+			Spec: kubearchivev1.SinkFilterSpec{
+				Namespaces: map[string][]kubearchivev1.KubeArchiveConfigResource{},
+			},
+		}
+	}
+
+	if sf.Spec.Namespaces == nil {
+		sf.Spec.Namespaces = make(map[string][]kubearchivev1.KubeArchiveConfigResource)
+	}
+
+	if resources != nil {
+		sf.Spec.Namespaces[namespace] = resources
+	} else {
+		delete(sf.Spec.Namespaces, namespace)
+	}
+
+	// Note that the owner reference is NOT set on the SinkFilter resource.  It should not be deleted when
+	// the KubeArchiveConfig object is deleted.
+	return sf
 }

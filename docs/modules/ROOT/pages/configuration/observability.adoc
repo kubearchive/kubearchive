@@ -8,6 +8,31 @@ and configuration of features related with observability.
 
 KubeArchive exposes the following custom metrics:
 
+### `workqueue` metrics
+
+KubeArchive makes use of queues to receive and process updates from the Kubernetes API.
+The supported labels are:
+
+* `queue`: the name of the queue.
+
+The metrics are:
+
+* `workqueue.adds`: total number of additions to the queue. Use with `rate` to
+measure how fast the queue is growing.
+* `workqueue.latency_(sum/count/bucket)`: seconds that an item is on the queue waiting for
+processing. Use with `rate(sum)/rate(count)` to measure latencies, or use the `bucket` metrics
+to inspect quantiles.
+* `workqueue.duration_(sum/count/bucket)`: seconds that an item takes to process. Use
+with `rate(sum)/rate(count)` to measure latencies, or use the `bucket` metrics to inspect
+quantiles.
+* `workqueue.retries`: total number of times items were added back to the queue for
+retry. Use with `rate` to measure how fast the processing is failing.
+* `workqueue.depth`: current number of items on the queue. Use directly.
+* `workqueue.longest_running`: seconds of the longest current active item has been processing.
+Use directly.
+* `workqueue.unfinished_work`: sum of all the seconds all the processing items are taking.
+Use directly.
+
 ### kubearchive.cloudevents.total
 
 **Labels**: `result`, `event_type` `resource_type`

@@ -265,7 +265,8 @@ func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string
 	queue := workqueue.NewTypedRateLimitingQueueWithConfig(
 		workqueue.DefaultTypedControllerRateLimiter[watch.Event](),
 		workqueue.TypedRateLimitingQueueConfig[watch.Event]{
-			Name: key,
+			Name:            key,
+			MetricsProvider: OpenTelemetryWorkqueueMetricsProvider{},
 		},
 	)
 

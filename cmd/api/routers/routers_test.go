@@ -51,12 +51,18 @@ func setupRouter(db interfaces.DBReader, core bool) *gin.Engine {
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetResources)
 	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType", ctrl.GetResources)
 	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/:name", ctrl.GetResources)
+	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/uid/:uid", ctrl.GetResourceByUID)
 	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/:name/log",
+		ctrl.GetLogURL, retrieveLogURL)
+	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
 		ctrl.GetLogURL, retrieveLogURL)
 	router.GET("/api/:version/:resourceType", ctrl.GetResources)
 	router.GET("/api/:version/namespaces/:namespace/:resourceType", ctrl.GetResources)
 	router.GET("/api/:version/namespaces/:namespace/:resourceType/:name", ctrl.GetResources)
+	router.GET("/api/:version/namespaces/:namespace/:resourceType/uid/:uid", ctrl.GetResourceByUID)
 	router.GET("/api/:version/namespaces/:namespace/:resourceType/:name/log",
+		ctrl.GetLogURL, retrieveLogURL)
+	router.GET("/api/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
 		ctrl.GetLogURL, retrieveLogURL)
 	return router
 }
@@ -172,6 +178,27 @@ func TestGetResourcesLogURLS(t *testing.T) {
 			expectedCode: http.StatusNotFound,
 			expectedBody: "{\"message\":\"Not Found\"}",
 		},
+		{
+			name:         "my-pod-uid",
+			api:          fmt.Sprintf("/api/v1/namespaces/ns/pods/uid/%s/log", coreResources[0].GetUID()),
+			isCore:       true,
+			expectedCode: http.StatusOK,
+			expectedBody: fmt.Sprintf("\"%s-%s\"", testLogUrls[0].Url, testLogJsonPath),
+		},
+		{
+			name:         "my-cronjob-uid",
+			api:          fmt.Sprintf("/apis/batch/v1/namespaces/ns/cronjobs/uid/%s/log", nonCoreResources[0].GetUID()),
+			isCore:       false,
+			expectedCode: http.StatusOK,
+			expectedBody: fmt.Sprintf("\"%s-%s\"", testLogUrls[0].Url, testLogJsonPath),
+		},
+		{
+			name:         "not-found-uid",
+			api:          "/apis//v1/namespaces/ns/pods/uid/not-found/log",
+			isCore:       true,
+			expectedCode: http.StatusNotFound,
+			expectedBody: "{\"message\":\"Not Found\"}",
+		},
 	}
 
 	for _, test := range tests {
@@ -252,6 +279,54 @@ func TestGetResources(t *testing.T) {
 				t.Fail()
 			}
 			assert.Equal(t, test.expectedResources, resources.Items)
+		})
+	}
+}
+
+func TestGetResourceByUID(t *testing.T) {
+	nonCoreResourceBytes, _ := json.Marshal(nonCoreResources[0])
+	coreResourceBytes, _ := json.Marshal(coreResources[0])
+	tests := []struct {
+		name           string
+		isCore         bool
+		endpoint       string
+		givenResources []*unstructured.Unstructured
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "Success namespaced non-core resource",
+			isCore:         false,
+			endpoint:       fmt.Sprintf("/apis/stable.example.com/v1/namespaces/test/crontabs/uid/%s", string(nonCoreResources[0].GetUID())),
+			givenResources: testResources,
+			expectedStatus: http.StatusOK,
+			expectedBody:   string(nonCoreResourceBytes),
+		},
+		{
+			name:           "Success namespaced core resource",
+			isCore:         true,
+			endpoint:       fmt.Sprintf("/api/v1/namespaces/test/pods/uid/%s", string(coreResources[0].GetUID())),
+			givenResources: testResources,
+			expectedStatus: http.StatusOK,
+			expectedBody:   string(coreResourceBytes),
+		},
+		{
+			name:           "Resource not found",
+			isCore:         false,
+			endpoint:       "/api/v1/namespaces/test/pods/uid/abcd",
+			givenResources: testResources,
+			expectedStatus: http.StatusNotFound,
+			expectedBody:   "not found",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := setupRouter(fake.NewFakeDatabase(tt.givenResources, testLogUrls, testLogJsonPath), tt.isCore)
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tt.endpoint, nil)
+			router.ServeHTTP(res, req)
+			assert.Equal(t, tt.expectedStatus, res.Code)
+			assert.Contains(t, res.Body.String(), tt.expectedBody)
 		})
 	}
 }

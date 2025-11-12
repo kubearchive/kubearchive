@@ -350,7 +350,7 @@ func TestQueryLogURLs(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
-			url, jsonPath, _ := db.QueryLogURL(context.Background(), tt.kind, "", "", "", "")
+			url, jsonPath, _ := db.QueryLogURLByName(context.Background(), tt.kind, "", "", "", "")
 			assert.Equal(t, tt.expected, url)
 			assert.Equal(t, testJsonPath, jsonPath)
 		})

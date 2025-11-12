@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -69,6 +70,7 @@ func CreateTestResources() []*unstructured.Unstructured {
 	crontab.SetAPIVersion("stable.example.com/v1")
 	crontab.SetName("test")
 	crontab.SetNamespace("test")
+	crontab.SetUID(types.UID(uuid.New().String()))
 	ret = append(ret, crontab)
 
 	crontab1 := &unstructured.Unstructured{}
@@ -76,6 +78,7 @@ func CreateTestResources() []*unstructured.Unstructured {
 	crontab1.SetAPIVersion("stable.example.com/v1")
 	crontab1.SetName("test-e2e-job")
 	crontab1.SetNamespace("test")
+	crontab.SetUID(types.UID(uuid.New().String()))
 	ret = append(ret, crontab1)
 
 	crontab2 := &unstructured.Unstructured{}
@@ -83,6 +86,7 @@ func CreateTestResources() []*unstructured.Unstructured {
 	crontab2.SetAPIVersion("stable.example.com/v1")
 	crontab2.SetName("my-e2e-service")
 	crontab2.SetNamespace("test")
+	crontab.SetUID(types.UID(uuid.New().String()))
 	ret = append(ret, crontab2)
 
 	crontab3 := &unstructured.Unstructured{}
@@ -90,6 +94,7 @@ func CreateTestResources() []*unstructured.Unstructured {
 	crontab3.SetAPIVersion("stable.example.com/v1")
 	crontab3.SetName("production-deployment")
 	crontab3.SetNamespace("test")
+	crontab.SetUID(types.UID(uuid.New().String()))
 	ret = append(ret, crontab3)
 
 	pod := &unstructured.Unstructured{}
@@ -97,6 +102,7 @@ func CreateTestResources() []*unstructured.Unstructured {
 	pod.SetAPIVersion("v1")
 	pod.SetName("test")
 	pod.SetNamespace("test")
+	pod.SetUID(types.UID(uuid.New().String()))
 	ret = append(ret, pod)
 
 	return ret
@@ -166,11 +172,38 @@ func (f *fakeDatabase) queryResources(_ context.Context, kind, version, _, _ str
 	return f.filterResourcesByKindAndApiVersion(kind, version)
 }
 
-func (f *fakeDatabase) QueryLogURL(_ context.Context, _, _, _, _, _ string) (string, string, error) {
+func (f *fakeDatabase) QueryLogURLByName(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (string, string, error) {
+	return f.queryLogURL(ctx, kind, apiVersion, namespace, name, containerName)
+}
+
+func (f *fakeDatabase) QueryLogURLByUID(ctx context.Context, kind, apiVersion, namespace, uid, containerName string) (string, string, error) {
+	return f.queryLogURL(ctx, kind, apiVersion, namespace, uid, containerName)
+}
+
+func (f *fakeDatabase) queryLogURL(_ context.Context, _, _, _, _, _ string) (string, string, error) {
 	if len(f.logUrl) == 0 {
 		return "", "", f.err
 	}
 	return f.logUrl[0].Url, f.jsonPath, f.err
+}
+
+func (f *fakeDatabase) QueryResourceByUID(ctx context.Context, kind, apiVersion, namespace, uid string) (*models.Resource, error) {
+	for _, resource := range f.resources {
+		sameKind := resource.GetKind() == kind
+		sameApiVersion := resource.GetAPIVersion() == apiVersion
+		sameNamespace := resource.GetNamespace() == namespace
+		sameUID := string(resource.GetUID()) == uid
+
+		if sameKind && sameApiVersion && sameNamespace && sameUID {
+			resourceString, err := json.Marshal(resource)
+			if err != nil {
+				panic(fmt.Sprintf("error while serializing resource: %s", resource))
+			}
+			return &models.Resource{Id: 0, Data: string(resourceString), Date: resource.GetCreationTimestamp().GoString()}, nil
+		}
+	}
+
+	return nil, f.err
 }
 
 func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namespace, name,

@@ -85,9 +85,13 @@ func (postgreSQLFilter) NameWildcardFilter(cond sqlbuilder.Cond, namePattern str
 }
 
 func (postgreSQLFilter) OwnerFilter(cond sqlbuilder.Cond, owners []string) string {
+	jsons := make([]string, 0, len(owners))
+	for _, owner := range owners {
+		jsons = append(jsons, fmt.Sprintf("[{\"uid\":\"%s\"}]", owner))
+	}
 	return fmt.Sprintf(
-		"jsonb_path_query_array(data->'metadata'->'ownerReferences', '$[*].uid') ?| %s",
-		cond.Var(pq.Array(owners)),
+		"(data->'metadata'->'ownerReferences') @> ANY(%s::jsonb[])",
+		cond.Var(pq.Array(jsons)),
 	)
 }
 

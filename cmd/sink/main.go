@@ -41,17 +41,28 @@ func main() {
 	}
 
 	slog.Info("Starting KubeArchive Sink", "version", version, "commit", commit, "built", date)
+	slog.Info("Establishing database connection for Sink component")
 	db, err := database.NewWriter()
 	if err != nil {
-		slog.Error("Could not connect to the database", "err", err)
+		slog.Error("Could not connect to the database",
+			"error", err.Error(),
+			"component", "sink_service",
+		)
 		os.Exit(1)
 	}
+	slog.Info("Database connection established successfully",
+		"component", "sink_service",
+	)
 	defer func(db interfaces.DBWriter) {
+		slog.Info("Closing database connection", "component", "sink_service")
 		err = db.CloseDB()
 		if err != nil {
-			slog.Error("Could not close the database connection", "error", err.Error())
+			slog.Error("Could not close the database connection",
+				"error", err.Error(),
+				"component", "sink_service",
+			)
 		} else {
-			slog.Info("Connection closed successfully")
+			slog.Info("Database connection closed successfully", "component", "sink_service")
 		}
 	}(db)
 

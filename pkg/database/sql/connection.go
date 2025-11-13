@@ -6,6 +6,7 @@ package sql
 import (
 	"database/sql"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/XSAM/otelsql"
@@ -44,7 +45,76 @@ func establishConnection(driver, connectionString string) (*sqlx.DB, error) {
 		slog.Error("Unable to instrument the DB properly", "error", err.Error())
 		return nil, err
 	}
-
 	slog.Info("Successfully connected to the database")
+
+	// Extract connection info for logging
+	connectionInfo := extractConnectionInfo(driver, connectionString)
+	slog.Info("Database connection information",
+		"driver", driver,
+		"host", connectionInfo.host,
+		"port", connectionInfo.port,
+		"database", connectionInfo.database,
+		"user", connectionInfo.user,
+		"ssl_mode", connectionInfo.sslMode,
+	)
 	return sqlx.NewDb(conn, driver), nil
+}
+
+// connectionInfo holds parsed connection details for logging
+type connectionInfo struct {
+	host     string
+	port     string
+	database string
+	user     string
+	sslMode  string
+}
+
+// extractConnectionInfo parses PostgreSQL connection string to extract non-sensitive information for logging
+func extractConnectionInfo(driver, connectionString string) connectionInfo {
+	info := connectionInfo{}
+
+	// Only parse PostgreSQL connection strings
+	if driver == "postgres" {
+		// Parse postgres connection string: user=... password=... dbname=... host=... port=... sslmode=...
+		parts := strings.Split(connectionString, " ")
+		for _, part := range parts {
+			if strings.Contains(part, "=") {
+				keyValue := strings.SplitN(part, "=", 2)
+				if len(keyValue) == 2 {
+					key, value := keyValue[0], keyValue[1]
+					switch key {
+					case "host":
+						info.host = value
+					case "port":
+						info.port = value
+					case "dbname":
+						info.database = value
+					case "user":
+						info.user = value
+					case "sslmode":
+						info.sslMode = value
+					}
+				}
+			}
+		}
+	}
+
+	// Set defaults for missing values
+	if info.host == "" {
+		info.host = "unknown"
+	}
+	if info.port == "" {
+		info.port = "default"
+	}
+	if info.database == "" {
+		info.database = "unknown"
+	}
+	if info.user == "" {
+		info.user = "unknown"
+	}
+	if info.sslMode == "" {
+		info.sslMode = "unknown"
+	}
+
+	return info
 }

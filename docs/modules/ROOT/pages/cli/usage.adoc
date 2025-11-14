@@ -23,7 +23,7 @@ For detailed configuration information, see xref:cli/configuration.adoc[CLI Conf
 
 == get Command
 
-Retrieve Kubernetes resources from both the live cluster and KubeArchive. Results are merged and displayed together.
+Retrieve Kubernetes resources from both the live cluster and KubeArchive. The command merges and displays results together.
 
 === Syntax
 
@@ -34,7 +34,7 @@ kubectl ka get [RESOURCE[.VERSION[.GROUP]]] [flags]
 
 === Resource Specification
 
-Resources can be specified in multiple formats:
+You can specify resources in multiple formats:
 
 * `pods` - Resource name only (discovers version and group automatically)
 * `jobs.batch` - Resource with group (discovers preferred version)
@@ -65,13 +65,28 @@ For example, `pods`, `pod`, `po` resolve to the Pod resource.
 |Label selector to filter resources
 |(none)
 
+|`--in-cluster`
+|Include resources from the live Kubernetes cluster
+|`true`
+
+|`--archived`
+|Include resources from KubeArchive
+|`true`
+
 |===
+
+[NOTE]
+====
+Providing `--in-cluster` shows only in-cluster resources.
+Providing `--archived` shows only archived resources.
+Providing both or neither flag shows all resources.
+====
 
 === Examples
 
 [source,bash]
 ----
-# Get pods from current namespace
+# Get pods from current namespace (shows both live and archived)
 kubectl ka get pods
 
 # Get pods from all namespaces
@@ -82,17 +97,23 @@ kubectl ka get po my-pod -n my-ns -o yaml
 
 # Get deployments with multiple labels
 kubectl ka get deployments -l 'tier=frontend,env in (staging,production)'
+
+# Get only live cluster resources (no archive query)
+kubectl ka get pods --in-cluster
+
+# Get only archived resources (no cluster query)
+kubectl ka get pods --archived
 ----
 
 [NOTE]
 ====
-The plugin merges results from both live cluster and KubeArchive, so you'll see both current and archived resources
-in the output. Archived resources may have different timestamps and status information.
+The plugin merges results from both live cluster and KubeArchive, showing availability indicators for each resource.
+The command deduplicates resources with the same UID from both sources and shows them once with both availability flags set.
 ====
 
 [WARNING]
 ====
-Label selectors (`-l`) cannot be used together with specifying a resource name. Use either a label selector to filter
+You cannot use label selectors (`-l`) together with specifying a resource name. Use either a label selector to filter
 multiple resources (`kubectl ka get pods -l app=nginx`) OR specify a specific resource name
 (`kubectl ka get pod nginx-pod`), but not both.
 ====
@@ -112,13 +133,13 @@ The command supports direct pod logs and logs from resources that own pods (like
 [IMPORTANT]
 ====
 **Pod Selection**: When multiple pods match the search criteria (e.g., from deployments or label selectors),
-the most recent pod will be selected automatically.
+the command automatically selects the most recent pod.
 ====
 
 [WARNING]
 ====
-**Container Selection**: If no container is specified with `-c` and the pod has multiple containers,
-a random container may be selected. Always specify the container name for predictable results.
+**Container Selection**: If you do not specify a container with `-c` and the pod has multiple containers,
+the command may select a random container. Always specify the container name for predictable results.
 ====
 
 [NOTE]
@@ -179,7 +200,7 @@ commands and flags.
 
 [NOTE]
 ====
-Resource names and types are not yet supported for autocompletion.
+Autocompletion does not yet support resource names and types.
 ====
 
 === Syntax

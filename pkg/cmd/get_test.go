@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubearchive/kubearchive/pkg/cmd/config"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
 )
 
@@ -80,54 +80,55 @@ func createPodListJSON(podName, timestamp, status, uid string) string {
 	return string(jsonBytes)
 }
 
-// MockKACLICommand implements the KACLICommand interface for testing
-type MockKACLICommand struct {
+// MockKARetrieverCommandForGet implements the KARetrieverCommand interface for testing get command
+type MockKARetrieverCommandForGet struct {
 	k8sResponse      string
 	k9eResponse      string
-	k8sError         *config.APIError
-	k9eError         *config.APIError
+	k8sError         *APIError
+	k9eError         *APIError
 	completeError    error
 	namespaceValue   string
 	namespaceError   error
-	mockResourceInfo *config.ResourceInfo
+	mockResourceInfo *ResourceInfo
 }
 
-func NewMockKACLICommand(mockErr error, resourceInfo *config.ResourceInfo) *MockKACLICommand {
-	return &MockKACLICommand{
+func NewMockKARetrieverCommandForGet(mockErr error, resourceInfo *ResourceInfo) *MockKARetrieverCommandForGet {
+	return &MockKARetrieverCommandForGet{
 		completeError:    mockErr,
 		mockResourceInfo: resourceInfo,
 	}
 }
 
 // ResolveResourceSpec overrides the KAOptions method to return mock ResourceInfo
-func (m *MockKACLICommand) ResolveResourceSpec(resourceSpec string) (*config.ResourceInfo, error) {
+func (m *MockKARetrieverCommandForGet) ResolveResourceSpec(resourceSpec string) (*ResourceInfo, error) {
 	return m.mockResourceInfo, nil
 }
 
-func (m *MockKACLICommand) GetFromAPI(api config.API, _ string) ([]byte, *config.APIError) {
+func (m *MockKARetrieverCommandForGet) GetFromAPI(api API, _ string) ([]byte, *APIError) {
 	switch api {
-	case config.Kubernetes:
+	case Kubernetes:
 		if m.k8sError != nil {
 			return nil, m.k8sError
 		}
 		return []byte(m.k8sResponse), nil
-	case config.KubeArchive:
+	case KubeArchive:
 		if m.k9eError != nil {
 			return nil, m.k9eError
 		}
 		return []byte(m.k9eResponse), nil
 	default:
-		return nil, &config.APIError{StatusCode: 500, URL: "unknown-api", Message: "unknown API type", Body: ""}
+		return nil, &APIError{StatusCode: 500, URL: "unknown-api", Message: "unknown API type", Body: ""}
 	}
 }
 
-func (m *MockKACLICommand) Complete() error {
+func (m *MockKARetrieverCommandForGet) CompleteK8sConfig() error {
 	return m.completeError
 }
 
-func (m *MockKACLICommand) AddFlags(_ *pflag.FlagSet) {}
+func (m *MockKARetrieverCommandForGet) AddK8sFlags(_ *pflag.FlagSet)       {}
+func (m *MockKARetrieverCommandForGet) AddRetrieverFlags(_ *pflag.FlagSet) {}
 
-func (m *MockKACLICommand) GetNamespace() (string, error) {
+func (m *MockKARetrieverCommandForGet) GetNamespace() (string, error) {
 	if m.namespaceError != nil {
 		return "", m.namespaceError
 	}
@@ -137,12 +138,23 @@ func (m *MockKACLICommand) GetNamespace() (string, error) {
 	return "default", nil
 }
 
+func (m *MockKARetrieverCommandForGet) GetK8sRESTConfig() *rest.Config {
+	// Return a mock REST config for testing
+	return &rest.Config{
+		Host: "https://test-cluster.example.com:6443",
+	}
+}
+
+func (m *MockKARetrieverCommandForGet) CompleteRetriever() error {
+	return m.completeError
+}
+
 // NewTestGetOptions creates GetOptions with mocks for testing
-func NewTestGetOptions(mockCLI config.KACLICommand) *GetOptions {
+func NewTestGetOptions(mockCLI KARetrieverCommand) *GetOptions {
 	outputFormat := ""
 
 	return &GetOptions{
-		KACLICommand:       mockCLI,
+		KARetrieverCommand: mockCLI,
 		OutputFormat:       &outputFormat,
 		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
 		IOStreams: genericiooptions.IOStreams{
@@ -161,7 +173,7 @@ func TestGetComplete(t *testing.T) {
 		allNamespaces   bool
 		labelSelector   string
 		args            []string
-		resourceInfo    *config.ResourceInfo
+		resourceInfo    *ResourceInfo
 		expectedApiPath string
 		mockError       error
 		expectError     bool
@@ -175,7 +187,7 @@ func TestGetComplete(t *testing.T) {
 			name:          "core resource",
 			allNamespaces: false,
 			args:          []string{"pods"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/namespaces/default/pods",
@@ -184,7 +196,7 @@ func TestGetComplete(t *testing.T) {
 			name:          "non-core resource with version and group",
 			allNamespaces: false,
 			args:          []string{"jobs.v1.batch"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "jobs", Version: "v1", Group: "batch", GroupVersion: "batch/v1", Kind: "Job", Namespaced: true,
 			},
 			expectedApiPath: "/apis/batch/v1/namespaces/default/jobs",
@@ -193,7 +205,7 @@ func TestGetComplete(t *testing.T) {
 			name:          "non-core resource with group only",
 			allNamespaces: false,
 			args:          []string{"deployments.apps"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment", Namespaced: true,
 			},
 			expectedApiPath: "/apis/apps/v1/namespaces/default/deployments",
@@ -202,7 +214,7 @@ func TestGetComplete(t *testing.T) {
 			name:          "short name resource",
 			allNamespaces: false,
 			args:          []string{"deploy"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment", Namespaced: true,
 			},
 			expectedApiPath: "/apis/apps/v1/namespaces/default/deployments", // Should use actual resource name
@@ -211,7 +223,7 @@ func TestGetComplete(t *testing.T) {
 			name:          "singular name resource",
 			allNamespaces: false,
 			args:          []string{"pod"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/namespaces/default/pods", // Should use actual resource name
@@ -220,7 +232,7 @@ func TestGetComplete(t *testing.T) {
 			name:          "all namespaces",
 			allNamespaces: true,
 			args:          []string{"pods"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/pods",
@@ -229,7 +241,7 @@ func TestGetComplete(t *testing.T) {
 			name:          "core resource with name",
 			allNamespaces: false,
 			args:          []string{"pods", "my-pod"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/namespaces/default/pods/my-pod",
@@ -238,7 +250,7 @@ func TestGetComplete(t *testing.T) {
 			name:          "non-core resource with name",
 			allNamespaces: false,
 			args:          []string{"deployments.apps", "my-deployment"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment", Namespaced: true,
 			},
 			expectedApiPath: "/apis/apps/v1/namespaces/default/deployments/my-deployment",
@@ -247,7 +259,7 @@ func TestGetComplete(t *testing.T) {
 			name:          "all namespaces with name (should still include name)",
 			allNamespaces: true,
 			args:          []string{"pods", "my-pod"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/pods/my-pod",
@@ -257,7 +269,7 @@ func TestGetComplete(t *testing.T) {
 			allNamespaces: false,
 			labelSelector: "app=nginx",
 			args:          []string{"pods"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/namespaces/default/pods?labelSelector=app%3Dnginx",
@@ -272,7 +284,7 @@ func TestGetComplete(t *testing.T) {
 		{
 			name: "both flags true - valid",
 			args: []string{"pods"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			inCluster:       true,
@@ -284,7 +296,7 @@ func TestGetComplete(t *testing.T) {
 		{
 			name: "in-cluster true, archived false - valid",
 			args: []string{"pods"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			inCluster:       true,
@@ -296,7 +308,7 @@ func TestGetComplete(t *testing.T) {
 		{
 			name: "in-cluster false, archived true - valid",
 			args: []string{"pods"},
-			resourceInfo: &config.ResourceInfo{
+			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			inCluster:       false,
@@ -327,7 +339,7 @@ func TestGetComplete(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			var options *GetOptions
-			mockCli := NewMockKACLICommand(tc.mockError, tc.resourceInfo)
+			mockCli := NewMockKARetrieverCommandForGet(tc.mockError, tc.resourceInfo)
 			options = NewTestGetOptions(mockCli)
 			options.AllNamespaces = tc.allNamespaces
 			options.LabelSelector = tc.labelSelector
@@ -376,8 +388,8 @@ func TestRun(t *testing.T) {
 		name               string
 		k8sResponse        string
 		k9eResponse        string
-		k8sError           *config.APIError
-		k9eError           *config.APIError
+		k8sError           *APIError
+		k9eError           *APIError
 		outputFormat       string
 		expectError        bool
 		errorContains      string
@@ -472,13 +484,13 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "API error",
-			k8sError: &config.APIError{
+			k8sError: &APIError{
 				StatusCode: 500,
 				URL:        "mock-k8s-url",
 				Message:    "connection failed",
 				Body:       "",
 			},
-			k9eError: &config.APIError{
+			k9eError: &APIError{
 				StatusCode: 500,
 				URL:        "mock-k9e-url",
 				Message:    "network timeout",
@@ -505,13 +517,13 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "both APIs not found",
-			k8sError: &config.APIError{
+			k8sError: &APIError{
 				StatusCode: 404,
 				URL:        "https://k8s/api/v1/pods",
 				Message:    "unable to get 'https://k8s/api/v1/pods': not found",
 				Body:       "",
 			},
-			k9eError: &config.APIError{
+			k9eError: &APIError{
 				StatusCode: 404,
 				URL:        "https://ka/api/v1/pods",
 				Message:    "unable to get 'https://ka/api/v1/pods': not found",
@@ -522,13 +534,13 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name: "kubernetes forbidden, kubearchive not found",
-			k8sError: &config.APIError{
+			k8sError: &APIError{
 				StatusCode: 403,
 				URL:        "https://k8s/api/v1/clusterrolebindings",
 				Message:    "clusterrolebindings.rbac.authorization.k8s.io is forbidden: User \"manon\" cannot list resource \"clusterrolebindings\" in API group \"rbac.authorization.k8s.io\" at the cluster scope",
 				Body:       "",
 			},
-			k9eError: &config.APIError{
+			k9eError: &APIError{
 				StatusCode: 404,
 				URL:        "https://ka/api/v1/clusterrolebindings",
 				Message:    "unable to get 'https://ka/api/v1/clusterrolebindings': not found",
@@ -541,7 +553,7 @@ func TestRun(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			mockCLI := &MockKACLICommand{
+			mockCLI := &MockKARetrieverCommandForGet{
 				k8sResponse:    tc.k8sResponse,
 				k9eResponse:    tc.k9eResponse,
 				k8sError:       tc.k8sError,

@@ -13,6 +13,7 @@ The plugin supports the following commands:
 
 * `get` - Retrieve Kubernetes resources from both live cluster and KubeArchive
 * `logs` - Retrieve container logs from archived resources
+* `config` - Manage persistent configuration for different clusters
 * `completion` - Generate shell autocompletion scripts (limited functionality)
 
 [NOTE]
@@ -192,6 +193,54 @@ kubectl ka logs deployment/nginx
 # Get logs from all pods matching label
 kubectl ka logs pods -l app=nginx
 ----
+
+== config Command
+
+Manage persistent configuration for different Kubernetes clusters. The plugin automatically stores cluster-specific
+KubeArchive settings, eliminating the need to specify connection details repeatedly.
+
+[NOTE]
+====
+For detailed configuration information, including environment variables, authentication methods, and certificate handling,
+see xref:cli/configuration.adoc[CLI Configuration].
+====
+
+=== Quick Start
+
+[source,bash]
+----
+# First time usage triggers automatic setup
+kubectl ka get pods
+
+# List configured clusters
+kubectl ka config list
+
+# Manual setup for current cluster
+kubectl ka config setup
+----
+
+=== Subcommands
+
+==== list
+Display all configured clusters and their settings.
+
+==== setup
+Run interactive configuration setup for the current cluster.
+
+==== set
+Set individual configuration values (`host`, `ca`, `insecure`, `token`) for the current cluster.
+
+==== unset
+Clear/reset individual configuration values for the current cluster.
+
+==== remove
+Remove configuration for a specific cluster or the current cluster (`--current`).
+
+[TIP]
+====
+See xref:cli/configuration.adoc[CLI Configuration] for detailed examples, configuration file format,
+and advanced configuration options.
+====
 
 == completion Command
 

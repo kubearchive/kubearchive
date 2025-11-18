@@ -1,0 +1,4 @@
+📋 minimal-cluster
+   Server:  https://api.minimal.com:6443
+   Host:    https://kubearchive.minimal.com
+   Config:  TLS: Secure • Token: kubectl

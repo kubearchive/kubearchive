@@ -1,0 +1,4 @@
+📋 test-cluster * (current)
+   Server:  https://api.test.com:6443
+   Host:    https://kubearchive.test.com
+   Config:  TLS: Secure • Cert: Custom • Token: Stored

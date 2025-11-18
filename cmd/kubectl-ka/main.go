@@ -21,6 +21,7 @@ func main() {
 	rootCmd := NewRootCmd()
 	rootCmd.AddCommand(cmd.NewGetCmd())
 	rootCmd.AddCommand(cmd.NewLogCmd())
+	rootCmd.AddCommand(cmd.NewConfigCmd())
 	rootCmd.AddCommand(NewVersionCmd())
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

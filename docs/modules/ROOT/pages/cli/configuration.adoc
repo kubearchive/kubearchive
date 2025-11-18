@@ -1,6 +1,6 @@
 = CLI Configuration
 
-The kubectl-ka plugin supports configuration through environment variables and CLI flags, following the same pattern as kubectl and other plugins.
+The kubectl-ka plugin supports configuration through persistent configuration files, environment variables, and CLI flags, following the same pattern as kubectl and other plugins.
 
 == Configuration Precedence
 
@@ -8,6 +8,8 @@ Configuration values are resolved in the following order (highest to lowest prio
 
 . *Plugin CLI Flags* - Plugin-specific command line arguments
 . *Environment Variables* - System environment variables
+. *Persistent Configuration* - Cluster-specific settings stored in `~/.config/kubectl-ka.conf`
+. *kubectl Configuration* - Bearer tokens from kubectl config
 . *Default Values* - Built-in defaults
 
 == Global Configuration Parameters
@@ -38,7 +40,96 @@ All configuration can be set using environment variables with the prefix `KUBECT
 |(from kubeconfig)
 |(uses kubectl's `--token` flag)
 
+|`KUBECTL_KA_CONFIG_PATH`
+|Path to the kubectl-ka configuration file
+|`~/.config/kubectl-ka.conf`
+|(none)
+
 |===
+
+== Persistent Configuration
+
+The plugin automatically manages cluster-specific configuration in `~/.config/kubectl-ka.conf`. This eliminates
+the need to specify KubeArchive connection details repeatedly when working with multiple clusters.
+
+=== Configuration File Location
+
+The default configuration file location can be customized:
+
+[source,bash]
+----
+# Use custom configuration file location
+export KUBECTL_KA_CONFIG_PATH="/path/to/my-config.conf"
+kubectl ka get pods
+----
+
+=== Automatic Setup
+
+When you first run a command, the plugin will:
+
+1. Detect if configuration exists for your current cluster
+2. If not found, offer to run interactive setup
+3. Attempt to discover KubeArchive services automatically
+4. Guide you through authentication setup if needed
+
+[IMPORTANT]
+====
+Automatic service discovery only works with:
+
+* **OpenShift Routes** - Services exposed via OpenShift route resources
+* **Local Port-forwarding** - Services accessible via `kubectl port-forward` on localhost
+
+For other service exposure methods (LoadBalancer, NodePort, Ingress, etc.), you must configure the KubeArchive host manually using `kubectl ka config set host <url>`.
+====
+
+=== Manual Configuration
+
+You can also configure clusters manually using the `config` command:
+
+[source,bash]
+----
+# Interactive setup for current cluster
+kubectl ka config setup
+
+# Set KubeArchive host for current cluster
+kubectl ka config set host https://kubearchive-api.example.com
+
+# Set authentication token
+kubectl ka config set token <your-service-account-token>
+
+# Set custom certificate authority
+kubectl ka config set ca /path/to/ca.crt
+
+# Enable insecure TLS (defaults to true if no value provided)
+kubectl ka config set insecure
+kubectl ka config set insecure true    # Explicit
+
+# Clear/reset configuration values
+kubectl ka config unset ca             # Clear certificate authority
+kubectl ka config unset insecure       # Reset to secure mode
+kubectl ka config unset token          # Use kubectl's token dynamically
+----
+
+=== Configuration File Format
+
+The configuration file uses YAML format:
+
+[source,yaml]
+----
+clusters:
+    production-cluster:
+        cluster_name: production-cluster
+        server_url: https://api.prod.example.com:6443
+        host: https://kubearchive-api.prod.example.com
+        tls_insecure: false
+        cert_path: /path/to/ca.crt
+        token: eyJhbGciOiJSUzI1NiIs...
+    staging-cluster:
+        cluster_name: staging-cluster
+        server_url: https://api.staging.example.com:6443
+        host: https://kubearchive-api.staging.example.com
+        tls_insecure: true
+----
 
 == Authentication
 

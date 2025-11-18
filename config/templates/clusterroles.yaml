@@ -12,7 +12,12 @@ metadata:
     app.kubernetes.io/version: "${NEXT_VERSION}"
 rules:
   - apiGroups: ["kubearchive.org"]
-    resources: ["*"]
+    resources:
+      - clusterkubearchiveconfigs
+      - clustervacuumconfigs
+      - kubearchiveconfigs
+      - namespacevacuumconfigs
+      - sinkfilters
     verbs: ["create", "update", "patch", "delete"]
 ---
 kind: ClusterRole
@@ -26,5 +31,10 @@ metadata:
     app.kubernetes.io/version: "${NEXT_VERSION}"
 rules:
   - apiGroups: ["kubearchive.org"]
-    resources: ["*"]
+    resources:
+      - clusterkubearchiveconfigs
+      - clustervacuumconfigs
+      - kubearchiveconfigs
+      - namespacevacuumconfigs
+      - sinkfilters
     verbs: ["get", "list", "watch"]

@@ -1,0 +1,2 @@
+NAME               IN-CLUSTER   ARCHIVED   AGE
+cluster-only-pod   yes          no         5m

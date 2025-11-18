@@ -1,3 +1,3 @@
-NAME             AGE
-archived-pod-1   5m
-test-pod-1       5m
+NAME             IN-CLUSTER   ARCHIVED   AGE
+archived-pod-1   no           yes        5m
+test-pod-1       yes          no         5m

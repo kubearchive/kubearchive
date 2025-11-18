@@ -10,13 +10,15 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"text/tabwriter"
+	"time"
 
 	"github.com/kubearchive/kubearchive/pkg/cmd/config"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
-	"k8s.io/cli-runtime/pkg/printers"
 )
 
 type GetOptions struct {
@@ -30,6 +32,15 @@ type GetOptions struct {
 	OutputFormat       *string
 	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
 	IsValidOutput      bool
+	InCluster          bool
+	Archived           bool
+}
+
+// ResourceWithAvailability tracks a resource and its availability in different APIs
+type ResourceWithAvailability struct {
+	Resource  *unstructured.Unstructured
+	InCluster bool
+	Archived  bool
 }
 
 func NewGetOptions() *GetOptions {
@@ -65,6 +76,8 @@ func NewGetCmd() *cobra.Command {
 
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', '!=', 'in', 'notin'.(e.g. -l key1=value1,key2=value2,key3 in (value3)). Matching objects must satisfy all of the specified label constraints.")
+	cmd.Flags().BoolVar(&o.InCluster, "in-cluster", true, "Include resources from the Kubernetes cluster.")
+	cmd.Flags().BoolVar(&o.Archived, "archived", true, "Include resources from KubeArchive.")
 	o.AddFlags(cmd.Flags())
 	o.JSONYamlPrintFlags.AddFlags(cmd)
 	cmd.Flags().StringVarP(o.OutputFormat, "output", "o", *o.OutputFormat, fmt.Sprintf(`Output format. One of: (%s).`, strings.Join(o.JSONYamlPrintFlags.AllowedFormats(), ", ")))
@@ -86,6 +99,11 @@ func (o *GetOptions) Complete(args []string) error {
 	// Validate that name and label selector are not used together
 	if o.Name != "" && o.LabelSelector != "" {
 		return fmt.Errorf("cannot specify both a resource name and a label selector")
+	}
+
+	// Validate that at least one flag is true
+	if !o.InCluster && !o.Archived {
+		return fmt.Errorf("at least one of --in-cluster or --archived must be true")
 	}
 
 	// Parse and resolve resource specification using discovery
@@ -154,11 +172,11 @@ func (o *GetOptions) parseResourcesFromBytes(bodyBytes []byte) ([]*unstructured.
 	return unstructuredObjects, nil
 }
 
-// sortResourcesByCreationTime sorts resources by creation timestamp (newest first)
-func sortResourcesByCreationTime(resources []*unstructured.Unstructured) {
+// sortResourcesByCreationTime sorts resources with availability by creation timestamp (newest first)
+func sortResourcesByCreationTime(resources []*ResourceWithAvailability) {
 	sort.Slice(resources, func(i, j int) bool {
-		timeI := resources[i].GetCreationTimestamp().Time
-		timeJ := resources[j].GetCreationTimestamp().Time
+		timeI := resources[i].Resource.GetCreationTimestamp().Time
+		timeJ := resources[j].Resource.GetCreationTimestamp().Time
 
 		// If both have timestamps, compare them (newer first)
 		if !timeI.IsZero() && !timeJ.IsZero() {
@@ -169,7 +187,7 @@ func sortResourcesByCreationTime(resources []*unstructured.Unstructured) {
 				return false
 			}
 			// If timestamps are equal, sort by name for stable ordering
-			return resources[i].GetName() < resources[j].GetName()
+			return resources[i].Resource.GetName() < resources[j].Resource.GetName()
 		}
 
 		// If only one has a timestamp, prioritize the one with timestamp
@@ -181,93 +199,139 @@ func sortResourcesByCreationTime(resources []*unstructured.Unstructured) {
 		}
 
 		// If neither has a timestamp, sort by name for stable ordering
-		return resources[i].GetName() < resources[j].GetName()
+		return resources[i].Resource.GetName() < resources[j].Resource.GetName()
 	})
 }
 
 func (o *GetOptions) Run() error {
-	var allResources []*unstructured.Unstructured
-	var k8sNotFound bool
+	var k8sResources []*unstructured.Unstructured
+	var kubearchiveResources []*unstructured.Unstructured
+	var k8sNotFound, kubearchiveNotFound bool
 
-	bodyBytes, apiErr := o.GetFromAPI(config.Kubernetes, o.APIPath)
-	if apiErr != nil {
-		if apiErr.StatusCode != http.StatusNotFound {
-			return apiErr
+	// Get resources from Kubernetes API (only if --in-cluster is true)
+	if o.InCluster {
+		bodyBytes, apiErr := o.GetFromAPI(config.Kubernetes, o.APIPath)
+		if apiErr != nil {
+			if apiErr.StatusCode != http.StatusNotFound {
+				return apiErr
+			}
+			k8sNotFound = true
+		} else {
+			resources, parseErr := o.parseResourcesFromBytes(bodyBytes)
+			if parseErr != nil {
+				return &config.APIError{
+					StatusCode: 200,
+					URL:        "Kubernetes API",
+					Message:    fmt.Sprintf("error parsing resources from the cluster: %v", parseErr),
+					Body:       string(bodyBytes),
+				}
+			}
+			k8sResources = resources
 		}
-		k8sNotFound = true
 	} else {
-		resources, parseErr := o.parseResourcesFromBytes(bodyBytes)
-		if parseErr != nil {
-			return &config.APIError{
-				StatusCode: 200,
-				URL:        "Kubernetes API",
-				Message:    fmt.Sprintf("error parsing resources from the cluster: %v", parseErr),
-				Body:       string(bodyBytes),
-			}
-		}
-
-		if o.Name != "" && len(resources) > 0 {
-			return o.printResources(resources)
-		}
-
-		allResources = resources
+		k8sNotFound = true
 	}
 
-	bodyBytes, apiErr = o.GetFromAPI(config.KubeArchive, o.APIPath)
-	if apiErr != nil {
-		if len(allResources) > 0 {
-			return o.printResources(allResources)
+	// Get resources from KubeArchive API (only if --archived is true)
+	if o.Archived {
+		bodyBytes, apiErr := o.GetFromAPI(config.KubeArchive, o.APIPath)
+		if apiErr != nil {
+			// If we have k8s resources, continue with those regardless of the error type
+			if len(k8sResources) > 0 {
+				kubearchiveNotFound = true
+			} else {
+				// Only return error if we don't have any k8s resources
+				if apiErr.StatusCode != http.StatusNotFound {
+					return apiErr
+				}
+				kubearchiveNotFound = true
+			}
+		} else {
+			resources, parseErr := o.parseResourcesFromBytes(bodyBytes)
+			if parseErr != nil {
+				// If we have k8s resources, continue with those
+				if len(k8sResources) > 0 {
+					kubearchiveNotFound = true
+				} else {
+					return &config.APIError{
+						StatusCode: 200,
+						URL:        "KubeArchive API",
+						Message:    fmt.Sprintf("error parsing resources from KubeArchive: %v", parseErr),
+						Body:       string(bodyBytes),
+					}
+				}
+			} else {
+				kubearchiveResources = resources
+			}
 		}
+	} else {
+		kubearchiveNotFound = true
+	}
 
-		if k8sNotFound && apiErr.StatusCode == http.StatusNotFound {
-			if o.Name != "" {
+	// Handle case where both APIs returned not found
+	if k8sNotFound && kubearchiveNotFound {
+		if o.Name != "" {
+			if o.InCluster && o.Archived {
 				return fmt.Errorf("resource not found in Kubernetes or KubeArchive")
+			} else if o.InCluster {
+				return fmt.Errorf("resource not found in Kubernetes cluster")
+			} else if o.Archived {
+				return fmt.Errorf("resource not found in KubeArchive")
 			}
+		}
+		if o.InCluster && o.Archived {
 			return fmt.Errorf("no resources found in Kubernetes or KubeArchive")
-		}
-
-		return apiErr
-	}
-
-	kubearchiveResources, parseErr := o.parseResourcesFromBytes(bodyBytes)
-	if parseErr != nil {
-		if len(allResources) > 0 {
-			return o.printResources(allResources)
-		}
-		return &config.APIError{
-			StatusCode: 200,
-			URL:        "KubeArchive API",
-			Message:    fmt.Sprintf("error parsing resources from KubeArchive: %v", parseErr),
-			Body:       string(bodyBytes),
+		} else if o.InCluster {
+			return fmt.Errorf("no resources found in Kubernetes cluster")
+		} else if o.Archived {
+			return fmt.Errorf("no resources found in KubeArchive")
 		}
 	}
 
-	if o.Name != "" && len(kubearchiveResources) > 0 {
-		return o.printResources(kubearchiveResources)
-	}
+	// Build resource availability map
+	resourceMap := make(map[string]*ResourceWithAvailability)
 
-	resourceMap := make(map[string]*unstructured.Unstructured)
-
-	for _, obj := range allResources {
+	// Add Kubernetes resources
+	for _, obj := range k8sResources {
 		key := string(obj.GetUID())
-		resourceMap[key] = obj
+		resourceMap[key] = &ResourceWithAvailability{
+			Resource:  obj,
+			InCluster: true,
+			Archived:  false,
+		}
 	}
 
+	// Add KubeArchive resources
 	for _, obj := range kubearchiveResources {
 		key := string(obj.GetUID())
-		if _, exists := resourceMap[key]; !exists {
-			resourceMap[key] = obj
+		if existing, exists := resourceMap[key]; exists {
+			// Resource exists in both - mark as archived too
+			existing.Archived = true
+		} else {
+			// Resource only in archive
+			resourceMap[key] = &ResourceWithAvailability{
+				Resource:  obj,
+				InCluster: false,
+				Archived:  true,
+			}
 		}
 	}
 
-	finalResources := make([]*unstructured.Unstructured, 0, len(resourceMap))
+	// Convert to slice for printing
+	finalResources := make([]*ResourceWithAvailability, 0, len(resourceMap))
 	for _, obj := range resourceMap {
 		finalResources = append(finalResources, obj)
 	}
 
 	if len(finalResources) == 0 {
 		if o.Name != "" {
-			return fmt.Errorf("resource not found in Kubernetes or KubeArchive")
+			if o.InCluster && o.Archived {
+				return fmt.Errorf("resource not found in Kubernetes or KubeArchive")
+			} else if o.InCluster {
+				return fmt.Errorf("resource not found in Kubernetes cluster")
+			} else if o.Archived {
+				return fmt.Errorf("resource not found in KubeArchive")
+			}
 		}
 		if o.AllNamespaces {
 			return fmt.Errorf("no resources found")
@@ -283,11 +347,12 @@ func (o *GetOptions) Run() error {
 	return o.printResources(finalResources)
 }
 
-func (o *GetOptions) printResources(resources []*unstructured.Unstructured) error {
+func (o *GetOptions) printResources(resources []*ResourceWithAvailability) error {
 	// Sort resources by creation timestamp (newest first)
 	sortResourcesByCreationTime(resources)
 
 	if o.OutputFormat != nil && *o.OutputFormat != "" {
+		// For JSON/YAML output, just print the resources without availability info
 		printer, printerErr := o.JSONYamlPrintFlags.ToPrinter(*o.OutputFormat)
 		if printerErr != nil {
 			return printerErr
@@ -302,22 +367,51 @@ func (o *GetOptions) printResources(resources []*unstructured.Unstructured) erro
 			},
 		}
 
-		for _, obj := range resources {
-			list.Items = append(list.Items, *obj)
+		for _, resourceWithAvailability := range resources {
+			list.Items = append(list.Items, *resourceWithAvailability.Resource)
 		}
 
 		if printErr := printer.PrintObj(list, o.Out); printErr != nil {
 			return printErr
 		}
 	} else {
-		printer := printers.NewTablePrinter(printers.PrintOptions{})
-		tabWriter := printers.GetNewTabWriter(o.Out)
-		defer tabWriter.Flush()
-		for _, obj := range resources {
-			if printErr := printer.PrintObj(obj, tabWriter); printErr != nil {
-				return printErr
-			}
+		// Custom table output with availability columns
+		return o.printCustomTable(resources)
+	}
+
+	return nil
+}
+
+func (o *GetOptions) printCustomTable(resources []*ResourceWithAvailability) error {
+	w := tabwriter.NewWriter(o.Out, 0, 0, 3, ' ', 0)
+	defer w.Flush()
+
+	// Print header
+	fmt.Fprintln(w, "NAME\tIN-CLUSTER\tARCHIVED\tAGE")
+
+	// Print each resource
+	for _, resourceWithAvailability := range resources {
+		obj := resourceWithAvailability.Resource
+		name := obj.GetName()
+
+		// Format availability columns
+		inCluster := "no"
+		if resourceWithAvailability.InCluster {
+			inCluster = "yes"
 		}
+
+		archived := "no"
+		if resourceWithAvailability.Archived {
+			archived = "yes"
+		}
+
+		// Calculate age
+		age := "<unknown>"
+		if !obj.GetCreationTimestamp().Time.IsZero() {
+			age = duration.HumanDuration(time.Since(obj.GetCreationTimestamp().Time))
+		}
+
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", name, inCluster, archived, age)
 	}
 
 	return nil

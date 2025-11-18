@@ -1,2 +1,2 @@
-NAME            AGE
-duplicate-pod   5m
+NAME            IN-CLUSTER   ARCHIVED   AGE
+duplicate-pod   yes          yes        5m

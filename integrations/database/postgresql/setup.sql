@@ -4,3 +4,4 @@ ALTER DATABASE kubearchive SET "TimeZone" TO 'UTC';
 CREATE USER kubearchive WITH ENCRYPTED PASSWORD 'Databas3Passw0rd';
 ALTER DATABASE kubearchive OWNER TO kubearchive;
 ALTER DATABASE kubearchive SET work_mem TO '64MB';
+ALTER DATABASE kubearchive SET enable_bitmapscan = 'on';

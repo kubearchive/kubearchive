@@ -1,5 +1,6 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package models
 
 import (
@@ -44,7 +45,8 @@ type LogTuple struct {
 }
 
 type Resource struct {
-	Id   int64
-	Date string
-	Data string
+	Date string `db:"created_at"`
+	Id   int64  `db:"id"`
+	Uuid string `db:"uuid"`
+	Data string `db:"data"`
 }

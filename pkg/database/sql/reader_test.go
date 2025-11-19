@@ -122,8 +122,8 @@ func TestCronJobQueryLogURLsByUID(t *testing.T) {
 			sb.Where(filter.UuidFilter(sb.Cond, pod1UID))
 			query, args = sb.BuildWithFlavor(flavor)
 
-			rows = sqlmock.NewRows([]string{"created_at", "id", "data"})
-			rows.AddRow("YYYY-MM-DDTHH:MM:SS+00", 0, testPodResource)
+			rows = sqlmock.NewRows([]string{"created_at", "id", "uuid", "data"})
+			rows.AddRow("YYYY-MM-DDTHH:MM:SS+00", 0, pod1UID, testPodResource)
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 			// Get pods log urls
@@ -197,8 +197,8 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 			sb.Where(filter.UuidFilter(sb.Cond, "mock-uuid-pod1"))
 			query, args = sb.BuildWithFlavor(flavor)
 
-			rows = sqlmock.NewRows([]string{"created_at", "id", "data"})
-			rows.AddRow("YYYY-MM-DDTHH:MM:SS+00", 0, testPodResource)
+			rows = sqlmock.NewRows([]string{"created_at", "id", "uuid", "data"})
+			rows.AddRow("YYYY-MM-DDTHH:MM:SS+00", 0, "42422d92-1a72-418d-97cf-97019c2d56e8", testPodResource)
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 			// Get pods log urls
@@ -610,8 +610,8 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 				)
 				query, args := sb.BuildWithFlavor(tt.database.getFlavor())
 
-				rows := sqlmock.NewRows([]string{"created_at", "id", "data"})
-				rows.AddRow("YYYY-MM-DDTHH:MM:SS+00", "0", string(newPodBytes))
+				rows := sqlmock.NewRows([]string{"created_at", "id", "uuid", "data"})
+				rows.AddRow("YYYY-MM-DDTHH:MM:SS+00", "0", string(pod.UID), string(newPodBytes))
 				mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 				// Get the Logs

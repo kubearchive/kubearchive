@@ -42,6 +42,7 @@ func (postgreSQLSelector) ResourceSelector() *sqlbuilder.SelectBuilder {
 	return sb.Select(
 		sb.As("data->'metadata'->>'creationTimestamp'", "created_at"),
 		"id",
+		"uuid",
 		"data",
 	).From("resource")
 }

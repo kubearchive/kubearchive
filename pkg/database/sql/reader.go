@@ -119,14 +119,15 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 	if len(resources) == 0 {
 		return "", "", dbErrors.ErrResourceNotFound
 	}
-
-	var pod corev1.Pod
-	err = json.Unmarshal([]byte(resources[0].Data), &pod)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to deserialize pod '%s/%s': %s", namespace, name, err.Error())
-	}
+	resource := resources[0]
 
 	if containerName == "" {
+		var pod corev1.Pod
+		err = json.Unmarshal([]byte(resource.Data), &pod)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to deserialize pod '%s/%s': %s", namespace, name, err.Error())
+		}
+
 		annotations := pod.GetAnnotations()
 		var ok bool
 		containerName, ok = annotations[defaultContainerAnnotation]
@@ -148,7 +149,7 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 	)
 	sb = db.selector.UrlSelector()
 	sb.Where(
-		db.filter.UuidFilter(sb.Cond, string(pod.UID)),
+		db.filter.UuidFilter(sb.Cond, resource.Uuid),
 		db.filter.ContainerNameFilter(sb.Cond, containerName),
 	)
 	logUrls, err := logQueryPerformer.performQuery(ctx, sb)
@@ -262,20 +263,10 @@ func (db *sqlDatabaseImpl) getOwnedPodsUuids(ctx context.Context, ownersUuids []
 }
 
 func (db *sqlDatabaseImpl) performResourceQuery(ctx context.Context, sb *sqlbuilder.SelectBuilder) ([]models.Resource, error) {
-	type resourceFields struct {
-		Date     string `db:"created_at"`
-		Id       int64  `db:"id"`
-		Resource string `db:"data"`
-	}
 
-	parsedRows, err := newQueryPerformer[resourceFields](db.db, db.flavor).performQuery(ctx, sb)
-	var resources []models.Resource
+	resources, err := newQueryPerformer[models.Resource](db.db, db.flavor).performQuery(ctx, sb)
 	if err != nil {
-		return resources, err
-	}
-
-	for _, parsedRow := range parsedRows {
-		resources = append(resources, models.Resource{Date: parsedRow.Date, Id: parsedRow.Id, Data: parsedRow.Resource})
+		return []models.Resource{}, err
 	}
 
 	return resources, nil

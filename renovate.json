@@ -65,6 +65,11 @@
     {
       "matchPackageNames": ["github.com/onsi/gomega"],
       "allowedVersions": "<1.38.1"
+    },
+    {
+      "matchPackageNames": ["go"],
+      "matchDepTypes": ["uses-with"],
+      "enabled": false
     }
   ]
 }

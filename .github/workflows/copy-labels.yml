@@ -30,7 +30,7 @@ jobs:
     if: github.actor != 'kubearchive-renovate[bot]'
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Check if user can be assigned
         id: check-assignable
         run: |

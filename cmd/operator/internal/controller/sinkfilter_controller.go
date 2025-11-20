@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"slices"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	kcel "github.com/kubearchive/kubearchive/pkg/cel"
@@ -70,33 +70,31 @@ type SinkFilterReconciler struct {
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles;clusterrolebindings,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
-
-	log.Info("Reconciling SinkFilter", "name", req.Name, "namespace", req.Namespace)
+	slog.Info("Reconciling SinkFilter", "name", req.Name, "namespace", req.Namespace)
 
 	sinkFilter := &kubearchivev1.SinkFilter{}
 	err := r.Client.Get(ctx, req.NamespacedName, sinkFilter)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("SinkFilter resource not found. Ignoring since object must be deleted")
+			slog.Info("SinkFilter resource not found. Ignoring since object must be deleted")
 			// Clear all watches when the resource is deleted by calling generateWatches with empty maps.
 			if err = r.generateWatches(ctx, map[string]filters.CelExpressions{}, map[string]map[string]filters.CelExpressions{}); err != nil {
-				log.Error(err, "Failed to clear watches on delete")
+				slog.Error("Failed to clear watches on delete", "error", err)
 				return ctrl.Result{}, err
 			}
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "Failed to get SinkFilter")
+		slog.Error("Failed to get SinkFilter", "error", err)
 		return ctrl.Result{}, err
 	}
 
 	if err := r.reconcileClusterRole(ctx, sinkFilter); err != nil {
-		log.Error(err, "Failed to reconcile ClusterRole")
+		slog.Error("Failed to reconcile ClusterRole", "error", err)
 		return ctrl.Result{}, err
 	}
 
 	if err := r.reconcileClusterRoleBinding(ctx); err != nil {
-		log.Error(err, "Failed to reconcile ClusterRoleBinding")
+		slog.Error("Failed to reconcile ClusterRoleBinding", "error", err)
 		return ctrl.Result{}, err
 	}
 
@@ -104,11 +102,11 @@ func (r *SinkFilterReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	namespacesByKinds := filters.ExtractNamespacesByKind(sinkFilter)
 
 	if err := r.generateWatches(ctx, clusterFilters, namespacesByKinds); err != nil {
-		log.Error(err, "Failed to generate watches")
+		slog.Error("Failed to generate watches", "error", err)
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Successfully reconciled SinkFilter", "namespacesByKinds", len(namespacesByKinds))
+	slog.Info("Successfully reconciled SinkFilter", "namespacesByKinds", len(namespacesByKinds))
 	return ctrl.Result{}, nil
 }
 
@@ -124,8 +122,6 @@ func (r *SinkFilterReconciler) parseKindAndAPIVersionFromKey(key string) (string
 }
 
 func (r *SinkFilterReconciler) generateWatches(ctx context.Context, clusterFilters map[string]filters.CelExpressions, namespacesByKinds map[string]map[string]filters.CelExpressions) error {
-	log := log.FromContext(ctx)
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -150,7 +146,7 @@ func (r *SinkFilterReconciler) generateWatches(ctx context.Context, clusterFilte
 			watchInfo.Queue.ShutDown()
 			watchInfo.WorkerWg.Wait()
 			delete(r.watches, key)
-			log.Info("Stopped watch for resource", "key", key)
+			slog.Info("Stopped watch for resource", "key", key)
 		}
 	}
 
@@ -162,7 +158,7 @@ func (r *SinkFilterReconciler) generateWatches(ctx context.Context, clusterFilte
 				watchInfo.ClusterCel = nil
 			}
 			watchInfo.Namespaces = namespacesByKinds[key]
-			log.Info("Updated watch filters", "key", key, "hasCluster", watchInfo.ClusterCel != nil, "namespaceCount", len(watchInfo.Namespaces))
+			slog.Info("Updated watch filters", "key", key, "hasCluster", watchInfo.ClusterCel != nil, "namespaceCount", len(watchInfo.Namespaces))
 		}
 	}
 
@@ -170,7 +166,7 @@ func (r *SinkFilterReconciler) generateWatches(ctx context.Context, clusterFilte
 		kind, apiVersion := r.parseKindAndAPIVersionFromKey(key)
 		gvr, _, _, err := r.getGVRFromKindAndAPIVersion(kind, apiVersion)
 		if err != nil {
-			log.Error(err, "Failed to get GVR for kind", "kind", kind, "apiVersion", apiVersion)
+			slog.Error("Failed to get GVR for kind", "error", err, "kind", kind, "apiVersion", apiVersion)
 			continue
 		}
 
@@ -179,10 +175,10 @@ func (r *SinkFilterReconciler) generateWatches(ctx context.Context, clusterFilte
 			clusterCel = &cel
 		}
 		r.createWatchForGVR(ctx, key, gvr, clusterCel, namespacesByKinds[key])
-		log.Info("Created watch for resource", "gvr", gvr.String())
+		slog.Info("Created watch for resource", "gvr", gvr.String())
 	}
 
-	log.Info("Watch update complete",
+	slog.Info("Watch update complete",
 		"stopped", len(toStop),
 		"updated", len(toUpdate),
 		"created", len(toCreate))
@@ -253,7 +249,6 @@ func (r *SinkFilterReconciler) getGVRFromKindAndAPIVersion(kind, apiVersion stri
 }
 
 func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string, gvr schema.GroupVersionResource, clusterCel *filters.CelExpressions, namespaces map[string]filters.CelExpressions) {
-	log := log.FromContext(ctx)
 	stopCh := make(chan struct{})
 
 	kind, apiVersion := r.parseKindAndAPIVersionFromKey(key)
@@ -287,20 +282,19 @@ func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string
 		watchInfo.WorkerWg.Add(1)
 		go r.runWorker(ctx, watchInfo, key)
 	}
-	log.Info("Started workers for resource", "apiVersion", kindSelector.APIVersion, "kind", kindSelector.Kind, "workers", resourceConfig.Workers)
+	slog.Info("Started workers for resource", "apiVersion", kindSelector.APIVersion, "kind", kindSelector.Kind, "workers", resourceConfig.Workers)
 
 	go r.watchLoop(ctx, watchInfo, key)
 }
 
 func (r *SinkFilterReconciler) watchLoop(ctx context.Context, watchInfo *WatchInfo, key string) {
-	log := log.FromContext(ctx)
 	backoff := time.Second
 	maxBackoff := 5 * time.Minute
 
 	for {
 		select {
 		case <-watchInfo.StopCh:
-			log.Info("Watch stopped", "key", key)
+			slog.Info("Watch stopped", "key", key)
 			return
 		default:
 		}
@@ -308,7 +302,7 @@ func (r *SinkFilterReconciler) watchLoop(ctx context.Context, watchInfo *WatchIn
 		var err error
 		watchInfo.WatchInterface, err = r.createWatch(ctx, watchInfo.GVR, watchInfo.ResourceVersion)
 		if err != nil {
-			log.Error(err, "Failed to create watch, retrying", "key", key, "backoff", backoff)
+			slog.Error("Failed to create watch, retrying", "error", err, "key", key, "backoff", backoff)
 			select {
 			case <-time.After(backoff):
 				backoff = time.Duration(float64(backoff) * 1.5)
@@ -323,14 +317,14 @@ func (r *SinkFilterReconciler) watchLoop(ctx context.Context, watchInfo *WatchIn
 
 		backoff = time.Second // Reset backoff on successful connection
 
-		log.Info("Started watch", "key", key, "gvr", watchInfo.GVR.String(), "resourceVersion", watchInfo.ResourceVersion)
+		slog.Info("Started watch", "key", key, "gvr", watchInfo.GVR.String(), "resourceVersion", watchInfo.ResourceVersion)
 
 		r.processWatchEvents(ctx, watchInfo.WatchInterface, watchInfo, key)
 
 		watchInfo.WatchInterface.Stop()
 		watchInfo.WatchInterface = nil
 
-		log.Info("Watch disconnected, will retry", "key", key)
+		slog.Info("Watch disconnected, will retry", "key", key)
 	}
 }
 
@@ -348,17 +342,16 @@ func (r *SinkFilterReconciler) createWatch(ctx context.Context, gvr schema.Group
 }
 
 func (r *SinkFilterReconciler) processWatchEvents(ctx context.Context, watchInterface watch.Interface, watchInfo *WatchInfo, key string) {
-	log := log.FromContext(ctx)
 	resultChan := watchInterface.ResultChan()
 
 	for {
 		select {
 		case <-watchInfo.StopCh:
-			log.Info("Stopping watch event processing", "key", key)
+			slog.Info("Stopping watch event processing", "key", key)
 			return
 		case event, ok := <-resultChan:
 			if !ok {
-				log.Info("Watch channel closed", "key", key)
+				slog.Info("Watch channel closed", "key", key)
 				return
 			}
 
@@ -366,7 +359,7 @@ func (r *SinkFilterReconciler) processWatchEvents(ctx context.Context, watchInte
 			if event.Type == watch.Error {
 				r.logWatchError(ctx, event, watchInfo, key)
 				if r.shouldClearResourceVersion(event) {
-					log.Info("Watch received Gone error, clearing resource version for full resync", "key", key)
+					slog.Info("Watch received Gone error, clearing resource version for full resync", "key", key)
 					watchInfo.ResourceVersion = ""
 				}
 				return
@@ -385,12 +378,11 @@ func (r *SinkFilterReconciler) processWatchEvents(ctx context.Context, watchInte
 
 func (r *SinkFilterReconciler) runWorker(ctx context.Context, watchInfo *WatchInfo, key string) {
 	defer watchInfo.WorkerWg.Done()
-	log := log.FromContext(ctx)
 
 	for {
 		select {
 		case <-watchInfo.StopCh:
-			log.Info("Stopping worker", "key", key)
+			slog.Info("Stopping worker", "key", key)
 			return
 		default:
 			event, shutdown := watchInfo.Queue.Get()
@@ -402,7 +394,7 @@ func (r *SinkFilterReconciler) runWorker(ctx context.Context, watchInfo *WatchIn
 				defer watchInfo.Queue.Done(event)
 
 				if err := r.handleWatchEvent(ctx, event, watchInfo); err != nil {
-					log.Error(err, "Failed to handle watch event", "key", key)
+					slog.Error("Failed to handle watch event", "error", err, "key", key)
 					watchInfo.Queue.AddRateLimited(event)
 					return
 				}
@@ -414,8 +406,6 @@ func (r *SinkFilterReconciler) runWorker(ctx context.Context, watchInfo *WatchIn
 }
 
 func (r *SinkFilterReconciler) logWatchError(ctx context.Context, event watch.Event, watchInfo *WatchInfo, key string) {
-	log := log.FromContext(ctx)
-
 	var errorMsg string
 	var errorCode int32
 	var errorReason metav1.StatusReason
@@ -428,7 +418,7 @@ func (r *SinkFilterReconciler) logWatchError(ctx context.Context, event watch.Ev
 		errorMsg = fmt.Sprintf("unknown error format: %T", event.Object)
 	}
 
-	log.Info("Watch error event received",
+	slog.Info("Watch error event received",
 		"key", key,
 		"errorMessage", errorMsg,
 		"errorCode", errorCode,
@@ -479,17 +469,15 @@ func (r *SinkFilterReconciler) handleWatchEvent(ctx context.Context, event watch
 		}
 		return nil
 	default:
-		log.FromContext(ctx).Error(nil, "Ignoring unknown watch event type", "type", event.Type)
+		slog.Error("Ignoring unknown watch event type", "type", event.Type)
 		return nil
 	}
 }
 
 func (r *SinkFilterReconciler) sendCloudEvent(ctx context.Context, eventType string, event watch.Event, watchInfo *WatchInfo) error {
-	log := log.FromContext(ctx)
-
 	if r.cloudEventPublisher == nil {
 		err := fmt.Errorf("CloudEvent publisher not available")
-		log.Error(err, "Skipping event", "eventType", event.Type, "gvr", watchInfo.GVR.String())
+		slog.Error("Skipping event", "error", err, "eventType", event.Type, "gvr", watchInfo.GVR.String())
 		return err
 	}
 
@@ -530,7 +518,8 @@ func (r *SinkFilterReconciler) sendCloudEvent(ctx context.Context, eventType str
 			err = fmt.Errorf("cloud event send failed: %w", result)
 		}
 
-		log.Error(err, "Failed to send cloud event",
+		slog.Error("Failed to send cloud event",
+			"error", err,
 			"uid", uid,
 			"namespace", namespace,
 			"name", name,
@@ -541,7 +530,7 @@ func (r *SinkFilterReconciler) sendCloudEvent(ctx context.Context, eventType str
 		return err
 	}
 
-	log.V(1).Info("Cloud event sent successfully",
+	slog.Debug("Cloud event sent successfully",
 		"uid", uid,
 		"namespace", namespace,
 		"name", name,
@@ -593,8 +582,6 @@ func (r *SinkFilterReconciler) extractResources(sinkFilter *kubearchivev1.SinkFi
 }
 
 func (r *SinkFilterReconciler) reconcileClusterRole(ctx context.Context, sinkFilter *kubearchivev1.SinkFilter) error {
-	log := log.FromContext(ctx)
-
 	resources := r.extractResources(sinkFilter)
 	rules := createPolicyRules(ctx, r.Mapper, resources, []string{"get", "list", "watch"})
 
@@ -604,14 +591,14 @@ func (r *SinkFilterReconciler) reconcileClusterRole(ctx context.Context, sinkFil
 	err := r.Client.Get(ctx, types.NamespacedName{Name: constants.KubeArchiveSinkFilterName}, existing)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Creating ClusterRole", "name", constants.KubeArchiveSinkFilterName)
+			slog.Info("Creating ClusterRole", "name", constants.KubeArchiveSinkFilterName)
 			return r.Client.Create(ctx, desired)
 		}
 		return fmt.Errorf("failed to get ClusterRole: %w", err)
 	}
 
 	if !equalPolicyRules(existing.Rules, rules) {
-		log.Info("Updating ClusterRole", "name", constants.KubeArchiveSinkFilterName)
+		slog.Info("Updating ClusterRole", "name", constants.KubeArchiveSinkFilterName)
 		existing.Rules = rules
 		return r.Client.Update(ctx, existing)
 	}
@@ -620,8 +607,6 @@ func (r *SinkFilterReconciler) reconcileClusterRole(ctx context.Context, sinkFil
 }
 
 func (r *SinkFilterReconciler) reconcileClusterRoleBinding(ctx context.Context) error {
-	log := log.FromContext(ctx)
-
 	subjects := []rbacv1.Subject{
 		{
 			Kind:      "ServiceAccount",
@@ -636,7 +621,7 @@ func (r *SinkFilterReconciler) reconcileClusterRoleBinding(ctx context.Context) 
 	err := r.Client.Get(ctx, types.NamespacedName{Name: constants.KubeArchiveSinkFilterName}, existing)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Creating ClusterRoleBinding", "name", constants.KubeArchiveSinkFilterName)
+			slog.Info("Creating ClusterRoleBinding", "name", constants.KubeArchiveSinkFilterName)
 			return r.Client.Create(ctx, desired)
 		}
 		return fmt.Errorf("failed to get ClusterRoleBinding: %w", err)
@@ -644,7 +629,7 @@ func (r *SinkFilterReconciler) reconcileClusterRoleBinding(ctx context.Context) 
 
 	if !slices.Equal(existing.Subjects, desired.Subjects) ||
 		existing.RoleRef != desired.RoleRef {
-		log.Info("Updating ClusterRoleBinding", "name", constants.KubeArchiveSinkFilterName)
+		slog.Info("Updating ClusterRoleBinding", "name", constants.KubeArchiveSinkFilterName)
 		existing.Subjects = desired.Subjects
 		existing.RoleRef = desired.RoleRef
 		return r.Client.Update(ctx, existing)

@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/kubearchive/kubearchive/pkg/k8sclient"
@@ -15,13 +16,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
-// log is for logging in this package.
-var nvlog = logf.Log.WithName("namespacevacuumconfig-resource")
 var dynaClient dynamic.Interface
 
 func SetupNamespaceVacuumConfigWebhookWithManager(mgr ctrl.Manager) error {
@@ -44,7 +42,7 @@ func (cvcd *NamespaceVacuumConfigCustomDefaulter) Default(_ context.Context, obj
 	if !ok {
 		return fmt.Errorf("expected a NamespaceVacuumConfig object but got %T", obj)
 	}
-	nvlog.Info("default", "name", cv.Name)
+	slog.Info("namespacevacuumconfig default", "name", cv.Name)
 	return nil
 }
 
@@ -61,7 +59,7 @@ func (nvcv *NamespaceVacuumConfigCustomValidator) ValidateCreate(_ context.Conte
 	if !ok {
 		return nil, fmt.Errorf("expected a NamespaceVacuumConfig object but got %T", obj)
 	}
-	nvlog.Info("validate create", "name", cv.Name)
+	slog.Info("namespacevacuumconfig validate create", "name", cv.Name)
 
 	return nvcv.validateNamespaceVacuumConfig(cv)
 }
@@ -72,7 +70,7 @@ func (nvcv *NamespaceVacuumConfigCustomValidator) ValidateUpdate(_ context.Conte
 	if !ok {
 		return nil, fmt.Errorf("expected a NamespaceVacuumConfig object but got %T", new)
 	}
-	nvlog.Info("validate update", "name", cv.Name)
+	slog.Info("namespacevacuumconfig validate update", "name", cv.Name)
 
 	return nvcv.validateNamespaceVacuumConfig(cv)
 }
@@ -83,7 +81,7 @@ func (nvcv *NamespaceVacuumConfigCustomValidator) ValidateDelete(_ context.Conte
 	if !ok {
 		return nil, fmt.Errorf("expected a NamespaceVacuumConfig object but got %T", new)
 	}
-	nvlog.Info("validate delete", "name", cv.Name)
+	slog.Info("namespacevacuumconfig validate delete", "name", cv.Name)
 
 	return nil, nil
 }
@@ -164,6 +162,6 @@ func init() {
 	var err error
 	dynaClient, err = k8sclient.NewInstrumentedDynamicClient()
 	if err != nil {
-		nvlog.Error(err, "Unable to get dynamic client")
+		slog.Error("Unable to get dynamic client", "error", err)
 	}
 }

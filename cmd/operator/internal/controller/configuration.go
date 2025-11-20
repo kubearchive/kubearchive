@@ -6,10 +6,10 @@ package controller
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 
 	"gopkg.in/yaml.v3"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 )
@@ -22,13 +22,11 @@ type ResourceConfig struct {
 var config map[string]map[string]ResourceConfig
 
 func LoadConfiguration(ctx context.Context) error {
-	log := log.FromContext(ctx)
-
 	configPath := "/etc/kubearchive/config/resources.yaml"
 	resourcesData, err := os.ReadFile(configPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Info("Config file not found, using empty configuration", "path", configPath)
+			slog.Info("Config file not found, using empty configuration", "path", configPath)
 			config = make(map[string]map[string]ResourceConfig)
 			config["resources"] = make(map[string]ResourceConfig)
 			return nil
@@ -37,7 +35,7 @@ func LoadConfiguration(ctx context.Context) error {
 	}
 
 	if len(resourcesData) == 0 || string(resourcesData) == "" {
-		log.Info("Empty config file, using empty configuration", "path", configPath)
+		slog.Info("Empty config file, using empty configuration", "path", configPath)
 		config = make(map[string]map[string]ResourceConfig)
 		config["resources"] = make(map[string]ResourceConfig)
 		return nil
@@ -56,7 +54,7 @@ func LoadConfiguration(ctx context.Context) error {
 		config["resources"][key] = rc
 	}
 
-	log.Info("Loaded operator configuration", "resourceCount", len(config["resources"]))
+	slog.Info("Loaded operator configuration", "resourceCount", len(config["resources"]))
 	return nil
 }
 

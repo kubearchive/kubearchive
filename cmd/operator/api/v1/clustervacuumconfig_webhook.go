@@ -7,17 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
-
-// log is for logging in this package.
-var cvlog = logf.Log.WithName("clustervacuumconfig-resource")
 
 func SetupClusterVacuumConfigWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -39,7 +36,7 @@ func (cvcd *ClusterVacuumConfigCustomDefaulter) Default(_ context.Context, obj r
 	if !ok {
 		return fmt.Errorf("expected a ClusterVacuumConfig object but got %T", obj)
 	}
-	cvlog.Info("default", "name", cv.Name)
+	slog.Info("clustervacuumconfig default", "name", cv.Name)
 	return nil
 }
 
@@ -56,7 +53,7 @@ func (cvcv *ClusterVacuumConfigCustomValidator) ValidateCreate(_ context.Context
 	if !ok {
 		return nil, fmt.Errorf("expected a ClusterVacuumConfig object but got %T", obj)
 	}
-	cvlog.Info("validate create", "name", cv.Name)
+	slog.Info("clustervacuumconfig validate create", "name", cv.Name)
 
 	return cvcv.validateClusterVacuumConfig(cv)
 }
@@ -67,7 +64,7 @@ func (cvcv *ClusterVacuumConfigCustomValidator) ValidateUpdate(_ context.Context
 	if !ok {
 		return nil, fmt.Errorf("expected a ClusterVacuumConfig object but got %T", new)
 	}
-	cvlog.Info("validate update", "name", cv.Name)
+	slog.Info("clustervacuumconfig validate update", "name", cv.Name)
 
 	return cvcv.validateClusterVacuumConfig(cv)
 }
@@ -78,7 +75,7 @@ func (cvcv *ClusterVacuumConfigCustomValidator) ValidateDelete(_ context.Context
 	if !ok {
 		return nil, fmt.Errorf("expected a ClusterVacuumConfig object but got %T", new)
 	}
-	cvlog.Info("validate delete", "name", cv.Name)
+	slog.Info("clustervacuumconfig validate delete", "name", cv.Name)
 
 	return nil, nil
 }

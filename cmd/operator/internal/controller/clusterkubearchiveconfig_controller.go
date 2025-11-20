@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"log/slog"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -15,7 +16,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
@@ -35,9 +35,7 @@ type ClusterKubeArchiveConfigReconciler struct {
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;update;watch
 
 func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
-
-	log.Info("Reconciling ClusterKubeArchiveConfig")
+	slog.Info("Reconciling ClusterKubeArchiveConfig")
 
 	ckaconfig := &kubearchivev1.ClusterKubeArchiveConfig{}
 	if err := r.Client.Get(ctx, req.NamespacedName, ckaconfig); err != nil {
@@ -59,7 +57,7 @@ func (r *ClusterKubeArchiveConfigReconciler) Reconcile(ctx context.Context, req 
 		if controllerutil.ContainsFinalizer(ckaconfig, resourceFinalizerName) {
 			// Finalizer is present, reconcile all with resources set to nil
 
-			log.Info("Deleting ClusterKubeArchiveConfig")
+			slog.Info("Deleting ClusterKubeArchiveConfig")
 
 			if err := updateSinkFilterCluster(ctx, r.Client, nil); err != nil {
 				return ctrl.Result{}, err
@@ -92,9 +90,7 @@ func (r *ClusterKubeArchiveConfigReconciler) SetupClusterKubeArchiveConfigWithMa
 }
 
 func updateSinkFilterCluster(ctx context.Context, client client.Client, resources []kubearchivev1.ClusterKubeArchiveConfigResource) error {
-	log := log.FromContext(ctx)
-
-	log.Info("in updateSinkFilterCluster")
+	slog.Info("in updateSinkFilterCluster")
 
 	sf := &kubearchivev1.SinkFilter{}
 	err := client.Get(ctx, types.NamespacedName{Name: constants.SinkFilterResourceName, Namespace: constants.KubeArchiveNamespace}, sf)
@@ -102,28 +98,26 @@ func updateSinkFilterCluster(ctx context.Context, client client.Client, resource
 		sf = desiredSinkFilterCluster(ctx, nil, resources)
 		err = client.Create(ctx, sf)
 		if err != nil {
-			log.Error(err, "Failed to create SinkFilter "+constants.SinkFilterResourceName)
+			slog.Error("Failed to create SinkFilter", "error", err, "name", constants.SinkFilterResourceName)
 			return err
 		}
 		return nil
 	} else if err != nil {
-		log.Error(err, "Failed to reconcile SinkFilter "+constants.SinkFilterResourceName)
+		slog.Error("Failed to reconcile SinkFilter", "error", err, "name", constants.SinkFilterResourceName)
 		return err
 	}
 
 	sf = desiredSinkFilterCluster(ctx, sf, resources)
 	err = client.Update(ctx, sf)
 	if err != nil {
-		log.Error(err, "Failed to update SinkFilter "+constants.SinkFilterResourceName)
+		slog.Error("Failed to update SinkFilter", "error", err, "name", constants.SinkFilterResourceName)
 		return err
 	}
 	return nil
 }
 
 func desiredSinkFilterCluster(ctx context.Context, sf *kubearchivev1.SinkFilter, resources []kubearchivev1.ClusterKubeArchiveConfigResource) *kubearchivev1.SinkFilter {
-	log := log.FromContext(ctx)
-
-	log.Info("in desiredSinkFilterCluster")
+	slog.Info("in desiredSinkFilterCluster")
 
 	if sf == nil {
 		sf = &kubearchivev1.SinkFilter{

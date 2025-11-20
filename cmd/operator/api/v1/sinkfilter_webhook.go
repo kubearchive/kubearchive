@@ -7,18 +7,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/kubearchive/kubearchive/pkg/cel"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
-
-// log is for logging in this package.
-var sflog = logf.Log.WithName("sinkfilter-resource")
 
 func SetupSinkFilterWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -40,7 +37,7 @@ func (sfcd *SinkFilterCustomDefaulter) Default(_ context.Context, obj runtime.Ob
 	if !ok {
 		return fmt.Errorf("expected an SinkFilter object but got %T", obj)
 	}
-	sflog.Info("default", "name", sf.Name)
+	slog.Info("sinkfilter default", "name", sf.Name)
 	return nil
 }
 
@@ -58,7 +55,7 @@ func (sfcv *SinkFilterCustomValidator) ValidateCreate(_ context.Context, obj run
 	if !ok {
 		return nil, fmt.Errorf("expected an SinkFilter object but got %T", obj)
 	}
-	sflog.Info("validate create", "name", sf.Name)
+	slog.Info("sinkfilter validate create", "name", sf.Name)
 
 	return sfcv.validateSinkFilter(sf)
 }
@@ -69,7 +66,7 @@ func (sfcv *SinkFilterCustomValidator) ValidateUpdate(_ context.Context, _ runti
 	if !ok {
 		return nil, fmt.Errorf("expected an SinkFilter object but got %T", new)
 	}
-	sflog.Info("validate update", "name", sf.Name)
+	slog.Info("sinkfilter validate update", "name", sf.Name)
 
 	return sfcv.validateSinkFilter(sf)
 }
@@ -80,7 +77,7 @@ func (sfcv *SinkFilterCustomValidator) ValidateDelete(_ context.Context, new run
 	if !ok {
 		return nil, fmt.Errorf("expected an SinkFilter object but got %T", new)
 	}
-	sflog.Info("validate delete", "name", sf.Name)
+	slog.Info("sinkfilter validate delete", "name", sf.Name)
 
 	return nil, nil
 }

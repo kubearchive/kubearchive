@@ -6,6 +6,7 @@ package filters
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/google/cel-go/cel"
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
@@ -15,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type CelExpressions struct {
@@ -154,7 +154,7 @@ func CompileCELExpression(expression, expressionType, namespace string) *cel.Pro
 
 	compiled, err := kcel.CompileCELExpr(expression)
 	if err != nil {
-		log.Log.Error(err, "Failed to compile CEL expression", "type", expressionType, "namespace", namespace, "expression", expression)
+		slog.Error("Failed to compile CEL expression", "error", err, "type", expressionType, "namespace", namespace, "expression", expression)
 		return nil
 	}
 

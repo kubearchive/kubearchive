@@ -4,62 +4,7 @@ KubeArchive emits observability data using OpenTelemetry: metrics, traces and
 logs. Environment variables on KubeArchive's components control the enablement
 and configuration of features related with observability.
 
-## Custom Metrics
-
-KubeArchive exposes the following custom metrics:
-
-### `workqueue` metrics
-
-KubeArchive makes use of queues to receive and process updates from the Kubernetes API.
-The supported labels are:
-
-* `queue`: the name of the queue.
-
-The metrics are:
-
-* `workqueue.adds`: total number of additions to the queue. Use with `rate` to
-measure how fast the queue is growing.
-* `workqueue.latency_(sum/count/bucket)`: seconds that an item is on the queue waiting for
-processing. Use with `rate(sum)/rate(count)` to measure latencies, or use the `bucket` metrics
-to inspect quantiles.
-* `workqueue.duration_(sum/count/bucket)`: seconds that an item takes to process. Use
-with `rate(sum)/rate(count)` to measure latencies, or use the `bucket` metrics to inspect
-quantiles.
-* `workqueue.retries`: total number of times items were added back to the queue for
-retry. Use with `rate` to measure how fast the processing is failing.
-* `workqueue.depth`: current number of items on the queue. Use directly.
-* `workqueue.longest_running`: seconds of the longest current active item has been processing.
-Use directly.
-* `workqueue.unfinished_work`: sum of all the seconds all the processing items are taking.
-Use directly.
-
-### kubearchive.cloudevents.total
-
-**Labels**: `result`, `event_type` `resource_type`
-
-Tracks the total number of Cloud Events (resource updates) received aggregated by `resource_type`,
-`event_type` and `result`.
-
-* `result`: one of `insert`, `update`, `none`, `error`, `no_match` or `no_conf`.
-** `error`: there was an error during the processing of the resource update. This may indicate
-    problems with the database, deleting resources, Cloud Event corruption, etc. Check the logs
-    to find the root cause.
-** `no_conf`: the resource update received is not configured on any `KubeArchiveConfig`. This may
-    mean there is something sending Cloud Events to KubeArchive but it should not.
-** `no_match`: the resource update received does not match the conditions for processing. This may
-    indicate that KubeArchiveConfig rules should be refined.
-** `insert`: the resource was inserted into the database.
-** `update`: a resource with the same `metadata.uid` exists in the database and it was updated.
-** `none`: a resource with the same `metadata.uid` exists in the database and its
-    `metadata.managedFields.time` was newer, so there was no update. This may indicate a problem
-    with the system that sends resource updates.
-
-* `resource_type`: a combination of the resource `apiVersion` and `kind`. For example `apps/v1/Deployment`,
-`v1/Pods` or `tekton.dev/v1/PipelineRun`.
-* `event_type`: one of `org.kubearchive.sinkfilters.resource.add`, `org.kubearchive.sinkfilters.resource.update`
-or `org.kubearchive.sinkfilters.resource.delete`.
-
-## Configuring Observability
+== Configuring Observability
 
 The following environment variables present on all of the KubeArchive components
 and control the observability behavior:
@@ -93,3 +38,7 @@ On clusters with really high activity we recommend setting `KUBEARCHIVE_OTEL_MOD
 `OTEL_TRACES_SAMPLER_ARG` to "0.1". With this configuration, only 10% of new traces created by KubeArchive are
 exported, but all traces from requests will respect the sampling decision of the requester.
 ====
+
+See
+xref:reference/observability.adoc[]
+to learn about all the metrics KubeArchive emits.

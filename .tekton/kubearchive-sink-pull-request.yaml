@@ -20,6 +20,27 @@ metadata:
 spec:
   pipelineRef:
     name: ko-build-pipeline
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/kubearchive-tenant/kubearchive-sink:on-pr-{{revision}}
+  - name: preprocessing-script
+    value: |
+      controller-gen crd paths="./cmd/operator/..." output:dir=config/crds
+      controller-gen object:headerFile="cmd/operator/hack/copyright.txt" paths="./cmd/operator/..." output:dir=cmd/operator/api/v1
+  - name: ko-docker-repo
+    value: quay.io/redhat-user-workloads/kubearchive-tenant/kubearchive-sink
+  - name: image-naming-strategy
+    value: "--bare"
+  - name: import-path
+    value: ./cmd/sink
+  - name: pr-tag
+    value: on-pr-{{revision}}
+  - name: image-expires-after
+    value: 5d
   taskRunTemplate:
     serviceAccountName: build-pipeline-kubearchive-sink
   workspaces:

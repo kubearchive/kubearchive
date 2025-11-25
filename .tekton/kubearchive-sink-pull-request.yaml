@@ -18,7 +18,8 @@ metadata:
   name: kubearchive-sink-on-pull-request
   namespace: kubearchive-tenant
 spec:
-  pipelineRef: ko-build-pipeline
+  pipelineRef:
+    name: ko-build-pipeline
   taskRunTemplate:
     serviceAccountName: build-pipeline-kubearchive-sink
   workspaces:

@@ -91,7 +91,7 @@ func (r *ClusterKubeArchiveConfigReconciler) SetupClusterKubeArchiveConfigWithMa
 		Complete(r)
 }
 
-func updateSinkFilterCluster(ctx context.Context, client client.Client, resources []kubearchivev1.KubeArchiveConfigResource) error {
+func updateSinkFilterCluster(ctx context.Context, client client.Client, resources []kubearchivev1.ClusterKubeArchiveConfigResource) error {
 	log := log.FromContext(ctx)
 
 	log.Info("in updateSinkFilterCluster")
@@ -120,7 +120,7 @@ func updateSinkFilterCluster(ctx context.Context, client client.Client, resource
 	return nil
 }
 
-func desiredSinkFilterCluster(ctx context.Context, sf *kubearchivev1.SinkFilter, resources []kubearchivev1.KubeArchiveConfigResource) *kubearchivev1.SinkFilter {
+func desiredSinkFilterCluster(ctx context.Context, sf *kubearchivev1.SinkFilter, resources []kubearchivev1.ClusterKubeArchiveConfigResource) *kubearchivev1.SinkFilter {
 	log := log.FromContext(ctx)
 
 	log.Info("in desiredSinkFilterCluster")
@@ -148,7 +148,7 @@ func desiredSinkFilterCluster(ctx context.Context, sf *kubearchivev1.SinkFilter,
 	if len(resources) > 0 {
 		sf.Spec.Cluster = resources
 	} else {
-		sf.Spec.Cluster = []kubearchivev1.KubeArchiveConfigResource{}
+		sf.Spec.Cluster = []kubearchivev1.ClusterKubeArchiveConfigResource{}
 	}
 
 	// Note that the owner reference is NOT set on the SinkFilter resource.  It should not be deleted when

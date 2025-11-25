@@ -199,8 +199,9 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 	isDeleteWhen := strings.HasSuffix(eventType, ".delete-when")
 	isArchiveWhen := strings.HasSuffix(eventType, ".archive-when")
 	isArchiveOnDelete := strings.HasSuffix(eventType, ".archive-on-delete")
+	isKeepLastWhenDelete := strings.HasSuffix(eventType, ".keep-last-when-delete")
 
-	if !isDeleteWhen && !isArchiveWhen && !isArchiveOnDelete {
+	if !isDeleteWhen && !isArchiveWhen && !isArchiveOnDelete && !isKeepLastWhenDelete {
 		CEMetricAttrs["result"] = string(observability.CEResultNoConfiguration)
 		slog.WarnContext(
 			ctx.Request.Context(),
@@ -227,7 +228,7 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 
 	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
 
-	if !isDeleteWhen {
+	if !isDeleteWhen && !isKeepLastWhenDelete {
 		var logMsg string
 		if isArchiveOnDelete {
 			logMsg = "Resource archived on deletion"
@@ -313,9 +314,17 @@ func (c *Controller) ReceiveCloudEvent(ctx *gin.Context) {
 	}
 
 	CEMetricAttrs["result"] = string(observability.NewCEResultFromWriteResourceResult(result))
+
+	var logMsg string
+	if isKeepLastWhenDelete {
+		logMsg = "Resource archived and deleted from keep-last-when rule"
+	} else {
+		logMsg = "Resource archived and deleted"
+	}
+
 	slog.InfoContext(
 		ctx.Request.Context(),
-		"Resource archived and deleted",
+		logMsg,
 		"event-id", event.ID(),
 		"event-type", event.Type(),
 		"id", string(k8sObj.GetUID()),

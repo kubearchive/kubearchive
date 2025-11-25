@@ -27,7 +27,7 @@ var _ = Describe("SinkFilterController", func() {
 					Namespace: SinkFilterNamespace,
 				},
 				Spec: kubearchivev1.SinkFilterSpec{
-					Cluster: []kubearchivev1.KubeArchiveConfigResource{
+					Cluster: []kubearchivev1.ClusterKubeArchiveConfigResource{
 						{
 							Selector: kubearchivev1.APIVersionKind{
 								APIVersion: "apps/v1",
@@ -67,7 +67,7 @@ var _ = Describe("SinkFilterController", func() {
 			}
 
 			// Test ExtractNamespacesByKind
-			namespacesByKinds := filters.ExtractNamespacesByKind(sinkFilter)
+			namespacesByKinds := filters.ExtractNamespacesByKind(sinkFilter, filters.Controller)
 
 			// Should have 2 unique kinds in namespaces: Pod-v1, Service-v1
 			// Deployment is in Cluster field, not Namespaces
@@ -100,7 +100,7 @@ var _ = Describe("SinkFilterController", func() {
 				},
 			}
 
-			namespacesByKinds := filters.ExtractNamespacesByKind(sinkFilter)
+			namespacesByKinds := filters.ExtractNamespacesByKind(sinkFilter, filters.Controller)
 			Expect(len(namespacesByKinds)).To(Equal(0))
 		})
 

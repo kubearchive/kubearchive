@@ -124,7 +124,15 @@ var _ = Describe("KubeArchiveConfig Controller", func() {
 				Name: constants.KubeArchiveConfigResourceName,
 			},
 			Spec: kubearchivev1.ClusterKubeArchiveConfigSpec{
-				Resources: []kubearchivev1.KubeArchiveConfigResource{podResource},
+				Resources: []kubearchivev1.ClusterKubeArchiveConfigResource{
+					{
+						ArchiveOnDelete: "true",
+						Selector: kubearchivev1.APIVersionKind{
+							APIVersion: "v1",
+							Kind:       "Pod",
+						},
+					},
+				},
 			},
 		}
 		ns := &corev1.Namespace{

@@ -21,13 +21,34 @@ func (a APIVersionKind) Key() string {
 	return a.Kind + "-" + a.APIVersion
 }
 
+// +kubebuilder:object:generate=true
+type KeepLastKeepRule struct {
+	Count int    `json:"count" yaml:"count"`
+	When  string `json:"when" yaml:"when"`
+	// +kubebuilder:default="metadata.creationTimestamp"
+	SortBy string `json:"sortBy,omitempty" yaml:"sortBy,omitempty"`
+}
+
+// +kubebuilder:object:generate=true
+type KeepLastOverrideRule struct {
+	Name  string `json:"name" yaml:"name"`
+	Count int    `json:"count" yaml:"count"`
+}
+
+// +kubebuilder:object:generate=true
+type KeepLastWhenConfig struct {
+	Keep     []KeepLastKeepRule     `json:"keep,omitempty" yaml:"keep,omitempty"`
+	Override []KeepLastOverrideRule `json:"override,omitempty" yaml:"override,omitempty"`
+}
+
 var KubeArchiveConfigGVR = schema.GroupVersionResource{Group: "kubearchive.org", Version: "v1", Resource: "kubearchiveconfigs"}
 
 type KubeArchiveConfigResource struct {
-	Selector        APIVersionKind `json:"selector,omitempty" yaml:"selector,omitempty"`
-	ArchiveWhen     string         `json:"archiveWhen,omitempty" yaml:"archiveWhen,omitempty"`
-	DeleteWhen      string         `json:"deleteWhen,omitempty" yaml:"deleteWhen,omitempty"`
-	ArchiveOnDelete string         `json:"archiveOnDelete,omitempty" yaml:"archiveOnDelete,omitempty"`
+	Selector        APIVersionKind      `json:"selector,omitempty" yaml:"selector,omitempty"`
+	ArchiveWhen     string              `json:"archiveWhen,omitempty" yaml:"archiveWhen,omitempty"`
+	DeleteWhen      string              `json:"deleteWhen,omitempty" yaml:"deleteWhen,omitempty"`
+	ArchiveOnDelete string              `json:"archiveOnDelete,omitempty" yaml:"archiveOnDelete,omitempty"`
+	KeepLastWhen    *KeepLastWhenConfig `json:"keepLastWhen,omitempty" yaml:"keepLastWhen,omitempty"`
 }
 
 // KubeArchiveConfigSpec defines the desired state of KubeArchiveConfig

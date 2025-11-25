@@ -1,0 +1,11 @@
+yyyy/mm/dd hh:mm:ss INFO Started publishing sink events namespace=test-nvac-keep-last-when-namespace-only
+yyyy/mm/dd hh:mm:ss INFO Processing resource in ProcessKeepLastWhen name=namespace-vacuum-001 apiversion=batch/v1 kind=Job
+yyyy/mm/dd hh:mm:ss INFO No event sent apiversion=batch/v1 kind=Job namespace=test-nvac-keep-last-when-namespace-only name=namespace-vacuum-001
+yyyy/mm/dd hh:mm:ss INFO Processing resource in ProcessKeepLastWhen name=vacuum-job-001 apiversion=batch/v1 kind=Job
+yyyy/mm/dd hh:mm:ss INFO Processing resource in ProcessKeepLastWhen name=vacuum-job-002 apiversion=batch/v1 kind=Job
+yyyy/mm/dd hh:mm:ss INFO Processing resource in ProcessKeepLastWhen name=vacuum-job-003 apiversion=batch/v1 kind=Job
+yyyy/mm/dd hh:mm:ss INFO Event sent successfully apiversion=batch/v1 kind=Job namespace=test-nvac-keep-last-when-namespace-only name=vacuum-job-001 eventType=org.kubearchive.vacuum.namespace.resource.keep-last-when-delete code=202
+yyyy/mm/dd hh:mm:ss INFO Processing resource in ProcessKeepLastWhen name=vacuum-job-004 apiversion=batch/v1 kind=Job
+yyyy/mm/dd hh:mm:ss INFO Event sent successfully apiversion=batch/v1 kind=Job namespace=test-nvac-keep-last-when-namespace-only name=vacuum-job-002 eventType=org.kubearchive.vacuum.namespace.resource.keep-last-when-delete code=202
+yyyy/mm/dd hh:mm:ss INFO Resources kept by keeper apiversion=batch/v1 kind=Job namespace=test-nvac-keep-last-when-namespace-only when="has(status.completionTime) && metadata.name.startsWith('vacuum-job-')" count=2 resources-kept=vacuum-job-004,vacuum-job-003
+yyyy/mm/dd hh:mm:ss INFO Finished publishing sink events namespace=test-nvac-keep-last-when-namespace-only

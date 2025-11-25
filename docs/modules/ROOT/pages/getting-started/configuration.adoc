@@ -25,8 +25,8 @@ spec:
   resources: [...] <1>
 ----
 
-<1> `spec.resources` is a list of elements, each defining rules for a specific kind, so KubeArchive knows
-when to archive or delete them.
+<1> `spec.resources` is a list of elements, each defining rules for a specific kind,
+so KubeArchive knows when to archive or delete them.
 
 ==  `selector`: Selecting Resources
 
@@ -95,6 +95,13 @@ spec:
 to archive the resource every time its updated.
 ====
 
+[NOTE]
+====
+`archiveWhen` is processed by both the controller and vacuums.
+Resources processed by the controller are handled immediately after Kubernetes sends the event.
+Resources processed by vacuums are handled based on how often the vacuum operations are scheduled to run.
+====
+
 To see it in action apply the KubeArchiveConfig in your namespace and
 run a pod:
 
@@ -138,6 +145,12 @@ are not needed anymore. To enable deletion of resources use the `deleteWhen` key
 [IMPORTANT]
 ====
 KubeArchive archives resources deleted using `deleteWhen`.
+====
+
+[NOTE]
+====
+`deleteWhen` is processed by the controller only.
+Resources are handled immediately after Kubernetes sends the event.
 ====
 
 The following KubeArchiveConfig configures KubeArchive to delete (and archive)
@@ -194,6 +207,89 @@ $ curl --insecure \
 "auto-deleted","64c48176-ba8c-4f2a-a662-1fd660f7a3b6"
 ----
 
+== `keepLastWhen`: Keeping the Last N Resources
+
+The `keepLastWhen` key provides a way to automatically retain only the most recent N resources
+that match specific criteria, while deleting older ones.
+This is particularly useful for managing resources like completed jobs,
+where you want to keep only the latest few for reference while cleaning up older ones.
+
+[IMPORTANT]
+====
+KubeArchive archives resources deleted using `keepLastWhen`.
+====
+
+[NOTE]
+====
+`keepLastWhen` is processed by vacuums only.
+Resources are handled based on how often the vacuum operations are scheduled to run,
+not immediately after Kubernetes sends events.
+====
+
+The following KubeArchiveConfig configures KubeArchive to keep only the last 3 completed jobs:
+
+[source,yaml]
+----
+---
+apiVersion: kubearchive.org/v1
+kind: KubeArchiveConfig
+metadata:
+  name: kubearchive
+  namespace: default
+spec:
+  resources:
+    - selector:
+        apiVersion: batch/v1
+        kind: Job
+      keepLastWhen:
+        keep:
+          - when: "has(status.completionTime)"
+            count: 3
+----
+
+To see it in action, apply the KubeArchiveConfig and create several completed jobs:
+
+[source,bash]
+----
+kubectl create job job-1 --image=busybox -- /bin/sh -c "exit 0"
+kubectl create job job-2 --image=busybox -- /bin/sh -c "exit 0"
+kubectl create job job-3 --image=busybox -- /bin/sh -c "exit 0"
+kubectl create job job-4 --image=busybox -- /bin/sh -c "exit 0"
+kubectl create job job-5 --image=busybox -- /bin/sh -c "exit 0"
+----
+
+Wait for the vacuum to run. After the vacuum processes these jobs,
+only the 3 most recent completed jobs remain:
+
+[source,bash]
+----
+$ kubectl get jobs --namespace default
+NAME    COMPLETIONS   DURATION   AGE
+job-3   1/1           2s         3m
+job-4   1/1           2s         2m
+job-5   1/1           2s         1m
+----
+
+The older jobs (job-1 and job-2) are deleted from the cluster and archived in KubeArchive:
+
+[source,bash]
+----
+$ curl --insecure \
+    -H "Authorization: Bearer ${SA_TOKEN}" \
+    https://localhost:8081/api/v1/namespaces/default/jobs \
+    | jq -r '.items[] | [.metadata.name, .metadata.uid] | @csv'
+
+"job-1","..."
+"job-2","..."
+----
+
+[NOTE]
+====
+For more details about `keepLastWhen` configuration options, including how to override
+cluster-wide rules and use custom sort fields, see
+xref:configuration/kubearchiveconfig.adoc#_keepLastWhen_keeping_the_last_n_resources[KubeArchiveConfig CRD].
+====
+
 == `archiveOnDelete`: Archiving on Deletion From the Cluster
 
 You can use KubeArchvie with other applications that clean up resources.
@@ -218,6 +314,12 @@ spec:
         kind: Pod
       archiveOnDelete: status.phase == "Succeeded"
 ----
+
+[NOTE]
+====
+`archiveOnDelete` is processed by the controller only.
+Resources are handled immediately after Kubernetes sends the event.
+====
 
 To see it in action apply the KubeArchiveConfig in your namespace and
 run a couple of pods:

@@ -18,7 +18,7 @@ metadata:
   name: kubearchive-sink-on-pull-request
   namespace: kubearchive-tenant
 spec:
-  pipelineRef: ko-build-pipeline.yaml
+  pipelineRef: https://github.com/ggallen/kubearchive/blob/onboard-konflux-latest/.tekton/ko-build-pipeline.yaml
   taskRunTemplate:
     serviceAccountName: build-pipeline-kubearchive-sink
   workspaces:

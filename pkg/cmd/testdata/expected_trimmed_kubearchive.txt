@@ -1,0 +1,6 @@
+NAME           IN-CLUSTER   ARCHIVED   AGE
+archive-pod1   no           yes        5m
+archive-pod2   no           yes        10m
+
+Results are trimmed to 2, to get the next page of elements, run:
+  kubectl ka get pods --namespace default --limit 2 --before <timestamp-placeholder> --archived

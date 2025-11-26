@@ -1,0 +1,3 @@
+NAME              IN-CLUSTER   ARCHIVED   AGE
+new-archive-pod   no           yes        5m
+old-k8s-pod       yes          no         15m

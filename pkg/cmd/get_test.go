@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -44,40 +45,81 @@ func normalizeYAML(t *testing.T, yamlStr string) string {
 
 // createPodListJSON creates a PodList JSON with the given pod name, timestamp, and optional status
 // If status is empty, no status field is added. If uid is empty, a unique UID is generated based on pod name.
-func createPodListJSON(podName, timestamp, status, uid string) string {
-	// Generate a unique UID if not provided
-	if uid == "" {
-		uid = fmt.Sprintf("%s-uid-12345678-1234-1234-1234-123456789abc", podName)
+// PodSpec represents a pod specification for test data generation
+type PodSpec struct {
+	Name      string
+	Timestamp string
+	Status    string
+	UID       string
+}
+
+// TestResponseOptions configures the test response generation
+type TestResponseOptions struct {
+	Pods          []PodSpec
+	ContinueToken string
+	IsKubeArchive bool // If true, creates KubeArchive format (kind: "List"), otherwise PodList format
+}
+
+// createTestResponse creates test responses for various scenarios with a unified interface
+func createTestResponse(t *testing.T, opts TestResponseOptions) string {
+	t.Helper()
+	var pods []map[string]interface{}
+
+	for _, podSpec := range opts.Pods {
+		// Generate a unique UID if not provided
+		uid := podSpec.UID
+		if uid == "" {
+			uid = fmt.Sprintf("%s-uid-12345678-1234-1234-1234-123456789abc", podSpec.Name)
+		}
+
+		pod := map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata": map[string]interface{}{
+				"name":              podSpec.Name,
+				"namespace":         "default",
+				"uid":               uid,
+				"creationTimestamp": podSpec.Timestamp,
+			},
+		}
+
+		// Add status if provided
+		if podSpec.Status != "" {
+			pod["status"] = map[string]interface{}{
+				"phase": podSpec.Status,
+			}
+		}
+
+		pods = append(pods, pod)
 	}
 
-	pod := map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "Pod",
-		"metadata": map[string]interface{}{
-			"name":              podName,
-			"namespace":         "default",
-			"uid":               uid,
-			"creationTimestamp": timestamp,
-		},
-	}
+	var response map[string]interface{}
 
-	// Add status if provided
-	if status != "" {
-		pod["status"] = map[string]interface{}{
-			"phase": status,
+	if opts.IsKubeArchive {
+		// KubeArchive format (kind: "List")
+		response = map[string]interface{}{
+			"kind":       "List",
+			"apiVersion": "v1",
+			"metadata":   map[string]interface{}{},
+			"items":      pods,
+		}
+		// Add continue token if provided
+		if opts.ContinueToken != "" {
+			response["metadata"].(map[string]interface{})["continue"] = opts.ContinueToken
+		}
+	} else {
+		// Kubernetes PodList format
+		response = map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "PodList",
+			"metadata": map[string]interface{}{
+				"resourceVersion": "",
+			},
+			"items": pods,
 		}
 	}
 
-	podList := map[string]interface{}{
-		"apiVersion": "v1",
-		"kind":       "PodList",
-		"metadata": map[string]interface{}{
-			"resourceVersion": "",
-		},
-		"items": []map[string]interface{}{pod},
-	}
-
-	jsonBytes, _ := json.Marshal(podList)
+	jsonBytes, _ := json.Marshal(response)
 	return string(jsonBytes)
 }
 
@@ -152,11 +194,9 @@ func (m *MockKARetrieverCommandForGet) CompleteRetriever() error {
 
 // NewTestGetOptions creates GetOptions with mocks for testing
 func NewTestGetOptions(mockCLI KARetrieverCommand) *GetOptions {
-	outputFormat := ""
-
 	return &GetOptions{
 		KARetrieverCommand: mockCLI,
-		OutputFormat:       &outputFormat,
+		OutputFormat:       "",
 		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
 		IOStreams: genericiooptions.IOStreams{
 			In:     nil,
@@ -165,6 +205,7 @@ func NewTestGetOptions(mockCLI KARetrieverCommand) *GetOptions {
 		},
 		InCluster: true,
 		Archived:  true,
+		Limit:     100, // Default limit
 	}
 }
 
@@ -180,6 +221,7 @@ func TestGetComplete(t *testing.T) {
 		mockError       error
 		expectError     bool
 		errorContains   string
+		errParseFlags   bool
 		expectInCluster bool
 		expectArchived  bool
 	}{
@@ -343,6 +385,60 @@ func TestGetComplete(t *testing.T) {
 			expectInCluster: true,
 			expectArchived:  true,
 		},
+		{
+			name: "valid timestamp filters",
+			args: []string{"pods"},
+			resourceInfo: &ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			},
+			flags:           []string{"--after=2023-01-01T00:00:00Z", "--before=2023-12-31T23:59:59Z"},
+			expectedApiPath: "/api/v1/namespaces/default/pods",
+			expectInCluster: true,
+			expectArchived:  true,
+		},
+		{
+			name:            "invalid after timestamp format",
+			args:            []string{"pods"},
+			flags:           []string{"--after=invalid"},
+			errParseFlags:   true,
+			expectInCluster: true,
+			expectArchived:  true,
+		},
+		{
+			name:            "invalid before timestamp format",
+			args:            []string{"pods"},
+			flags:           []string{"--before=invalid"},
+			errParseFlags:   true,
+			expectInCluster: true,
+			expectArchived:  true,
+		},
+		{
+			name:            "before must be after after",
+			args:            []string{"pods"},
+			flags:           []string{"--after=2023-12-31T23:59:59Z", "--before=2023-01-01T00:00:00Z"},
+			expectError:     true,
+			errorContains:   "--before must be after --after",
+			expectInCluster: true,
+			expectArchived:  true,
+		},
+		{
+			name:            "invalid limit too small",
+			args:            []string{"pods"},
+			flags:           []string{"--limit=-5"},
+			expectError:     true,
+			errorContains:   "limit must be between 1 and 1000",
+			expectInCluster: true,
+			expectArchived:  true,
+		},
+		{
+			name:            "invalid limit too large",
+			args:            []string{"pods"},
+			flags:           []string{"--limit=2000"},
+			expectError:     true,
+			errorContains:   "limit must be between 1 and 1000",
+			expectInCluster: true,
+			expectArchived:  true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -356,10 +452,17 @@ func TestGetComplete(t *testing.T) {
 			cmd := &cobra.Command{}
 			cmd.Flags().BoolVar(&options.InCluster, "in-cluster", true, "")
 			cmd.Flags().BoolVar(&options.Archived, "archived", true, "")
+			cmd.Flags().IntVar(&options.Limit, "limit", 100, "")
+			cmd.Flags().TimeVar(&options.After, "after", time.Time{}, []string{time.RFC3339}, "")
+			cmd.Flags().TimeVar(&options.Before, "before", time.Now().Add(1*time.Hour), []string{time.RFC3339}, "")
 
 			// Parse the flags if any are provided
 			if len(tc.flags) > 0 {
 				err := cmd.Flags().Parse(tc.flags)
+				if tc.errParseFlags {
+					assert.Error(t, err)
+					return
+				}
 				require.NoError(t, err, "Failed to parse test flags")
 			}
 
@@ -390,14 +493,70 @@ func TestRun(t *testing.T) {
 
 	// Pre-generate common responses
 	emptyPodList := `{"apiVersion": "v1", "kind": "PodList", "metadata": {"resourceVersion": ""}, "items": []}`
-	testPod1 := createPodListJSON("test-pod-1", timestamp, "", "")
-	archivedPod1 := createPodListJSON("archived-pod-1", timestamp, "", "")
-	clusterOnlyPod := createPodListJSON("cluster-only-pod", timestamp, "", "")
-	archiveOnlyPod := createPodListJSON("archive-only-pod", timestamp, "", "")
+	testPod1 := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{{"test-pod-1", timestamp, "", ""}},
+	})
+	archivedPod1 := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{{"archived-pod-1", timestamp, "", ""}},
+	})
+	clusterOnlyPod := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{{"cluster-only-pod", timestamp, "", ""}},
+	})
+	archiveOnlyPod := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{{"archive-only-pod", timestamp, "", ""}},
+	})
 	duplicateUID := "duplicate-pod-uid-12345678-1234-1234-1234-123456789abc"
-	duplicatePodK8s := createPodListJSON("duplicate-pod", timestamp, "Running", duplicateUID)
-	duplicatePodArchive := createPodListJSON("duplicate-pod", timestamp, "Succeeded", duplicateUID)
+	duplicatePodK8s := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{{"duplicate-pod", timestamp, "Running", duplicateUID}},
+	})
+	duplicatePodArchive := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{{"duplicate-pod", timestamp, "Succeeded", duplicateUID}},
+	})
 	invalidJSON := `invalid json`
+
+	// Generate timestamp for old pod (15 minutes ago, outside filter range)
+	oldPodTime := time.Now().Add(-15 * time.Minute)
+	oldPodTimestamp := oldPodTime.Format(time.RFC3339)
+
+	// Use relative timestamps for realistic age diversity in pagination tests
+	pod1Timestamp := time.Now().Add(-5 * time.Minute).Format(time.RFC3339)                 // Most recent: 5 minutes ago for "5m" age
+	pod2Timestamp := time.Now().Add(-10 * time.Minute).Format(time.RFC3339)                // 10 minutes ago for "10m" age
+	pod3Timestamp := time.Now().Add(-10*time.Minute - 30*time.Second).Format(time.RFC3339) // 10m30s ago for "10m" age (slightly older)
+
+	// Create test responses for new functionality
+	multiplePods := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{
+			{"pod1", pod1Timestamp, "", ""},
+			{"pod2", pod2Timestamp, "", ""},
+			{"pod3", pod3Timestamp, "", ""},
+		},
+	})
+
+	// Pre-create test responses for new functionality test cases
+	newPodResponse := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{{"new-pod", timestamp, "", ""}}, // Use existing timestamp (5 min ago)
+	})
+	oldK8sPodResponse := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{{"old-k8s-pod", oldPodTimestamp, "", ""}},
+	})
+	newArchivePodResponse := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{{"new-archive-pod", timestamp, "", ""}}, // Use existing timestamp (5 min ago)
+	})
+
+	// Create test responses with unique UIDs for trimming tests
+	k8sPodsForTrimming := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{
+			{"k8s-pod1", pod1Timestamp, "", "k8s-pod1-uid"},
+			{"k8s-pod2", pod2Timestamp, "", "k8s-pod2-uid"},
+		},
+	})
+	archivePodsForTrimming := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{
+			{"archive-pod1", pod1Timestamp, "", "archive-pod1-uid"},
+			{"archive-pod2", pod2Timestamp, "", "archive-pod2-uid"},
+			{"archive-pod3", pod3Timestamp, "", "archive-pod3-uid"},
+		},
+	})
 
 	testCases := []struct {
 		name               string
@@ -412,6 +571,10 @@ func TestRun(t *testing.T) {
 		needsNormalization bool
 		flags              []string
 		allNamespaces      bool
+		// New fields for timestamp and limit testing
+		afterMinutes  int // 0 means no --after filter, positive value means "X minutes ago"
+		beforeMinutes int // 0 means no --before filter, positive value means "X minutes ago"
+		limit         int // 0 means use default limit (100)
 	}{
 		{
 			name:               "table output with availability columns",
@@ -422,16 +585,16 @@ func TestRun(t *testing.T) {
 		},
 		{
 			name:               "JSON output",
-			k8sResponse:        createPodListJSON("test-pod-1", staticTimestamp, "", ""),
-			k9eResponse:        createPodListJSON("archived-pod-1", staticTimestamp, "", ""),
+			k8sResponse:        createTestResponse(t, TestResponseOptions{Pods: []PodSpec{{"test-pod-1", staticTimestamp, "", ""}}}),
+			k9eResponse:        createTestResponse(t, TestResponseOptions{Pods: []PodSpec{{"archived-pod-1", staticTimestamp, "", ""}}}),
 			outputFormat:       "json",
 			expectedOutputFile: "expected_json_output.json",
 			needsNormalization: true,
 		},
 		{
 			name:               "YAML output",
-			k8sResponse:        createPodListJSON("test-pod-1", staticTimestamp, "", ""),
-			k9eResponse:        createPodListJSON("archived-pod-1", staticTimestamp, "", ""),
+			k8sResponse:        createTestResponse(t, TestResponseOptions{Pods: []PodSpec{{"test-pod-1", staticTimestamp, "", ""}}}),
+			k9eResponse:        createTestResponse(t, TestResponseOptions{Pods: []PodSpec{{"archived-pod-1", staticTimestamp, "", ""}}}),
 			outputFormat:       "yaml",
 			expectedOutputFile: "expected_yaml_output.yaml",
 			needsNormalization: true,
@@ -555,6 +718,48 @@ func TestRun(t *testing.T) {
 			expectError:   true,
 			errorContains: "clusterrolebindings.rbac.authorization.k8s.io is forbidden: User \"manon\" cannot list resource \"clusterrolebindings\"",
 		},
+		{
+			name:               "timestamp filtering - resources within range",
+			k8sResponse:        newPodResponse,
+			k9eResponse:        emptyPodList, // KubeArchive should return empty since old-pod would be filtered out by timestamp
+			outputFormat:       "",
+			expectedOutputFile: "expected_timestamp_filtered.txt",
+			afterMinutes:       10, // Include pods newer than 10 minutes ago
+			beforeMinutes:      1,  // Include pods older than 1 minute ago
+			limit:              100,
+		},
+		{
+			name:               "trimmed kubernetes results",
+			k8sResponse:        multiplePods,
+			k9eResponse:        emptyPodList,
+			outputFormat:       "",
+			expectedOutputFile: "expected_limited_results.txt",
+			limit:              2, // Limit to 2 resources when we have 3
+		},
+		{
+			name:               "trimmed kubearchive results",
+			k8sResponse:        emptyPodList,
+			k9eResponse:        archivePodsForTrimming, // 3 pods from KubeArchive
+			outputFormat:       "",
+			expectedOutputFile: "expected_trimmed_kubearchive.txt",
+			limit:              2, // Limit to 2 when KubeArchive has 3
+		},
+		{
+			name:               "trimmed both kubernetes and kubearchive",
+			k8sResponse:        k8sPodsForTrimming,     // 2 pods from Kubernetes
+			k9eResponse:        archivePodsForTrimming, // 3 pods from KubeArchive (with different UIDs)
+			outputFormat:       "",
+			expectedOutputFile: "expected_trimmed_both_apis.txt",
+			limit:              3, // Limit to 3 when we have 5 total (2+3)
+		},
+		{
+			name:               "optimized sorting - newest first",
+			k8sResponse:        oldK8sPodResponse,
+			k9eResponse:        newArchivePodResponse,
+			outputFormat:       "",
+			expectedOutputFile: "expected_sorted_newest_first.txt",
+			limit:              100,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -569,8 +774,13 @@ func TestRun(t *testing.T) {
 
 			opts := NewTestGetOptions(mockCLI)
 			opts.APIPath = "/api/v1/pods"
-			opts.OutputFormat = &tc.outputFormat
+			opts.OutputFormat = tc.outputFormat
 			opts.AllNamespaces = tc.allNamespaces
+
+			// Set ResourceInfo for all tests to prevent nil pointer issues
+			opts.ResourceInfo = &ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			}
 
 			// Set flags if specified in test case
 			if len(tc.flags) > 0 {
@@ -583,8 +793,22 @@ func TestRun(t *testing.T) {
 				require.NoError(t, err, "Failed to parse test flags")
 			}
 
-			var outBuf bytes.Buffer
-			opts.IOStreams = genericiooptions.IOStreams{Out: &outBuf}
+			// Configure test-specific settings from test case struct
+			if tc.beforeMinutes == 0 {
+				opts.Before = time.Now()
+			}
+			if tc.afterMinutes > 0 {
+				opts.After = time.Now().Add(-time.Duration(tc.afterMinutes) * time.Minute)
+			}
+			if tc.beforeMinutes > 0 {
+				opts.Before = time.Now().Add(-time.Duration(tc.beforeMinutes) * time.Minute)
+			}
+			if tc.limit > 0 {
+				opts.Limit = tc.limit
+			}
+
+			var outBuf, errBuf bytes.Buffer
+			opts.IOStreams = genericiooptions.IOStreams{Out: &outBuf, ErrOut: &errBuf}
 
 			err := opts.Run()
 
@@ -595,9 +819,16 @@ func TestRun(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-				expectedOutput := loadGoldenFile(t, tc.expectedOutputFile)
-				actualOutput := outBuf.String()
+				actualOutput := outBuf.String() + errBuf.String()
 
+				// Normalize dynamic timestamps in pagination commands for predictable testing
+				if strings.Contains(actualOutput, "--before") {
+					// Replace dynamic timestamp with placeholder for comparison
+					re := regexp.MustCompile(`--before \S+`)
+					actualOutput = re.ReplaceAllString(actualOutput, "--before <timestamp-placeholder>")
+				}
+
+				expectedOutput := loadGoldenFile(t, tc.expectedOutputFile)
 				if tc.needsNormalization {
 					if tc.outputFormat == "json" {
 						expectedNormalized := normalizeJSON(t, expectedOutput)

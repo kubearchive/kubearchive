@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/duration"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -67,7 +68,7 @@ func NewGetCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := o.Complete(args); err != nil {
+			if err := o.Complete(cmd.Flags(), args); err != nil {
 				return err
 			}
 			return o.Run()
@@ -85,7 +86,7 @@ func NewGetCmd() *cobra.Command {
 	return cmd
 }
 
-func (o *GetOptions) Complete(args []string) error {
+func (o *GetOptions) Complete(flags *pflag.FlagSet, args []string) error {
 	err := o.CompleteRetriever()
 	if err != nil {
 		return err
@@ -104,6 +105,12 @@ func (o *GetOptions) Complete(args []string) error {
 	// Validate that at least one flag is true
 	if !o.InCluster && !o.Archived {
 		return fmt.Errorf("at least one of --in-cluster or --archived must be true")
+	}
+	if flags.Changed("archived") && o.Archived {
+		o.InCluster = false
+	}
+	if flags.Changed("in-cluster") && o.InCluster {
+		o.Archived = false
 	}
 
 	// Parse and resolve resource specification using discovery

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -173,15 +174,14 @@ func TestGetComplete(t *testing.T) {
 		allNamespaces   bool
 		labelSelector   string
 		args            []string
+		flags           []string // Command line flags to set
 		resourceInfo    *ResourceInfo
 		expectedApiPath string
 		mockError       error
 		expectError     bool
 		errorContains   string
-		inCluster       bool
-		archived        bool
-		setInCluster    bool
-		setArchived     bool
+		expectInCluster bool
+		expectArchived  bool
 	}{
 		{
 			name:          "core resource",
@@ -191,6 +191,8 @@ func TestGetComplete(t *testing.T) {
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/namespaces/default/pods",
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 		{
 			name:          "non-core resource with version and group",
@@ -200,6 +202,8 @@ func TestGetComplete(t *testing.T) {
 				Resource: "jobs", Version: "v1", Group: "batch", GroupVersion: "batch/v1", Kind: "Job", Namespaced: true,
 			},
 			expectedApiPath: "/apis/batch/v1/namespaces/default/jobs",
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 		{
 			name:          "non-core resource with group only",
@@ -209,6 +213,8 @@ func TestGetComplete(t *testing.T) {
 				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment", Namespaced: true,
 			},
 			expectedApiPath: "/apis/apps/v1/namespaces/default/deployments",
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 		{
 			name:          "short name resource",
@@ -218,6 +224,8 @@ func TestGetComplete(t *testing.T) {
 				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment", Namespaced: true,
 			},
 			expectedApiPath: "/apis/apps/v1/namespaces/default/deployments", // Should use actual resource name
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 		{
 			name:          "singular name resource",
@@ -227,6 +235,8 @@ func TestGetComplete(t *testing.T) {
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/namespaces/default/pods", // Should use actual resource name
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 		{
 			name:          "all namespaces",
@@ -236,6 +246,8 @@ func TestGetComplete(t *testing.T) {
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/pods",
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 		{
 			name:          "core resource with name",
@@ -245,6 +257,8 @@ func TestGetComplete(t *testing.T) {
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/namespaces/default/pods/my-pod",
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 		{
 			name:          "non-core resource with name",
@@ -254,6 +268,8 @@ func TestGetComplete(t *testing.T) {
 				Resource: "deployments", Version: "v1", Group: "apps", GroupVersion: "apps/v1", Kind: "Deployment", Namespaced: true,
 			},
 			expectedApiPath: "/apis/apps/v1/namespaces/default/deployments/my-deployment",
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 		{
 			name:          "all namespaces with name (should still include name)",
@@ -263,6 +279,8 @@ func TestGetComplete(t *testing.T) {
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/pods/my-pod",
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 		{
 			name:          "with label selector",
@@ -273,86 +291,79 @@ func TestGetComplete(t *testing.T) {
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
 			expectedApiPath: "/api/v1/namespaces/default/pods?labelSelector=app%3Dnginx",
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 		{
-			name:          "name and label selector together",
-			labelSelector: "app=nginx",
-			args:          []string{"pods", "my-pod"},
-			expectError:   true,
-			errorContains: "cannot specify both a resource name and a label selector",
+			name:            "name and label selector together",
+			labelSelector:   "app=nginx",
+			args:            []string{"pods", "my-pod"},
+			expectError:     true,
+			errorContains:   "cannot specify both a resource name and a label selector",
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 		{
-			name: "both flags true - valid",
-			args: []string{"pods"},
+			name:  "in-cluster true, archived false - valid",
+			args:  []string{"pods"},
+			flags: []string{"--in-cluster"},
 			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
-			inCluster:       true,
-			archived:        true,
-			setInCluster:    true,
-			setArchived:     true,
 			expectedApiPath: "/api/v1/namespaces/default/pods",
+			expectInCluster: true,
+			expectArchived:  false,
 		},
 		{
-			name: "in-cluster true, archived false - valid",
-			args: []string{"pods"},
+			name:  "in-cluster false, archived true - valid",
+			args:  []string{"pods"},
+			flags: []string{"--archived"},
 			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},
-			inCluster:       true,
-			archived:        false,
-			setInCluster:    true,
-			setArchived:     true,
 			expectedApiPath: "/api/v1/namespaces/default/pods",
+			expectInCluster: false,
+			expectArchived:  true,
 		},
 		{
-			name: "in-cluster false, archived true - valid",
-			args: []string{"pods"},
-			resourceInfo: &ResourceInfo{
-				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
-			},
-			inCluster:       false,
-			archived:        true,
-			setInCluster:    true,
-			setArchived:     true,
-			expectedApiPath: "/api/v1/namespaces/default/pods",
+			name:            "both flags false - invalid",
+			args:            []string{"pods"},
+			flags:           []string{"--in-cluster=false", "--archived=false"},
+			expectError:     true,
+			errorContains:   "at least one of --in-cluster or --archived must be true",
+			expectInCluster: false,
+			expectArchived:  false,
 		},
 		{
-			name:          "both flags false - invalid",
-			args:          []string{"pods"},
-			inCluster:     false,
-			archived:      false,
-			setInCluster:  true,
-			setArchived:   true,
-			expectError:   true,
-			errorContains: "at least one of --in-cluster or --archived must be true",
-		},
-		{
-			name:          "complete error",
-			args:          []string{"pods"},
-			mockError:     fmt.Errorf("mock complete failed"),
-			expectError:   true,
-			errorContains: "mock complete failed",
+			name:            "complete error",
+			args:            []string{"pods"},
+			mockError:       fmt.Errorf("mock complete failed"),
+			expectError:     true,
+			errorContains:   "mock complete failed",
+			expectInCluster: true,
+			expectArchived:  true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var options *GetOptions
 			mockCli := NewMockKARetrieverCommandForGet(tc.mockError, tc.resourceInfo)
-			options = NewTestGetOptions(mockCli)
+			options := NewTestGetOptions(mockCli)
 			options.AllNamespaces = tc.allNamespaces
 			options.LabelSelector = tc.labelSelector
 
-			// Set flags if specified in test case
-			if tc.setInCluster {
-				options.InCluster = tc.inCluster
-			}
-			if tc.setArchived {
-				options.Archived = tc.archived
+			// Create a cobra command to properly simulate flag parsing
+			cmd := &cobra.Command{}
+			cmd.Flags().BoolVar(&options.InCluster, "in-cluster", true, "")
+			cmd.Flags().BoolVar(&options.Archived, "archived", true, "")
+
+			// Parse the flags if any are provided
+			if len(tc.flags) > 0 {
+				err := cmd.Flags().Parse(tc.flags)
+				require.NoError(t, err, "Failed to parse test flags")
 			}
 
-			err := options.Complete(tc.args)
+			err := options.Complete(cmd.Flags(), tc.args)
 
 			if tc.expectError {
 				assert.Error(t, err)
@@ -364,6 +375,10 @@ func TestGetComplete(t *testing.T) {
 				assert.Equal(t, tc.expectedApiPath, options.APIPath)
 				assert.NotNil(t, options.ResourceInfo)
 			}
+
+			// Check flag values after Complete is called (whether error or not)
+			assert.Equal(t, tc.expectInCluster, options.InCluster, "InCluster flag mismatch")
+			assert.Equal(t, tc.expectArchived, options.Archived, "Archived flag mismatch")
 		})
 	}
 }
@@ -395,10 +410,7 @@ func TestRun(t *testing.T) {
 		errorContains      string
 		expectedOutputFile string
 		needsNormalization bool
-		inCluster          bool
-		archived           bool
-		setInCluster       bool
-		setArchived        bool
+		flags              []string
 		allNamespaces      bool
 	}{
 		{
@@ -451,10 +463,7 @@ func TestRun(t *testing.T) {
 			k9eResponse:        emptyPodList,
 			outputFormat:       "",
 			expectedOutputFile: "expected_only_in_cluster.txt",
-			inCluster:          true,
-			archived:           false,
-			setInCluster:       true,
-			setArchived:        true,
+			flags:              []string{"--in-cluster=true"},
 		},
 		{
 			name:               "archived flag only",
@@ -462,10 +471,7 @@ func TestRun(t *testing.T) {
 			k9eResponse:        archiveOnlyPod,
 			outputFormat:       "",
 			expectedOutputFile: "expected_only_in_archive.txt",
-			inCluster:          false,
-			archived:           true,
-			setInCluster:       true,
-			setArchived:        true,
+			flags:              []string{"--archived=true"},
 		},
 		{
 			name:          "no resources found in namespace",
@@ -567,11 +573,14 @@ func TestRun(t *testing.T) {
 			opts.AllNamespaces = tc.allNamespaces
 
 			// Set flags if specified in test case
-			if tc.setInCluster {
-				opts.InCluster = tc.inCluster
-			}
-			if tc.setArchived {
-				opts.Archived = tc.archived
+			if len(tc.flags) > 0 {
+				// Create a cobra command to properly simulate flag parsing
+				cmd := &cobra.Command{}
+				cmd.Flags().BoolVar(&opts.InCluster, "in-cluster", true, "")
+				cmd.Flags().BoolVar(&opts.Archived, "archived", true, "")
+
+				err := cmd.Flags().Parse(tc.flags)
+				require.NoError(t, err, "Failed to parse test flags")
 			}
 
 			var outBuf bytes.Buffer

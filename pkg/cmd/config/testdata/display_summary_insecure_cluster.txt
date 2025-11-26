@@ -1,0 +1,4 @@
+📋 insecure-cluster
+   Server:  https://api.insecure.com:6443
+   Host:    http://kubearchive.insecure.com
+   Config:  TLS: Insecure • Token: kubectl

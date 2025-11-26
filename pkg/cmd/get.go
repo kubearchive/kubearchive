@@ -1,5 +1,6 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
+
 package cmd
 
 import (
@@ -13,7 +14,6 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/kubearchive/kubearchive/pkg/cmd/config"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/duration"
@@ -23,10 +23,10 @@ import (
 
 type GetOptions struct {
 	genericiooptions.IOStreams
-	config.KACLICommand
+	KARetrieverCommand
 	AllNamespaces      bool
 	APIPath            string
-	ResourceInfo       *config.ResourceInfo
+	ResourceInfo       *ResourceInfo
 	Name               string
 	LabelSelector      string
 	OutputFormat       *string
@@ -53,7 +53,7 @@ func NewGetOptions() *GetOptions {
 			Out:    os.Stdout,
 			ErrOut: os.Stderr,
 		},
-		KACLICommand: config.NewKAOptions(),
+		KARetrieverCommand: NewKARetrieverOptions(),
 	}
 }
 
@@ -78,7 +78,7 @@ func NewGetCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', '!=', 'in', 'notin'.(e.g. -l key1=value1,key2=value2,key3 in (value3)). Matching objects must satisfy all of the specified label constraints.")
 	cmd.Flags().BoolVar(&o.InCluster, "in-cluster", true, "Include resources from the Kubernetes cluster.")
 	cmd.Flags().BoolVar(&o.Archived, "archived", true, "Include resources from KubeArchive.")
-	o.AddFlags(cmd.Flags())
+	o.AddRetrieverFlags(cmd.Flags())
 	o.JSONYamlPrintFlags.AddFlags(cmd)
 	cmd.Flags().StringVarP(o.OutputFormat, "output", "o", *o.OutputFormat, fmt.Sprintf(`Output format. One of: (%s).`, strings.Join(o.JSONYamlPrintFlags.AllowedFormats(), ", ")))
 
@@ -86,7 +86,7 @@ func NewGetCmd() *cobra.Command {
 }
 
 func (o *GetOptions) Complete(args []string) error {
-	err := o.KACLICommand.Complete()
+	err := o.CompleteRetriever()
 	if err != nil {
 		return err
 	}
@@ -210,7 +210,7 @@ func (o *GetOptions) Run() error {
 
 	// Get resources from Kubernetes API (only if --in-cluster is true)
 	if o.InCluster {
-		bodyBytes, apiErr := o.GetFromAPI(config.Kubernetes, o.APIPath)
+		bodyBytes, apiErr := o.GetFromAPI(Kubernetes, o.APIPath)
 		if apiErr != nil {
 			if apiErr.StatusCode != http.StatusNotFound {
 				return apiErr
@@ -219,7 +219,7 @@ func (o *GetOptions) Run() error {
 		} else {
 			resources, parseErr := o.parseResourcesFromBytes(bodyBytes)
 			if parseErr != nil {
-				return &config.APIError{
+				return &APIError{
 					StatusCode: 200,
 					URL:        "Kubernetes API",
 					Message:    fmt.Sprintf("error parsing resources from the cluster: %v", parseErr),
@@ -234,8 +234,14 @@ func (o *GetOptions) Run() error {
 
 	// Get resources from KubeArchive API (only if --archived is true)
 	if o.Archived {
-		bodyBytes, apiErr := o.GetFromAPI(config.KubeArchive, o.APIPath)
+		bodyBytes, apiErr := o.GetFromAPI(KubeArchive, o.APIPath)
 		if apiErr != nil {
+			// If KubeArchive fails with authentication error, don't fall back to just Kubernetes
+			if apiErr.StatusCode == http.StatusUnauthorized ||
+				strings.Contains(apiErr.Message, "empty authorization bearer token given") ||
+				strings.Contains(apiErr.Message, "authentication failed") {
+				return fmt.Errorf("KubeArchive authentication required: %s", apiErr.Message)
+			}
 			// If we have k8s resources, continue with those regardless of the error type
 			if len(k8sResources) > 0 {
 				kubearchiveNotFound = true
@@ -253,7 +259,7 @@ func (o *GetOptions) Run() error {
 				if len(k8sResources) > 0 {
 					kubearchiveNotFound = true
 				} else {
-					return &config.APIError{
+					return &APIError{
 						StatusCode: 200,
 						URL:        "KubeArchive API",
 						Message:    fmt.Sprintf("error parsing resources from KubeArchive: %v", parseErr),

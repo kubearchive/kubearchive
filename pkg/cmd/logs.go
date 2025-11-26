@@ -8,16 +8,15 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/kubearchive/kubearchive/pkg/cmd/config"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 type LogsOptions struct {
-	config.KACLICommand
+	KARetrieverCommand
 	ContainerName string
 	Name          string
-	ResourceInfo  *config.ResourceInfo
+	ResourceInfo  *ResourceInfo
 	LabelSelector string
 }
 
@@ -46,7 +45,7 @@ kubectl ka logs deployments -l app=nginx
 
 func NewLogsOptions() *LogsOptions {
 	return &LogsOptions{
-		KACLICommand: config.NewKAOptions(),
+		KARetrieverCommand: NewKARetrieverOptions(),
 	}
 }
 
@@ -69,7 +68,7 @@ func NewLogCmd() *cobra.Command {
 		},
 	}
 
-	o.AddFlags(cmd.Flags())
+	o.AddRetrieverFlags(cmd.Flags())
 	cmd.Flags().StringVarP(&o.ContainerName, "container", "c", o.ContainerName, "Name of the container to retrieve the logs from.")
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', '!=', 'in', 'notin'.(e.g. -l key1=value1,key2=value2,key3 in (value3)). Matching objects must satisfy all of the specified label constraints.")
 
@@ -77,7 +76,7 @@ func NewLogCmd() *cobra.Command {
 }
 
 func (o *LogsOptions) Complete(args []string) error {
-	err := o.KACLICommand.Complete()
+	err := o.CompleteRetriever()
 	if err != nil {
 		return err
 	}
@@ -128,7 +127,7 @@ func (o *LogsOptions) Run(cmd *cobra.Command) error {
 	names := make([]string, 0)
 	if o.LabelSelector != "" {
 		apiPath := fmt.Sprintf("%s/%s/namespaces/%s/%s?labelSelector=%s", apiPrefix, o.ResourceInfo.GroupVersion, ns, o.ResourceInfo.Resource, url.QueryEscape(o.LabelSelector))
-		bodyBytes, apiErr := o.GetFromAPI(config.KubeArchive, apiPath)
+		bodyBytes, apiErr := o.GetFromAPI(KubeArchive, apiPath)
 		if apiErr != nil {
 			return apiErr
 		}
@@ -136,7 +135,7 @@ func (o *LogsOptions) Run(cmd *cobra.Command) error {
 		var list unstructured.UnstructuredList
 		err := json.Unmarshal(bodyBytes, &list)
 		if err != nil {
-			return &config.APIError{
+			return &APIError{
 				StatusCode: 200,
 				URL:        "KubeArchive API",
 				Message:    fmt.Sprintf("error deserializing the body into unstructured.UnstructuredList: %v", err),
@@ -161,7 +160,7 @@ func (o *LogsOptions) Run(cmd *cobra.Command) error {
 			apiPath = fmt.Sprintf("%s?container=%s", apiPath, o.ContainerName)
 		}
 
-		kubearchiveLog, apiErr := o.GetFromAPI(config.KubeArchive, apiPath)
+		kubearchiveLog, apiErr := o.GetFromAPI(KubeArchive, apiPath)
 		if apiErr != nil {
 			return apiErr
 		}

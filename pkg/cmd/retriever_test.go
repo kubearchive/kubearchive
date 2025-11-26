@@ -1,6 +1,6 @@
 // Copyright KubeArchive Authors
 // SPDX-License-Identifier: Apache-2.0
-package config
+package cmd
 
 import (
 	"net/http"
@@ -161,7 +161,7 @@ func withMultipleEnv(t *testing.T, envVars map[string]string, testFunc func()) {
 	testFunc()
 }
 
-func TestNewKAOptions(t *testing.T) {
+func TestNewKARetrieverOptions(t *testing.T) {
 	testCases := []struct {
 		name             string
 		envVars          map[string]string
@@ -172,7 +172,7 @@ func TestNewKAOptions(t *testing.T) {
 		{
 			name:             "defaults",
 			envVars:          map[string]string{},
-			expectedHost:     "https://localhost:8081",
+			expectedHost:     "", // No default host - must be configured
 			expectedCert:     "",
 			expectedInsecure: false,
 		},
@@ -192,7 +192,7 @@ func TestNewKAOptions(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			withMultipleEnv(t, tc.envVars, func() {
-				opts := NewKAOptions()
+				opts := NewKARetrieverOptions()
 				assert.Equal(t, tc.expectedHost, opts.host)
 				assert.Equal(t, tc.expectedCert, opts.certificatePath)
 				assert.Equal(t, tc.expectedInsecure, opts.tlsInsecure)
@@ -239,11 +239,11 @@ func TestAddFlagsAndPrecedence(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			withMultipleEnv(t, tc.envVars, func() {
-				opts := NewKAOptions()
+				opts := NewKARetrieverOptions()
 
 				if len(tc.flagValues) > 0 {
 					flags := pflag.NewFlagSet("test", pflag.ExitOnError)
-					opts.AddFlags(flags)
+					opts.AddRetrieverFlags(flags)
 
 					for flagName, flagValue := range tc.flagValues {
 						flag := flags.Lookup(flagName)
@@ -260,14 +260,16 @@ func TestAddFlagsAndPrecedence(t *testing.T) {
 	}
 }
 
-func TestComplete(t *testing.T) {
-	kubeconfigPath := filepath.Join("testdata", "kubeconfig.yaml")
+func TestCompleteRetriever(t *testing.T) {
+	kubeconfigPath := filepath.Join("config", "testdata", "kubeconfig.yaml")
 	t.Setenv("KUBECONFIG", kubeconfigPath)
 
 	testCases := []struct {
 		name                string
-		setup               func(opts *KAOptions)
+		setup               func(opts *KARetrieverOptions)
 		env                 map[string]string
+		connectivityFails   bool
+		connectivityError   error
 		expectedK9eHost     string
 		expectedK9eToken    string
 		expectedK9eInsecure bool
@@ -276,24 +278,24 @@ func TestComplete(t *testing.T) {
 		errorContains       string
 	}{
 		{
-			name:                "default configuration",
-			setup:               func(opts *KAOptions) {},
-			env:                 map[string]string{},
-			expectedK9eHost:     "https://localhost:8081",
-			expectedK9eToken:    "k8s-config-token",
-			expectedK9eInsecure: false,
-			expectCertData:      false,
-			expectError:         false,
+			name:              "default config, no kubearchive exposed route",
+			setup:             func(opts *KARetrieverOptions) {},
+			env:               map[string]string{},
+			connectivityFails: true,
+			expectError:       true,
+			errorContains:     "KubeArchive couldn't be automatically discovered",
 		},
 		{
 			name: "token precedence - kubectl flag wins",
-			setup: func(opts *KAOptions) {
+			setup: func(opts *KARetrieverOptions) {
 				testToken := "kubectl-token" // #nosec G101 - this is a test token
 				opts.kubeFlags.BearerToken = &testToken
+				opts.host = "https://localhost:8081"
 			},
 			env: map[string]string{
 				"KUBECTL_PLUGIN_KA_TOKEN": "env-token",
 			},
+			connectivityFails:   false,
 			expectedK9eHost:     "https://localhost:8081",
 			expectedK9eToken:    "kubectl-token",
 			expectedK9eInsecure: false,
@@ -301,11 +303,14 @@ func TestComplete(t *testing.T) {
 			expectError:         false,
 		},
 		{
-			name:  "token from environment variable",
-			setup: func(opts *KAOptions) {},
+			name: "token from environment variable",
+			setup: func(opts *KARetrieverOptions) {
+				opts.host = "https://localhost:8081"
+			},
 			env: map[string]string{
 				"KUBECTL_PLUGIN_KA_TOKEN": "env-token",
 			},
+			connectivityFails:   false,
 			expectedK9eHost:     "https://localhost:8081",
 			expectedK9eToken:    "env-token",
 			expectedK9eInsecure: false,
@@ -314,11 +319,13 @@ func TestComplete(t *testing.T) {
 		},
 		{
 			name: "certificate path with TLS override",
-			setup: func(opts *KAOptions) {
+			setup: func(opts *KARetrieverOptions) {
+				opts.host = "https://localhost:8081"
 				opts.tlsInsecure = true
-				opts.certificatePath = filepath.Join("testdata", "test-cert.crt")
+				opts.certificatePath = filepath.Join("config", "testdata", "test-cert.crt")
 			},
 			env:                 map[string]string{},
+			connectivityFails:   false,
 			expectedK9eHost:     "https://localhost:8081",
 			expectedK9eToken:    "k8s-config-token",
 			expectedK9eInsecure: false, // Certificate overrides insecure setting
@@ -327,24 +334,32 @@ func TestComplete(t *testing.T) {
 		},
 		{
 			name: "certificate error",
-			setup: func(opts *KAOptions) {
+			setup: func(opts *KARetrieverOptions) {
 				opts.certificatePath = "/nonexistent/cert.crt"
 			},
 			env:           map[string]string{},
 			expectError:   true,
-			errorContains: "failed to load certificate from path",
+			errorContains: "failed to read certificate file",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			withMultipleEnv(t, tc.env, func() {
-				opts := NewKAOptions()
+				opts := NewKARetrieverOptions()
+
+				// Set up mock connectivity tester
+				mockConnectivity := &MockConnectivityTester{
+					shouldFail: tc.connectivityFails,
+					failError:  tc.connectivityError,
+				}
+				opts.connectivityTester = mockConnectivity
+
 				if tc.setup != nil {
 					tc.setup(opts)
 				}
 
-				err := opts.Complete()
+				err := opts.CompleteRetriever()
 				if tc.expectError {
 					assert.Error(t, err)
 					if tc.errorContains != "" {
@@ -354,17 +369,17 @@ func TestComplete(t *testing.T) {
 				}
 
 				require.NoError(t, err)
-				assert.NotNil(t, opts.K8sRESTConfig)
-				assert.NotNil(t, opts.K9eRESTConfig)
-				assert.Equal(t, tc.expectedK9eHost, opts.K9eRESTConfig.Host)
-				assert.Equal(t, tc.expectedK9eToken, opts.K9eRESTConfig.BearerToken)
-				assert.Equal(t, tc.expectedK9eInsecure, opts.K9eRESTConfig.Insecure)
+				assert.NotNil(t, opts.k8sRESTConfig)
+				assert.NotNil(t, opts.k9eRESTConfig)
+				assert.Equal(t, tc.expectedK9eHost, opts.k9eRESTConfig.Host)
+				assert.Equal(t, tc.expectedK9eToken, opts.k9eRESTConfig.BearerToken)
+				assert.Equal(t, tc.expectedK9eInsecure, opts.k9eRESTConfig.Insecure)
 
 				if tc.expectCertData {
-					assert.NotNil(t, opts.K9eRESTConfig.CAData)
-					assert.NotEmpty(t, opts.K9eRESTConfig.CAData)
+					assert.NotNil(t, opts.k9eRESTConfig.CAData)
+					assert.NotEmpty(t, opts.k9eRESTConfig.CAData)
 				} else {
-					assert.Nil(t, opts.K9eRESTConfig.CAData)
+					assert.Nil(t, opts.k9eRESTConfig.CAData)
 				}
 			})
 		})
@@ -375,13 +390,13 @@ func TestGetNamespace(t *testing.T) {
 	testCases := []struct {
 		name          string
 		useKubeconfig bool
-		setup         func(opts *KAOptions)
+		setup         func(opts *KARetrieverOptions)
 		expectedNs    string
 		expectError   bool
 	}{
 		{
 			name: "namespace from flags",
-			setup: func(opts *KAOptions) {
+			setup: func(opts *KARetrieverOptions) {
 				ns := "test-namespace"
 				opts.kubeFlags.Namespace = &ns
 			},
@@ -391,7 +406,7 @@ func TestGetNamespace(t *testing.T) {
 		{
 			name:          "namespace from kubeconfig",
 			useKubeconfig: true,
-			setup:         func(opts *KAOptions) {},
+			setup:         func(opts *KARetrieverOptions) {},
 			expectedNs:    "kubeconfig-namespace",
 			expectError:   false,
 		},
@@ -400,11 +415,11 @@ func TestGetNamespace(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.useKubeconfig {
-				kubeconfigPath := filepath.Join("testdata", "kubeconfig.yaml")
+				kubeconfigPath := filepath.Join("config", "testdata", "kubeconfig.yaml")
 				t.Setenv("KUBECONFIG", kubeconfigPath)
 			}
 
-			opts := &KAOptions{
+			opts := &KARetrieverOptions{
 				kubeFlags: genericclioptions.NewConfigFlags(true),
 			}
 			if tc.setup != nil {
@@ -498,12 +513,12 @@ func TestGetFromAPI(t *testing.T) {
 				serverURL = server.URL
 			}
 
-			opts := &KAOptions{
+			opts := &KARetrieverOptions{
 				host: serverURL,
-				K8sRESTConfig: &rest.Config{
+				k8sRESTConfig: &rest.Config{
 					Host: serverURL,
 				},
-				K9eRESTConfig: &rest.Config{
+				k9eRESTConfig: &rest.Config{
 					Host: serverURL,
 				},
 			}
@@ -628,7 +643,7 @@ func TestResolveResourceSpec(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			opts := NewKAOptions()
+			opts := NewKARetrieverOptions()
 			opts.discoveryClient = newMockDiscoveryClient()
 
 			resourceInfo, err := opts.ResolveResourceSpec(tc.resourceSpec)

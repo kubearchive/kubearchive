@@ -142,7 +142,7 @@ spec:
       - name: name
         value: prefetch-dependencies-oci-ta
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.2@sha256:9dbb38efdfca525b00dc502acf44723ac4a6c413bb2ab97459a13cd3a6056f17
+        value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.2@sha256:3fa0204a481044b21f0e784ce39cbd25e8fb49c664a5458f3eef351fff1c906e
       - name: kind
         value: task
       resolver: bundles
@@ -176,7 +176,7 @@ spec:
       - name: name
         value: ko-oci-ta
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-ko-oci-ta:0.1@sha256:998d5b793577fdcd5da29b4394df46dfa1467e599eeaf3cef1d8b2cd3e533146
+        value: quay.io/konflux-ci/tekton-catalog/task-ko-oci-ta:0.1@sha256:1b27e45da98c9a83c98b20830d4865d5c89635f33d2d215ebab5e7a5c81e8e56
       - name: kind
         value: task
       resolver: bundles
@@ -199,7 +199,7 @@ spec:
       value:
       - $(tasks.build-container.results.IMAGE_URL)@$(tasks.build-container.results.IMAGE_DIGEST)
     - name: BUILDAH_FORMAT
-      value: docker
+      value: oci
     runAfter:
     - build-container
     taskRef:

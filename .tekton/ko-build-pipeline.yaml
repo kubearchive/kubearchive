@@ -63,7 +63,7 @@ spec:
       description: Preprocessing script for source code
       name: preprocessing-script
       type: string
-    - default: pr-tag
+    - default: ""
       description: PR tag to use on image
       name: pr-tag
       type: string

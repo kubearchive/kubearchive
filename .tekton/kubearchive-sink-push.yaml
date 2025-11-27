@@ -7,9 +7,8 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/ggallen/kubearchive?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
-    build.appstudio.redhat.com/push_request_number: '{{push_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
-    pipelinesascode.tekton.dev/cancel-in-progress: "true"
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch == "onboard-konflux-ggallen"
   creationTimestamp: null
@@ -17,7 +16,7 @@ metadata:
     appstudio.openshift.io/application: kubearchive
     appstudio.openshift.io/component: kubearchive-sink
     pipelines.appstudio.openshift.io/type: build
-  name: kubearchive-sink-on-push-request
+  name: kubearchive-sink-on-push
   namespace: kubearchive-tenant
 spec:
   pipelineRef:

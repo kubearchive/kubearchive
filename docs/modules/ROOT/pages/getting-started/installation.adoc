@@ -18,8 +18,9 @@ This document explains how to install and configure KubeArchive in your Kubernet
 == Prepare the Database
 
 . Create a user and a password for KubeArchive to use.
-. Create a database for KubeArchive, with admin permissions granted to the new user.
-  Configure its timezone as UTC and its locale as UTF-8.
+. Create a database for KubeArchive.
+  Follow link:https://github.com/kubearchive/kubearchive/blob/{page-component-display-version}/integrations/database/postgresql/setup.sql[KubeArchive's setup.sql]
+  for options that need to be applied to the database.
 . Clone the
 link:https://github.com/kubearchive/kubearchive[KubeArchive repository]
 and run the SQL migrations for your database, in this example PostgreSQL:

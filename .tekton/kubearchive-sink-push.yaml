@@ -20,7 +20,7 @@ metadata:
   namespace: kubearchive-tenant
 spec:
   pipelineRef:
-    name: ko-build-pipeline.yaml
+    name: ko-build-pipeline
   params:
     - name: git-url
       value: '{{source_url}}'

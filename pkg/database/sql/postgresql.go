@@ -165,7 +165,7 @@ func (f postgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[stri
 type postgreSQLSorter struct{}
 
 func (postgreSQLSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {
-	return sb.OrderBy("data->'metadata'->>'creationTimestamp' DESC", "id DESC")
+	return sb.OrderByDesc("data->'metadata'->>'creationTimestamp'").OrderByDesc("id")
 }
 
 type postgreSQLInserter struct {

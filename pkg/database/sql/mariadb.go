@@ -116,7 +116,7 @@ func (mariaDBFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]
 type mariaDBSorter struct{}
 
 func (mariaDBSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {
-	return sb.OrderBy("CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime) DESC", "id DESC")
+	return sb.OrderByDesc("CONVERT(JSON_VALUE(data, '$.metadata.creationTimestamp'), datetime)").OrderByDesc("id")
 }
 
 type mariaDBInserter struct {

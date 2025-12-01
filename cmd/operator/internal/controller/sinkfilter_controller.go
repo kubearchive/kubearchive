@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
@@ -293,7 +294,7 @@ func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string
 }
 
 func (r *SinkFilterReconciler) watchLoop(ctx context.Context, watchInfo *WatchInfo, key string) {
-	log := log.FromContext(ctx)
+	log := log.Log.WithValues("fromReconcileID", controller.ReconcileIDFromContext(ctx))
 	backoff := time.Second
 	maxBackoff := 5 * time.Minute
 
@@ -348,7 +349,8 @@ func (r *SinkFilterReconciler) createWatch(ctx context.Context, gvr schema.Group
 }
 
 func (r *SinkFilterReconciler) processWatchEvents(ctx context.Context, watchInterface watch.Interface, watchInfo *WatchInfo, key string) {
-	log := log.FromContext(ctx)
+	log := log.Log.WithValues("fromReconcileID", controller.ReconcileIDFromContext(ctx))
+
 	resultChan := watchInterface.ResultChan()
 
 	for {
@@ -385,7 +387,8 @@ func (r *SinkFilterReconciler) processWatchEvents(ctx context.Context, watchInte
 
 func (r *SinkFilterReconciler) runWorker(ctx context.Context, watchInfo *WatchInfo, key string) {
 	defer watchInfo.WorkerWg.Done()
-	log := log.FromContext(ctx)
+	log := log.Log.WithValues("fromReconcileID", controller.ReconcileIDFromContext(ctx))
+	log.Info("Starting worker")
 
 	for {
 		select {
@@ -414,7 +417,7 @@ func (r *SinkFilterReconciler) runWorker(ctx context.Context, watchInfo *WatchIn
 }
 
 func (r *SinkFilterReconciler) logWatchError(ctx context.Context, event watch.Event, watchInfo *WatchInfo, key string) {
-	log := log.FromContext(ctx)
+	log := log.Log.WithValues("fromReconcileID", controller.ReconcileIDFromContext(ctx))
 
 	var errorMsg string
 	var errorCode int32
@@ -449,6 +452,7 @@ func (r *SinkFilterReconciler) shouldClearResourceVersion(event watch.Event) boo
 }
 
 func (r *SinkFilterReconciler) handleWatchEvent(ctx context.Context, event watch.Event, watchInfo *WatchInfo) error {
+	log := log.Log.WithValues("fromReconcileID", controller.ReconcileIDFromContext(ctx))
 	unstructuredObj, ok := event.Object.(*unstructured.Unstructured)
 	if !ok {
 		return fmt.Errorf("unexpected object type: %T", event.Object)
@@ -479,13 +483,13 @@ func (r *SinkFilterReconciler) handleWatchEvent(ctx context.Context, event watch
 		}
 		return nil
 	default:
-		log.FromContext(ctx).Error(nil, "Ignoring unknown watch event type", "type", event.Type)
+		log.Error(nil, "Ignoring unknown watch event type", "type", event.Type)
 		return nil
 	}
 }
 
 func (r *SinkFilterReconciler) sendCloudEvent(ctx context.Context, eventType string, event watch.Event, watchInfo *WatchInfo) error {
-	log := log.FromContext(ctx)
+	log := log.Log.WithValues("fromReconcileID", controller.ReconcileIDFromContext(ctx))
 
 	if r.cloudEventPublisher == nil {
 		err := fmt.Errorf("CloudEvent publisher not available")

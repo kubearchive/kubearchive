@@ -6,3 +6,6 @@ defaultLdflags:
   - -X main.commit={{ .Git.FullCommit }}
   - -X main.date={{ .Date }}
 defaultBaseImage: registry.access.redhat.com/ubi9/ubi-minimal
+baseImageOverrides:
+  github.com/kubearchive/kubearchive/cmd/tools: registry.access.redhat.com/ubi9/go-toolset
+

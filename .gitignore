@@ -50,3 +50,7 @@ merge/*
 
 # Integration Test Results
 integration-results/*
+
+# Release and source build binaries
+cli-binaries/
+kubectl-ka

@@ -19,15 +19,15 @@ spec:
     spec:
       containers:
         - name: migration
-          image: quay.io/fedora/python-311:20240911
+          image: ko://github.com/kubearchive/kubearchive/cmd/tools
           command: ["/bin/sh", "-c"]
           args:
             - set -o errexit;
               git clone https://github.com/kubearchive/kubearchive --depth=1 --branch=${KUBEARCHIVE_VERSION} /tmp/kubearchive;
               cd /tmp/kubearchive;
+              go mod tidy
               export QUOTED_PASSWORD=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${DATABASE_PASSWORD}', ''))");
-              curl --silent -L https://github.com/golang-migrate/migrate/releases/download/${MIGRATE_VERSION}/migrate.linux-amd64.tar.gz | tar xvz migrate;
-              ./migrate -verbose -path integrations/database/postgresql/migrations/ -database postgresql://${DATABASE_USER}:${QUOTED_PASSWORD}@${DATABASE_URL}:${DATABASE_PORT}/${DATABASE_DB} up
+              go tool migrate -verbose -path integrations/database/postgresql/migrations/ -database postgresql://${DATABASE_USER}:${QUOTED_PASSWORD}@${DATABASE_URL}:${DATABASE_PORT}/${DATABASE_DB} up
           resources:
             limits:
               cpu: 10m

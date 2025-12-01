@@ -35,6 +35,12 @@ curl -LO {download-path}/kubectl-ka-linux-amd64
 
 # For Linux ARM64
 curl -LO {download-path}/kubectl-ka-linux-arm64
+
+# For Darwin AMD64
+curl -LO {download-path}/kubectl-ka-darwin-amd64
+
+# For Darwin ARM64
+curl -LO {download-path}/kubectl-ka-darwin-arm64
 ----
 
 2. **Make the binary executable:**
@@ -42,6 +48,9 @@ curl -LO {download-path}/kubectl-ka-linux-arm64
 [source,bash]
 ----
 chmod +x kubectl-ka-*
+
+# For Darwin, remove the quarantine attribute to trust the downloaded binary
+xattr -d com.apple.quarantine kubectl-ka-*
 ----
 
 3. **Move the binary to your PATH:**

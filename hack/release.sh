@@ -69,6 +69,12 @@ GOOS=linux GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ./cli-binaries/kubectl
 echo "Building kubectl-ka for linux/arm64..."
 GOOS=linux GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ./cli-binaries/kubectl-ka-linux-arm64 ./cmd/kubectl-ka/
 
+echo "Building kubectl-ka for darwin/amd64..."
+GOOS=darwin GOARCH=amd64 go build -ldflags "${LDFLAGS}" -o ./cli-binaries/kubectl-ka-darwin-amd64 ./cmd/kubectl-ka/
+
+echo "Building kubectl-ka for darwin/arm64..."
+GOOS=darwin GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ./cli-binaries/kubectl-ka-darwin-arm64 ./cmd/kubectl-ka/
+
 # Build and push container images
 bash cmd/operator/generate.sh
 kubectl kustomize config/ | envsubst '$NEXT_VERSION' | ko resolve -f - --base-import-paths --tags=${NEXT_VERSION} > kubearchive.yaml
@@ -82,7 +88,9 @@ gh release create "${NEXT_VERSION}" \
     --repo ${RELEASE_REPOSITORY} \
     kubearchive.yaml \
     ./cli-binaries/kubectl-ka-linux-amd64 \
-    ./cli-binaries/kubectl-ka-linux-arm64
+    ./cli-binaries/kubectl-ka-linux-arm64 \
+    ./cli-binaries/kubectl-ka-darwin-amd64 \
+    ./cli-binaries/kubectl-ka-darwin-arm64
 rm ./release-notes.md
 rm ./kubearchive.yaml
 rm -rf ./cli-binaries

@@ -208,7 +208,7 @@ func (f *fakeDatabase) QueryResourceByUID(ctx context.Context, kind, apiVersion,
 
 func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namespace, name,
 	continueId, continueDate string, _ *models.LabelFilters,
-	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error) {
+	creationTimestampAfter, creationTimestampBefore *time.Time, prunedFromEtcd *bool, limit int) ([]models.Resource, error) {
 	var resources []models.Resource
 
 	if name != "" && strings.Contains(name, "*") {
@@ -223,6 +223,10 @@ func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namesp
 
 	if creationTimestampAfter != nil || creationTimestampBefore != nil {
 		resources = f.filterResourcesByTimestamp(resources, creationTimestampAfter, creationTimestampBefore)
+	}
+
+	if prunedFromEtcd != nil {
+		resources = f.filterResourcesByDeletionTimestamp(resources, prunedFromEtcd)
 	}
 
 	return resources, f.err
@@ -248,6 +252,27 @@ func (f *fakeDatabase) filterResourcesByTimestamp(resources []models.Resource,
 		}
 
 		filteredResources = append(filteredResources, resource)
+	}
+
+	return filteredResources
+}
+
+// filterResourcesByDeletionTimestamp filters resources based on presence of deletionTimestamp
+func (f *fakeDatabase) filterResourcesByDeletionTimestamp(resources []models.Resource,
+	prunedFromEtcd *bool) []models.Resource {
+	var filteredResources []models.Resource
+
+	for _, resource := range resources {
+		var obj unstructured.Unstructured
+		err := json.Unmarshal([]byte(resource.Data), &obj)
+		if err != nil {
+			panic(fmt.Sprintf("error while deserializing resource: %s", err))
+		}
+
+		hasDeletionTimestamp := obj.GetDeletionTimestamp() != nil
+		if *prunedFromEtcd == hasDeletionTimestamp {
+			filteredResources = append(filteredResources, resource)
+		}
 	}
 
 	return filteredResources

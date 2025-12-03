@@ -19,15 +19,7 @@ spec:
     spec:
       containers:
         - name: migration
-          image: ko://github.com/kubearchive/kubearchive/cmd/tools
-          command: ["/bin/sh", "-c"]
-          args:
-            - set -o errexit;
-              git clone https://github.com/kubearchive/kubearchive --depth=1 --branch=${KUBEARCHIVE_VERSION} /tmp/kubearchive;
-              cd /tmp/kubearchive;
-              go mod tidy
-              export QUOTED_PASSWORD=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${DATABASE_PASSWORD}', ''))");
-              go tool migrate -verbose -path integrations/database/postgresql/migrations/ -database postgresql://${DATABASE_USER}:${QUOTED_PASSWORD}@${DATABASE_URL}:${DATABASE_PORT}/${DATABASE_DB} up
+          image: ko://github.com/kubearchive/kubearchive/integrations/database/postgresql
           resources:
             limits:
               cpu: 10m
@@ -45,4 +37,5 @@ spec:
               value: v4.18.3
           securityContext:
             runAsNonRoot: true
+            runAsUser: 1000
       restartPolicy: Never

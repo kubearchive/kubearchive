@@ -162,6 +162,16 @@ func (f postgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[stri
 	return cond.And(f.ExistsLabelFilter(cond, slices.Collect(keys), nil), notContainsClause)
 }
 
+func (postgreSQLFilter) DeletionTimestampFilter(cond sqlbuilder.Cond, prunedFromEtcd *bool) string {
+	if prunedFromEtcd == nil {
+		return ""
+	}
+	if *prunedFromEtcd {
+		return "data->'metadata'->'deletionTimestamp' IS NOT NULL"
+	}
+	return "data->'metadata'->'deletionTimestamp' IS NULL"
+}
+
 type postgreSQLSorter struct{}
 
 func (postgreSQLSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {

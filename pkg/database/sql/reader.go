@@ -44,7 +44,7 @@ func (db *sqlDatabaseImpl) QueryResourceByUID(ctx context.Context, kind, apiVers
 
 func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *models.LabelFilters,
-	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error) {
+	creationTimestampAfter, creationTimestampBefore *time.Time, prunedFromEtcd *bool, limit int) ([]models.Resource, error) {
 	sb := db.selector.ResourceSelector()
 	sb.Where(db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion))
 	if namespace != "" {
@@ -72,6 +72,12 @@ func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion,
 		}
 		if creationTimestampBefore != nil {
 			sb.Where(db.filter.CreationTimestampBeforeFilter(sb.Cond, *creationTimestampBefore))
+		}
+		if prunedFromEtcd != nil {
+			filterClause := db.filter.DeletionTimestampFilter(sb.Cond, prunedFromEtcd)
+			if filterClause != "" {
+				sb.Where(filterClause)
+			}
 		}
 		if labelFilters.Exists != nil {
 			sb.Where(db.filter.ExistsLabelFilter(sb.Cond, labelFilters.Exists, mainWhereClause))

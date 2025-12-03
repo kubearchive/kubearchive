@@ -97,6 +97,13 @@ func (c *Controller) GetResources(context *gin.Context) {
 		}
 	}
 
+	// Parse prunedFromEtcd filter
+	prunedFromEtcd, err := parseBoolQuery(context, "prunedFromEtcd")
+	if err != nil {
+		abort.Abort(context, err, http.StatusBadRequest)
+		return
+	}
+
 	apiVersion := version
 	if group != "" {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
@@ -109,7 +116,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 	newLimit := limit + 1
 	resources, err := c.Database.QueryResources(
 		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
-		creationTimestampAfter, creationTimestampBefore, newLimit)
+		creationTimestampAfter, creationTimestampBefore, prunedFromEtcd, newLimit)
 
 	if err != nil {
 		abort.Abort(context, err, http.StatusInternalServerError)
@@ -163,6 +170,25 @@ func parseTimestampQuery(context *gin.Context, paramName string) (*time.Time, er
 	}
 
 	return &timestamp, nil
+}
+
+// parseBoolQuery parses a boolean query parameter and returns a pointer to bool
+// Returns nil if the parameter is not provided or empty
+func parseBoolQuery(context *gin.Context, paramName string) (*bool, error) {
+	value := context.Query(paramName)
+	if value == "" {
+		return nil, nil //nolint:nilnil // This is intentional - empty parameter means no filter
+	}
+
+	if value == "true" {
+		result := true
+		return &result, nil
+	} else if value == "false" {
+		result := false
+		return &result, nil
+	}
+
+	return nil, fmt.Errorf("invalid %s format: %s. Expected 'true' or 'false'", paramName, value)
 }
 
 func (c *Controller) GetLogURL(context *gin.Context) {

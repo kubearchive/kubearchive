@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -25,16 +25,20 @@ import (
 type GetOptions struct {
 	genericiooptions.IOStreams
 	KARetrieverCommand
-	AllNamespaces      bool
-	APIPath            string
-	ResourceInfo       *ResourceInfo
-	Name               string
-	LabelSelector      string
-	OutputFormat       *string
-	JSONYamlPrintFlags *genericclioptions.JSONYamlPrintFlags
-	IsValidOutput      bool
-	InCluster          bool
-	Archived           bool
+	AllNamespaces          bool
+	APIPath                string
+	ResourceInfo           *ResourceInfo
+	Name                   string
+	LabelSelector          string
+	OutputFormat           string
+	JSONYamlPrintFlags     *genericclioptions.JSONYamlPrintFlags
+	IsValidOutput          bool
+	InCluster              bool
+	Archived               bool
+	Limit                  int
+	After                  time.Time
+	Before                 time.Time
+	kubearchiveQueryParams url.Values
 }
 
 // ResourceWithAvailability tracks a resource and its availability in different APIs
@@ -44,10 +48,31 @@ type ResourceWithAvailability struct {
 	Archived  bool
 }
 
+// KubeArchiveResponse represents the response structure from KubeArchive API
+type KubeArchiveResponse struct {
+	Kind       string                      `json:"kind"`
+	APIVersion string                      `json:"apiVersion"`
+	Metadata   map[string]interface{}      `json:"metadata"`
+	Items      []unstructured.Unstructured `json:"items"`
+}
+
+// getContinueToken extracts the continue token from KubeArchive API response metadata
+func getContinueToken(bodyBytes []byte) string {
+	var response KubeArchiveResponse
+	if err := json.Unmarshal(bodyBytes, &response); err != nil {
+		return ""
+	}
+	if response.Metadata != nil {
+		if continueToken, ok := response.Metadata["continue"].(string); ok {
+			return continueToken
+		}
+	}
+	return ""
+}
+
 func NewGetOptions() *GetOptions {
-	outputFormat := ""
 	return &GetOptions{
-		OutputFormat:       &outputFormat,
+		OutputFormat:       "",
 		JSONYamlPrintFlags: genericclioptions.NewJSONYamlPrintFlags(),
 		IOStreams: genericiooptions.IOStreams{
 			In:     os.Stdin,
@@ -55,6 +80,7 @@ func NewGetOptions() *GetOptions {
 			ErrOut: os.Stderr,
 		},
 		KARetrieverCommand: NewKARetrieverOptions(),
+		Limit:              100, // Default limit as per API
 	}
 }
 
@@ -79,11 +105,41 @@ func NewGetCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', '!=', 'in', 'notin'.(e.g. -l key1=value1,key2=value2,key3 in (value3)). Matching objects must satisfy all of the specified label constraints.")
 	cmd.Flags().BoolVar(&o.InCluster, "in-cluster", true, "Include resources from the Kubernetes cluster.")
 	cmd.Flags().BoolVar(&o.Archived, "archived", true, "Include resources from KubeArchive.")
+	cmd.Flags().IntVar(&o.Limit, "limit", o.Limit, "Maximum number of resources to return (default 100, max 1000).")
+	cmd.Flags().TimeVar(&o.After, "after", time.Time{}, []string{time.RFC3339}, "Only return resources created after this timestamp (RFC3339 format, e.g., 2023-01-01T12:00:00Z).")
+	cmd.Flags().TimeVar(&o.Before, "before", time.Now().Add(1*time.Hour), []string{time.RFC3339}, "Only return resources created before this timestamp (RFC3339 format, e.g., 2023-12-31T12:00:00Z).")
 	o.AddRetrieverFlags(cmd.Flags())
 	o.JSONYamlPrintFlags.AddFlags(cmd)
-	cmd.Flags().StringVarP(o.OutputFormat, "output", "o", *o.OutputFormat, fmt.Sprintf(`Output format. One of: (%s).`, strings.Join(o.JSONYamlPrintFlags.AllowedFormats(), ", ")))
+	cmd.Flags().StringVarP(&o.OutputFormat, "output", "o", o.OutputFormat, fmt.Sprintf(`Output format. One of: (%s).`, strings.Join(o.JSONYamlPrintFlags.AllowedFormats(), ", ")))
 
 	return cmd
+}
+
+// buildKubeArchiveQueryParams creates query parameters for KubeArchive API
+func (o *GetOptions) buildKubeArchiveQueryParams() url.Values {
+	// Parse existing query parameters from base API path
+	var params url.Values
+	if strings.Contains(o.APIPath, "?") {
+		parts := strings.SplitN(o.APIPath, "?", 2)
+		var err error
+		params, err = url.ParseQuery(parts[1])
+		if err != nil {
+			params = url.Values{}
+		}
+	} else {
+		params = url.Values{}
+	}
+
+	// Add KubeArchive-specific parameters
+	params.Set("limit", fmt.Sprintf("%d", o.Limit))
+	if !o.After.IsZero() {
+		params.Set("creationTimestampAfter", o.After.Format(time.RFC3339))
+	}
+	if !o.Before.Before(time.Now()) {
+		params.Set("creationTimestampBefore", o.Before.Format(time.RFC3339))
+	}
+
+	return params
 }
 
 func (o *GetOptions) Complete(flags *pflag.FlagSet, args []string) error {
@@ -111,6 +167,16 @@ func (o *GetOptions) Complete(flags *pflag.FlagSet, args []string) error {
 	}
 	if flags.Changed("in-cluster") && o.InCluster {
 		o.Archived = false
+	}
+
+	// Validate limit
+	if o.Limit < 1 || o.Limit > 1000 {
+		return fmt.Errorf("limit must be between 1 and 1000")
+	}
+
+	// Validate timestamp order
+	if o.Before.Before(o.After) || o.Before.Equal(o.After) {
+		return fmt.Errorf("--before must be after --after")
 	}
 
 	// Parse and resolve resource specification using discovery
@@ -149,7 +215,79 @@ func (o *GetOptions) Complete(flags *pflag.FlagSet, args []string) error {
 		o.APIPath = fmt.Sprintf("%s?labelSelector=%s", o.APIPath, url.QueryEscape(o.LabelSelector))
 	}
 
+	// Pre-compute KubeArchive query parameters
+	o.kubearchiveQueryParams = o.buildKubeArchiveQueryParams()
+
 	return nil
+}
+
+// insertSortedResourcesOptimized inserts resources into a sorted slice with deduplication and limit handling
+func (o *GetOptions) insertSortedResourcesOptimized(
+	init []*ResourceWithAvailability,
+	resources []*unstructured.Unstructured,
+	fromK8s bool) ([]*ResourceWithAvailability, bool, bool) {
+
+	result := make([]*ResourceWithAvailability, len(init), min(len(resources)+len(init), o.Limit))
+	copy(result, init)
+
+	var k8sTrimmed, k9eTrimmed bool
+
+	for _, resource := range resources {
+
+		idx, found := slices.BinarySearchFunc(result, resource, cmpResource)
+
+		if found {
+			if fromK8s {
+				result[idx].InCluster = true
+			} else {
+				result[idx].Archived = true
+			}
+			continue
+		}
+
+		resourceWithAvailability := &ResourceWithAvailability{
+			Resource:  resource,
+			InCluster: fromK8s,
+			Archived:  !fromK8s,
+		}
+
+		// Insert at the correct position
+		if idx < cap(result) {
+			if len(result) == cap(result) {
+				// If the slice is full we are going to trim the last element
+				k8sTrimmed = k8sTrimmed || result[len(result)-1].InCluster
+				k9eTrimmed = k9eTrimmed || result[len(result)-1].Archived
+			} else {
+				// Increase the length
+				result = append(result, nil)
+			}
+			copy(result[idx+1:], result[idx:])
+			result[idx] = resourceWithAvailability
+
+		} else {
+			// Not inserted, so resources are trimmed
+			k8sTrimmed = k8sTrimmed || fromK8s
+			k9eTrimmed = k9eTrimmed || !fromK8s
+		}
+	}
+
+	return result, k8sTrimmed, k9eTrimmed
+}
+
+// cmpResource
+func cmpResource(existing *ResourceWithAvailability, target *unstructured.Unstructured) int {
+	existingTime := existing.Resource.GetCreationTimestamp().Time
+	targetTime := target.GetCreationTimestamp().Time
+
+	if targetTime.After(existingTime) {
+		return 1
+	} else if targetTime.Before(existingTime) {
+		return -1
+	} else if target.GetUID() == existing.Resource.GetUID() {
+		return 0
+	}
+	// If timestamps are equal, but not UUIDs, sort by name
+	return strings.Compare(target.GetName(), existing.Resource.GetName())
 }
 
 func (o *GetOptions) parseResourcesFromBytes(bodyBytes []byte) ([]*unstructured.Unstructured, error) {
@@ -179,41 +317,11 @@ func (o *GetOptions) parseResourcesFromBytes(bodyBytes []byte) ([]*unstructured.
 	return unstructuredObjects, nil
 }
 
-// sortResourcesByCreationTime sorts resources with availability by creation timestamp (newest first)
-func sortResourcesByCreationTime(resources []*ResourceWithAvailability) {
-	sort.Slice(resources, func(i, j int) bool {
-		timeI := resources[i].Resource.GetCreationTimestamp().Time
-		timeJ := resources[j].Resource.GetCreationTimestamp().Time
-
-		// If both have timestamps, compare them (newer first)
-		if !timeI.IsZero() && !timeJ.IsZero() {
-			if timeI.After(timeJ) {
-				return true
-			}
-			if timeJ.After(timeI) {
-				return false
-			}
-			// If timestamps are equal, sort by name for stable ordering
-			return resources[i].Resource.GetName() < resources[j].Resource.GetName()
-		}
-
-		// If only one has a timestamp, prioritize the one with timestamp
-		if !timeI.IsZero() && timeJ.IsZero() {
-			return true
-		}
-		if timeI.IsZero() && !timeJ.IsZero() {
-			return false
-		}
-
-		// If neither has a timestamp, sort by name for stable ordering
-		return resources[i].Resource.GetName() < resources[j].Resource.GetName()
-	})
-}
-
 func (o *GetOptions) Run() error {
-	var k8sResources []*unstructured.Unstructured
-	var kubearchiveResources []*unstructured.Unstructured
+	var sortedResources []*ResourceWithAvailability
+	var k8sTrimmed, k8sTrimmedInMerge, kubeArchiveTrimmed bool
 	var k8sNotFound, kubearchiveNotFound bool
+	var kubearchiveContinueToken string
 
 	// Get resources from Kubernetes API (only if --in-cluster is true)
 	if o.InCluster {
@@ -233,7 +341,8 @@ func (o *GetOptions) Run() error {
 					Body:       string(bodyBytes),
 				}
 			}
-			k8sResources = resources
+			// Process Kubernetes resources: filter by timestamp, sort, and limit
+			sortedResources, k8sTrimmed, _ = o.insertSortedResourcesOptimized(make([]*ResourceWithAvailability, 0), resources, true)
 		}
 	} else {
 		k8sNotFound = true
@@ -241,7 +350,19 @@ func (o *GetOptions) Run() error {
 
 	// Get resources from KubeArchive API (only if --archived is true)
 	if o.Archived {
-		bodyBytes, apiErr := o.GetFromAPI(KubeArchive, o.APIPath)
+		// Build KubeArchive API path using pre-computed query parameters
+		var kubearchiveAPIPath string
+		basePath := o.APIPath
+		if strings.Contains(basePath, "?") {
+			basePath = strings.SplitN(basePath, "?", 2)[0]
+		}
+		if o.kubearchiveQueryParams.Encode() != "" {
+			kubearchiveAPIPath = fmt.Sprintf("%s?%s", basePath, o.kubearchiveQueryParams.Encode())
+		} else {
+			kubearchiveAPIPath = basePath
+		}
+
+		bodyBytes, apiErr := o.GetFromAPI(KubeArchive, kubearchiveAPIPath)
 		if apiErr != nil {
 			// If KubeArchive fails with authentication error, don't fall back to just Kubernetes
 			if apiErr.StatusCode == http.StatusUnauthorized ||
@@ -250,7 +371,7 @@ func (o *GetOptions) Run() error {
 				return fmt.Errorf("KubeArchive authentication required: %s", apiErr.Message)
 			}
 			// If we have k8s resources, continue with those regardless of the error type
-			if len(k8sResources) > 0 {
+			if len(sortedResources) > 0 {
 				kubearchiveNotFound = true
 			} else {
 				// Only return error if we don't have any k8s resources
@@ -263,7 +384,7 @@ func (o *GetOptions) Run() error {
 			resources, parseErr := o.parseResourcesFromBytes(bodyBytes)
 			if parseErr != nil {
 				// If we have k8s resources, continue with those
-				if len(k8sResources) > 0 {
+				if len(sortedResources) > 0 {
 					kubearchiveNotFound = true
 				} else {
 					return &APIError{
@@ -274,7 +395,9 @@ func (o *GetOptions) Run() error {
 					}
 				}
 			} else {
-				kubearchiveResources = resources
+				kubearchiveContinueToken = getContinueToken(bodyBytes)
+				// Merge KubeArchive resources efficiently with existing sorted list
+				sortedResources, k8sTrimmedInMerge, kubeArchiveTrimmed = o.insertSortedResourcesOptimized(sortedResources, resources, false)
 			}
 		}
 	} else {
@@ -301,42 +424,7 @@ func (o *GetOptions) Run() error {
 		}
 	}
 
-	// Build resource availability map
-	resourceMap := make(map[string]*ResourceWithAvailability)
-
-	// Add Kubernetes resources
-	for _, obj := range k8sResources {
-		key := string(obj.GetUID())
-		resourceMap[key] = &ResourceWithAvailability{
-			Resource:  obj,
-			InCluster: true,
-			Archived:  false,
-		}
-	}
-
-	// Add KubeArchive resources
-	for _, obj := range kubearchiveResources {
-		key := string(obj.GetUID())
-		if existing, exists := resourceMap[key]; exists {
-			// Resource exists in both - mark as archived too
-			existing.Archived = true
-		} else {
-			// Resource only in archive
-			resourceMap[key] = &ResourceWithAvailability{
-				Resource:  obj,
-				InCluster: false,
-				Archived:  true,
-			}
-		}
-	}
-
-	// Convert to slice for printing
-	finalResources := make([]*ResourceWithAvailability, 0, len(resourceMap))
-	for _, obj := range resourceMap {
-		finalResources = append(finalResources, obj)
-	}
-
-	if len(finalResources) == 0 {
+	if len(sortedResources) == 0 {
 		if o.Name != "" {
 			if o.InCluster && o.Archived {
 				return fmt.Errorf("resource not found in Kubernetes or KubeArchive")
@@ -357,16 +445,96 @@ func (o *GetOptions) Run() error {
 		}
 	}
 
-	return o.printResources(finalResources)
+	// Print resources
+	err := o.printResources(sortedResources)
+	if err != nil {
+		return err
+	}
+
+	// If we have more in-cluster resources and no continue token, suggest --in-cluster
+	moreInCluster := k8sTrimmed || k8sTrimmedInMerge
+	// If we have a continue token or more archived-only resources, suggest --archived
+	moreArchived := kubearchiveContinueToken != "" || kubeArchiveTrimmed
+
+	return o.printPaginationMessage(sortedResources, moreInCluster, moreArchived)
+}
+
+// printPaginationMessage prints a message indicating results were trimmed and suggests the next command
+func (o *GetOptions) printPaginationMessage(resources []*ResourceWithAvailability, moreInCluster, moreArchived bool) error {
+	if !moreInCluster && !moreArchived {
+		return nil
+	}
+
+	// Check if ResourceInfo is available
+	if o.ResourceInfo == nil {
+		return fmt.Errorf("error generating command for getting the next page: no resource info")
+	}
+
+	// Get the timestamp of the oldest resource shown
+	oldestResource := resources[len(resources)-1]
+	oldestTimestamp := oldestResource.Resource.GetCreationTimestamp().Time
+	if oldestTimestamp.IsZero() {
+		return nil // Can't generate pagination command without timestamp
+	}
+
+	// Build the next command
+	var nextCmd strings.Builder
+	nextCmd.WriteString("kubectl ka get ")
+
+	// Add resource type
+	if o.ResourceInfo.Group == "" {
+		nextCmd.WriteString(o.ResourceInfo.Resource)
+	} else {
+		nextCmd.WriteString(fmt.Sprintf("%s.%s.%s", o.ResourceInfo.Resource, o.ResourceInfo.Version, o.ResourceInfo.Group))
+	}
+
+	// Add namespace if applicable
+	if o.ResourceInfo.Namespaced && !o.AllNamespaces {
+		namespace, _ := o.GetNamespace()
+		nextCmd.WriteString(fmt.Sprintf(" --namespace %s", namespace))
+	} else if o.AllNamespaces {
+		nextCmd.WriteString(" --all-namespaces")
+	}
+
+	// Add label selector if provided
+	if o.LabelSelector != "" {
+		nextCmd.WriteString(fmt.Sprintf(" --selector '%s'", o.LabelSelector))
+	}
+
+	// Add limit
+	nextCmd.WriteString(fmt.Sprintf(" --limit %d", o.Limit))
+
+	// Add before timestamp (set to just before the oldest resource's timestamp to avoid including it)
+	// Subtract 1 nanosecond to ensure we don't include the same resource again
+	beforeTimestamp := oldestTimestamp.Add(-1 * time.Nanosecond)
+	nextCmd.WriteString(fmt.Sprintf(" --before %s", beforeTimestamp.Format(time.RFC3339Nano)))
+
+	// Add after timestamp if originally provided
+	if !o.After.IsZero() {
+		nextCmd.WriteString(fmt.Sprintf(" --after %s", o.After.Format(time.RFC3339)))
+	}
+
+	// Add appropriate flags based on where more resources are likely to be found
+	if moreArchived && !moreInCluster {
+		nextCmd.WriteString(" --archived")
+	} else if moreInCluster && !moreArchived {
+		nextCmd.WriteString(" --in-cluster")
+	}
+
+	// Add output format if specified
+	if o.OutputFormat != "" {
+		nextCmd.WriteString(fmt.Sprintf(" --output %s", o.OutputFormat))
+	}
+
+	fmt.Fprintf(o.ErrOut, "\nResults are trimmed to %d, to get the next page of elements, run:\n  %s\n", len(resources), nextCmd.String())
+	return nil
 }
 
 func (o *GetOptions) printResources(resources []*ResourceWithAvailability) error {
-	// Sort resources by creation timestamp (newest first)
-	sortResourcesByCreationTime(resources)
 
-	if o.OutputFormat != nil && *o.OutputFormat != "" {
+	if o.OutputFormat != "" {
 		// For JSON/YAML output, just print the resources without availability info
-		printer, printerErr := o.JSONYamlPrintFlags.ToPrinter(*o.OutputFormat)
+		printer, printerErr := o.JSONYamlPrintFlags.ToPrinter(o.OutputFormat)
 		if printerErr != nil {
 			return printerErr
 		}

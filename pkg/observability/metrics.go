@@ -9,7 +9,10 @@ import (
 	"go.opentelemetry.io/otel/metric"
 )
 
-var CloudEvents metric.Int64UpDownCounter
+var (
+	CloudEvents metric.Int64Counter
+	Updates     metric.Int64Counter
+)
 
 type CEResult string
 
@@ -40,10 +43,19 @@ func NewCEResultFromWriteResourceResult(result interfaces.WriteResourceResult) C
 func init() {
 	meter := otel.Meter("github.com/kubearchive/kubearchive")
 	var err error
-	CloudEvents, err = meter.Int64UpDownCounter(
-		"kubearchive.cloudevents.total",
+	CloudEvents, err = meter.Int64Counter(
+		"kubearchive.cloudevents",
 		metric.WithDescription("Total number of CloudEvents received broken down by type, resource type and result of its processing"),
 		metric.WithUnit("{count}"))
+	if err != nil {
+		panic(err)
+	}
+
+	Updates, err = meter.Int64Counter(
+		"kubearchive.updates",
+		metric.WithDescription("Total number of resource updates received from Kubernetes broken down by type, resource type and result of its delivery to the sink"),
+		metric.WithUnit("{count}"),
+	)
 	if err != nil {
 		panic(err)
 	}

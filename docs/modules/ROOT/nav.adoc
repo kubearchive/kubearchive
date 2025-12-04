@@ -30,6 +30,7 @@
 ** xref:reference/database.adoc[]
 ** xref:reference/api.adoc[]
 ** xref:reference/vacuum.adoc[Vacuums]
+** xref:reference/observability.adoc[]
 
 * Integrations
 ** xref:integrations/database.adoc[Database Integrations]

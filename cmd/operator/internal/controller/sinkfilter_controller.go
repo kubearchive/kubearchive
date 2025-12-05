@@ -286,7 +286,7 @@ func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string
 	resourceConfig, _ := GetResourceConfig(kindSelector)
 	for i := 0; i < resourceConfig.Workers; i++ {
 		watchInfo.WorkerWg.Add(1)
-		go r.runWorker(ctx, watchInfo, key)
+		go r.runWorker(ctx, watchInfo, key, i)
 	}
 	log.Info("Started workers for resource", "apiVersion", kindSelector.APIVersion, "kind", kindSelector.Kind, "workers", resourceConfig.Workers)
 
@@ -385,34 +385,27 @@ func (r *SinkFilterReconciler) processWatchEvents(ctx context.Context, watchInte
 	}
 }
 
-func (r *SinkFilterReconciler) runWorker(ctx context.Context, watchInfo *WatchInfo, key string) {
+func (r *SinkFilterReconciler) runWorker(ctx context.Context, watchInfo *WatchInfo, key string, number int) {
 	defer watchInfo.WorkerWg.Done()
 	log := log.Log.WithValues("fromReconcileID", controller.ReconcileIDFromContext(ctx))
-	log.Info("Starting worker")
+	log.Info("Starting worker", "worker", number, "key", key)
 
 	for {
-		select {
-		case <-watchInfo.StopCh:
-			log.Info("Stopping worker", "key", key)
+		event, shutdown := watchInfo.Queue.Get()
+		if shutdown {
+			log.Info("Shutting down worker", "worker", number, "key", key)
 			return
-		default:
-			event, shutdown := watchInfo.Queue.Get()
-			if shutdown {
-				return
-			}
-
-			func() {
-				defer watchInfo.Queue.Done(event)
-
-				if err := r.handleWatchEvent(ctx, event, watchInfo); err != nil {
-					log.Error(err, "Failed to handle watch event", "key", key)
-					watchInfo.Queue.AddRateLimited(event)
-					return
-				}
-
-				watchInfo.Queue.Forget(event)
-			}()
 		}
+
+		defer watchInfo.Queue.Done(event)
+
+		if err := r.handleWatchEvent(ctx, event, watchInfo); err != nil {
+			log.Error(err, "Failed to handle watch event", "worker", number, "key", key)
+			watchInfo.Queue.AddRateLimited(event)
+			continue
+		}
+
+		watchInfo.Queue.Forget(event)
 	}
 }
 

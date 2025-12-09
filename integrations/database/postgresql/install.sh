@@ -46,7 +46,7 @@ start_port_forward() {
     fi
     sleep 1
   done
-  
+
   echo "[ERROR] Port-forward failed to become ready after 30 seconds"
   return 1
 }
@@ -71,7 +71,7 @@ fi
 
 # Run migrate from host
 echo "[INFO] Running migrations using migrate CLI..."
-export KUBEARCHIVE_PASSWORD="Databas3Passw0rd"  # notsecret
+export KUBEARCHIVE_PASSWORD="$(python3 -c "import urllib.parse; print(urllib.parse.quote('Dat!abas]3Pass*w0rd', ''))")"; # notsecret
 if start_port_forward; then
   # Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues in CI
   migrate -verbose \

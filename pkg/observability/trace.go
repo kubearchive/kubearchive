@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/host"
 	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -49,6 +50,7 @@ func Start(serviceName string) error {
 		resource.WithFromEnv(),
 		resource.WithAttributes(
 			semconv.ServiceName(serviceName),
+			attribute.String("pod", os.Getenv("POD_NAME")),
 		),
 	)
 	if err != nil {

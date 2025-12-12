@@ -26,7 +26,7 @@ jobs:
         working-directory: ./docs
         run: npm run build
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           path: docs/build/site
           retention-days: 1

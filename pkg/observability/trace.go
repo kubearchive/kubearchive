@@ -49,6 +49,7 @@ func Start(serviceName string) error {
 		resource.WithFromEnv(),
 		resource.WithAttributes(
 			semconv.ServiceName(serviceName),
+			semconv.K8SPodName(os.Getenv("POD_NAME")),
 		),
 	)
 	if err != nil {

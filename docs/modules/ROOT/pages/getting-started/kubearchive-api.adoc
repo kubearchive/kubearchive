@@ -58,6 +58,63 @@ $ curl --insecure \
 {"apiVersion":"v1","items":null,"kind":"List","metadata":{"continue":"","resourceVersion":""}}
 ----
 
+== Query KubeArchive with the CLI
+
+Follow the instructions in
+xref:cli/installation.adoc[]
+to install and start using the CLI instead of manual querying
+the KubeArchive API.
+
+[TIP]
+====
+Deploy the following `ConfigMap`, `Role` and `RoleBinding` to make the API endpoint discoverable
+for every authenticated user.
+The CLI will automatically try to read the information on the
+`ConfigMap` to get automatically set up.
+
+[source, yaml]
+----
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kubearchive-configmap-url-reader
+  namespace: kubearchive
+rules:
+  - apiGroups:
+      - v1
+    resources:
+      - configmaps
+    resourceNames:
+      - kubearchive-api-url
+    verbs:
+      - get
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: kubearchive-configmap-url-reader
+  namespace: kubearchive
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: system:authenticated
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kubearchive-configmap-url-reader
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: kubearchive-api-url
+  namespace: kubearchive
+data:
+  URL: https://kubearchive-url:443 <1>
+----
+<1> Update it with the proper URL based on the ingress controller used to expose the `kubearchive-api-server` Service.
+====
+
 == Next steps
 
 Continue reading

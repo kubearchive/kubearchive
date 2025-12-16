@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,6 +32,10 @@ import (
 const OtelStartEnvVar = "KUBEARCHIVE_OTEL_MODE"
 const OtelMetricsInterval = "KUBEARCHIVE_METRICS_INTERVAL"
 const OtelLogsEnvVar = "KUBEARCHIVE_OTLP_SEND_LOGS"
+
+// name of the environment variable that if a float, will determine the sampling rate for root spans created by
+// KubeArchive
+const OtelSamplingRateEnvVar = "OTEL_TRACES_SAMPLER_ARG"
 
 var tp *trace.TracerProvider
 
@@ -67,11 +72,26 @@ func Start(serviceName string) error {
 	}
 
 	otelMode := os.Getenv(OtelStartEnvVar)
+	sampler := trace.AlwaysSample()
+	if sampleRateRaw, exists := os.LookupEnv(OtelSamplingRateEnvVar); exists {
+		sampleRate, parseErr := strconv.ParseFloat(sampleRateRaw, 64)
+		if parseErr != nil {
+			slog.Error(
+				"Failed to parse trace sample rate as float. Falling back to always sample.",
+				OtelSamplingRateEnvVar,
+				sampleRateRaw,
+				"error",
+				parseErr,
+			)
+		} else {
+			sampler = trace.TraceIDRatioBased(sampleRate)
+		}
+	}
 	if otelMode == "enabled" {
-		tracerProviderOptions = append(tracerProviderOptions, trace.WithSampler(trace.AlwaysSample()))
+		tracerProviderOptions = append(tracerProviderOptions, trace.WithSampler(sampler))
 	} else if otelMode == "delegated" {
 		// This is the default, I didn't want to leave an empty block here. This could drift in the future.
-		tracerProviderOptions = append(tracerProviderOptions, trace.WithSampler(trace.ParentBased(trace.AlwaysSample())))
+		tracerProviderOptions = append(tracerProviderOptions, trace.WithSampler(trace.ParentBased(sampler)))
 	} else {
 		// "disabled" is not checked in this if/else because the code does not get here when the value is "disabled"
 		return fmt.Errorf("value '%s' for '%s' not valid. Use 'disabled', 'enabled' or 'delegated'", otelMode, OtelStartEnvVar)

@@ -70,14 +70,26 @@ and control the observability behavior:
 ** "enabled": always send traces and metrics. Useful for observability in development.
 ** "delegated": always send metrics but send traces only when the incoming request sent its traces (see
 link:https://www.w3.org/TR/trace-context-2/#sampled-flag[W3 Trace Context `sampled` flag]).
+* `OTEL_TRACES_SAMPLER_ARG`: a floating point number between 0.0 and 1.0 that is used as the sampling rate for
+  traces. If `KUBEARCHIVE_OTEL_MODE` is set to "delegated" the sampling rate is applied to traces where the root span
+  originiates from KubeArchive. Spans for traces started by other services are sent only if the trace is marked as
+  sampled. The default value is 1.0. (see
+link:https://opentelemetry.io/docs/concepts/sampling/[explainer on sampling]).
 Useful for observability in production.
 * `OTEL_EXPORTER_OTLP_ENDPOINT`: an OTLP compatible endpoint where traces are
     sent. By default it is set to an empty string.
 * `KUBEARCHIVE_OTLP_SEND_LOGS`: if set to "true" logs are sent to the
-    `OTEL_EXPOTER_OTLP_ENDPOINT` and not printed to stdout. Defaults to
+    `OTEL_EXPORTER_OTLP_ENDPOINT` and not printed to stdout. Defaults to
     "false", so logs are printed on stdout by default. When enabled, a single log line
     is printed to stdout informing that logs will be redirected.
 
 To change these environment variables values, edit or patch KubeArchive's
 components: `deployments/kubearchive-api-server`, `deployments/kubearchive-sink`
 and `deployments/kubearchive-operator`.
+
+[TIP]
+====
+On clusters with really high activity we recommend setting `KUBEARCHIVE_OTEL_MODE` to "delegated" and
+`OTEL_TRACES_SAMPLER_ARG` to "0.1". With this configuration, only 10% of new traces created by KubeArchive are
+exported, but all traces from requests will respect the sampling decision of the requester.
+====

@@ -120,17 +120,28 @@ func main() {
 	}
 	memCache := cache.New()
 
+	slog.Info("Establishing database connection for API server")
 	db, err := database.NewReader()
 	if err != nil {
-		slog.Error("Could not connect to database", "error", err.Error())
+		slog.Error("Could not connect to database",
+			"error", err.Error(),
+			"component", "api_server",
+		)
 		os.Exit(1)
 	}
+	slog.Info("Database connection established successfully",
+		"component", "api_server",
+	)
 	defer func(db interfaces.DBReader) {
+		slog.Info("Closing database connection", "component", "api_server")
 		deferErr := db.CloseDB()
 		if deferErr != nil {
-			slog.Error("Could not close the database connection", "error", deferErr.Error())
+			slog.Error("Could not close the database connection",
+				"error", deferErr.Error(),
+				"component", "api_server",
+			)
 		} else {
-			slog.Info("Database connection closed successfully")
+			slog.Info("Database connection closed successfully", "component", "api_server")
 		}
 	}(db)
 

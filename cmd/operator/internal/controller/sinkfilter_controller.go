@@ -15,6 +15,8 @@ import (
 	"time"
 
 	ce "github.com/cloudevents/sdk-go/v2"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/api/meta"
@@ -37,6 +39,7 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/kubearchive/kubearchive/pkg/filters"
 	"github.com/kubearchive/kubearchive/pkg/k8sclient"
+	"github.com/kubearchive/kubearchive/pkg/observability"
 )
 
 type WatchInfo struct {
@@ -367,10 +370,19 @@ func (r *SinkFilterReconciler) processWatchEvents(ctx context.Context, watchInte
 			// If watch event type is ERROR, exit the loop to recreate the watch.
 			if event.Type == watch.Error {
 				r.logWatchError(ctx, event, watchInfo, key)
+				CEMetricsAttrs := []attribute.KeyValue{
+					attribute.String("event_type", string(event.Type)),
+					attribute.String("resource_type", fmt.Sprintf("%s/%s", watchInfo.KindSelector.APIVersion, watchInfo.KindSelector.Kind)),
+					attribute.String("result", "error"),
+				}
+
 				if r.shouldClearResourceVersion(event) {
+					CEMetricsAttrs = append(CEMetricsAttrs, attribute.String("result", "resync"))
 					log.Info("Watch received Gone error, clearing resource version for full resync", "key", key)
 					watchInfo.ResourceVersion = ""
 				}
+
+				observability.Updates.Add(ctx, 1, metric.WithAttributes(CEMetricsAttrs...))
 				return
 			}
 
@@ -399,12 +411,23 @@ func (r *SinkFilterReconciler) runWorker(ctx context.Context, watchInfo *WatchIn
 
 		defer watchInfo.Queue.Done(event)
 
+		CEMetricsAttrs := []attribute.KeyValue{
+			attribute.String("event_type", string(event.Type)),
+			attribute.String("resource_type", fmt.Sprintf("%s/%s", watchInfo.KindSelector.APIVersion, watchInfo.KindSelector.Kind)),
+			attribute.String("result", "delivered"),
+		}
+
 		if err := r.handleWatchEvent(ctx, event, watchInfo); err != nil {
 			log.Error(err, "Failed to handle watch event", "worker", number, "key", key)
 			watchInfo.Queue.AddRateLimited(event)
+
+			CEMetricsAttrs = append(CEMetricsAttrs, attribute.String("result", "failed"))
+			observability.Updates.Add(ctx, 1, metric.WithAttributes(CEMetricsAttrs...))
+
 			continue
 		}
 
+		observability.Updates.Add(ctx, 1, metric.WithAttributes(CEMetricsAttrs...))
 		watchInfo.Queue.Forget(event)
 	}
 }

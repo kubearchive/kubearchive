@@ -30,11 +30,6 @@ spec:
           envFrom:
             - secretRef:
                 name: kubearchive-database-credentials
-          env:
-            - name: KUBEARCHIVE_VERSION
-              value: "${NEXT_VERSION}"
-            - name: MIGRATE_VERSION
-              value: v4.18.3
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000

@@ -68,6 +68,10 @@ spec:
               value: "false"
             - name: OTEL_GO_X_DEPRECATED_RUNTIME_METRICS
               value: "false"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
             - name: GOMEMLIMIT
               valueFrom:
                 resourceFieldRef:

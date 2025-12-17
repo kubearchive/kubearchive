@@ -38,6 +38,20 @@ func (d *discoverer) getKubeArchiveHost(ctx context.Context) (string, error) {
 		}
 	}
 
+	// Look for `kubearchive-api-url` ConfigMap in all namespaces until found
+	var configmap *v1.ConfigMap
+	for _, namespace := range candidateNamespaces {
+		configmap, err = d.CoreV1().ConfigMaps(namespace).Get(ctx, "kubearchive-api-url", metav1.GetOptions{})
+		if err == nil && configmap != nil && configmap.Data != nil {
+			if url, ok := configmap.Data["URL"]; ok {
+				if strings.HasPrefix(url, "http://") || strings.HasPrefix(url, "https://") {
+					return url, nil
+				}
+				fmt.Printf("Warning: Invalid URL format in ConfigMap %s/%s: %s\n", namespace, "kubearchive-api-url", url)
+			}
+		}
+	}
+
 	// Look for `kubearchive-api-server` service in all namespaces until found
 	var service *v1.Service
 	for _, namespace := range candidateNamespaces {

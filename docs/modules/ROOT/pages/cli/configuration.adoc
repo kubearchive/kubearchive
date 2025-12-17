@@ -74,9 +74,10 @@ When you first run a command, the plugin will:
 
 [IMPORTANT]
 ====
-Automatic service discovery only works with:
+Automatic service discovery does the following checks:
 
-* **OpenShift Routes** - Services exposed via OpenShift route resources
+* **ConfigMap** - Check for the field `URL` under a `ConfigMap` named `kubearchive-api-url`
+* **OpenShift Routes** - Services exposed via OpenShift route resources. This piece needs the CLI user to have `list` permissions over the `Routes`
 * **Local Port-forwarding** - Services accessible via `kubectl port-forward` on localhost
 
 For other service exposure methods (LoadBalancer, NodePort, Ingress, etc.), you must configure the KubeArchive host manually using `kubectl ka config set host <url>`.

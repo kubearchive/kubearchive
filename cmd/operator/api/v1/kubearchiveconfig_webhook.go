@@ -282,11 +282,10 @@ func validateDurationString(expr string) []error {
 	}
 	var BadConversion = errors.New("type conversion error from 'string' to 'google.protobuf.Duration'")
 
-	re := regexp.MustCompile(`(duration *\([^)]+\))`)
-	matches := re.FindAllString(expr, -1)
+	durations := getDurationCalls(expr)
 
 	errList := make([]error, 0)
-	for _, match := range matches {
+	for _, match := range durations {
 		prg, err := cel.CompileCELExpr(match)
 		if err != nil {
 			errList = append(errList, err)
@@ -298,6 +297,36 @@ func validateDurationString(expr string) []error {
 		}
 	}
 	return errList
+}
+
+// Returns a slice of duration(...) strings
+func getDurationCalls(expr string) []string {
+	durations := []string{}
+	// match duration(, duration (, etc.
+	re := regexp.MustCompile(`duration *\(`)
+	locs := re.FindAllStringIndex(expr, -1)
+	if locs == nil {
+		return durations
+	}
+	for _, loc := range locs {
+		if loc == nil || len(loc) != 2 {
+			continue
+		}
+		innerParenCount := 1
+		for i := loc[1]; i < len(expr); i++ {
+			switch expr[i] {
+			case '(':
+				innerParenCount++
+			case ')':
+				innerParenCount--
+			}
+			if innerParenCount == 0 {
+				durations = append(durations, expr[loc[0]:i+1])
+				break
+			}
+		}
+	}
+	return durations
 }
 
 func normalizeString(s string) string {

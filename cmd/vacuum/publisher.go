@@ -171,12 +171,24 @@ func (vcep *VacuumCloudEventPublisher) sendByAPIVersionKind(ctx context.Context,
 				continue
 			}
 		}
+
+		// If keepers didn't match we should enter here
+		sentSometing := false
 		if (clusterExists && kcel.ExecuteBooleanCEL(context.Background(), clusterCel.ArchiveWhen, &item)) ||
 			(namespaceExists && kcel.ExecuteBooleanCEL(context.Background(), namespaceCel.ArchiveWhen, &item)) {
 			vcep.sendCloudEvent(ctx, eventTypePrefix+".archive-when", avk, namespace, name, &item)
-			continue
+			sentSometing = true
 		}
-		slog.Info("No event sent", "apiversion", avk.APIVersion, "kind", avk.Kind, "namespace", namespace, "name", name)
+
+		if (clusterExists && kcel.ExecuteBooleanCEL(context.Background(), clusterCel.DeleteWhen, &item)) ||
+			(namespaceExists && kcel.ExecuteBooleanCEL(context.Background(), namespaceCel.ArchiveOnDelete, &item)) {
+			vcep.sendCloudEvent(ctx, eventTypePrefix+"delete-when", avk, namespace, name, &item)
+			sentSometing = true
+		}
+
+		if !sentSometing {
+			slog.Info("No event sent", "apiversion", avk.APIVersion, "kind", avk.Kind, "namespace", namespace, "name", name)
+		}
 	}
 
 	sort.Slice(keepers, func(i, j int) bool {

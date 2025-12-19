@@ -27,7 +27,10 @@ spec:
     - selector:
         apiVersion: v1
         kind: Pod
-      deleteWhen: status.phase == "Succeeded" && timestamp(status.startTime) < now() - duration("10s")
+      keepLastWhen:
+        keep:
+          - when: status.phase == "Succeeded" && timestamp(status.startTime) < now() - duration("10s")
+            count: 0
 ----
 
 Given a `Pod` that just prints `Hello`, when the latest update for it is received

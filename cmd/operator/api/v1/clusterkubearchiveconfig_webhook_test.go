@@ -121,6 +121,28 @@ func TestClusterKubeArchiveConfigValidateDurationString(t *testing.T) {
 			validated:       false,
 			expectedError:   "invalid duration string 'duration('invalid-time')'",
 		},
+		{
+			name:            "Valid duration string with nested parenthesis",
+			archiveWhen:     "duration(string(true ? (41 > 30 ? 720 : 1 * 24) : 120) + \"h\")",
+			deleteWhen:      "",
+			archiveOnDelete: "",
+			validated:       true,
+		},
+		{
+			name:            "Invalid duration string with nested parenthesis",
+			archiveWhen:     "duration(string(true ? (41 > 30 ? 720 : 1 * 24) : 120))",
+			deleteWhen:      "",
+			archiveOnDelete: "",
+			validated:       false,
+			expectedError:   "duration(string(true ? (41 > 30 ? 720 : 1 * 24) : 120))",
+		},
+		{
+			name:            "Valid multiple duration strings with nested parenthesis",
+			archiveWhen:     "duration(string(true ? (41 > 30 ? 720 : 1 * 24) : 120) + \"h\") + duration(string(true ? (41 > 30 ? 720 : 1 * 24) : 120) + \"h\")",
+			deleteWhen:      "",
+			archiveOnDelete: "",
+			validated:       true,
+		},
 	}
 	validator := ClusterKubeArchiveConfigCustomValidator{kubearchiveResourceName: k9eResourceName}
 	for _, test := range tests {

@@ -289,7 +289,7 @@ func (r *SinkFilterReconciler) createWatchForGVR(ctx context.Context, key string
 	resourceConfig, _ := GetResourceConfig(kindSelector)
 	for i := 0; i < resourceConfig.Workers; i++ {
 		watchInfo.WorkerWg.Add(1)
-		go r.runWorker(ctx, watchInfo, key, i)
+		go r.runWorker(ctx, watchInfo, key)
 	}
 	log.Info("Started workers for resource", "apiVersion", kindSelector.APIVersion, "kind", kindSelector.Kind, "workers", resourceConfig.Workers)
 
@@ -397,38 +397,44 @@ func (r *SinkFilterReconciler) processWatchEvents(ctx context.Context, watchInte
 	}
 }
 
-func (r *SinkFilterReconciler) runWorker(ctx context.Context, watchInfo *WatchInfo, key string, number int) {
+func (r *SinkFilterReconciler) runWorker(ctx context.Context, watchInfo *WatchInfo, key string) {
 	defer watchInfo.WorkerWg.Done()
 	log := log.Log.WithValues("fromReconcileID", controller.ReconcileIDFromContext(ctx))
-	log.Info("Starting worker", "worker", number, "key", key)
+	log.Info("Starting worker")
 
 	for {
-		event, shutdown := watchInfo.Queue.Get()
-		if shutdown {
-			log.Info("Shutting down worker", "worker", number, "key", key)
+		select {
+		case <-watchInfo.StopCh:
+			log.Info("Stopping worker", "key", key)
 			return
+		default:
+			event, shutdown := watchInfo.Queue.Get()
+			if shutdown {
+				return
+			}
+
+			CEMetricsAttrs := []attribute.KeyValue{
+				attribute.String("event_type", string(event.Type)),
+				attribute.String("resource_type", fmt.Sprintf("%s/%s", watchInfo.KindSelector.APIVersion, watchInfo.KindSelector.Kind)),
+				attribute.String("result", "delivered"),
+			}
+
+			func() {
+				defer watchInfo.Queue.Done(event)
+
+				if err := r.handleWatchEvent(ctx, event, watchInfo); err != nil {
+					log.Error(err, "Failed to handle watch event", "key", key)
+					watchInfo.Queue.AddRateLimited(event)
+
+					CEMetricsAttrs = append(CEMetricsAttrs, attribute.String("result", "failed"))
+					observability.Updates.Add(ctx, 1, metric.WithAttributes(CEMetricsAttrs...))
+					return
+				}
+
+				observability.Updates.Add(ctx, 1, metric.WithAttributes(CEMetricsAttrs...))
+				watchInfo.Queue.Forget(event)
+			}()
 		}
-
-		defer watchInfo.Queue.Done(event)
-
-		CEMetricsAttrs := []attribute.KeyValue{
-			attribute.String("event_type", string(event.Type)),
-			attribute.String("resource_type", fmt.Sprintf("%s/%s", watchInfo.KindSelector.APIVersion, watchInfo.KindSelector.Kind)),
-			attribute.String("result", "delivered"),
-		}
-
-		if err := r.handleWatchEvent(ctx, event, watchInfo); err != nil {
-			log.Error(err, "Failed to handle watch event", "worker", number, "key", key)
-			watchInfo.Queue.AddRateLimited(event)
-
-			CEMetricsAttrs = append(CEMetricsAttrs, attribute.String("result", "failed"))
-			observability.Updates.Add(ctx, 1, metric.WithAttributes(CEMetricsAttrs...))
-
-			continue
-		}
-
-		observability.Updates.Add(ctx, 1, metric.WithAttributes(CEMetricsAttrs...))
-		watchInfo.Queue.Forget(event)
 	}
 }
 

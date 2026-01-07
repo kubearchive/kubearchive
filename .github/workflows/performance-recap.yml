@@ -44,7 +44,7 @@ jobs:
           gnuplot -e "name='Requests during GET'; filename='merge/get-req.csv'; outfile='get-req.png'" test/performance/req.gnuplot
           gnuplot -e "name='Requests during POST'; filename='merge/create-req.csv'; outfile='create-req.png'" test/performance/req.gnuplot
       - name: Upload graphs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           path: "*.png"
       - name: Send notification using Slack

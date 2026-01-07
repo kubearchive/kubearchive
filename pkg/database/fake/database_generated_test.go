@@ -203,7 +203,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(tt.testData, testLogUrls)
 			filteredResources, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace,
-				tt.resourceName, "", "", &models.LabelFilters{}, nil, nil, 100)
+				tt.resourceName, "", "", &models.LabelFilters{}, nil, nil, nil, 100)
 
 			expectedUids := make([]string, 0)
 			for _, resource := range tt.expected {
@@ -420,7 +420,7 @@ func TestQueryResourcesWithWildcardName(t *testing.T) {
 		t.Run(tt.namePattern, func(t *testing.T) {
 			db := NewFakeDatabase(testResources, []LogUrlRow{})
 			resources, err := db.QueryResources(context.TODO(), "Pod", "v1", "test",
-				tt.namePattern, "", "", &models.LabelFilters{}, nil, nil, 100)
+				tt.namePattern, "", "", &models.LabelFilters{}, nil, nil, nil, 100)
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedCount, len(resources))

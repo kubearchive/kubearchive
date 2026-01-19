@@ -10,7 +10,10 @@ spec:
     - selector:
         apiVersion: tekton.dev/v1
         kind: PipelineRun
-      deleteWhen: timestamp(status.completionTime) < now() - duration("5m")
+      keepLastWhen:
+        keep:
+          - when: timestamp(status.completionTime) < now() - duration("5m")
+            count: 0
     - selector:
         apiVersion: tekton.dev/v1
         kind: TaskRun

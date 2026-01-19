@@ -6,6 +6,7 @@ package logging
 import (
 	"bufio"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -141,9 +142,8 @@ func LogRetrieval() gin.HandlerFunc {
 		}
 
 		if !logsReturned {
-			abort.Abort(c, fmt.Errorf("no parsed logs for the json path: %s from logs in %s",
-				jsonPathParser.String(), logUrl),
-				http.StatusNotFound)
+			slog.Error("no logs on loki", "jsonPath", jsonPathParser.String(), "url", logUrl)
+			abort.Abort(c, errors.New("no logs found for the requested resource"), http.StatusNotFound)
 		}
 	}
 }

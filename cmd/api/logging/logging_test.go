@@ -104,7 +104,7 @@ func TestLogRetrievalSuccess(t *testing.T) {
 					assert.Equal(t, res.Body.String(), "log-example1\nlog-example2\n")
 				} else {
 					assert.Equal(t, http.StatusNotFound, res.Code)
-					assert.Contains(t, res.Body.String(), "no parsed logs for the json path:")
+					assert.Contains(t, res.Body.String(), "no logs found for the requested resource")
 				}
 			} else {
 				assert.Equal(t, http.StatusNotFound, res.Code)

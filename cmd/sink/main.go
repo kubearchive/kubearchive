@@ -23,10 +23,7 @@ var (
 	date    = ""
 )
 
-const (
-	otelServiceName = "kubearchive.sink"
-	mountPathEnvVar = "MOUNT_PATH"
-)
+const otelServiceName = "kubearchive.sink"
 
 func main() {
 	if err := logging.ConfigureLogging(); err != nil {

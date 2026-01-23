@@ -5,4 +5,4 @@ defaultLdflags:
   - -X main.version={{ .Git.Tag }}
   - -X main.commit={{ .Git.FullCommit }}
   - -X main.date={{ .Date }}
-defaultBaseImage: registry.access.redhat.com/ubi9/ubi-minimal
+defaultBaseImage: registry.access.redhat.com/ubi10/ubi-minimal

@@ -272,39 +272,6 @@ func (r *KubeArchiveConfigReconciler) desiredRoleBinding(namespace string, name 
 	return binding
 }
 
-func (r *KubeArchiveConfigReconciler) reconcileClusterRoleBinding(ctx context.Context, name string, kind string, add bool, subjects ...rbacv1.Subject) (*rbacv1.ClusterRoleBinding, error) {
-	log := log.FromContext(ctx)
-
-	log.Info("in reconcileClusterRoleBinding " + name)
-	desired := desiredClusterRoleBinding(name, kind, subjects...)
-
-	existing := &rbacv1.ClusterRoleBinding{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: name}, existing)
-	if errors.IsNotFound(err) {
-		err = r.Client.Create(ctx, desired)
-		if err != nil {
-			log.Error(err, "Failed to create ClusterRoleBinding "+name)
-			return nil, err
-		}
-		return desired, nil
-	} else if err != nil {
-		log.Error(err, "Failed to reconcile ClusterRoleBinding "+name)
-		return nil, err
-	}
-
-	if add {
-		existing.Subjects = mergeSubjects(existing.Subjects, desired.Subjects)
-	} else {
-		existing.Subjects = removeSubjects(existing.Subjects, desired.Subjects...)
-	}
-	err = r.Client.Update(ctx, existing)
-	if err != nil {
-		log.Error(err, "Failed to update ClusterRoleBinding "+name)
-		return nil, err
-	}
-	return existing, nil
-}
-
 func (r *KubeArchiveConfigReconciler) reconcileVacuumResources(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) error {
 	if _, err := r.reconcileVacuumServiceAccount(ctx, kaconfig); err != nil {
 		return err

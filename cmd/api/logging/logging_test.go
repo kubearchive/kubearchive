@@ -23,7 +23,6 @@ func getServer(withLogs bool, retErr bool) *httptest.Server {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			return
 		}))
 	}
 	if withLogs {

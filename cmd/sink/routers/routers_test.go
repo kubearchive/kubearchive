@@ -27,8 +27,6 @@ import (
 	"k8s.io/client-go/dynamic/fake"
 )
 
-var namespace string = "generate-logs-cronjobs"
-
 func setupRouter(
 	t testing.TB,
 	db interfaces.DBWriter,

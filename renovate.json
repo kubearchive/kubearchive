@@ -32,11 +32,6 @@
     },
     {
       "matchManagers": ["regex"],
-      "matchDepNames": ["knative-eventing"],
-      "groupName": "knative eventing"
-    },
-    {
-      "matchManagers": ["regex"],
       "matchDepNames": ["cert-manager"],
       "groupName": "cert manager"
     },
@@ -48,15 +43,6 @@
     {
       "matchPackageNames": ["k8s.io/api", "k8s.io/apimachinery", "k8s.io/apiserver", "k8s.io/cli-runtime", "k8s.io/client-go", "k8s.io/apiextensions-apiserver"],
       "allowedVersions": "<0.33.0"
-    },
-    {
-      "matchPackageNames": ["knative.dev/pkg"],
-      "matchUpdateTypes": "digest",
-      "automerge": false
-    },
-    {
-      "matchPackageNames": ["knative.dev/eventing"],
-      "allowedVersions": "<0.46.0"
     },
     {
       "matchPackageNames": ["sigs.k8s.io/controller-runtime"],

@@ -50,15 +50,6 @@
         "custom.regex"
       ],
       "matchDepNames": [
-        "knative-eventing"
-      ],
-      "groupName": "knative eventing"
-    },
-    {
-      "matchManagers": [
-        "custom.regex"
-      ],
-      "matchDepNames": [
         "cert-manager"
       ],
       "groupName": "cert manager"
@@ -82,19 +73,6 @@
         "k8s.io/apiextensions-apiserver"
       ],
       "allowedVersions": "<0.33.0"
-    },
-    {
-      "matchPackageNames": [
-        "knative.dev/pkg"
-      ],
-      "matchUpdateTypes": "digest",
-      "automerge": false
-    },
-    {
-      "matchPackageNames": [
-        "knative.dev/eventing"
-      ],
-      "allowedVersions": "<0.46.0"
     },
     {
       "matchPackageNames": [

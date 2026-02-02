@@ -27,6 +27,15 @@
   ],
   "packageRules": [
     {
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchDepTypes": [
+        "indirect"
+      ],
+      "enabled": false
+    },
+    {
       "matchManagers": ["regex"],
       "automerge": false
     },

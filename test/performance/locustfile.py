@@ -94,7 +94,7 @@ class CreatePods(HttpUser):
 
         attributes = dict(
             source="localhost:443",
-            type="dev.knative.apiserver.resource.update",
+            type="org.kubearchive.sinkfilters.resource.archive-when",
             datacontenttype="application/json",
         )
         event = CloudEvent(attributes, json.loads(data))

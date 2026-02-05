@@ -11,7 +11,9 @@
     {
       "customType": "regex",
       "description": "Update _VERSION variables in bash files",
-      "fileMatch": [".sh"],
+      "managerFilePatterns": [
+        "/.sh/"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))? packageName=(?<packageName>.+?)(?: versioning=(?<versioning>[a-z-]+?))?\\s(?:export) .+?_VERSION=(?<currentValue>.+?)\\s"
       ]
@@ -19,7 +21,9 @@
     {
       "customType": "regex",
       "description": "Update versions listed in the documentation",
-      "fileMatch": [".adoc"],
+      "managerFilePatterns": [
+        "/.adoc/"
+      ],
       "matchStrings": [
         "\\/\\/ renovate: datasource=(?<datasource>[a-z-]+?)(?: depName=(?<depName>.+?))? packageName=(?<packageName>.+?)(?: versioning=(?<versioning>[a-z-]+?))?\\s.+? \\(\\+(?<currentValue>.+?)\\)"
       ]
@@ -36,48 +40,81 @@
       "enabled": false
     },
     {
-      "matchManagers": ["regex"],
+      "matchManagers": [
+        "custom.regex"
+      ],
       "automerge": false
     },
     {
-      "matchManagers": ["regex"],
-      "matchDepNames": ["knative-eventing"],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "knative-eventing"
+      ],
       "groupName": "knative eventing"
     },
     {
-      "matchManagers": ["regex"],
-      "matchDepNames": ["cert-manager"],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDepNames": [
+        "cert-manager"
+      ],
       "groupName": "cert manager"
     },
     {
-      "matchCategories": ["golang"],
-      "matchDepTypes": ["toolchain"],
+      "matchCategories": [
+        "golang"
+      ],
+      "matchDepTypes": [
+        "toolchain"
+      ],
       "enabled": false
     },
     {
-      "matchPackageNames": ["k8s.io/api", "k8s.io/apimachinery", "k8s.io/apiserver", "k8s.io/cli-runtime", "k8s.io/client-go", "k8s.io/apiextensions-apiserver"],
+      "matchPackageNames": [
+        "k8s.io/api",
+        "k8s.io/apimachinery",
+        "k8s.io/apiserver",
+        "k8s.io/cli-runtime",
+        "k8s.io/client-go",
+        "k8s.io/apiextensions-apiserver"
+      ],
       "allowedVersions": "<0.33.0"
     },
     {
-      "matchPackageNames": ["knative.dev/pkg"],
+      "matchPackageNames": [
+        "knative.dev/pkg"
+      ],
       "matchUpdateTypes": "digest",
       "automerge": false
     },
     {
-      "matchPackageNames": ["knative.dev/eventing"],
+      "matchPackageNames": [
+        "knative.dev/eventing"
+      ],
       "allowedVersions": "<0.46.0"
     },
     {
-      "matchPackageNames": ["sigs.k8s.io/controller-runtime"],
+      "matchPackageNames": [
+        "sigs.k8s.io/controller-runtime"
+      ],
       "allowedVersions": "<0.21.0"
     },
     {
-      "matchPackageNames": ["github.com/onsi/gomega"],
+      "matchPackageNames": [
+        "github.com/onsi/gomega"
+      ],
       "allowedVersions": "<1.38.1"
     },
     {
-      "matchPackageNames": ["go"],
-      "matchDepTypes": ["uses-with"],
+      "matchPackageNames": [
+        "go"
+      ],
+      "matchDepTypes": [
+        "uses-with"
+      ],
       "enabled": false
     }
   ]

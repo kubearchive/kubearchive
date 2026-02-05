@@ -6,14 +6,15 @@ package sql
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/database/env"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
@@ -40,10 +41,10 @@ type postgreSQLSelector struct {
 func (postgreSQLSelector) ResourceSelector() *sqlbuilder.SelectBuilder {
 	sb := sqlbuilder.NewSelectBuilder()
 	return sb.Select(
-		sb.As("data->'metadata'->>'creationTimestamp'", "created_at"),
-		"id",
-		"uuid",
-		"data",
+		sb.As("resource.data->'metadata'->>'creationTimestamp'", "created_at"),
+		"resource.id",
+		"resource.uuid",
+		"resource.data",
 	).From("resource")
 }
 
@@ -62,21 +63,21 @@ type postgreSQLFilter struct {
 
 func (postgreSQLFilter) CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string {
 	return fmt.Sprintf(
-		"(data->'metadata'->>'creationTimestamp', id) < (%s, %s)",
+		"(resource.data->'metadata'->>'creationTimestamp', resource.id) < (%s, %s)",
 		cond.Var(continueDate), cond.Var(continueId),
 	)
 }
 
 func (postgreSQLFilter) CreationTimestampAfterFilter(cond sqlbuilder.Cond, timestamp time.Time) string {
 	return fmt.Sprintf(
-		"data->'metadata'->>'creationTimestamp' > %s",
+		"resource.data->'metadata'->>'creationTimestamp' > %s",
 		cond.Var(timestamp.Format(time.RFC3339)),
 	)
 }
 
 func (postgreSQLFilter) CreationTimestampBeforeFilter(cond sqlbuilder.Cond, timestamp time.Time) string {
 	return fmt.Sprintf(
-		"data->'metadata'->>'creationTimestamp' < %s",
+		"resource.data->'metadata'->>'creationTimestamp' < %s",
 		cond.Var(timestamp.Format(time.RFC3339)),
 	)
 }
@@ -91,81 +92,382 @@ func (postgreSQLFilter) OwnerFilter(cond sqlbuilder.Cond, owners []string) strin
 		jsons = append(jsons, fmt.Sprintf("[{\"uid\":\"%s\"}]", owner))
 	}
 	return fmt.Sprintf(
-		"(data->'metadata'->'ownerReferences') @> ANY(%s::jsonb[])",
+		"(resource.data->'metadata'->'ownerReferences') @> ANY(%s::jsonb[])",
 		cond.Var(pq.Array(jsons)),
 	)
 }
 
-func (postgreSQLFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string, _ *sqlbuilder.WhereClause) string {
-	return fmt.Sprintf(
-		"data->'metadata'->'labels' ?& %s",
-		cond.Var(pq.Array(labels)),
-	)
-}
-
-func (postgreSQLFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string, _ *sqlbuilder.WhereClause) string {
-	return fmt.Sprintf(
-		"((NOT data->'metadata'->'labels' ?| %s) OR data->'metadata'->'labels' IS NULL)",
-		cond.Var(pq.Array(labels)),
-	)
-}
-
-func (postgreSQLFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, _ *sqlbuilder.WhereClause) string {
-	jsonLabels, _ := json.Marshal(labels)
-	return fmt.Sprintf(
-		"data->'metadata'->'labels' @> %s",
-		cond.Var(string(jsonLabels)),
-	)
-}
-
-func (postgreSQLFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string {
-	jsons := make([]string, 0)
-	for key, value := range labels {
-		jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
+// resolveKeyIDs batch-resolves label key names to their integer IDs.
+func resolveKeyIDs(ctx context.Context, querier sqlx.QueryerContext, keys []string) (map[string]int64, error) {
+	if len(keys) == 0 {
+		return nil, nil
 	}
 
-	uuidWithAnyLabelQuery := sqlbuilder.Select("uuid").From("resource")
-	uuidWithAnyLabelQuery.AddWhereClause(clause)
-	uuidWithAnyLabelQuery.Where(fmt.Sprintf(
-		"data->'metadata'->'labels' @> ANY(%s::jsonb[])",
-		uuidWithAnyLabelQuery.Var(pq.Array(jsons)),
-	))
+	query, args, err := sqlx.In("SELECT id, key FROM label_key WHERE key IN (?)", keys)
+	if err != nil {
+		return nil, fmt.Errorf("building key resolution query: %w", err)
+	}
+	query = sqlx.Rebind(sqlx.DOLLAR, query)
 
-	return cond.NotIn("uuid", uuidWithAnyLabelQuery)
-}
+	rows, err := querier.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("resolving label key IDs: %w", err)
+	}
+	defer rows.Close()
 
-func (postgreSQLFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, _ *sqlbuilder.WhereClause) string {
-	clauses := make([]string, 0)
-	for key, values := range labels {
-		jsons := make([]string, 0)
-		for _, value := range values {
-			jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
+	result := make(map[string]int64, len(keys))
+	for rows.Next() {
+		var id int64
+		var key string
+		if err := rows.Scan(&id, &key); err != nil {
+			return nil, fmt.Errorf("scanning label key row: %w", err)
 		}
-		clauses = append(clauses, fmt.Sprintf(
-			"data->'metadata'->'labels' @> ANY(%s::jsonb[])",
-			cond.Var(pq.Array(jsons))))
+		result[key] = id
 	}
-	return cond.And(clauses...)
+	return result, rows.Err()
 }
 
-func (f postgreSQLFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, _ *sqlbuilder.WhereClause) string {
-	keys := maps.Keys(labels)
-	jsons := make([]string, 0)
-	for key, values := range labels {
-		for _, value := range values {
-			jsons = append(jsons, fmt.Sprintf("{\"%s\":\"%s\"}", key, value))
+// resolveLabelIDs batch-resolves key=value label pairs to their label_key_value.id.
+func resolveLabelIDs(ctx context.Context, querier sqlx.QueryerContext, labels map[string]string) (map[string]int64, error) {
+	if len(labels) == 0 {
+		return nil, nil
+	}
+
+	keys := slices.Sorted(maps.Keys(labels))
+	tupleFragments := make([]string, 0, len(keys))
+	args := make([]any, 0, len(keys)*2)
+	for i, key := range keys {
+		tupleFragments = append(tupleFragments, fmt.Sprintf("($%d, $%d)", i*2+1, i*2+2))
+		args = append(args, key, labels[key])
+	}
+
+	query := fmt.Sprintf(
+		"SELECT lkv.id, lk.key, lv.value FROM label_key_value lkv "+
+			"JOIN label_key lk ON lk.id = lkv.key_id "+
+			"JOIN label_value lv ON lv.id = lkv.value_id "+
+			"WHERE (lk.key, lv.value) IN (%s)",
+		strings.Join(tupleFragments, ", "),
+	)
+
+	rows, err := querier.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("resolving label IDs: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]int64, len(labels))
+	for rows.Next() {
+		var id int64
+		var key, value string
+		if err := rows.Scan(&id, &key, &value); err != nil {
+			return nil, fmt.Errorf("scanning label ID row: %w", err)
+		}
+		result[key+"="+value] = id
+	}
+	return result, rows.Err()
+}
+
+// resolveLabelIDsMulti batch-resolves key with multiple values to their label_key_value.id.
+func resolveLabelIDsMulti(ctx context.Context, querier sqlx.QueryerContext, labels map[string][]string) (map[string]int64, error) {
+	if len(labels) == 0 {
+		return nil, nil
+	}
+
+	keys := slices.Sorted(maps.Keys(labels))
+	tupleFragments := make([]string, 0)
+	args := make([]any, 0)
+	paramIdx := 1
+	for _, key := range keys {
+		for _, value := range labels[key] {
+			tupleFragments = append(tupleFragments, fmt.Sprintf("($%d, $%d)", paramIdx, paramIdx+1))
+			args = append(args, key, value)
+			paramIdx += 2
 		}
 	}
-	notContainsClause := fmt.Sprintf(
-		"NOT data->'metadata'->'labels' @> ANY(%s::jsonb[])",
-		cond.Var(pq.Array(jsons)))
-	return cond.And(f.ExistsLabelFilter(cond, slices.Collect(keys), nil), notContainsClause)
+
+	query := fmt.Sprintf(
+		"SELECT lkv.id, lk.key, lv.value FROM label_key_value lkv "+
+			"JOIN label_key lk ON lk.id = lkv.key_id "+
+			"JOIN label_value lv ON lv.id = lkv.value_id "+
+			"WHERE (lk.key, lv.value) IN (%s)",
+		strings.Join(tupleFragments, ", "),
+	)
+
+	rows, err := querier.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("resolving label IDs (multi): %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]int64)
+	for rows.Next() {
+		var id int64
+		var key, value string
+		if err := rows.Scan(&id, &key, &value); err != nil {
+			return nil, fmt.Errorf("scanning label ID row: %w", err)
+		}
+		result[key+"="+value] = id
+	}
+	return result, rows.Err()
+}
+
+// Helper methods for building positive filter conditions using pre-resolved IDs
+
+func (postgreSQLFilter) applyExistsFilter(sb *sqlbuilder.SelectBuilder, keyIDs map[string]int64, keys []string) {
+	for _, key := range slices.Sorted(slices.Values(keys)) {
+		keyID := keyIDs[key]
+		existsSubquery := fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM resource_label rl "+
+				"JOIN label_key_value lkv ON lkv.id = rl.label_id "+
+				"WHERE rl.resource_id = resource.id AND lkv.key_id = %s)",
+			sb.Var(keyID),
+		)
+		sb.Where(existsSubquery)
+	}
+}
+
+func (postgreSQLFilter) applyEqualsFilter(sb *sqlbuilder.SelectBuilder, labelIDs map[string]int64, labels map[string]string) {
+	for _, key := range slices.Sorted(maps.Keys(labels)) {
+		value := labels[key]
+		labelID := labelIDs[key+"="+value]
+		existsSubquery := fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM resource_label rl "+
+				"WHERE rl.resource_id = resource.id AND rl.label_id = %s)",
+			sb.Var(labelID),
+		)
+		sb.Where(existsSubquery)
+	}
+}
+
+func (postgreSQLFilter) applyInFilter(sb *sqlbuilder.SelectBuilder, labelIDs map[string]int64, labels map[string][]string) {
+	for _, key := range slices.Sorted(maps.Keys(labels)) {
+		values := labels[key]
+		idVars := make([]string, 0, len(values))
+		for _, v := range values {
+			if id, ok := labelIDs[key+"="+v]; ok {
+				idVars = append(idVars, sb.Var(id))
+			}
+		}
+		existsSubquery := fmt.Sprintf(
+			"EXISTS (SELECT 1 FROM resource_label rl "+
+				"WHERE rl.resource_id = resource.id AND rl.label_id IN (%s))",
+			strings.Join(idVars, ", "),
+		)
+		sb.Where(existsSubquery)
+	}
+}
+
+// Helper methods for building negative filter conditions
+
+func (postgreSQLFilter) applyNotExistsFilter(sb *sqlbuilder.SelectBuilder, keyIDs map[string]int64, keys []string) {
+	idVars := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if id, ok := keyIDs[key]; ok {
+			idVars = append(idVars, sb.Var(id))
+		}
+	}
+	if len(idVars) == 0 {
+		return
+	}
+	notExistsSubquery := fmt.Sprintf(
+		"NOT EXISTS (SELECT 1 FROM resource_label rl "+
+			"JOIN label_key_value lkv ON lkv.id = rl.label_id "+
+			"WHERE rl.resource_id = resource.id AND lkv.key_id IN (%s))",
+		strings.Join(idVars, ", "),
+	)
+	sb.Where(notExistsSubquery)
+}
+
+func (postgreSQLFilter) applyNotEqualsFilter(sb *sqlbuilder.SelectBuilder, labelIDs map[string]int64, labels map[string]string) {
+	idVars := make([]string, 0, len(labels))
+	for _, key := range slices.Sorted(maps.Keys(labels)) {
+		value := labels[key]
+		if id, ok := labelIDs[key+"="+value]; ok {
+			idVars = append(idVars, sb.Var(id))
+		}
+	}
+	if len(idVars) == 0 {
+		return
+	}
+	notEqualsSubquery := fmt.Sprintf(
+		"NOT EXISTS (SELECT 1 FROM resource_label rl "+
+			"WHERE rl.resource_id = resource.id AND rl.label_id IN (%s))",
+		strings.Join(idVars, ", "),
+	)
+	sb.Where(notEqualsSubquery)
+}
+
+func (postgreSQLFilter) applyNotInFilter(sb *sqlbuilder.SelectBuilder, keyIDs map[string]int64, labelIDs map[string]int64, labels map[string][]string) {
+	keys := slices.Sorted(maps.Keys(labels))
+
+	// Ensure all keys exist using pre-resolved key IDs
+	keyIDVars := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if id, ok := keyIDs[key]; ok {
+			keyIDVars = append(keyIDVars, sb.Var(id))
+		}
+	}
+	existsSubquery := fmt.Sprintf(
+		"EXISTS (SELECT 1 FROM resource_label rl "+
+			"JOIN label_key_value lkv ON lkv.id = rl.label_id "+
+			"WHERE rl.resource_id = resource.id AND lkv.key_id IN (%s) "+
+			"GROUP BY rl.resource_id "+
+			"HAVING COUNT(DISTINCT lkv.key_id) = %d)",
+		strings.Join(keyIDVars, ", "),
+		len(keys),
+	)
+	sb.Where(existsSubquery)
+
+	// Exclude forbidden labels using pre-resolved label IDs
+	forbiddenIDVars := make([]string, 0)
+	for _, key := range keys {
+		for _, value := range labels[key] {
+			if id, ok := labelIDs[key+"="+value]; ok {
+				forbiddenIDVars = append(forbiddenIDVars, sb.Var(id))
+			}
+		}
+	}
+	if len(forbiddenIDVars) > 0 {
+		notInSubquery := fmt.Sprintf(
+			"NOT EXISTS (SELECT 1 FROM resource_label rl "+
+				"WHERE rl.resource_id = resource.id AND rl.label_id IN (%s))",
+			strings.Join(forbiddenIDVars, ", "),
+		)
+		sb.Where(notInSubquery)
+	}
+}
+
+// ApplyLabelFilters pre-resolves label keys and key-value labels to integer IDs,
+// then applies all label filters using EXISTS/NOT EXISTS subqueries with those IDs.
+// This lets the PostgreSQL planner use MCV statistics for accurate row estimates.
+func (f postgreSQLFilter) ApplyLabelFilters(ctx context.Context, querier sqlx.QueryerContext, sb *sqlbuilder.SelectBuilder, labelFilters *models.LabelFilters) error {
+	// Collect all keys that need resolution
+	allKeys := make(map[string]struct{})
+	for _, k := range labelFilters.Exists {
+		allKeys[k] = struct{}{}
+	}
+	for _, k := range labelFilters.NotExists {
+		allKeys[k] = struct{}{}
+	}
+	for k := range labelFilters.NotIn {
+		allKeys[k] = struct{}{}
+	}
+
+	// Resolve key IDs (needed for Exists, NotExists, NotIn)
+	var keyIDs map[string]int64
+	if len(allKeys) > 0 {
+		keySlice := slices.Sorted(maps.Keys(allKeys))
+		var err error
+		keyIDs, err = resolveKeyIDs(ctx, querier, keySlice)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Resolve label IDs for Equals/NotEquals (single-value)
+	allEqualsLabels := make(map[string]string)
+	maps.Copy(allEqualsLabels, labelFilters.Equals)
+	maps.Copy(allEqualsLabels, labelFilters.NotEquals)
+
+	var labelIDs map[string]int64
+	if len(allEqualsLabels) > 0 {
+		var err error
+		labelIDs, err = resolveLabelIDs(ctx, querier, allEqualsLabels)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Resolve label IDs for In/NotIn (multi-value)
+	allMultiLabels := make(map[string][]string)
+	for k, v := range labelFilters.In {
+		allMultiLabels[k] = append(allMultiLabels[k], v...)
+	}
+	for k, v := range labelFilters.NotIn {
+		allMultiLabels[k] = append(allMultiLabels[k], v...)
+	}
+
+	var multiLabelIDs map[string]int64
+	if len(allMultiLabels) > 0 {
+		var err error
+		multiLabelIDs, err = resolveLabelIDsMulti(ctx, querier, allMultiLabels)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Apply positive filters with short-circuit on missing keys/labels
+
+	if len(labelFilters.Exists) > 0 {
+		for _, key := range labelFilters.Exists {
+			if _, ok := keyIDs[key]; !ok {
+				sb.Where("1=0")
+				return nil
+			}
+		}
+		f.applyExistsFilter(sb, keyIDs, labelFilters.Exists)
+	}
+
+	if len(labelFilters.Equals) > 0 {
+		for _, key := range slices.Sorted(maps.Keys(labelFilters.Equals)) {
+			value := labelFilters.Equals[key]
+			if _, ok := labelIDs[key+"="+value]; !ok {
+				sb.Where("1=0")
+				return nil
+			}
+		}
+		f.applyEqualsFilter(sb, labelIDs, labelFilters.Equals)
+	}
+
+	if len(labelFilters.In) > 0 {
+		for _, key := range slices.Sorted(maps.Keys(labelFilters.In)) {
+			hasAny := false
+			for _, v := range labelFilters.In[key] {
+				if _, ok := multiLabelIDs[key+"="+v]; ok {
+					hasAny = true
+					break
+				}
+			}
+			if !hasAny {
+				sb.Where("1=0")
+				return nil
+			}
+		}
+		f.applyInFilter(sb, multiLabelIDs, labelFilters.In)
+	}
+
+	// Apply negative filters — missing keys/labels are no-ops (trivially true)
+
+	if len(labelFilters.NotExists) > 0 {
+		f.applyNotExistsFilter(sb, keyIDs, labelFilters.NotExists)
+	}
+
+	if len(labelFilters.NotEquals) > 0 {
+		f.applyNotEqualsFilter(sb, labelIDs, labelFilters.NotEquals)
+	}
+
+	if len(labelFilters.NotIn) > 0 {
+		allKeysFound := true
+		for _, key := range slices.Sorted(maps.Keys(labelFilters.NotIn)) {
+			if _, ok := keyIDs[key]; !ok {
+				allKeysFound = false
+				break
+			}
+		}
+		if allKeysFound {
+			f.applyNotInFilter(sb, keyIDs, multiLabelIDs, labelFilters.NotIn)
+		} else {
+			sb.Where("1=0")
+		}
+	}
+
+	return nil
 }
 
 type postgreSQLSorter struct{}
 
 func (postgreSQLSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {
-	return sb.OrderByDesc("data->'metadata'->>'creationTimestamp'").OrderByDesc("id")
+	return sb.OrderByDesc("resource.data->'metadata'->>'creationTimestamp'").OrderByDesc("resource.id")
 }
 
 type postgreSQLInserter struct {

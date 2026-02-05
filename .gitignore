@@ -54,3 +54,6 @@ integration-results/*
 # Release and source build binaries
 cli-binaries/
 kubectl-ka
+
+# Claude Code local settings (but track skills)
+.claude/settings.local.json

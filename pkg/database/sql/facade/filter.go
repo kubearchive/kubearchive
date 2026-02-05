@@ -4,9 +4,12 @@
 package facade
 
 import (
+	"context"
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/jmoiron/sqlx"
+	"github.com/kubearchive/kubearchive/pkg/models"
 )
 
 // DBFilter encapsulates all the filter functions that must be implemented by the drivers
@@ -23,12 +26,9 @@ type DBFilter interface {
 	UuidsFilter(cond sqlbuilder.Cond, uuids []string) string
 	UuidFilter(cond sqlbuilder.Cond, uuid string) string
 
-	ExistsLabelFilter(cond sqlbuilder.Cond, labels []string, clause *sqlbuilder.WhereClause) string
-	NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string, clause *sqlbuilder.WhereClause) string
-	EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string
-	NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string
-	InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string
-	NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string
+	// ApplyLabelFilters applies all label filters using EXISTS/NOT EXISTS subqueries
+	// This method modifies the SelectBuilder by adding WHERE conditions with correlated subqueries
+	ApplyLabelFilters(ctx context.Context, querier sqlx.QueryerContext, sb *sqlbuilder.SelectBuilder, labelFilters *models.LabelFilters) error
 
 	ContainerNameFilter(cond sqlbuilder.Cond, containerName string) string
 }

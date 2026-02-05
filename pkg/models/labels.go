@@ -62,3 +62,13 @@ func NewLabelFilters(labelRequirements []labels.Requirement) (*LabelFilters, err
 	}
 	return &lf, nil
 }
+
+// IsEmpty returns true if no label filters are set
+func (lf *LabelFilters) IsEmpty() bool {
+	return len(lf.Exists) == 0 &&
+		len(lf.NotExists) == 0 &&
+		len(lf.Equals) == 0 &&
+		len(lf.NotEquals) == 0 &&
+		len(lf.In) == 0 &&
+		len(lf.NotIn) == 0
+}

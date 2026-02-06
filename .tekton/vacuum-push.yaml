@@ -1,0 +1,53 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/kubearchive/kubearchive?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: |
+      event == "pull_request" && target_branch == "main" && (
+        files.all.exists(x, x.matches(".*\\.go$")) && (
+          files.all.exists(x, x.matches("^cmd/vacuum/")) ||
+          files.all.exists(x, !x.matches("^cmd/"))
+        )
+      )
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: kubearchive
+    appstudio.openshift.io/component: vacuum
+    pipelines.appstudio.openshift.io/type: build
+  name: vacuum-on-push
+  namespace: kubearchive-tenant
+spec:
+  pipelineRef:
+    name: ko-build-pipeline
+  params:
+    - name: git-url
+      value: '{{source_url}}'
+    - name: revision
+      value: '{{revision}}'
+    - name: output-image
+      value: quay.io/redhat-user-workloads/kubearchive-tenant/vacuum:{{revision}}
+    - name: preprocessing-script
+      value: |
+        controller-gen crd paths="./cmd/operator/..." output:dir=config/crds
+        controller-gen object:headerFile="cmd/operator/hack/copyright.txt" paths="./cmd/operator/..." output:dir=cmd/operator/api/v1
+    - name: ko-docker-repo
+      value: quay.io/redhat-user-workloads/kubearchive-tenant/vacuum
+    - name: image-naming-strategy
+      value: "--bare"
+    - name: import-path
+      value: ./cmd/vacuum
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-vacuum
+  workspaces:
+    - name: git-auth
+      secret:
+        secretName: '{{ git_auth_secret }}'
+status: {}

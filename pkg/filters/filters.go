@@ -4,12 +4,12 @@
 package filters
 
 import (
+	"log/slog"
 	"strings"
 
 	"github.com/google/cel-go/cel"
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	kcel "github.com/kubearchive/kubearchive/pkg/cel"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type FilterType int
@@ -123,7 +123,7 @@ func CompileCELExpression(expression, expressionType, namespace string) *cel.Pro
 
 	compiled, err := kcel.CompileCELExpr(expression)
 	if err != nil {
-		log.Log.Error(err, "Failed to compile CEL expression", "type", expressionType, "namespace", namespace, "expression", expression)
+		slog.Error("Failed to compile CEL expression", "error", err, "type", expressionType, "namespace", namespace, "expression", expression)
 		return nil
 	}
 

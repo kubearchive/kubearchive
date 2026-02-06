@@ -8,6 +8,7 @@ package controller
 
 import (
 	"context"
+	"log/slog"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -21,7 +22,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
@@ -42,9 +42,7 @@ type KubeArchiveConfigReconciler struct {
 //+kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;update;watch
 
 func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
-
-	log.Info("Reconciling KubeArchiveConfig")
+	slog.Info("Reconciling KubeArchiveConfig")
 
 	kaconfig := &kubearchivev1.KubeArchiveConfig{}
 	if err := r.Client.Get(ctx, req.NamespacedName, kaconfig); err != nil {
@@ -66,7 +64,7 @@ func (r *KubeArchiveConfigReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		if controllerutil.ContainsFinalizer(kaconfig, resourceFinalizerName) {
 			// Finalizer is present, clean up filters from ConfigMap and remove Namespace label.
 
-			log.Info("Deleting KubeArchiveConfig")
+			slog.Info("Deleting KubeArchiveConfig")
 
 			if err := updateSinkFilterNamespace(ctx, r.Client, kaconfig.Namespace, nil); err != nil {
 				return ctrl.Result{}, err
@@ -138,7 +136,6 @@ func (r *KubeArchiveConfigReconciler) SetupKubeArchiveConfigWithManager(mgr ctrl
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) (*rbacv1.Role, error) {
-	log := log.FromContext(ctx)
 
 	resources := make([]kubearchivev1.APIVersionKind, 0)
 	for _, kar := range kaconfig.Spec.Resources {
@@ -154,7 +151,7 @@ func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kac
 			resources = append(resources, resource)
 		}
 	} else if !errors.IsNotFound(err) {
-		log.Error(err, "Unable to get ClusterKubeArchiveConfg when reconciling sink role ")
+		slog.Error("Unable to get ClusterKubeArchiveConfig when reconciling sink role", "error", err)
 	}
 
 	role, err := r.reconcileRole(ctx, kaconfig, kaconfig.Namespace, constants.KubeArchiveSinkName, createPolicyRules(ctx, r.Mapper, resources, []string{"delete"}))
@@ -165,9 +162,8 @@ func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kac
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, namespace string, name string, rules []rbacv1.PolicyRule) (*rbacv1.Role, error) {
-	log := log.FromContext(ctx)
 
-	log.Info("in reconcileRole " + name)
+	slog.Info("in reconcileRole", "name", name)
 	desired := r.desiredRole(namespace, name, rules)
 	if kaconfig != nil {
 		if err := ctrl.SetControllerReference(kaconfig, desired, r.Scheme); err != nil {
@@ -180,19 +176,19 @@ func (r *KubeArchiveConfigReconciler) reconcileRole(ctx context.Context, kaconfi
 	if errors.IsNotFound(err) {
 		err = r.Client.Create(ctx, desired)
 		if err != nil {
-			log.Error(err, "Failed to create Role "+name)
+			slog.Error("Failed to create Role", "error", err, "name", name)
 			return nil, err
 		}
 		return desired, nil
 	} else if err != nil {
-		log.Error(err, "Failed to reconcile Role "+name)
+		slog.Error("Failed to reconcile Role", "error", err, "name", name)
 		return nil, err
 	}
 
 	existing.Rules = desired.Rules
 	err = r.Client.Update(ctx, existing)
 	if err != nil {
-		log.Error(err, "Failed to update Role "+name)
+		slog.Error("Failed to update Role", "error", err, "name", name)
 		return nil, err
 	}
 	return existing, nil
@@ -219,9 +215,8 @@ func (r *KubeArchiveConfigReconciler) reconcileSinkRoleBinding(ctx context.Conte
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, namespace string, name string, kind string, add bool, subjects ...rbacv1.Subject) (*rbacv1.RoleBinding, error) {
-	log := log.FromContext(ctx)
 
-	log.Info("in reconcileRoleBinding " + name)
+	slog.Info("in reconcileRoleBinding", "name", name)
 	desired := r.desiredRoleBinding(namespace, name, kind, subjects...)
 	if kaconfig != nil {
 		if err := ctrl.SetControllerReference(kaconfig, desired, r.Scheme); err != nil {
@@ -234,12 +229,12 @@ func (r *KubeArchiveConfigReconciler) reconcileRoleBinding(ctx context.Context, 
 	if errors.IsNotFound(err) {
 		err = r.Client.Create(ctx, desired)
 		if err != nil {
-			log.Error(err, "Failed to create RoleBinding "+name)
+			slog.Error("Failed to create RoleBinding", "error", err, "name", name)
 			return nil, err
 		}
 		return desired, nil
 	} else if err != nil {
-		log.Error(err, "Failed to reconcile RoleBinding "+name)
+		slog.Error("Failed to reconcile RoleBinding", "error", err, "name", name)
 		return nil, err
 	}
 
@@ -250,7 +245,7 @@ func (r *KubeArchiveConfigReconciler) reconcileRoleBinding(ctx context.Context, 
 	}
 	err = r.Client.Update(ctx, existing)
 	if err != nil {
-		log.Error(err, "Failed to update RoleBinding "+name)
+		slog.Error("Failed to update RoleBinding", "error", err, "name", name)
 		return nil, err
 	}
 	return existing, nil
@@ -294,9 +289,8 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumResources(ctx context.Conte
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileVacuumServiceAccount(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) (*corev1.ServiceAccount, error) {
-	log := log.FromContext(ctx)
 
-	log.Info("in reconcileVacuumServiceAccount")
+	slog.Info("in reconcileVacuumServiceAccount")
 
 	sa, err := r.reconcileServiceAccount(ctx, kaconfig, kaconfig.Namespace, constants.KubeArchiveVacuumName)
 	if err != nil {
@@ -306,9 +300,8 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumServiceAccount(ctx context.
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileServiceAccount(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, namespace string, name string) (*corev1.ServiceAccount, error) {
-	log := log.FromContext(ctx)
 
-	log.Info("in reconcileServiceAccount")
+	slog.Info("in reconcileServiceAccount")
 	sa := &corev1.ServiceAccount{}
 
 	err := r.Client.Get(ctx, types.NamespacedName{Namespace: namespace, Name: name}, sa)
@@ -321,11 +314,11 @@ func (r *KubeArchiveConfigReconciler) reconcileServiceAccount(ctx context.Contex
 		}
 		err = r.Client.Create(ctx, sa)
 		if err != nil {
-			log.Error(err, "Failed to create ServiceAccount")
+			slog.Error("Failed to create ServiceAccount", "error", err)
 			return nil, err
 		}
 	} else if err != nil {
-		log.Error(err, "Failed to reconcile ServiceAccount")
+		slog.Error("Failed to reconcile ServiceAccount", "error", err)
 		return nil, err
 	}
 
@@ -333,9 +326,8 @@ func (r *KubeArchiveConfigReconciler) reconcileServiceAccount(ctx context.Contex
 }
 
 func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig) (*rbacv1.Role, error) {
-	log := log.FromContext(ctx)
 
-	log.Info("in reconcileVacuumRole")
+	slog.Info("in reconcileVacuumRole")
 
 	resources := []kubearchivev1.APIVersionKind{
 		{
@@ -371,9 +363,8 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, k
 
 // Reconcile the vacuum role binding in the KubeArchiveConfig namespace.
 func (r *KubeArchiveConfigReconciler) reconcileLocalVacuumRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, role *rbacv1.Role) (*rbacv1.RoleBinding, error) {
-	log := log.FromContext(ctx)
 
-	log.Info("in reconcileLocalVacuumRoleBinding")
+	slog.Info("in reconcileLocalVacuumRoleBinding")
 
 	ns := newSubject(kaconfig.Namespace, constants.KubeArchiveVacuumName)
 	ka := newSubject(constants.KubeArchiveNamespace, constants.KubeArchiveClusterVacuumName)
@@ -386,9 +377,8 @@ func (r *KubeArchiveConfigReconciler) reconcileLocalVacuumRoleBinding(ctx contex
 
 // Reconcile the vacuum role binding in the kubearchive namespace.
 func (r *KubeArchiveConfigReconciler) reconcileKubeArchiveVacuumRoleBinding(ctx context.Context, kaconfig *kubearchivev1.KubeArchiveConfig, add bool) error {
-	log := log.FromContext(ctx)
 
-	log.Info("in reconcileKubeArchiveVacuumRoleBinding")
+	slog.Info("in reconcileKubeArchiveVacuumRoleBinding")
 
 	subjects := []rbacv1.Subject{newSubject(kaconfig.Namespace, constants.KubeArchiveVacuumName)}
 	// Don't ever remove the cluster vacuum SA, but always make sure it is there.
@@ -403,9 +393,8 @@ func (r *KubeArchiveConfigReconciler) reconcileKubeArchiveVacuumRoleBinding(ctx 
 }
 
 func updateSinkFilterNamespace(ctx context.Context, client client.Client, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) error {
-	log := log.FromContext(ctx)
 
-	log.Info("in updateSinkFilterNamespace")
+	slog.Info("in updateSinkFilterNamespace")
 
 	sf := &kubearchivev1.SinkFilter{}
 	err := client.Get(ctx, types.NamespacedName{Name: constants.SinkFilterResourceName, Namespace: constants.KubeArchiveNamespace}, sf)
@@ -413,28 +402,27 @@ func updateSinkFilterNamespace(ctx context.Context, client client.Client, namesp
 		sf = desiredSinkFilterNamespace(ctx, nil, namespace, resources)
 		err = client.Create(ctx, sf)
 		if err != nil {
-			log.Error(err, "Failed to create SinkFilter "+constants.SinkFilterResourceName)
+			slog.Error("Failed to create SinkFilter", "error", err, "name", constants.SinkFilterResourceName)
 			return err
 		}
 		return nil
 	} else if err != nil {
-		log.Error(err, "Failed to reconcile SinkFilter "+constants.SinkFilterResourceName)
+		slog.Error("Failed to reconcile SinkFilter", "error", err, "name", constants.SinkFilterResourceName)
 		return err
 	}
 
 	sf = desiredSinkFilterNamespace(ctx, sf, namespace, resources)
 	err = client.Update(ctx, sf)
 	if err != nil {
-		log.Error(err, "Failed to update SinkFilter "+constants.SinkFilterResourceName)
+		slog.Error("Failed to update SinkFilter", "error", err, "name", constants.SinkFilterResourceName)
 		return err
 	}
 	return nil
 }
 
 func desiredSinkFilterNamespace(ctx context.Context, sf *kubearchivev1.SinkFilter, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) *kubearchivev1.SinkFilter {
-	log := log.FromContext(ctx)
 
-	log.Info("in desiredSinkFilterNamespace")
+	slog.Info("in desiredSinkFilterNamespace")
 
 	if sf == nil {
 		sf = &kubearchivev1.SinkFilter{

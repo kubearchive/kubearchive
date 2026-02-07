@@ -1,0 +1,390 @@
+= PostgreSQL Label Filtering
+
+== Overview
+
+This page documents the PostgreSQL-specific implementation of label filtering
+using normalized relational tables.
+
+=== Motivation
+
+The initial implementation stored Kubernetes resource labels exclusively in JSONB
+fields within the `resource` table.
+While JSONB provides flexibility and keeps the full resource manifest intact,
+querying by labels using JSONB operations had severe performance limitations:
+
+* **Query Performance**: Performance degraded significantly as the number of
+  resources grew when label filters were applied that were not selective enough
+* **Index Limitations**: GIN indexes on JSONB fields are less efficient for
+  complex label selector queries with low selectivity
+* **Query Complexity**: Multiple label conditions required expensive JSONB path
+  operations for each row
+
+To achieve better query performance for label selector queries, we implemented
+a normalized relational schema that duplicates labels from JSONB into dedicated
+indexed tables.
+
+=== Design Goals
+
+* Maintain backward compatibility - keep JSONB `data` field unchanged for full
+  manifest storage
+* Improve query performance for label selectors, especially those with low
+  selectivity on large datasets
+* Support all Kubernetes label selector operations: `exists`, `notexists`,
+  `equals`, `notequals`, `in`, `notin`
+* Avoid updating label tables when resource updates don't affect labels
+  (e.g., status-only updates), preventing unnecessary table locking and write
+  operations
+* Avoid querying the database for previous resource state and deserializing it
+  just to determine if label updates are needed
+* Deduplicate label keys, values, and key-value pairs to minimize storage
+  overhead
+* Immutable label tables to prevent accidental modifications (UPDATE operations
+  are revoked)
+* Minimize timestamp overhead - only `resource_label` has `created_at` for
+  troubleshooting
+
+== Normalized Schema
+
+The label normalization uses a 4-table design to minimize storage and maximize
+query performance:
+
+image::images/label-normalization-schema.png[Label Normalization Schema]
+
+Key relationships:
+
+* Each **resource** can have multiple **resource_label** entries (one per label)
+* Each **resource_label** references one **label_pair** (the key-value combination)
+* Each **label_pair** references one **label_key** and one **label_value**
+* Keys, values, and pairs are deduplicated - stored once and reused across all
+  resources
+
+== Query Implementation
+
+=== Interface Changes
+
+The label filtering implementation required changes to the `DBFilter` interface
+to support JOIN-based queries:
+
+Previously, each label filter type was implemented as separate methods that
+returned SQL expressions:
+[source,go]
+----
+existsLabelFilter(cond sqlbuilder.Cond, labels []string) string
+equalsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string
+// ... etc
+----
+
+The new approach consolidates all label filtering into a single method:
+[source,go]
+----
+ApplyLabelFilters(sb *sqlbuilder.SelectBuilder, labelFilters *models.LabelFilters)
+----
+
+**Rationale**: Label filtering with normalized tables requires JOINs, GROUP BY,
+and HAVING clauses that must be coordinated with the main query structure.
+Individual filter methods cannot add JOINs independently without creating
+incorrect queries.
+The consolidated method can:
+
+* Add the necessary JOINs to normalized tables
+* Apply WHERE conditions for initial label matching
+* Add GROUP BY clauses to group by resource
+* Apply HAVING conditions to ensure ALL required labels are present
+
+=== Query Strategy
+
+The implementation uses different query strategies for positive and negative
+filters:
+
+**Positive Filters** (Exists, Equals, In):: Use direct JOINs with `GROUP BY`
+and `HAVING` for optimal performance.
+All positive filters are combined in a single query with shared JOINs.
+
+**Negative Filters** (NotExists, NotEquals, NotIn):: Use `NOT EXISTS`
+subqueries.
+Each negative filter type is applied as an independent subquery.
+
+=== Query Examples
+
+==== Example 1: Single Exists Filter
+
+**Label Selector**: `env` (select resources that have the label key `env`)
+
+**Generated Query**:
+[source,sql]
+----
+SELECT
+    resource.data->'metadata'->>'creationTimestamp' AS created_at,
+    resource.id,
+    resource.uuid,
+    resource.data
+FROM resource
+JOIN resource_label rl ON rl.resource_id = resource.id
+JOIN label_pair lp ON lp.id = rl.pair_id
+JOIN label_key lk ON lk.id = lp.key_id
+JOIN label_value lv ON lv.id = lp.value_id
+WHERE lk.key IN ($1)  <1>
+GROUP BY resource.id
+HAVING COUNT(DISTINCT CASE WHEN lk.key IN ($2) THEN lk.key END) = 1  <2>
+----
+<1> `$1 = 'env'` - Filter to rows matching the key
+<2> `$2 = 'env'` - Ensure the resource has exactly the required key
+
+**Logic**:
+* JOIN to normalized tables to access label keys
+* WHERE filters rows to those matching the key
+* GROUP BY resource.id to aggregate labels per resource
+* HAVING ensures the resource has exactly the required keys
+
+==== Example 2: Single Equals Filter
+
+**Label Selector**: `env=prod` (select resources where label `env` equals `prod`)
+
+**Generated Query**:
+[source,sql]
+----
+SELECT
+    resource.data->'metadata'->>'creationTimestamp' AS created_at,
+    resource.id,
+    resource.uuid,
+    resource.data
+FROM resource
+JOIN resource_label rl ON rl.resource_id = resource.id
+JOIN label_pair lp ON lp.id = rl.pair_id
+JOIN label_key lk ON lk.id = lp.key_id
+JOIN label_value lv ON lv.id = lp.value_id
+WHERE (lk.key = $1 AND lv.value = $2)  <1>
+GROUP BY resource.id
+HAVING COUNT(CASE WHEN lk.key = $3 AND lv.value = $4 THEN 1 END) >= 1  <2>
+----
+<1> `$1 = 'env'`, `$2 = 'prod'` - Filter to rows matching the key-value pair
+<2> `$3 = 'env'`, `$4 = 'prod'` - Ensure at least one occurrence of the exact pair
+
+**Logic**:
+* WHERE filters to rows matching the key-value pair
+* HAVING ensures at least one occurrence of the exact pair
+
+==== Example 3: Single In Filter
+
+**Label Selector**: `env in (prod, stage)` (select resources where label `env`
+is either `prod` or `stage`)
+
+**Generated Query**:
+[source,sql]
+----
+SELECT
+    resource.data->'metadata'->>'creationTimestamp' AS created_at,
+    resource.id,
+    resource.uuid,
+    resource.data
+FROM resource
+JOIN resource_label rl ON rl.resource_id = resource.id
+JOIN label_pair lp ON lp.id = rl.pair_id
+JOIN label_key lk ON lk.id = lp.key_id
+JOIN label_value lv ON lv.id = lp.value_id
+WHERE (lk.key = $1 AND lv.value IN ($2, $3))  <1>
+GROUP BY resource.id
+HAVING COUNT(CASE WHEN lk.key = $4 AND lv.value IN ($5, $6) THEN 1 END) >= 1  <2>
+----
+<1> `$1 = 'env'`, `$2 = 'prod'`, `$3 = 'stage'` - Filter to rows where key is
+`env` and value is in the set
+<2> `$4 = 'env'`, `$5 = 'prod'`, `$6 = 'stage'` - Ensure at least one matching pair exists
+
+**Logic**:
+* WHERE filters to rows where key is `env` and value is in the set
+* HAVING ensures at least one matching pair exists
+
+==== Example 4: Single NotExists Filter
+
+**Label Selector**: `!env` (select resources that do NOT have the label key `env`)
+
+**Generated Query**:
+[source,sql]
+----
+SELECT
+    resource.data->'metadata'->>'creationTimestamp' AS created_at,
+    resource.id,
+    resource.uuid,
+    resource.data
+FROM resource
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM resource_label rl
+    JOIN label_pair lp ON lp.id = rl.pair_id
+    JOIN label_key lk ON lk.id = lp.key_id
+    WHERE rl.resource_id = resource.id
+    AND lk.key IN ($1)  <1>
+)
+----
+<1> `$1 = 'env'` - Exclude resources that have this label key
+
+**Logic**: Use NOT EXISTS subquery to exclude resources that have the label key
+
+==== Example 5: Single NotEquals Filter
+
+**Label Selector**: `env!=prod` (select resources where label `env` exists but
+does NOT equal `prod`)
+
+**Generated Query**:
+[source,sql]
+----
+SELECT
+    resource.data->'metadata'->>'creationTimestamp' AS created_at,
+    resource.id,
+    resource.uuid,
+    resource.data
+FROM resource
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM resource_label rl
+    JOIN label_pair lp ON lp.id = rl.pair_id
+    JOIN label_key lk ON lk.id = lp.key_id
+    JOIN label_value lv ON lv.id = lp.value_id
+    WHERE rl.resource_id = resource.id
+    AND (lk.key = $1 AND lv.value = $2)  <1>
+)
+----
+<1> `$1 = 'env'`, `$2 = 'prod'` - Exclude resources that have this specific
+key-value pair
+
+**Logic**: Use NOT EXISTS subquery to exclude resources that have the specific
+key-value pair
+
+==== Example 6: Single NotIn Filter
+
+**Label Selector**: `env notin (prod, stage)` (select resources where label
+`env` exists but is NOT `prod` or `stage`)
+
+**Generated Query**:
+[source,sql]
+----
+SELECT
+    resource.data->'metadata'->>'creationTimestamp' AS created_at,
+    resource.id,
+    resource.uuid,
+    resource.data
+FROM resource
+WHERE EXISTS (
+    SELECT 1
+    FROM resource_label rl
+    JOIN label_pair lp ON lp.id = rl.pair_id
+    JOIN label_key lk ON lk.id = lp.key_id
+    WHERE rl.resource_id = resource.id
+    AND lk.key IN ($1)  <1>
+    GROUP BY rl.resource_id
+    HAVING COUNT(DISTINCT lk.key) = 1
+)
+AND NOT EXISTS (
+    SELECT 1
+    FROM resource_label rl
+    JOIN label_pair lp ON lp.id = rl.pair_id
+    JOIN label_key lk ON lk.id = lp.key_id
+    JOIN label_value lv ON lv.id = lp.value_id
+    WHERE rl.resource_id = resource.id
+    AND (lk.key = $2 AND lv.value IN ($3, $4))  <2>
+)
+----
+<1> `$1 = 'env'` - Ensure the key exists
+<2> `$2 = 'env'`, `$3 = 'prod'`, `$4 = 'stage'` - Ensure none of the forbidden
+values are present
+
+**Logic**:
+* First EXISTS ensures the key exists
+* Second NOT EXISTS ensures none of the forbidden values are present
+
+==== Example 7: Combined Filters
+
+**Label Selector**: `env in (prod, stage), app=frontend, !debug`
+
+This selector combines multiple filter types:
+* `env in (prod, stage)` - In filter (positive)
+* `app=frontend` - Equals filter (positive)
+* `!debug` - NotExists filter (negative)
+
+**Generated Query**:
+[source,sql]
+----
+SELECT
+    resource.data->'metadata'->>'creationTimestamp' AS created_at,
+    resource.id,
+    resource.uuid,
+    resource.data
+FROM resource
+JOIN resource_label rl ON rl.resource_id = resource.id
+JOIN label_pair lp ON lp.id = rl.pair_id
+JOIN label_key lk ON lk.id = lp.key_id
+JOIN label_value lv ON lv.id = lp.value_id
+WHERE (
+    (lk.key = $1 AND lv.value = $2) OR  <1>
+    (lk.key = $3 AND lv.value IN ($4, $5))  <2>
+)
+GROUP BY resource.id
+HAVING
+    COUNT(CASE WHEN lk.key = $6 AND lv.value = $7 THEN 1 END) >= 1  <3>
+    AND COUNT(CASE WHEN lk.key = $8 AND lv.value IN ($9, $10) THEN 1 END) >= 1  <4>
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM resource_label rl
+    JOIN label_pair lp ON lp.id = rl.pair_id
+    JOIN label_key lk ON lk.id = lp.key_id
+    WHERE rl.resource_id = resource.id
+    AND lk.key IN ($11)  <5>
+)
+----
+<1> `$1 = 'app'`, `$2 = 'frontend'` - Match app=frontend
+<2> `$3 = 'env'`, `$4 = 'prod'`, `$5 = 'stage'` - Match env in (prod, stage)
+<3> `$6 = 'app'`, `$7 = 'frontend'` - Ensure app=frontend exists
+<4> `$8 = 'env'`, `$9 = 'prod'`, `$10 = 'stage'` - Ensure env in (prod, stage)
+exists
+<5> `$11 = 'debug'` - Exclude resources with debug label
+
+**Logic**:
+* All positive filters share the same JOINs
+* WHERE uses OR to match any of the positive conditions
+* HAVING ensures ALL positive conditions are met (AND logic)
+* Negative filter is applied as an independent NOT EXISTS subquery
+
+== Write Path: Trigger Synchronization
+
+Labels are automatically synchronized from JSONB to normalized tables using a
+PostgreSQL trigger that fires on INSERT, UPDATE, or DELETE operations on the
+`resource` table.
+
+=== Trigger Logic
+
+The trigger handles three operations:
+
+**INSERT**::
+* Extracts labels from JSONB `data->'metadata'->'labels'` using set-based
+  operations
+* Uses CTEs (Common Table Expressions) to batch-insert new keys, values, and
+  pairs
+* Inserts new keys and values if they don't exist (using ON CONFLICT DO NOTHING)
+* Creates or reuses label pairs for key-value combinations
+* Creates `resource_label` entries linking the resource to its label pairs
+* All operations performed in a single efficient query using CTEs instead of
+  loops
+
+**UPDATE**::
+* Optimization: Skips processing if labels haven't changed (90%+ of updates are
+  status-only)
+* Deletes all existing `resource_label` entries for the resource
+* Re-inserts `resource_label` entries based on updated labels using the same
+  CTE-based approach
+* More efficient than computing diffs for label changes
+
+When a resource is deleted, the `resource_label` entries are automatically
+removed via the `ON DELETE CASCADE` foreign key constraint on
+`resource_label.resource_id`.
+The trigger does not handle DELETE operations.
+Entries in `label_key`, `label_value`, and `label_pair` tables are not removed
+when resources are deleted, allowing reuse across resources.
+
+=== Update Optimization
+
+The trigger checks if labels have changed before processing.
+This optimization is critical because most resource updates only change the
+`status` field, not labels.
+Skipping trigger logic for unchanged labels significantly reduces write overhead
+and prevents unnecessary table locking.
+

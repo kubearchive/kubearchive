@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/kubearchive/kubearchive/pkg/models"
 )
 
 // DBFilter encapsulates all the filter functions that must be implemented by the drivers
@@ -23,12 +24,9 @@ type DBFilter interface {
 	UuidsFilter(cond sqlbuilder.Cond, uuids []string) string
 	UuidFilter(cond sqlbuilder.Cond, uuid string) string
 
-	ExistsLabelFilter(cond sqlbuilder.Cond, labels []string, clause *sqlbuilder.WhereClause) string
-	NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string, clause *sqlbuilder.WhereClause) string
-	EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string
-	NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string
-	InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string
-	NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string
+	// ApplyLabelFilters applies all label filters using JOINs for optimal performance
+	// This method modifies the SelectBuilder by adding JOINs, WHERE conditions, and GROUP BY as needed
+	ApplyLabelFilters(sb *sqlbuilder.SelectBuilder, labelFilters *models.LabelFilters)
 
 	ContainerNameFilter(cond sqlbuilder.Cond, containerName string) string
 }

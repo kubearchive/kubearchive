@@ -14,7 +14,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 )
 
 type PromResult struct {

@@ -241,7 +241,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Always register SinkFilter controller since we're no longer using Knative
 	slog.Info("registering SinkFilter controller")
 	if err = (&controller.SinkFilterReconciler{
 		Client: mgr.GetClient(),

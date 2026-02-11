@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"github.com/kubearchive/kubearchive/test"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,7 +138,7 @@ func TestLabels(t *testing.T) {
 
 	var list *unstructured.UnstructuredList
 	podsURL := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods", port, namespaceName)
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(240), retry.MaxDelay(4*time.Second)).Do(func() error {
 		var getUrlErr error
 		list, getUrlErr = test.GetUrl(t, token.Status.Token, podsURL, map[string][]string{})
 		if getUrlErr != nil {
@@ -151,7 +151,7 @@ func TestLabels(t *testing.T) {
 		}
 
 		return errors.New("could not retrieve Pods from the API")
-	}, retry.Attempts(240), retry.MaxDelay(4*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -171,7 +171,7 @@ func TestLabels(t *testing.T) {
 				podsURL = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?labelSelector=%s", port, namespaceName, selector)
 			}
 
-			retryErr := retry.Do(func() error {
+			retryErr := retry.New(retry.Attempts(240), retry.MaxDelay(4*time.Second)).Do(func() error {
 				podList, getUrlErr := test.GetUrl(t, token.Status.Token, podsURL, map[string][]string{})
 				if getUrlErr != nil {
 					t.Fatal(getUrlErr)
@@ -210,7 +210,7 @@ func TestLabels(t *testing.T) {
 
 				t.Log("found expected pods for the selector")
 				return nil
-			}, retry.Attempts(240), retry.MaxDelay(4*time.Second))
+			})
 
 			if retryErr != nil {
 				t.Fatal(retryErr)

@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
@@ -140,13 +140,13 @@ func PortForwardApiServer(t testing.TB, clientset kubernetes.Interface) string {
 			t.Fatal(err)
 		}
 		var errPortForward error
-		retryErr := retry.Do(func() error {
+		retryErr := retry.New(retry.Attempts(3)).Do(func() error {
 			forwardChan, errPortForward = portForward(t, []string{fmt.Sprintf("%s:%s", apiServerPort, apiServerPort)}, pods.Items[0].Name, "kubearchive")
 			if errPortForward != nil {
 				return errPortForward
 			}
 			return nil
-		}, retry.Attempts(3))
+		})
 
 		if retryErr != nil {
 			t.Fatal(retryErr)
@@ -547,10 +547,10 @@ func CreateTestNamespaceWithClusterAccessWithName(t testing.TB, customCleanup bo
 		})
 	}
 
-	err = retry.Do(func() error {
+	err = retry.New(retry.Attempts(10), retry.MaxDelay(2*time.Second)).Do(func() error {
 		_, e := clientset.CoreV1().ServiceAccounts(namespace).Get(context.Background(), "default", metav1.GetOptions{})
 		return e
-	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+	})
 	if err != nil {
 		t.Logf("Could not find Service Account 'default' in namespace '%s'", namespace)
 		t.Fatal(err)
@@ -622,7 +622,7 @@ func CreateCKAC(t testing.TB, filename string) *kubearchiveapi.ClusterKubeArchiv
 	if len(ckac.Spec.Resources) > 0 {
 		_, dynamicClient := GetKubernetesClient(t)
 
-		err := retry.Do(func() error {
+		err := retry.New(retry.Attempts(10), retry.MaxDelay(2*time.Second)).Do(func() error {
 			obj, retryErr := dynamicClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 			if retryErr != nil {
 				return retryErr
@@ -635,7 +635,7 @@ func CreateCKAC(t testing.TB, filename string) *kubearchiveapi.ClusterKubeArchiv
 				return fmt.Errorf("SinkFilter " + constants.SinkFilterResourceName + " does not yet have cluster filters")
 			}
 			return nil
-		}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -654,7 +654,7 @@ func CreateKAC(t testing.TB, filename string, namespace string) *kubearchiveapi.
 	if len(kac.Spec.Resources) > 0 {
 		_, dynamicClient := GetKubernetesClient(t)
 
-		err := retry.Do(func() error {
+		err := retry.New(retry.Attempts(20), retry.MaxDelay(2*time.Second)).Do(func() error {
 			obj, retryErr := dynamicClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 			if retryErr != nil {
 				return retryErr
@@ -668,7 +668,7 @@ func CreateKAC(t testing.TB, filename string, namespace string) *kubearchiveapi.
 				return fmt.Errorf("SinkFilter "+constants.SinkFilterResourceName+" does not yet have filters for the namespace %s", namespace)
 			}
 			return nil
-		}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -703,7 +703,7 @@ func DeleteKAC(t testing.TB, namespace string) {
 	}
 
 	// Make sure ClusterKubeArchiveConfig/KubeArchiveConfig is deleted.
-	err = retry.Do(func() error {
+	err = retry.New(retry.Attempts(10), retry.MaxDelay(2*time.Second)).Do(func() error {
 		if namespace == "" {
 			_, retryErr := dynamicClient.Resource(gvr).Get(context.Background(), constants.KubeArchiveConfigResourceName, metav1.GetOptions{})
 			if !errs.IsNotFound(retryErr) {
@@ -716,13 +716,13 @@ func DeleteKAC(t testing.TB, namespace string) {
 			}
 		}
 		return nil
-	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Make sure the sink filters have been updated.
-	err = retry.Do(func() error {
+	err = retry.New(retry.Attempts(10), retry.MaxDelay(2*time.Second)).Do(func() error {
 		object, retryErr := dynamicClient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 		if retryErr != nil {
 			return retryErr
@@ -736,7 +736,7 @@ func DeleteKAC(t testing.TB, namespace string) {
 			return fmt.Errorf("SinkFilter "+constants.SinkFilterResourceName+" still has filters for namespace '%s'", namespace)
 		}
 		return nil
-	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -755,13 +755,13 @@ func DeleteTestNamespace(t testing.TB, namespace string) {
 		t.Fatal(errNamespace)
 	}
 
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(10), retry.MaxDelay(3*time.Second)).Do(func() error {
 		_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 		if !errs.IsNotFound(getErr) {
 			return errors.New("Waiting for namespace " + namespace + " to be deleted")
 		}
 		return nil
-	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Log(retryErr)
@@ -789,13 +789,13 @@ func DeleteTestNamespaceWithClusterAccess(t testing.TB, namespace string) {
 		t.Fatal(errNamespace)
 	}
 
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(10), retry.MaxDelay(3*time.Second)).Do(func() error {
 		_, getErr := clientset.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
 		if !errs.IsNotFound(getErr) {
 			return errors.New("Waiting for namespace " + namespace + " to be deleted")
 		}
 		return nil
-	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Log(retryErr)
@@ -811,7 +811,7 @@ func OutputLines(t testing.TB, output string) {
 }
 
 func WaitForJob(t testing.TB, clientset *kubernetes.Clientset, namespace string, jobName string) {
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(30), retry.MaxDelay(2*time.Second)).Do(func() error {
 		job, err := clientset.BatchV1().Jobs(namespace).Get(context.Background(), jobName, metav1.GetOptions{})
 		if err != nil {
 			return errors.New("Could not find job " + jobName + " in namespace " + namespace + ".")
@@ -822,7 +822,7 @@ func WaitForJob(t testing.TB, clientset *kubernetes.Clientset, namespace string,
 		}
 
 		return nil
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

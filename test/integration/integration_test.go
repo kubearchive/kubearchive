@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"github.com/google/uuid"
 	"github.com/kubearchive/kubearchive/test"
 	"github.com/stretchr/testify/assert"
@@ -27,7 +27,7 @@ func TestAllDeploymentsReady(t *testing.T) {
 
 	client, _ := test.GetKubernetesClient(t)
 
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New().Do(func() error {
 		deployments, errList := client.AppsV1().Deployments("kubearchive").List(context.Background(), metav1.ListOptions{})
 		if errList != nil {
 			return fmt.Errorf("Failed to get Deployments from the 'kubearchive' namespace: %w", errList)
@@ -67,7 +67,7 @@ func TestNormalOperation(t *testing.T) {
 
 	t.Log("Getting list of jobs")
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs", port, namespaceName)
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(20), retry.MaxDelay(2*time.Second)).Do(func() error {
 		list, getUrlErr := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
 			return getUrlErr
@@ -78,7 +78,7 @@ func TestNormalOperation(t *testing.T) {
 			return nil
 		}
 		return errors.New("could not retrieve a Job from the API")
-	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -87,7 +87,7 @@ func TestNormalOperation(t *testing.T) {
 	t.Log("Getting list of pods")
 	var pod unstructured.Unstructured
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods", port, namespaceName)
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(20), retry.MaxDelay(2*time.Second)).Do(func() error {
 		list, getUrlErr := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
 			return getUrlErr
@@ -100,7 +100,7 @@ func TestNormalOperation(t *testing.T) {
 		pod = list.Items[0]
 
 		return nil
-	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -108,7 +108,7 @@ func TestNormalOperation(t *testing.T) {
 
 	t.Log("Retrieving pod by name")
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/%s", port, namespaceName, pod.GetName())
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(20), retry.MaxDelay(2*time.Second)).Do(func() error {
 		resource, getUrlErr := test.GetResource(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
 			return getUrlErr
@@ -119,7 +119,7 @@ func TestNormalOperation(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -127,7 +127,7 @@ func TestNormalOperation(t *testing.T) {
 
 	t.Log("Retrieving pod log by name")
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/%s/log", port, namespaceName, pod.GetName())
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(20), retry.MaxDelay(2*time.Second)).Do(func() error {
 		logBytes, getUrlErr := test.GetLogs(t, token.Status.Token, url)
 		if getUrlErr != nil {
 			return getUrlErr
@@ -138,7 +138,7 @@ func TestNormalOperation(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -146,7 +146,7 @@ func TestNormalOperation(t *testing.T) {
 
 	t.Log("Retrieving pod by uid")
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/uid/%s/", port, namespaceName, string(pod.GetUID()))
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(20), retry.MaxDelay(2*time.Second)).Do(func() error {
 		resource, getUrlErr := test.GetResource(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
 			return getUrlErr
@@ -161,7 +161,7 @@ func TestNormalOperation(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -169,7 +169,7 @@ func TestNormalOperation(t *testing.T) {
 
 	t.Log("Retrieving pod log by uid")
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/uid/%s/log", port, namespaceName, string(pod.GetUID()))
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(20), retry.MaxDelay(2*time.Second)).Do(func() error {
 		logBytes, getUrlErr := test.GetLogs(t, token.Status.Token, url)
 		if getUrlErr != nil {
 			return getUrlErr
@@ -180,7 +180,7 @@ func TestNormalOperation(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -188,13 +188,13 @@ func TestNormalOperation(t *testing.T) {
 
 	t.Log("Retrieving unexistent pod by uid")
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/uid/%s/", port, namespaceName, uuid.New().String())
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(20), retry.MaxDelay(2*time.Second)).Do(func() error {
 		_, getUrlErr := test.GetResource(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr.Error() != "404" {
 			return errors.New("expected 404 error for unexistent pod")
 		}
 		return nil
-	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -202,13 +202,13 @@ func TestNormalOperation(t *testing.T) {
 
 	t.Log("Retrieving unexistent pod log by uid")
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/uid/%s/log", port, namespaceName, uuid.New().String())
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(20), retry.MaxDelay(2*time.Second)).Do(func() error {
 		_, getUrlErr := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr.Error() != "404" {
 			return errors.New("expected 404 error for unexistent pod")
 		}
 		return nil
-	}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -272,7 +272,7 @@ func TestGzipCompression(t *testing.T) {
 			var compressedResponse *test.GzipTestResponse
 
 			// Test without gzip compression - wait for substantial data
-			retryErr := retry.Do(func() error {
+			retryErr := retry.New(retry.Attempts(30), retry.MaxDelay(5*time.Second)).Do(func() error {
 				gzipResp, list, getUrlErr := test.GetUrlWithGzipCheck(t, token.Status.Token, testCase.url, map[string][]string{})
 				if getUrlErr != nil {
 					return getUrlErr
@@ -287,7 +287,7 @@ func TestGzipCompression(t *testing.T) {
 				t.Logf("%s works without gzip compression - %d items, %d bytes, Content-Encoding: %s, Actually compressed: %v",
 					testCase.description, len(list.Items), len(gzipResp.Body), gzipResp.ContentEncoding, gzipResp.IsActuallyGzipped)
 				return nil
-			}, retry.Attempts(30), retry.MaxDelay(5*time.Second))
+			})
 
 			if retryErr != nil {
 				t.Fatalf("✗ Failed to test %s without gzip: %v", testCase.name, retryErr)
@@ -301,7 +301,7 @@ func TestGzipCompression(t *testing.T) {
 			t.Logf("Uncompressed response validated - %d bytes, proceeding with compression test", len(uncompressedResponse.Body))
 
 			// Test with gzip compression
-			retryErr = retry.Do(func() error {
+			retryErr = retry.New(retry.Attempts(30), retry.MaxDelay(5*time.Second)).Do(func() error {
 				headers := map[string][]string{
 					"Accept-Encoding": {"gzip"},
 				}
@@ -319,7 +319,7 @@ func TestGzipCompression(t *testing.T) {
 				t.Logf("%s works with gzip compression - %d items, %d bytes, Content-Encoding: %s, Actually compressed: %v, Compressed size: %d bytes, Decompressed size: %d bytes",
 					testCase.description, len(list.Items), len(gzipResp.Body), gzipResp.ContentEncoding, gzipResp.IsActuallyGzipped, gzipResp.CompressedSize, gzipResp.DecompressedSize)
 				return nil
-			}, retry.Attempts(30), retry.MaxDelay(5*time.Second))
+			})
 
 			if retryErr != nil {
 				t.Fatalf("✗ Failed to test %s with gzip: %v", testCase.name, retryErr)
@@ -356,7 +356,7 @@ func TestKindNotFound(t *testing.T) {
 
 	// Retrieve the objects from the DB using the API.
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/pobs", port, namespaceName)
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(5), retry.MaxDelay(5*time.Second)).Do(func() error {
 		_, getUrlErr := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 
 		if strings.Contains(getUrlErr.Error(), "404") {
@@ -364,7 +364,7 @@ func TestKindNotFound(t *testing.T) {
 		}
 
 		return errors.New("expecting 404")
-	}, retry.Attempts(5), retry.MaxDelay(5*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

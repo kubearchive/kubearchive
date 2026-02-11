@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"github.com/kubearchive/kubearchive/test"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -56,7 +56,7 @@ func TestPagination(t *testing.T) {
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods", port, namespaceName)
 	var list *unstructured.UnstructuredList
 	var getUrlErr error
-	err := retry.Do(func() error {
+	err := retry.New(retry.Attempts(240), retry.MaxDelay(4*time.Second)).Do(func() error {
 		list, getUrlErr = test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
 			t.Fatal(getUrlErr)
@@ -66,7 +66,7 @@ func TestPagination(t *testing.T) {
 			return nil
 		}
 		return errors.New("could not retrieve Pods from the API")
-	}, retry.Attempts(240), retry.MaxDelay(4*time.Second))
+	})
 
 	if err != nil {
 		t.Fatal(err)
@@ -150,7 +150,7 @@ func TestPaginationNoContinue(t *testing.T) {
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods", port, namespaceName)
 	var list *unstructured.UnstructuredList
 	var getUrlErr error
-	err := retry.Do(func() error {
+	err := retry.New(retry.Attempts(240), retry.MaxDelay(4*time.Second)).Do(func() error {
 		list, getUrlErr = test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
 			t.Fatal(getUrlErr)
@@ -160,7 +160,7 @@ func TestPaginationNoContinue(t *testing.T) {
 			return nil
 		}
 		return errors.New("could not retrieve Pods from the API")
-	}, retry.Attempts(240), retry.MaxDelay(4*time.Second))
+	})
 
 	if err != nil {
 		t.Fatal(err)
@@ -171,7 +171,7 @@ func TestPaginationNoContinue(t *testing.T) {
 	assert.Empty(t, list.GetContinue())
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?limit=20", port, namespaceName)
-	err = retry.Do(func() error {
+	err = retry.New(retry.Attempts(240), retry.MaxDelay(4*time.Second)).Do(func() error {
 		list, getUrlErr = test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
 			t.Fatal(getUrlErr)
@@ -181,7 +181,7 @@ func TestPaginationNoContinue(t *testing.T) {
 			return nil
 		}
 		return errors.New("could not retrieve Pods from the API")
-	}, retry.Attempts(240), retry.MaxDelay(4*time.Second))
+	})
 
 	if err != nil {
 		t.Fatal(err)
@@ -192,7 +192,7 @@ func TestPaginationNoContinue(t *testing.T) {
 	assert.NotEmpty(t, list.GetContinue())
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?limit=30", port, namespaceName)
-	err = retry.Do(func() error {
+	err = retry.New(retry.Attempts(240), retry.MaxDelay(4*time.Second)).Do(func() error {
 		list, getUrlErr = test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
 			t.Fatal(getUrlErr)
@@ -202,7 +202,7 @@ func TestPaginationNoContinue(t *testing.T) {
 			return nil
 		}
 		return errors.New("could not retrieve Pods from the API")
-	}, retry.Attempts(240), retry.MaxDelay(4*time.Second))
+	})
 
 	if err != nil {
 		t.Fatal(err)

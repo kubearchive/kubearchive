@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/kubearchive/kubearchive/test"
@@ -54,7 +54,7 @@ func checkResourcesAfterApply(t testing.TB, namespace string, applyNS int) {
 
 	clientset, dynaclient := test.GetKubernetesClient(t)
 
-	err := retry.Do(func() error {
+	err := retry.New(retry.Attempts(10), retry.MaxDelay(3*time.Second)).Do(func() error {
 		object, err := dynaclient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -86,7 +86,7 @@ func checkResourcesAfterApply(t testing.TB, namespace string, applyNS int) {
 			return err
 		}
 		return nil
-	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+	})
 
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +98,7 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, deleteNS int) {
 
 	clientset, dynaclient := test.GetKubernetesClient(t)
 
-	err := retry.Do(func() error {
+	err := retry.New(retry.Attempts(10), retry.MaxDelay(3*time.Second)).Do(func() error {
 		object, err := dynaclient.Resource(kubearchiveapi.SinkFilterGVR).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), constants.SinkFilterResourceName, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -126,7 +126,7 @@ func checkResourcesAfterDelete(t testing.TB, namespace string, deleteNS int) {
 			return errors.New("Unexpectedly found Role " + constants.KubeArchiveVacuumName + " in namespace " + namespace + ".")
 		}
 		return nil
-	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+	})
 
 	if err != nil {
 		t.Fatal(err)
@@ -152,7 +152,7 @@ func TestGlobalAndLocalKAC(t *testing.T) {
 
 	job := test.RunLogGenerator(t, namespace)
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespace, job)
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(60), retry.MaxDelay(2*time.Second)).Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -169,7 +169,7 @@ func TestGlobalAndLocalKAC(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

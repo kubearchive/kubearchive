@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/XSAM/otelsql"
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"github.com/jmoiron/sqlx"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )

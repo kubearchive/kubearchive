@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"github.com/kubearchive/kubearchive/test"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -59,7 +59,7 @@ func TestImpersonation(t *testing.T) {
 				authenticationv1.ImpersonateUserHeader: {impersonatedUser},
 			}
 			var auth bool
-			retryErr := retry.Do(func() error {
+			retryErr := retry.New(retry.Attempts(20), retry.MaxDelay(2*time.Second)).Do(func() error {
 				_, getUrlErr := test.GetUrl(t, token.Status.Token, url, impersonateHeaders)
 				if getUrlErr != nil {
 					if getUrlErr == test.ErrUnauth {
@@ -70,7 +70,7 @@ func TestImpersonation(t *testing.T) {
 				}
 				auth = true
 				return nil
-			}, retry.Attempts(20), retry.MaxDelay(2*time.Second))
+			})
 
 			if retryErr != nil {
 				t.Fatal(retryErr)
@@ -102,7 +102,7 @@ func setImpersonation(t *testing.T, clientset *kubernetes.Clientset, enabled boo
 
 	// Wait API to have to pods, so port-forward doesn't pick the previous pod
 	t.Logf("Waiting for API to have no pods")
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(30), retry.MaxDelay(2*time.Second)).Do(func() error {
 		pods, listErr := clientset.CoreV1().Pods("kubearchive").List(
 			context.Background(),
 			metav1.ListOptions{
@@ -115,7 +115,7 @@ func setImpersonation(t *testing.T, clientset *kubernetes.Clientset, enabled boo
 			return nil
 		}
 		return fmt.Errorf("API still has pods")
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -169,7 +169,7 @@ func setImpersonation(t *testing.T, clientset *kubernetes.Clientset, enabled boo
 
 	// Wait API to be up
 	t.Logf("Waiting for API to be up")
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(30), retry.MaxDelay(2*time.Second)).Do(func() error {
 		logs, getErr := test.GetPodLogs(t, "kubearchive", "kubearchive-api-server")
 		if getErr != nil {
 			return getErr
@@ -179,7 +179,7 @@ func setImpersonation(t *testing.T, clientset *kubernetes.Clientset, enabled boo
 		}
 		t.Log("logs:", logs)
 		return fmt.Errorf("API has not started yet")
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)

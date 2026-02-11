@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/XSAM/otelsql"
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"github.com/jmoiron/sqlx"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
@@ -26,15 +26,14 @@ func establishConnection(driver, connectionString string) (*sqlx.DB, error) {
 	}
 	var conn *sql.DB
 	var err error
-	errRetry := retry.Do(
+	errRetry := retry.New(configs...).Do(
 		func() error {
 			conn, err = otelsql.Open(driver, connectionString, otelsql.WithAttributes(semconv.DBSystemKey.String(driver)))
 			if err != nil {
 				return err
 			}
 			return conn.Ping()
-		},
-		configs...)
+		})
 	if errRetry != nil {
 		slog.Error("Unable to connect to the database", "error", errRetry.Error())
 		return nil, errRetry

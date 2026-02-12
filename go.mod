@@ -19,7 +19,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/huandu/go-sqlbuilder v1.39.0
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/lib/pq v1.11.1
+	github.com/lib/pq v1.11.2
 	github.com/ohler55/ojg v1.28.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.0

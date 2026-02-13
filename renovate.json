@@ -7,6 +7,19 @@
   ],
   "automerge": true,
   "prHourlyLimit": 1,
+  "gomod": {
+    "packageRules": [
+      {
+        "matchManagers": [
+          "gomod"
+        ],
+        "matchDepTypes": [
+          "indirect"
+        ],
+        "enabled": false
+      }
+    ]
+  },
   "customManagers": [
     {
       "customType": "regex",
@@ -30,15 +43,6 @@
     }
   ],
   "packageRules": [
-    {
-      "matchManagers": [
-        "gomod"
-      ],
-      "matchDepTypes": [
-        "indirect"
-      ],
-      "enabled": false
-    },
     {
       "matchManagers": [
         "custom.regex"

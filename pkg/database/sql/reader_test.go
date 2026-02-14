@@ -435,27 +435,9 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 			t.Run(fmt.Sprintf("%s %s", tt.name, ttt.name), func(t *testing.T) {
 				filter := tt.database.getFilter()
 				sb := tt.database.getSelector().ResourceSelector()
-				mainWhereClause := sqlbuilder.NewWhereClause()
-				cond := sqlbuilder.NewCond()
-				mainWhereClause.AddWhereExpr(cond.Args, filter.KindApiVersionFilter(*cond, podKind, podApiVersion))
-				sb.AddWhereClause(mainWhereClause)
-				if ttt.labelFilters.Exists != nil {
-					sb.Where(filter.ExistsLabelFilter(sb.Cond, ttt.labelFilters.Exists, nil))
-				}
-				if ttt.labelFilters.NotExists != nil {
-					sb.Where(filter.NotExistsLabelFilter(sb.Cond, ttt.labelFilters.NotExists, nil))
-				}
-				if ttt.labelFilters.Equals != nil {
-					sb.Where(filter.EqualsLabelFilter(sb.Cond, ttt.labelFilters.Equals, nil))
-				}
-				if ttt.labelFilters.NotEquals != nil {
-					sb.Where(filter.NotEqualsLabelFilter(sb.Cond, ttt.labelFilters.NotEquals, mainWhereClause))
-				}
-				if ttt.labelFilters.In != nil {
-					sb.Where(filter.InLabelFilter(sb.Cond, ttt.labelFilters.In, nil))
-				}
-				if ttt.labelFilters.NotIn != nil {
-					sb.Where(filter.NotInLabelFilter(sb.Cond, ttt.labelFilters.NotIn, nil))
+				sb.Where(filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion))
+				if !ttt.labelFilters.IsEmpty() {
+					filter.ApplyLabelFilters(sb, &ttt.labelFilters)
 				}
 				sb = tt.database.getSorter().CreationTSAndIDSorter(sb)
 				sb.Limit(100)
@@ -836,7 +818,7 @@ func TestTimestampFilterWithLabelFilters(t *testing.T) {
 
 			// Add both timestamp and label filters
 			sb.Where(filter.CreationTimestampAfterFilter(sb.Cond, testTime))
-			sb.Where(filter.EqualsLabelFilter(sb.Cond, labelFilters.Equals, nil))
+			filter.ApplyLabelFilters(sb, labelFilters)
 
 			sb = tt.database.getSorter().CreationTSAndIDSorter(sb)
 			sb.Limit(100)
@@ -848,7 +830,7 @@ func TestTimestampFilterWithLabelFilters(t *testing.T) {
 			// For PostgreSQL, verify labels filter is present
 			// Note: MariaDB label filters are not fully implemented yet
 			if tt.name == "postgresql" {
-				assert.Contains(t, query, "labels")
+				assert.Contains(t, query, "resource_label")
 			}
 
 			db, mock := NewMock()

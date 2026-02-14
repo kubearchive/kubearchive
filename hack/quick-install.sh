@@ -11,7 +11,7 @@ cd ${SCRIPT_DIR}/..
 bash integrations/database/postgresql/install.sh
 
 # renovate: datasource=github-releases depName=cert-manager packageName=cert-manager/cert-manager
-export CERT_MANAGER_VERSION=v1.19.2
+export CERT_MANAGER_VERSION=v1.19.3
 
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml
 kubectl rollout status deployment --namespace=cert-manager --timeout=30s

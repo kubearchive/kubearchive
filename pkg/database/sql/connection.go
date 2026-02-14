@@ -39,7 +39,7 @@ func establishConnection(driver, connectionString string) (*sqlx.DB, error) {
 		return nil, errRetry
 	}
 
-	err = otelsql.RegisterDBStatsMetrics(conn, otelsql.WithAttributes(semconv.DBSystemKey.String(driver)))
+	_, err = otelsql.RegisterDBStatsMetrics(conn, otelsql.WithAttributes(semconv.DBSystemKey.String(driver)))
 	if err != nil {
 		slog.Error("Unable to instrument the DB properly", "error", err.Error())
 		return nil, err

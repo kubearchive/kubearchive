@@ -13,16 +13,16 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: |
       event == "push" && target_branch == "main" && (
         files.all.exists(x, x.matches(".*\\.go$")) && (
-          files.all.exists(x, x.matches("^cmd/operator/")) ||
+          files.all.exists(x, x.matches("^cmd/api/")) ||
           files.all.exists(x, !x.matches("^cmd/"))
         )
       )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: kubearchive
-    appstudio.openshift.io/component: operator
+    appstudio.openshift.io/component: api
     pipelines.appstudio.openshift.io/type: build
-  name: operator-on-push
+  name: api-on-push
   namespace: kubearchive-tenant
 spec:
   pipelineRef:
@@ -33,19 +33,19 @@ spec:
     - name: revision
       value: '{{revision}}'
     - name: output-image
-      value: quay.io/redhat-user-workloads/kubearchive-tenant/operator:{{revision}}
+      value: quay.io/redhat-user-workloads/kubearchive-tenant/api:{{revision}}
     - name: preprocessing-script
       value: |
         controller-gen crd paths="./cmd/operator/..." output:dir=config/crds
         controller-gen object:headerFile="cmd/operator/hack/copyright.txt" paths="./cmd/operator/..." output:dir=cmd/operator/api/v1
     - name: ko-docker-repo
-      value: quay.io/redhat-user-workloads/kubearchive-tenant/operator
+      value: quay.io/redhat-user-workloads/kubearchive-tenant/api
     - name: image-naming-strategy
       value: "--bare"
     - name: import-path
-      value: ./cmd/operator
+      value: ./cmd/api
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator
+    serviceAccountName: build-pipeline-api
   workspaces:
     - name: git-auth
       secret:

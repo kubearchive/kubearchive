@@ -8,7 +8,6 @@
   "datacontenttype": "application/json",
   "apiversion": "v1",
   "kind": "Pod",
-  "knativearrivaltime": "2025-01-28T19:04:03.880549164Z",
   "name": "generate-log-1-28806900-sp286",
   "namespace": "generate-logs-cronjobs",
   "data": {

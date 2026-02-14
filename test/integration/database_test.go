@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"github.com/kubearchive/kubearchive/test"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,10 +58,10 @@ func TestDatabaseConnection(t *testing.T) {
 	t.Log(*usSink)
 
 	t.Logf("Waiting for sink pod '%s' to disappear", podName)
-	err = retry.Do(func() error {
+	err = retry.New(retry.Attempts(10), retry.MaxDelay(2*time.Second)).Do(func() error {
 		_, e := clientset.CoreV1().Pods("kubearchive").Get(context.Background(), podName, metav1.GetOptions{})
 		return e
-	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestDatabaseConnection(t *testing.T) {
 
 	// wait to sink pod ready and generate connection retries with the database
 	t.Logf("Waiting for sink to be up, and to generate retries with the database")
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(30), retry.MaxDelay(2*time.Second)).Do(func() error {
 		logs, getErr := test.GetPodLogs(t, "kubearchive", "kubearchive-sink")
 		if getErr != nil {
 			return getErr
@@ -93,7 +93,7 @@ func TestDatabaseConnection(t *testing.T) {
 		}
 
 		return fmt.Errorf("Sink pod didn't try to connect to the database yet")
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -114,7 +114,7 @@ func TestDatabaseConnection(t *testing.T) {
 	}
 	t.Logf("Unfenced database")
 
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(30), retry.MaxDelay(2*time.Second)).Do(func() error {
 		logs, getErr := test.GetPodLogs(t, "kubearchive", "kubearchive-sink")
 		if getErr != nil {
 			return getErr
@@ -125,7 +125,7 @@ func TestDatabaseConnection(t *testing.T) {
 		}
 
 		return errors.New("Sink pod did not connect successfully to the database yet")
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -133,7 +133,7 @@ func TestDatabaseConnection(t *testing.T) {
 
 	// Wait for sink pod to be ready.
 	podName = test.GetPodName(t, clientset, "kubearchive", "kubearchive-sink")
-	err = retry.Do(func() error {
+	err = retry.New(retry.Attempts(10), retry.MaxDelay(2*time.Second)).Do(func() error {
 		pod, e := clientset.CoreV1().Pods("kubearchive").Get(context.Background(), podName, metav1.GetOptions{})
 		if e != nil {
 			return e
@@ -145,7 +145,7 @@ func TestDatabaseConnection(t *testing.T) {
 			}
 		}
 		return errors.New("Sink pod is not in 'Ready' status")
-	}, retry.Attempts(10), retry.MaxDelay(2*time.Second))
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

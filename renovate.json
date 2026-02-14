@@ -7,6 +7,19 @@
   ],
   "automerge": true,
   "prHourlyLimit": 1,
+  "gomod": {
+    "packageRules": [
+      {
+        "matchManagers": [
+          "gomod"
+        ],
+        "matchDepTypes": [
+          "indirect"
+        ],
+        "enabled": false
+      }
+    ]
+  },
   "customManagers": [
     {
       "customType": "regex",
@@ -32,27 +45,9 @@
   "packageRules": [
     {
       "matchManagers": [
-        "gomod"
-      ],
-      "matchDepTypes": [
-        "indirect"
-      ],
-      "enabled": false
-    },
-    {
-      "matchManagers": [
         "custom.regex"
       ],
       "automerge": false
-    },
-    {
-      "matchManagers": [
-        "custom.regex"
-      ],
-      "matchDepNames": [
-        "knative-eventing"
-      ],
-      "groupName": "knative eventing"
     },
     {
       "matchManagers": [
@@ -82,19 +77,6 @@
         "k8s.io/apiextensions-apiserver"
       ],
       "allowedVersions": "<0.33.0"
-    },
-    {
-      "matchPackageNames": [
-        "knative.dev/pkg"
-      ],
-      "matchUpdateTypes": "digest",
-      "automerge": false
-    },
-    {
-      "matchPackageNames": [
-        "knative.dev/eventing"
-      ],
-      "allowedVersions": "<0.46.0"
     },
     {
       "matchPackageNames": [

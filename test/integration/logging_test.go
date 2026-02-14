@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"github.com/kubearchive/kubearchive/test"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -31,7 +31,7 @@ func TestLogging(t *testing.T) {
 	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
 	job := test.RunLogGenerator(t, namespaceName)
 	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespaceName, job)
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(60), retry.MaxDelay(2*time.Second)).Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -48,7 +48,7 @@ func TestLogging(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -86,7 +86,7 @@ func TestLogOrder(t *testing.T) {
 	}
 
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/logs-order/log", port, namespaceName)
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(1000), retry.MaxDelay(2*time.Second)).Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -104,7 +104,7 @@ func TestLogOrder(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(1000), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -179,7 +179,7 @@ func TestDefaultContainer(t *testing.T) {
 	for _, testCase := range tests {
 		t.Logf("checking logs for pod '%s', expected log '%s'", testCase.podName, testCase.expectedLog)
 		url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/%s/log", port, namespaceName, testCase.podName)
-		retryErr := retry.Do(func() error {
+		retryErr := retry.New(retry.Attempts(30), retry.MaxDelay(5*time.Second)).Do(func() error {
 			body, err := test.GetLogs(t, token.Status.Token, url)
 			if err != nil {
 				return err
@@ -197,7 +197,7 @@ func TestDefaultContainer(t *testing.T) {
 			}
 
 			return nil
-		}, retry.Attempts(30), retry.MaxDelay(5*time.Second))
+		})
 
 		if retryErr != nil {
 			t.Fatal(retryErr)
@@ -253,7 +253,7 @@ func TestQueryContainer(t *testing.T) {
 	}
 
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log", port, namespaceName)
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(60), retry.MaxDelay(2*time.Second)).Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -271,14 +271,14 @@ func TestQueryContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
 	}
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log?container=second", port, namespaceName)
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(60), retry.MaxDelay(2*time.Second)).Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -297,14 +297,14 @@ func TestQueryContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
 	}
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log?container=init1", port, namespaceName)
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(60), retry.MaxDelay(2*time.Second)).Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -323,14 +323,14 @@ func TestQueryContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
 	}
 
 	url = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/defaults-to-first/log?container=init2", port, namespaceName)
-	retryErr = retry.Do(func() error {
+	retryErr = retry.New(retry.Attempts(60), retry.MaxDelay(2*time.Second)).Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -349,7 +349,7 @@ func TestQueryContainer(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -388,7 +388,7 @@ func TestLogsWithResourceThatHasNoPods(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(30), retry.MaxDelay(2*time.Second)).Do(func() error {
 		t.Log("testing that the service is properly archived...")
 		url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/services", port, namespaceName)
 		list, err := test.GetUrl(t, token.Status.Token, url, map[string][]string{})
@@ -414,7 +414,7 @@ func TestLogsWithResourceThatHasNoPods(t *testing.T) {
 		}
 
 		return nil
-	}, retry.Attempts(30), retry.MaxDelay(2*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -466,7 +466,7 @@ func TestLogRetrievalConsecutiveNumbers(t *testing.T) {
 	}
 
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/consecutive-logs/log", port, namespaceName)
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(60), retry.MaxDelay(5*time.Second)).Do(func() error {
 		body, err := test.GetLogs(t, token.Status.Token, url)
 		if err != nil {
 			return err
@@ -499,7 +499,7 @@ func TestLogRetrievalConsecutiveNumbers(t *testing.T) {
 
 		t.Log("All 10000 log entries are in correct order")
 		return nil
-	}, retry.Attempts(60), retry.MaxDelay(5*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Fatal(retryErr)
@@ -549,7 +549,7 @@ func TestLogGzipCompression(t *testing.T) {
 			var actuallyGzipped bool
 			var contentEncoding string
 
-			retryErr := retry.Do(func() error {
+			retryErr := retry.New(retry.Attempts(60), retry.MaxDelay(2*time.Second)).Do(func() error {
 				body, gzipped, encoding, err := test.GetLogsWithGzipCheck(t, token.Status.Token, url, testCase.headers)
 				if err != nil {
 					return err
@@ -570,7 +570,7 @@ func TestLogGzipCompression(t *testing.T) {
 				contentEncoding = encoding
 				t.Logf("Successfully retrieved logs %s", testCase.name)
 				return nil
-			}, retry.Attempts(60), retry.MaxDelay(2*time.Second))
+			})
 
 			if retryErr != nil {
 				t.Fatalf("✗ Failed to retrieve logs %s: %v", testCase.name, retryErr)

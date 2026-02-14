@@ -13,16 +13,16 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: |
       event == "push" && target_branch == "main" && (
         files.all.exists(x, x.matches(".*\\.go$")) && (
-          files.all.exists(x, x.matches("^cmd/operator/")) ||
+          files.all.exists(x, x.matches("^cmd/vacuum/")) ||
           files.all.exists(x, !x.matches("^cmd/"))
         )
       )
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: kubearchive
-    appstudio.openshift.io/component: operator
+    appstudio.openshift.io/component: vacuum
     pipelines.appstudio.openshift.io/type: build
-  name: operator-on-push
+  name: vacuum-on-push
   namespace: kubearchive-tenant
 spec:
   pipelineRef:
@@ -33,19 +33,19 @@ spec:
     - name: revision
       value: '{{revision}}'
     - name: output-image
-      value: quay.io/redhat-user-workloads/kubearchive-tenant/operator:{{revision}}
+      value: quay.io/redhat-user-workloads/kubearchive-tenant/vacuum:{{revision}}
     - name: preprocessing-script
       value: |
         controller-gen crd paths="./cmd/operator/..." output:dir=config/crds
         controller-gen object:headerFile="cmd/operator/hack/copyright.txt" paths="./cmd/operator/..." output:dir=cmd/operator/api/v1
     - name: ko-docker-repo
-      value: quay.io/redhat-user-workloads/kubearchive-tenant/operator
+      value: quay.io/redhat-user-workloads/kubearchive-tenant/vacuum
     - name: image-naming-strategy
       value: "--bare"
     - name: import-path
-      value: ./cmd/operator
+      value: ./cmd/vacuum
   taskRunTemplate:
-    serviceAccountName: build-pipeline-operator
+    serviceAccountName: build-pipeline-vacuum
   workspaces:
     - name: git-auth
       secret:

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/constants"
 	"github.com/kubearchive/kubearchive/test"
@@ -226,13 +226,13 @@ func deleteClusterVacuumConfig(t testing.TB) {
 		t.Fatal(err)
 	}
 
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(10), retry.MaxDelay(3*time.Second)).Do(func() error {
 		_, getErr := dynamicClient.Resource(gvr).Namespace(constants.KubeArchiveNamespace).Get(context.Background(), clusterVacuumConfigName, metav1.GetOptions{})
 		if !errs.IsNotFound(getErr) {
 			return fmt.Errorf("Waiting for cluster vacuum config '%s/%s' to be deleted", constants.KubeArchiveNamespace, clusterVacuumConfigName)
 		}
 		return nil
-	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Log(retryErr)
@@ -257,13 +257,13 @@ func deleteClusterVacuumJob(t testing.TB, name string) {
 		t.Fatal(err)
 	}
 
-	retryErr := retry.Do(func() error {
+	retryErr := retry.New(retry.Attempts(10), retry.MaxDelay(3*time.Second)).Do(func() error {
 		_, getErr := clientset.BatchV1().Jobs(constants.KubeArchiveNamespace).Get(context.Background(), name, metav1.GetOptions{})
 		if !errs.IsNotFound(getErr) {
 			return fmt.Errorf("Waiting for cluster vacuum job '%s/%s' to be deleted", constants.KubeArchiveNamespace, name)
 		}
 		return nil
-	}, retry.Attempts(10), retry.MaxDelay(3*time.Second))
+	})
 
 	if retryErr != nil {
 		t.Log(retryErr)

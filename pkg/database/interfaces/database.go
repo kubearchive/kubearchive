@@ -23,7 +23,7 @@ const (
 type DBReader interface {
 	QueryResources(ctx context.Context, kind, apiVersion, namespace,
 		name, continueId, continueDate string, labelFilters *models.LabelFilters,
-		creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error)
+		creationTimestampAfter, creationTimestampBefore *time.Time, prunedFromEtcd *bool, limit int) ([]models.Resource, error)
 	QueryResourceByUID(ctx context.Context, kind, apiVersion, namespace, uid string) (*models.Resource, error)
 	QueryLogURLByName(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (string, string, error)
 	QueryLogURLByUID(ctx context.Context, kind, apiVersion, namespace, uid, containerName string) (string, string, error)

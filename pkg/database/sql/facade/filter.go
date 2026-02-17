@@ -31,6 +31,7 @@ type DBFilter interface {
 	NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string
 
 	ContainerNameFilter(cond sqlbuilder.Cond, containerName string) string
+	DeletionTimestampFilter(cond sqlbuilder.Cond, prunedFromEtcd *bool) string
 }
 
 // PartialDBFilterImpl implements partially the DBFilter interface

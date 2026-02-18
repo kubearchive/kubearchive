@@ -98,6 +98,12 @@
         "uses-with"
       ],
       "enabled": false
+    },
+    {
+      "matchPackageNames":[
+        "actions/go-versions"
+      ],
+      "enabled": false
     }
   ]
 }

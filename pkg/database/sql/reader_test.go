@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -357,14 +359,104 @@ func (arrayArgs arrayArg) Match(v driver.Value) bool {
 	return match
 }
 
+// setupLabelResolutionMocks adds mock expectations for PostgreSQL label resolution queries.
+// The expectations match the queries executed by resolveKeyIDs, resolvePairIDs, and
+// resolvePairIDsMulti in the order they are called from ApplyLabelFilters.
+func setupLabelResolutionMocks(mock sqlmock.Sqlmock, labelFilters *models.LabelFilters) {
+	// resolveKeyIDs - needed for Exists, NotExists, NotIn
+	allKeys := make(map[string]struct{})
+	for _, k := range labelFilters.Exists {
+		allKeys[k] = struct{}{}
+	}
+	for _, k := range labelFilters.NotExists {
+		allKeys[k] = struct{}{}
+	}
+	for k := range labelFilters.NotIn {
+		allKeys[k] = struct{}{}
+	}
+
+	if len(allKeys) > 0 {
+		keySlice := slices.Sorted(maps.Keys(allKeys))
+		query, _, _ := sqlx.In("SELECT id, key FROM label_key WHERE key IN (?)", keySlice)
+		query = sqlx.Rebind(sqlx.DOLLAR, query)
+
+		rows := sqlmock.NewRows([]string{"id", "key"})
+		for i, k := range keySlice {
+			rows.AddRow(int64(i+1), k)
+		}
+		mock.ExpectQuery(regexp.QuoteMeta(query)).WillReturnRows(rows)
+	}
+
+	// resolvePairIDs - needed for Equals, NotEquals
+	allEqualsPairs := make(map[string]string)
+	maps.Copy(allEqualsPairs, labelFilters.Equals)
+	maps.Copy(allEqualsPairs, labelFilters.NotEquals)
+
+	if len(allEqualsPairs) > 0 {
+		keys := slices.Sorted(maps.Keys(allEqualsPairs))
+		tupleFragments := make([]string, 0, len(keys))
+		for i := range keys {
+			tupleFragments = append(tupleFragments, fmt.Sprintf("($%d, $%d)", i*2+1, i*2+2))
+		}
+		query := fmt.Sprintf(
+			"SELECT lkv.id, lk.key, lv.value FROM label_key_value lkv "+
+				"JOIN label_key lk ON lk.id = lkv.key_id "+
+				"JOIN label_value lv ON lv.id = lkv.value_id "+
+				"WHERE (lk.key, lv.value) IN (%s)",
+			strings.Join(tupleFragments, ", "),
+		)
+
+		rows := sqlmock.NewRows([]string{"id", "key", "value"})
+		for i, k := range keys {
+			rows.AddRow(int64(100+i), k, allEqualsPairs[k])
+		}
+		mock.ExpectQuery(regexp.QuoteMeta(query)).WillReturnRows(rows)
+	}
+
+	// resolvePairIDsMulti - needed for In, NotIn
+	allMultiPairs := make(map[string][]string)
+	for k, v := range labelFilters.In {
+		allMultiPairs[k] = append(allMultiPairs[k], v...)
+	}
+	for k, v := range labelFilters.NotIn {
+		allMultiPairs[k] = append(allMultiPairs[k], v...)
+	}
+
+	if len(allMultiPairs) > 0 {
+		keys := slices.Sorted(maps.Keys(allMultiPairs))
+		tupleFragments := make([]string, 0)
+		paramIdx := 1
+		for _, key := range keys {
+			for range allMultiPairs[key] {
+				tupleFragments = append(tupleFragments, fmt.Sprintf("($%d, $%d)", paramIdx, paramIdx+1))
+				paramIdx += 2
+			}
+		}
+		query := fmt.Sprintf(
+			"SELECT lkv.id, lk.key, lv.value FROM label_key_value lkv "+
+				"JOIN label_key lk ON lk.id = lkv.key_id "+
+				"JOIN label_value lv ON lv.id = lkv.value_id "+
+				"WHERE (lk.key, lv.value) IN (%s)",
+			strings.Join(tupleFragments, ", "),
+		)
+
+		rows := sqlmock.NewRows([]string{"id", "key", "value"})
+		id := int64(200)
+		for _, k := range keys {
+			for _, v := range allMultiPairs[k] {
+				rows.AddRow(id, k, v)
+				id++
+			}
+		}
+		mock.ExpectQuery(regexp.QuoteMeta(query)).WillReturnRows(rows)
+	}
+}
+
 func TestQueryResourcesWithLabelFilters(t *testing.T) {
 
-	// NOTE: The extra values are commented because they make the unit tests flaky
-	// The reason behind is that the order of arguments in a map is not deterministic
 	var filterTests = []struct {
 		name         string
 		labelFilters models.LabelFilters
-		args         *arrayArg
 	}{
 		{
 			name: "existence", // kubectl get pods -l 'key1, key2'
@@ -395,7 +487,6 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 					"key2": "value2",
 				},
 			},
-			args: &arrayArg{[][]map[string]string{{{"key1": "value1"}, {"key2": "value2"}}}},
 		},
 		{
 			name: "set based", // kubectl get pods -l 'key1 in (value1, value3), key2 in (value2)'
@@ -405,7 +496,6 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 					"key2": {"value2"},
 				},
 			},
-			args: &arrayArg{[][]map[string]string{{{"key1": "value1"}, {"key1": "value3"}}, {{"key2": "value2"}}}},
 		},
 		{
 			name: "set not based", // kubectl get pods -l 'key1 notin (value1, value3), key2 notin (value2)'
@@ -415,7 +505,6 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 					"key2": {"value2"},
 				},
 			},
-			args: &arrayArg{[][]map[string]string{{{"key1": "value1"}, {"key1": "value3"}}, {{"key2": "value2"}}}},
 		},
 		{
 			name: "all filters", // kubectl get pods -l 'key1, !key2, key3=value3, key4!=value4, key5 in (value5,value6), key6 notin (value6)'
@@ -434,54 +523,38 @@ func TestQueryResourcesWithLabelFilters(t *testing.T) {
 		for _, ttt := range filterTests {
 			t.Run(fmt.Sprintf("%s %s", tt.name, ttt.name), func(t *testing.T) {
 				filter := tt.database.getFilter()
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+				defer cancel()
+
+				db, mock := NewMock()
+				tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+				querier := sqlx.NewDb(db, "sqlmock")
+				isPostgreSQL := tt.name == "postgresql"
+
+				// Set up resolution expectations for building expected SQL
+				if isPostgreSQL && !ttt.labelFilters.IsEmpty() {
+					setupLabelResolutionMocks(mock, &ttt.labelFilters)
+				}
+
+				// Build expected SQL
 				sb := tt.database.getSelector().ResourceSelector()
-				mainWhereClause := sqlbuilder.NewWhereClause()
-				cond := sqlbuilder.NewCond()
-				mainWhereClause.AddWhereExpr(cond.Args, filter.KindApiVersionFilter(*cond, podKind, podApiVersion))
-				sb.AddWhereClause(mainWhereClause)
-				if ttt.labelFilters.Exists != nil {
-					sb.Where(filter.ExistsLabelFilter(sb.Cond, ttt.labelFilters.Exists, nil))
-				}
-				if ttt.labelFilters.NotExists != nil {
-					sb.Where(filter.NotExistsLabelFilter(sb.Cond, ttt.labelFilters.NotExists, nil))
-				}
-				if ttt.labelFilters.Equals != nil {
-					sb.Where(filter.EqualsLabelFilter(sb.Cond, ttt.labelFilters.Equals, nil))
-				}
-				if ttt.labelFilters.NotEquals != nil {
-					sb.Where(filter.NotEqualsLabelFilter(sb.Cond, ttt.labelFilters.NotEquals, mainWhereClause))
-				}
-				if ttt.labelFilters.In != nil {
-					sb.Where(filter.InLabelFilter(sb.Cond, ttt.labelFilters.In, nil))
-				}
-				if ttt.labelFilters.NotIn != nil {
-					sb.Where(filter.NotInLabelFilter(sb.Cond, ttt.labelFilters.NotIn, nil))
+				sb.Where(filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion))
+				if !ttt.labelFilters.IsEmpty() {
+					err := filter.ApplyLabelFilters(ctx, querier, sb, &ttt.labelFilters)
+					assert.NoError(t, err)
 				}
 				sb = tt.database.getSorter().CreationTSAndIDSorter(sb)
 				sb.Limit(100)
 				query, args := sb.BuildWithFlavor(tt.database.getFlavor())
-				db, mock := NewMock()
-				tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+
+				// Set up resolution expectations for actual QueryResources call
+				if isPostgreSQL && !ttt.labelFilters.IsEmpty() {
+					setupLabelResolutionMocks(mock, &ttt.labelFilters)
+				}
+
 				rows := sqlmock.NewRows(resourceQueryColumns)
 				rows.AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource))
-				// In inequality, set-based and set not based, the order of the arguments is not ensured
-				// That's why there is a custom validator function for this arguments
-				if ttt.args != nil {
-					expectedArgs := make([]driver.Value, 0)
-					for _, expectedArg := range args {
-						switch expectedArg.(type) {
-						case string, int:
-							expectedArgs = append(expectedArgs, expectedArg)
-						default:
-							expectedArgs = append(expectedArgs, ttt.args)
-						}
-					}
-					mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(expectedArgs...).WillReturnRows(rows)
-				} else {
-					mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
-				}
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-				defer cancel()
+				mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 				resources, err := tt.database.QueryResources(ctx, podKind, version,
 					"", "", "", "",
@@ -831,12 +904,26 @@ func TestTimestampFilterWithLabelFilters(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filter := tt.database.getFilter()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+
+			db, mock := NewMock()
+			tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+			querier := sqlx.NewDb(db, "sqlmock")
+			isPostgreSQL := tt.name == "postgresql"
+
+			// Set up resolution expectations for building expected SQL
+			if isPostgreSQL {
+				setupLabelResolutionMocks(mock, labelFilters)
+			}
+
 			sb := tt.database.getSelector().ResourceSelector()
 			sb.Where(filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion))
 
 			// Add both timestamp and label filters
 			sb.Where(filter.CreationTimestampAfterFilter(sb.Cond, testTime))
-			sb.Where(filter.EqualsLabelFilter(sb.Cond, labelFilters.Equals, nil))
+			err := filter.ApplyLabelFilters(ctx, querier, sb, labelFilters)
+			assert.NoError(t, err)
 
 			sb = tt.database.getSorter().CreationTSAndIDSorter(sb)
 			sb.Limit(100)
@@ -846,20 +933,18 @@ func TestTimestampFilterWithLabelFilters(t *testing.T) {
 			assert.Contains(t, query, "creationTimestamp")
 
 			// For PostgreSQL, verify labels filter is present
-			// Note: MariaDB label filters are not fully implemented yet
-			if tt.name == "postgresql" {
-				assert.Contains(t, query, "labels")
+			if isPostgreSQL {
+				assert.Contains(t, query, "resource_label")
 			}
 
-			db, mock := NewMock()
-			tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+			// Set up resolution expectations for actual QueryResources call
+			if isPostgreSQL {
+				setupLabelResolutionMocks(mock, labelFilters)
+			}
 
 			rows := sqlmock.NewRows(resourceQueryColumns)
 			rows.AddRow("2024-04-05T09:58:03Z", 1, json.RawMessage(testPodResource))
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
-
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-			defer cancel()
 
 			resources, err := tt.database.QueryResources(ctx, podKind, podApiVersion, "", "",
 				"", "", labelFilters, &testTime, nil, 100)

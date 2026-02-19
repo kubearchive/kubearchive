@@ -42,3 +42,4 @@
 ** xref:design/logging-integration.adoc[]
 ** xref:design/database-interface.adoc[]
 ** xref:design/database-migrations.adoc[]
+** xref:design/postgresql-label-filtering.adoc[]

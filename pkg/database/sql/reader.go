@@ -50,7 +50,6 @@ func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion,
 	if namespace != "" {
 		sb.Where(db.filter.NamespaceFilter(sb.Cond, namespace))
 	}
-	mainWhereClause := sqlbuilder.CopyWhereClause(sb.WhereClause)
 
 	isWildcardQuery := false
 	if name != "" {
@@ -73,23 +72,10 @@ func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion,
 		if creationTimestampBefore != nil {
 			sb.Where(db.filter.CreationTimestampBeforeFilter(sb.Cond, *creationTimestampBefore))
 		}
-		if labelFilters.Exists != nil {
-			sb.Where(db.filter.ExistsLabelFilter(sb.Cond, labelFilters.Exists, mainWhereClause))
-		}
-		if labelFilters.NotExists != nil {
-			sb.Where(db.filter.NotExistsLabelFilter(sb.Cond, labelFilters.NotExists, mainWhereClause))
-		}
-		if labelFilters.Equals != nil {
-			sb.Where(db.filter.EqualsLabelFilter(sb.Cond, labelFilters.Equals, mainWhereClause))
-		}
-		if labelFilters.NotEquals != nil {
-			sb.Where(db.filter.NotEqualsLabelFilter(sb.Cond, labelFilters.NotEquals, mainWhereClause))
-		}
-		if labelFilters.In != nil {
-			sb.Where(db.filter.InLabelFilter(sb.Cond, labelFilters.In, mainWhereClause))
-		}
-		if labelFilters.NotIn != nil {
-			sb.Where(db.filter.NotInLabelFilter(sb.Cond, labelFilters.NotIn, mainWhereClause))
+		if !labelFilters.IsEmpty() {
+			if err := db.filter.ApplyLabelFilters(ctx, db.db, sb, labelFilters); err != nil {
+				return nil, err
+			}
 		}
 		sb = db.sorter.CreationTSAndIDSorter(sb)
 		sb.Limit(limit)

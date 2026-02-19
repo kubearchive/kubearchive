@@ -12,6 +12,7 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/huandu/go-sqlbuilder"
+	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/database/env"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
@@ -83,34 +84,58 @@ func (mariaDBFilter) OwnerFilter(cond sqlbuilder.Cond, uuids []string) string {
 		cond.Var(sqlbuilder.List(uuids)))
 }
 
-func (mariaDBFilter) ExistsLabelFilter(cond sqlbuilder.Cond, labels []string, clause *sqlbuilder.WhereClause) string {
+func (mariaDBFilter) existsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
 	// TODO
 	return ""
 }
 
-func (mariaDBFilter) NotExistsLabelFilter(cond sqlbuilder.Cond, labels []string, clause *sqlbuilder.WhereClause) string {
+func (mariaDBFilter) notExistsLabelFilter(cond sqlbuilder.Cond, labels []string) string {
 	// TODO
 	return ""
 }
 
-func (mariaDBFilter) EqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string {
+func (mariaDBFilter) equalsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
 	// TODO
 	return ""
 }
 
-func (mariaDBFilter) NotEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string, clause *sqlbuilder.WhereClause) string {
+func (mariaDBFilter) notEqualsLabelFilter(cond sqlbuilder.Cond, labels map[string]string) string {
 	// TODO
 	return ""
 }
 
-func (mariaDBFilter) InLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string {
+func (mariaDBFilter) inLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
 	// TODO
 	return ""
 }
 
-func (mariaDBFilter) NotInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string, clause *sqlbuilder.WhereClause) string {
+func (mariaDBFilter) notInLabelFilter(cond sqlbuilder.Cond, labels map[string][]string) string {
 	// TODO
 	return ""
+}
+
+func (f mariaDBFilter) ApplyLabelFilters(_ context.Context, _ sqlx.QueryerContext, sb *sqlbuilder.SelectBuilder, labelFilters *models.LabelFilters) error {
+	// TODO: Implement label filtering for MariaDB
+	// For now, delegate to stub helper methods to maintain interface compatibility
+	if labelFilters.Exists != nil {
+		sb.Where(f.existsLabelFilter(sb.Cond, labelFilters.Exists))
+	}
+	if labelFilters.NotExists != nil {
+		sb.Where(f.notExistsLabelFilter(sb.Cond, labelFilters.NotExists))
+	}
+	if labelFilters.Equals != nil {
+		sb.Where(f.equalsLabelFilter(sb.Cond, labelFilters.Equals))
+	}
+	if labelFilters.NotEquals != nil {
+		sb.Where(f.notEqualsLabelFilter(sb.Cond, labelFilters.NotEquals))
+	}
+	if labelFilters.In != nil {
+		sb.Where(f.inLabelFilter(sb.Cond, labelFilters.In))
+	}
+	if labelFilters.NotIn != nil {
+		sb.Where(f.notInLabelFilter(sb.Cond, labelFilters.NotIn))
+	}
+	return nil
 }
 
 type mariaDBSorter struct{}

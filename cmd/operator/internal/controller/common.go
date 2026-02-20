@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"log/slog"
 	"slices"
 	"strings"
 
@@ -13,7 +14,6 @@ import (
 	meta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kubearchivev1 "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 )
@@ -48,7 +48,6 @@ func desiredClusterRoleBinding(name string, kind string, subjects ...rbacv1.Subj
 }
 
 func createPolicyRules(ctx context.Context, mapper meta.RESTMapper, resources []kubearchivev1.APIVersionKind, verbs []string) []rbacv1.PolicyRule {
-	log := log.FromContext(ctx)
 	groups := make(map[string][]string)
 
 	for _, resource := range resources {
@@ -68,7 +67,7 @@ func createPolicyRules(ctx context.Context, mapper meta.RESTMapper, resources []
 			}
 			groups[apiGroup] = append(groups[apiGroup], strings.ToLower(gvr.Resource.Resource))
 		} else {
-			log.Error(err, "Failed to get GVR for "+resource.APIVersion)
+			slog.Error("Failed to get GVR", "error", err, "apiVersion", resource.APIVersion)
 		}
 	}
 

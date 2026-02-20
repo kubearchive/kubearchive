@@ -7,17 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/kubearchive/kubearchive/pkg/cel"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
-
-// log is for logging in this package.
-var ckaclog = logf.Log.WithName("clusterkubearchiveconfig-resource")
 
 func SetupCKACWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -40,7 +37,7 @@ func (ckaccd *ClusterKubeArchiveConfigCustomDefaulter) Default(_ context.Context
 	if !ok {
 		return fmt.Errorf("expected an ClusterKubeArchiveConfig object but got %T", obj)
 	}
-	ckaclog.Info("default", "name", ckac.Name)
+	slog.Info("clusterkubearchiveconfig default", "name", ckac.Name)
 
 	// Set default values for KeepLastWhen rules
 	for i := range ckac.Spec.Resources {
@@ -69,7 +66,7 @@ func (ckaccv *ClusterKubeArchiveConfigCustomValidator) ValidateCreate(_ context.
 	if !ok {
 		return nil, fmt.Errorf("expected an ClusterKubeArchiveConfig object but got %T", obj)
 	}
-	ckaclog.Info("validate create", "name", ckac.Name)
+	slog.Info("clusterkubearchiveconfig validate create", "name", ckac.Name)
 
 	return ckaccv.validateKAC(ckac)
 }
@@ -80,7 +77,7 @@ func (ckaccv *ClusterKubeArchiveConfigCustomValidator) ValidateUpdate(_ context.
 	if !ok {
 		return nil, fmt.Errorf("expected an ClusterKubeArchiveConfig object but got %T", new)
 	}
-	ckaclog.Info("validate update", "name", ckac.Name)
+	slog.Info("clusterkubearchiveconfig validate update", "name", ckac.Name)
 
 	return ckaccv.validateKAC(ckac)
 }
@@ -91,7 +88,7 @@ func (ckaccv *ClusterKubeArchiveConfigCustomValidator) ValidateDelete(_ context.
 	if !ok {
 		return nil, fmt.Errorf("expected an ClusterKubeArchiveConfig object but got %T", new)
 	}
-	ckaclog.Info("validate delete", "name", ckac.Name)
+	slog.Info("clusterkubearchiveconfig validate delete", "name", ckac.Name)
 
 	return nil, nil
 }

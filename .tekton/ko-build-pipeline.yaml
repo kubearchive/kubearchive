@@ -67,7 +67,7 @@ spec:
       description: PR tag to use on image
       name: pr-tag
       type: string
-    - default: quay.io/konflux-ci/operator-sdk-builder:latest@sha256:e08de236089a3756535b5be1abacc3f465b1f5771efd8a40c7a2dae4febd67d7
+    - default: quay.io/konflux-ci/operator-sdk-builder:latest@sha256:2737ff035f3a6d94e189cd31e7653998525c52f4d4db994ba1874a3a74bb4912
       description: Script runner image
       name: script-runner-image
       type: string

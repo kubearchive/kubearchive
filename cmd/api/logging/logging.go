@@ -115,29 +115,49 @@ func LogRetrieval() gin.HandlerFunc {
 
 		defer response.Body.Close()
 
-		reader := bufio.NewReader(response.Body)
-		var readErr error
-		var logsReturned bool
-		var line []byte
+		if response.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(io.LimitReader(response.Body, 1024))
+			abort.Abort(c, fmt.Errorf("error response: %d - %s", response.StatusCode, body), response.StatusCode)
+			return
+		}
 
-		for readErr != io.EOF {
-			line, readErr = reader.ReadBytes('\n')
-			if response.StatusCode != http.StatusOK {
-				abort.Abort(c, fmt.Errorf("error response: %d - %s", response.StatusCode, line), response.StatusCode)
-				return
-			}
+		reader := bufio.NewReader(response.Body)
+		var logsReturned bool
+
+		for {
+			line, readErr := reader.ReadBytes('\n')
 			if readErr != nil && readErr != io.EOF {
-				abort.Abort(c, readErr, http.StatusInternalServerError)
+				if logsReturned {
+					slog.ErrorContext(c.Request.Context(), "error reading log line after streaming started", "error", readErr)
+				} else {
+					abort.Abort(c, readErr, http.StatusInternalServerError)
+				}
 				return
 			}
 			parsedLine, errParseLine := parseLine(line, jsonPathParser)
 			if errParseLine != nil {
-				abort.Abort(c, errParseLine, http.StatusInternalServerError)
+				if logsReturned {
+					slog.ErrorContext(c.Request.Context(), "error parsing log line after streaming started", "error", errParseLine)
+				} else {
+					abort.Abort(c, errParseLine, http.StatusInternalServerError)
+				}
 				return
 			}
 			if parsedLine != "" {
-				logsReturned = true
-				c.String(http.StatusOK, parsedLine+"\n")
+				if !logsReturned {
+					c.Header("Content-Type", "text/plain; charset=utf-8")
+					c.Status(http.StatusOK)
+					logsReturned = true
+				}
+				if _, err := fmt.Fprintln(c.Writer, parsedLine); err != nil { // #nosec G705 -- Content-Type is text/plain
+					slog.ErrorContext(c.Request.Context(), "error writing log line", "error", err)
+					return
+				}
+				c.Writer.Flush()
+			}
+
+			if readErr == io.EOF {
+				break
 			}
 		}
 

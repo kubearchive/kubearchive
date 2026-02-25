@@ -846,3 +846,32 @@ func TestRun(t *testing.T) {
 		})
 	}
 }
+
+func TestBeforeParamProperlyWorking(t *testing.T) {
+	testCases := []struct {
+		name     string
+		before   time.Time
+		expected string
+	}{
+		{
+			name:     "before is really before now",
+			before:   time.Now().Add(-1 * time.Hour),
+			expected: time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
+		},
+		{
+			name:     "before is after now",
+			before:   time.Now().Add(1 * time.Hour),
+			expected: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			o := GetOptions{}
+			o.Before = tc.before
+			params := o.buildKubeArchiveQueryParams()
+
+			assert.Equal(t, tc.expected, params.Get("creationTimestampBefore"))
+		})
+	}
+}

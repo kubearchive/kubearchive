@@ -95,55 +95,121 @@ In this example the following happens:
 
 [IMPORTANT]
 ====
-The KubeArchive Sink and API are not aware of changes to the `kubearchive-logging` `ConfigMap` or `Secret`.
-After making changes to them, both elements should be restarted. The following
-command can be used to perform the restart:
+The logging configuration is read once at startup. Changes to the logging
+`ConfigMaps` or `Secret` require restarting the affected components:
 
 [source, bash]
 ----
-kubectl rollout restart deployment --selector=app=kubearchive-sink
-kubectl rollout restart deployment --selector=app=kubearchive-api-server
+kubectl rollout restart deployment --selector=app=kubearchive-sink   # <1>
+kubectl rollout restart deployment --selector=app=kubearchive-api-server  # <2>
 ----
+
+<1> Restart the Sink after changes to the writer ConfigMap.
+<2> Restart the API Server after changes to the reader ConfigMap or the secret.
 ====
 
-=== ConfigMap
+The logging configuration is split into three Kubernetes resources:
 
-To support multiple logging systems, the URLs must be able to be parameterized
-based on the logging system. This is done via a `ConfigMap` named
-`kubearchive-logging`.
-The ConfigMap contains entries that are used to generate logging URLs.
-The only required key in this ConfigMap is `LOG_URL`.
+* `kubearchive-logging-writer` ConfigMap -- used by the Sink to generate log URLs and query metadata at archival time.
+* `kubearchive-logging-reader` ConfigMap -- used by the API Server to know how to query each logging backend.
+* `kubearchive-logging` Secret -- used by the API Server to authenticate requests to the logging backends.
 
-.Example of kubearchive-logging ConfigMap for Splunk
+The API Server mounts the reader ConfigMap and the secret together as a projected volume.
+The Sink only mounts the writer ConfigMap.
+
+=== Writer ConfigMap
+
+The `kubearchive-logging-writer` ConfigMap is used by the Sink. It contains entries
+for generating log URLs and query metadata when resources are archived. The key
+`LOG_URL` is required and specifies the base URL of the logging backend. Other
+keys define template variables whose values are extracted from the resource using
+link:https://github.com/google/cel-spec[CEL] expressions.
+
+.Example of kubearchive-logging-writer ConfigMap
 [source,yaml]
 ----
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubearchive-logging
+  name: kubearchive-logging-writer
   namespace: kubearchive
 data:
-  # CONTAINER_NAME: "cel:spec.containers.map(m, m.name)" <1>
-  POD_ID: "cel:metadata.uid" <2>
-  LOG_URL: "https://splunk-single-standalone-service.splunk-operator.svc.cluster.local:8089/services/search/jobs/export?search=search%20%2A%20%7C%20spath%20%22kubernetes.pod_id%22%20%7C%20search%20%22kubernetes.pod_id%22%3D%22{POD_ID}%22%20%7C%20spath%20%22kubernetes.container_name%22%20%7C%20search%20%22kubernetes.container_name%22%3D%22{CONTAINER_NAME}%22%20%7C%20sort%20time%20%7C%20table%20%22message%22&output_mode=json" <3>
-  LOG_URL_JSONPATH: "$.hits.hits[*]._source.message" <4>
+  POD_ID: "cel:metadata.uid" # <1>
+  QUERY: "kubernetes.pod_id:{POD_ID} AND kubernetes.container_name:{CONTAINER_NAME}" # <2>
+  LOG_URL: "https://my-logging-backend.example.com:9200" # <3>
 ----
 
-<1> The `CONTAINER_NAME` parameter is provided at URL generation time by KubeArchive.
-<2> The string to replace `POD_ID` inside the `LOG_URL` template.
-If it's prefixed with `cel:`, it is considered as a CEL expression to locate its value
-within the body of the Cloud Event where the resource is stored.
-<3> The template for the log URL. The `CONTAINER_NAME` variable is allowed
-even if it's not defined in the `ConfigMap` as it's provided at URL generation time.
-<4> Optional
-link:https://goessner.net/articles/JsonPath/[JSONPath Expression]
-applied by the API Server to the output of the response body.
+<1> Values prefixed with `cel:` are CEL expressions evaluated against the resource body.
+`{POD_ID}` and `{CONTAINER_NAME}` are substituted at URL generation time.
+<2> `QUERY` is stored alongside the log URL and made available to the reader at query time.
+The `{CONTAINER_NAME}` variable is always provided by KubeArchive.
+<3> The base URL of the logging backend. This URL is used as a key to match a provider
+in the reader ConfigMap and the secret headers.
+
+Additional supported keys include `NAMESPACE`, `START`, and `END`, whose values
+are also stored and made available for variable substitution at query time.
+
+=== Reader ConfigMap
+
+The `kubearchive-logging-reader` ConfigMap is used by the API Server. It contains
+a single key `LOG_PROVIDERS` with a YAML value that defines how to query each
+logging backend. The top-level keys in the YAML are the base URLs of the logging
+backends (matching the `LOG_URL` from the writer ConfigMap). Each backend defines
+a `tail` and/or `full` endpoint configuration.
+
+.Example of kubearchive-logging-reader ConfigMap
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-logging-reader
+  namespace: kubearchive
+data:
+  LOG_PROVIDERS: |
+    https://my-logging-backend.example.com:9200: # <1>
+      tail: # <2>
+        reverse: true # <3>
+        path: /index/_search # <4>
+        method: GET # <5>
+        params: # <6>
+          q: ${QUERY}
+          size: ${TAIL_LINES}
+          sort: "@timestamp:desc"
+        json-path: "$.hits.hits[*]._source.message" # <7>
+      full: # <8>
+        reverse: false
+        path: /index/_search
+        method: GET
+        params:
+          q: ${QUERY}
+          size: 10000
+          sort: "@timestamp:asc"
+        json-path: "$.hits.hits[*]._source.message"
+----
+
+<1> The base URL must match the `LOG_URL` in the writer ConfigMap.
+<2> `tail` defines the endpoint used when the `tailLines` query parameter is provided.
+<3> When `reverse` is `true`, the API Server buffers all results and reverses
+them before returning. Buffering also occurs when the `tailLines` query parameter
+is set, so that only the last N lines are returned. When neither condition applies,
+results are streamed directly to the client as they are read.
+<4> The path appended to the base URL.
+<5> HTTP method. Supports `GET` (with query parameters) and `POST` (with JSON body).
+<6> Query parameters for `GET` requests. For `POST` requests, use `body` instead.
+Template variables like `${QUERY}`, `${TAIL_LINES}`, `${START}`, `${END}`,
+and `${NAMESPACE}` are substituted at request time.
+<7> Optional link:https://goessner.net/articles/JsonPath/[JSONPath expression]
+applied to the response body to extract log lines.
+<8> `full` defines the endpoint used when no `tailLines` parameter is provided.
 
 === Secret
 
-The headers that are needed for querying the logging API should be included in a `kubearchive-logging` `Secret`.
-For example, a basic authentication with the user `user` and password `password will be as follows:
+Authentication headers for each logging backend are stored in a `kubearchive-logging`
+Secret under a single `HEADERS` key. The value is a YAML document that maps each
+backend base URL to its required HTTP headers.
 
 .Example of kubearchive-logging Secret
 [source, yaml]
@@ -156,45 +222,197 @@ metadata:
   namespace: kubearchive
 type: Opaque
 stringData:
-  Authorization: "Basic YWRtaW46cGFzc3dvcmQ=" # <1>
+  HEADERS: | # <1>
+    https://my-logging-backend.example.com:9200: # <2>
+      Authorization: "Basic YWRtaW46cGFzc3dvcmQ=" # <3>
 ----
 
-<1> The token is `user:password` in base64 encoding.
+<1> The `HEADERS` key contains a YAML document with per-backend headers.
+<2> The base URL must match the `LOG_URL` in the writer ConfigMap.
+<3> HTTP headers sent with every request to this backend.
 
 == Supported Logging Systems
 
-KubeArchive currently integrates with both Splunk and Elasticsearch
+KubeArchive currently integrates with Elasticsearch, Splunk, and Loki.
+
+[TIP]
+====
+Because the reader ConfigMap and the secret are keyed by base URL, multiple
+logging backends can coexist at the same time. This is useful when migrating
+from one backend to another -- both can be configured in `LOG_PROVIDERS` and
+`HEADERS` simultaneously, allowing KubeArchive to serve logs from either
+backend depending on which URL was stored with the resource at archival time.
+====
 
 === Elasticsearch
 
-.Example of kubearchive-logging ConfigMap for ElasticSearch integration
+.Writer ConfigMap for Elasticsearch
 [source,yaml]
 ----
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubearchive-logging
-  namespace: kubearchive
+  name: kubearchive-logging-writer
 data:
   POD_ID: "cel:metadata.uid"
-  LOG_URL: "https://localhost:9200/fluentd/_search?_source_includes=message&size=10000&sort=_doc&q=kubernetes.pod_id:{POD_ID}%20AND%20kubernetes.container_name:{CONTAINER_NAME}"
-  LOG_URL_JSONPATH: "$.hits.hits[*]._source.message"
+  QUERY: "kubernetes.pod_id:{POD_ID} AND kubernetes.container_name:{CONTAINER_NAME}"
+  LOG_URL: "https://kubearchive-es-http.elastic-system.svc.cluster.local:9200"
+----
+
+.Reader ConfigMap for Elasticsearch
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-logging-reader
+data:
+  LOG_PROVIDERS: |
+    https://kubearchive-es-http.elastic-system.svc.cluster.local:9200:
+      tail:
+        reverse: true
+        path: /fluentd/_search
+        method: GET
+        params:
+          q: ${QUERY}
+          _source_includes: message
+          sort: "@timestamp:desc"
+          size: ${TAIL_LINES}
+        json-path: "$.hits.hits[*]._source.message"
+      full:
+        reverse: false
+        path: /fluentd/_search
+        method: GET
+        params:
+          q: ${QUERY}
+          _source_includes: message
+          sort: "@timestamp:asc"
+          size: 10000
+        json-path: "$.hits.hits[*]._source.message"
 ----
 
 === Splunk
 
-.Example of kubearchive-logging ConfigMap for Splunk integration
+.Writer ConfigMap for Splunk
 [source,yaml]
 ----
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubearchive-logging
-  namespace: kubearchive
+  name: kubearchive-logging-writer
 data:
   POD_ID: "cel:metadata.uid"
-  LOG_URL: "https://splunk-single-standalone-service.splunk-operator.svc.cluster.local:8089/services/search/jobs/export?search=search%20%2A%20%7C%20spath%20%22kubernetes.pod_id%22%20%7C%20search%20%22kubernetes.pod_id%22%3D%22{POD_ID}%22%20%7C%20spath%20%22kubernetes.container_name%22%20%7C%20search%20%22kubernetes.container_name%22%3D%22{CONTAINER_NAME}%22%20%7C%20sort%20time%20%7C%20table%20%22message%22&output_mode=json"
-  LOG_URL_JSONPATH: "$[*].result.message"
+  QUERY: 'search * | spath "kubernetes.pod_id" | search "kubernetes.pod_id"="{POD_ID}" | spath "kubernetes.container_name" | search "kubernetes.container_name"="{CONTAINER_NAME}" | sort time | table "message"'
+  LOG_URL: "https://splunk-single-standalone-service.splunk-operator.svc.cluster.local:8089"
+----
+
+.Reader ConfigMap for Splunk
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-logging-reader
+data:
+  LOG_PROVIDERS: |
+    https://splunk-single-standalone-service.splunk-operator.svc.cluster.local:8089:
+      tail:
+        reverse: false
+        path: /services/search/jobs/export
+        method: GET
+        params:
+          search: ${QUERY} | head ${TAIL_LINES}
+          output_mode: json
+        json-path: "$.result.message"
+      full:
+        reverse: false
+        path: /services/search/jobs/export
+        method: GET
+        params:
+          search: ${QUERY}
+          output_mode: json
+        json-path: "$.result.message"
+----
+
+.Secret for Splunk
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubearchive-logging
+stringData:
+  HEADERS: |
+    https://splunk-single-standalone-service.splunk-operator.svc.cluster.local:8089:
+      Authorization: "Basic YWRtaW46cGFzc3dvcmQ="
+----
+
+=== Loki
+
+.Writer ConfigMap for Loki
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-logging-writer
+data:
+  NAMESPACE: "cel:metadata.namespace"
+  POD_ID: "cel:metadata.uid"
+  START: "cel:status.?startTime == optional.none() ? int(now()-duration('1h'))*1000000000: status.startTime"
+  QUERY: '{stream="{NAMESPACE}"} | pod_id = `{POD_ID}` | container = `{CONTAINER_NAME}`'
+  LOG_URL: "http://loki-gateway.grafana-loki.svc.cluster.local:80"
+----
+
+.Reader ConfigMap for Loki
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-logging-reader
+data:
+  LOG_PROVIDERS: |
+    http://loki-gateway.grafana-loki.svc.cluster.local:80:
+      tail:
+        reverse: true
+        path: /loki/api/v1/query_range
+        method: GET
+        params:
+          query: ${QUERY}
+          start: ${START}
+          limit: ${TAIL_LINES}
+          direction: backward
+        json-path: "$.data.result[*].values[*][1]"
+      full:
+        reverse: false
+        path: /loki/api/v1/query_range
+        method: GET
+        params:
+          query: ${QUERY}
+          start: ${START}
+          limit: 10000
+          direction: forward
+        json-path: "$.data.result[*].values[*][1]"
+----
+
+.Secret for Loki
+[source,yaml]
+----
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubearchive-logging
+stringData:
+  HEADERS: |
+    http://loki-gateway.grafana-loki.svc.cluster.local:80:
+      X-Scope-OrgID: "kubearchive"
 ----

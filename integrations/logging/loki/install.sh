@@ -122,13 +122,16 @@ fi
 
 # If KubeArchive is installed, update the credentials and set the jsonpath
 KUBEARCHIVE_NS="kubearchive"
+LOKI_ENDPOINT="http://loki-gateway.${NAMESPACE}.svc.cluster.local:80"
 if kubectl get ns ${KUBEARCHIVE_NS} >& /dev/null; then
-    # Configure the logging configmap
-    kubectl patch -n ${KUBEARCHIVE_NS} configmap kubearchive-logging --patch-file ${SCRIPT_DIR}/patch-logging-configmap.yaml
+    # Configure the writer configmap (sink)
+    kubectl patch -n ${KUBEARCHIVE_NS} configmap kubearchive-logging-writer --patch-file ${SCRIPT_DIR}/patch-logging-configmap.yaml
     kubectl -n ${KUBEARCHIVE_NS} rollout restart deployment kubearchive-sink
-    # Configure the password and tenant for the api server
-    kubectl patch -n ${KUBEARCHIVE_NS} secret kubearchive-logging --patch-file ${SCRIPT_DIR}/patch-logging-secret.yaml
-    kubectl patch -n ${KUBEARCHIVE_NS} secret kubearchive-logging -p "{\"stringData\": {\"Authorization\": \"Basic $(echo -n "${LOKI_USERNAME}:${LOKI_PWD}" | base64)\"}}"
+    # Configure the reader configmap (api server)
+    kubectl patch -n ${KUBEARCHIVE_NS} configmap kubearchive-logging-reader --patch-file ${SCRIPT_DIR}/patch-logging-reader-configmap.yaml
+    # Configure the HEADERS secret for the api server
+    LOKI_AUTH="Basic $(echo -n "${LOKI_USERNAME}:${LOKI_PWD}" | base64)"
+    kubectl patch -n ${KUBEARCHIVE_NS} secret kubearchive-logging -p "{\"stringData\": {\"HEADERS\": \"${LOKI_ENDPOINT}:\\n  Authorization: \\\"${LOKI_AUTH}\\\"\\n  X-Scope-OrgID: \\\"kubearchive\\\"\\n\"}}"
     kubectl -n ${KUBEARCHIVE_NS} rollout restart deployment kubearchive-api-server
 
     sleep 10 # FIXME - There is an issue with rollout and sometimes the old pod is running

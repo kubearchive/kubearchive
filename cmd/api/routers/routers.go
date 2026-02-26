@@ -190,12 +190,12 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
-	var logURL, jsonPath string
+	var logRecord *interfaces.LogRecord
 	if name != "" {
-		logURL, jsonPath, err = c.Database.QueryLogURLByName(
+		logRecord, err = c.Database.QueryLogURLByName(
 			context.Request.Context(), kind, apiVersion, namespace, name, containerName)
 	} else {
-		logURL, jsonPath, err = c.Database.QueryLogURLByUID(
+		logRecord, err = c.Database.QueryLogURLByUID(
 			context.Request.Context(), kind, apiVersion, namespace, uid, containerName)
 	}
 
@@ -208,8 +208,7 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 		return
 	}
 
-	context.Set("logURL", logURL)
-	context.Set("jsonPath", jsonPath)
+	context.Set("logRecord", logRecord)
 }
 
 func (c *Controller) GetResourceByUID(context *gin.Context) {

@@ -1,0 +1,26 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-logging-reader
+data:
+  LOG_PROVIDERS: |
+    https://splunk-single-standalone-service.splunk-operator.svc.cluster.local:8089:
+      tail:
+        reverse: false
+        path: /services/search/jobs/export
+        method: GET
+        params:
+          search: ${QUERY} | head ${TAIL_LINES}
+          output_mode: json
+        json-path: "$.result.message"
+      full:
+        reverse: false
+        path: /services/search/jobs/export
+        method: GET
+        params:
+          search: ${QUERY}
+          output_mode: json
+        json-path: "$.result.message"

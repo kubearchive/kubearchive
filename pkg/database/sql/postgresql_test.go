@@ -166,7 +166,9 @@ func TestPostgreSQLWriteResource(t *testing.T) {
 							string(k8sObj.GetUID()),
 							log.Url,
 							log.ContainerName,
-							"jsonPath",
+							log.Query,
+							log.Start,
+							log.End,
 						).BuildWithFlavor(database.flavor)
 
 						mock.ExpectExec(regexp.QuoteMeta(logQuery)).WithArgs(sliceOfAny2sliceOfValue(logArgs)...).WillReturnResult(driver.ResultNoRows)
@@ -175,7 +177,7 @@ func TestPostgreSQLWriteResource(t *testing.T) {
 
 				mock.ExpectCommit()
 
-				inserted, dbErr := database.WriteResource(context.Background(), k8sObj, data, insert.Time, "jsonPath", test.logs...)
+				inserted, dbErr := database.WriteResource(context.Background(), k8sObj, data, insert.Time, test.logs...)
 				if test.err == nil {
 					assert.Nil(t, dbErr)
 					assert.Equal(t, inserted, interfaces.WriteResourceResultInserted)

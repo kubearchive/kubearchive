@@ -26,7 +26,7 @@ func (PartialDBSelectorImpl) UUIDResourceSelector() *sqlbuilder.SelectBuilder {
 
 func (PartialDBSelectorImpl) UrlFromResourceSelector() *sqlbuilder.SelectBuilder {
 	sb := sqlbuilder.NewSelectBuilder()
-	sb.Select("log.url", "log.json_path")
+	sb.Select("log.url", "log.query", "log.start", `log."end"`)
 	sb.From("log_url log")
 	sb.Join("resource res", "log.uuid = res.uuid")
 	return sb
@@ -34,7 +34,7 @@ func (PartialDBSelectorImpl) UrlFromResourceSelector() *sqlbuilder.SelectBuilder
 
 func (PartialDBSelectorImpl) UrlSelector() *sqlbuilder.SelectBuilder {
 	sb := sqlbuilder.NewSelectBuilder()
-	return sb.Select("url", "json_path").From("log_url")
+	return sb.Select("url", "query", "start", `"end"`).From("log_url")
 }
 
 func (PartialDBSelectorImpl) VersionSelector() *sqlbuilder.SelectBuilder {

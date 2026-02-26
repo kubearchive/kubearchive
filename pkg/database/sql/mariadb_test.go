@@ -157,7 +157,9 @@ func TestMariaDBWriteResource(t *testing.T) {
 							string(obj.GetUID()),
 							log.Url,
 							log.ContainerName,
-							"jsonPath",
+							log.Query,
+							log.Start,
+							log.End,
 						).BuildWithFlavor(database.flavor)
 
 						mock.ExpectExec(regexp.QuoteMeta(logQuery)).WithArgs(sliceOfAny2sliceOfValue(logArgs)...).WillReturnResult(driver.ResultNoRows)
@@ -172,7 +174,7 @@ func TestMariaDBWriteResource(t *testing.T) {
 					mock.ExpectRollback()
 				}
 
-				_, dbErr := database.WriteResource(context.Background(), obj, data, insert.Time, "jsonPath", test.logs...)
+				_, dbErr := database.WriteResource(context.Background(), obj, data, insert.Time, test.logs...)
 				if test.err == nil {
 					assert.Nil(t, dbErr)
 				} else {

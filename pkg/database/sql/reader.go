@@ -16,6 +16,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	dbErrors "github.com/kubearchive/kubearchive/pkg/database/errors"
+	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	corev1 "k8s.io/api/core/v1"
@@ -103,38 +104,40 @@ type uuidKindDate struct {
 	Date string `db:"created_at"`
 }
 
-// Returns the log url, the json path and an error given a selector builder for a Pod
-func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbuilder.SelectBuilder, namespace, name, containerName string) (string, string, error) {
-	type logURLJsonPath struct {
-		LogURL   string `db:"url"`
-		JsonPath string `db:"json_path"`
+// Returns the log record and an error given a selector builder for a Pod
+func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbuilder.SelectBuilder, namespace, name, containerName string) (*interfaces.LogRecord, error) {
+	type logURLRecord struct {
+		URL   string         `db:"url"`
+		Query sql.NullString `db:"query"`
+		Start sql.NullString `db:"start"`
+		End   sql.NullString `db:"end"`
 	}
-	logQueryPerformer := newQueryPerformer[logURLJsonPath](db.db, db.flavor)
+	logQueryPerformer := newQueryPerformer[logURLRecord](db.db, db.flavor)
 
 	resources, err := db.performResourceQuery(ctx, sb)
 	if err != nil {
-		return "", "", fmt.Errorf("could not retrieve resource '%s/%s': %s", namespace, name, err.Error())
+		return nil, fmt.Errorf("could not retrieve resource '%s/%s': %s", namespace, name, err.Error())
 	}
 
 	if len(resources) == 0 {
-		return "", "", dbErrors.ErrResourceNotFound
+		return nil, dbErrors.ErrResourceNotFound
 	}
 	resource := resources[0]
 
-	if containerName == "" {
-		var pod corev1.Pod
-		err = json.Unmarshal([]byte(resource.Data), &pod)
-		if err != nil {
-			return "", "", fmt.Errorf("failed to deserialize pod '%s/%s': %s", namespace, name, err.Error())
-		}
+	var pod corev1.Pod
+	err = json.Unmarshal([]byte(resource.Data), &pod)
+	if err != nil {
+		return nil, fmt.Errorf("failed to deserialize pod '%s/%s': %s", namespace, name, err.Error())
+	}
 
+	if containerName == "" {
 		annotations := pod.GetAnnotations()
 		var ok bool
 		containerName, ok = annotations[defaultContainerAnnotation]
 		if !ok || containerName == "" {
 			// This is to avoid index out of bounds error with no context
 			if len(pod.Spec.Containers) == 0 {
-				return "", "", fmt.Errorf("pod '%s/%s' does not have containers, something went wrong", namespace, name)
+				return nil, fmt.Errorf("pod '%s/%s' does not have containers, something went wrong", namespace, name)
 			}
 			containerName = pod.Spec.Containers[0].Name
 		}
@@ -145,7 +148,7 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 		"found pod preferred container for logs",
 		"container", containerName,
 		"namespace", namespace,
-		"name", name,
+		"name", pod.Name,
 	)
 	sb = db.selector.UrlSelector()
 	sb.Where(
@@ -154,24 +157,33 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 	)
 	logUrls, err := logQueryPerformer.performQuery(ctx, sb)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	if len(logUrls) >= 1 {
-		return logUrls[0].LogURL, logUrls[0].JsonPath, nil
+		return &interfaces.LogRecord{
+			Namespace:     namespace,
+			PodName:       pod.Name,
+			PodUUID:       resource.Uuid,
+			ContainerName: containerName,
+			URL:           logUrls[0].URL,
+			Query:         logUrls[0].Query.String,
+			Start:         logUrls[0].Start.String,
+			End:           logUrls[0].End.String,
+		}, nil
 	} else {
-		return "", "", dbErrors.ErrResourceNotFound
+		return nil, dbErrors.ErrResourceNotFound
 	}
 }
 
-func (db *sqlDatabaseImpl) QueryLogURLByUID(ctx context.Context, kind, apiVersion, namespace, uid, containerName string) (string, string, error) {
+func (db *sqlDatabaseImpl) QueryLogURLByUID(ctx context.Context, kind, apiVersion, namespace, uid, containerName string) (*interfaces.LogRecord, error) {
 	return db.queryLogURL(ctx, kind, apiVersion, namespace, uid, containerName, true)
 }
 
-func (db *sqlDatabaseImpl) QueryLogURLByName(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (string, string, error) {
+func (db *sqlDatabaseImpl) QueryLogURLByName(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (*interfaces.LogRecord, error) {
 	return db.queryLogURL(ctx, kind, apiVersion, namespace, name, containerName, false)
 }
 
-func (db *sqlDatabaseImpl) queryLogURL(ctx context.Context, kind, apiVersion, namespace, identifier, containerName string, useUID bool) (string, string, error) {
+func (db *sqlDatabaseImpl) queryLogURL(ctx context.Context, kind, apiVersion, namespace, identifier, containerName string, useUID bool) (*interfaces.LogRecord, error) {
 	if kind == "Pod" {
 		sb := db.selector.ResourceSelector()
 		sb = db.sorter.CreationTSAndIDSorter(sb) // If resources are named the same, select the newest
@@ -205,10 +217,10 @@ func (db *sqlDatabaseImpl) queryLogURL(ctx context.Context, kind, apiVersion, na
 	strQueryPerformer := newQueryPerformer[string](db.db, db.flavor)
 	uuid, err := strQueryPerformer.performSingleRowQuery(ctx, sb)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", "", dbErrors.ErrResourceNotFound
+		return nil, dbErrors.ErrResourceNotFound
 	}
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	slog.DebugContext(
@@ -222,10 +234,10 @@ func (db *sqlDatabaseImpl) queryLogURL(ctx context.Context, kind, apiVersion, na
 
 	pods, err := db.getOwnedPodsUuids(ctx, []string{uuid}, []uuidKindDate{})
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 	if len(pods) == 0 {
-		return "", "", dbErrors.ErrResourceNotFound
+		return nil, dbErrors.ErrResourceNotFound
 	}
 
 	slices.SortFunc(pods, func(a, b uuidKindDate) int {

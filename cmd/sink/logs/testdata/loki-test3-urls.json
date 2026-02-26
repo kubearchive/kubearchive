@@ -1,0 +1,16 @@
+[
+  {
+    "Url": "http://loki-gateway.grafana-loki.svc.cluster.local:80",
+    "ContainerName": "step-generate",
+    "Query": "{stream=\"generate-logs-pipelines\"} | pod_id = `be4d8e3f-859c-42f0-8041-8a40fdd4cc58` | container = `step-generate`",
+    "Start": "2025-10-15T12:28:02Z",
+    "End": ""
+  },
+  {
+    "Url": "http://loki-gateway.grafana-loki.svc.cluster.local:80",
+    "ContainerName": "prepare",
+    "Query": "{stream=\"generate-logs-pipelines\"} | pod_id = `be4d8e3f-859c-42f0-8041-8a40fdd4cc58` | container = `prepare`",
+    "Start": "2025-10-15T12:28:02Z",
+    "End": ""
+  }
+]

@@ -29,13 +29,17 @@ kubectl wait -n ${NAMESPACE} pod --all --for=condition=ready -l app.kubernetes.i
 
 # If KubeArchive is installed, update the credentials and set the jsonpath
 KUBEARCHIVE_NS="kubearchive"
+SPLUNK_ENDPOINT="https://splunk-single-standalone-service.${NAMESPACE}.svc.cluster.local:8089"
 if kubectl get ns ${KUBEARCHIVE_NS} >& /dev/null; then
-    # Configure the jsonpath and the server for the sink
-    kubectl patch -n ${KUBEARCHIVE_NS} configmap kubearchive-logging --patch-file ${SCRIPT_DIR}/patch-logging-configmap.yaml
+    # Configure the writer configmap (sink)
+    kubectl patch -n ${KUBEARCHIVE_NS} configmap kubearchive-logging-writer --patch-file ${SCRIPT_DIR}/patch-logging-configmap.yaml
     kubectl -n ${KUBEARCHIVE_NS} rollout restart deployment kubearchive-sink
-    # Configure the password for the api server
+    # Configure the reader configmap (api server)
+    kubectl patch -n ${KUBEARCHIVE_NS} configmap kubearchive-logging-reader --patch-file ${SCRIPT_DIR}/patch-logging-reader-configmap.yaml
+    # Configure the HEADERS secret for the api server
     SPLUNK_PWD=$(kubectl -n ${NAMESPACE} get secret splunk-splunk-operator-secret -o jsonpath='{.data.password}' | base64 --decode)
-    kubectl patch -n ${KUBEARCHIVE_NS} secret kubearchive-logging -p "{\"stringData\": {\"Authorization\": \"Basic $(echo -n "admin:${SPLUNK_PWD}" | base64)\"}}"
+    SPLUNK_AUTH="Basic $(echo -n "admin:${SPLUNK_PWD}" | base64)"
+    kubectl patch -n ${KUBEARCHIVE_NS} secret kubearchive-logging -p "{\"stringData\": {\"HEADERS\": \"${SPLUNK_ENDPOINT}:\\n  Authorization: \\\"${SPLUNK_AUTH}\\\"\\n\"}}"
     kubectl -n ${KUBEARCHIVE_NS} rollout restart deployment kubearchive-api-server
 
     sleep 10 # FIXME - There is an issue with rollout and sometimes the old pod is running

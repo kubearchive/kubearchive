@@ -135,7 +135,7 @@ func (o *GetOptions) buildKubeArchiveQueryParams() url.Values {
 	if !o.After.IsZero() {
 		params.Set("creationTimestampAfter", o.After.Format(time.RFC3339))
 	}
-	if !o.Before.Before(time.Now()) {
+	if o.Before.Before(time.Now()) {
 		params.Set("creationTimestampBefore", o.Before.Format(time.RFC3339))
 	}
 

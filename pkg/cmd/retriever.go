@@ -118,6 +118,16 @@ func (opts *KARetrieverOptions) CompleteRetriever() error {
 		opts.token = *opts.kubeFlags.BearerToken
 	}
 
+	// Load token from persistent config if not already set by --token flag or env var
+	if opts.token == "" {
+		cm := config.NewFileConfigManager()
+		if loadErr := cm.LoadConfig(opts.k8sRESTConfig); loadErr == nil {
+			if cc, ccErr := cm.GetCurrentClusterConfig(); ccErr == nil && cc != nil && cc.Token != "" {
+				opts.token = cc.Token
+			}
+		}
+	}
+
 	if opts.token == "" && opts.k8sRESTConfig.BearerToken != "" {
 		opts.token = opts.k8sRESTConfig.BearerToken
 	}

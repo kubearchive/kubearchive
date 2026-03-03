@@ -332,6 +332,54 @@ func TestCompleteRetriever(t *testing.T) {
 			expectCertData:      true,
 			expectError:         false,
 		},
+		{ // #nosec G101 - test token
+			name: "token from config file wins over kubeconfig",
+			setup: func(opts *KARetrieverOptions) {
+				opts.host = "https://localhost:8081"
+			},
+			env: map[string]string{
+				"KUBECTL_KA_CONFIG_PATH": filepath.Join("config", "testdata", "test-config-with-token.yaml"),
+			},
+			connectivityFails:   false,
+			expectedK9eHost:     "https://localhost:8081",
+			expectedK9eToken:    "config-file-token",
+			expectedK9eInsecure: false,
+			expectCertData:      false,
+			expectError:         false,
+		},
+		{
+			name: "token precedence - env var wins over config file",
+			setup: func(opts *KARetrieverOptions) {
+				opts.host = "https://localhost:8081"
+			},
+			env: map[string]string{
+				"KUBECTL_PLUGIN_KA_TOKEN": "env-token",
+				"KUBECTL_KA_CONFIG_PATH":  filepath.Join("config", "testdata", "test-config-with-token.yaml"),
+			},
+			connectivityFails:   false,
+			expectedK9eHost:     "https://localhost:8081",
+			expectedK9eToken:    "env-token",
+			expectedK9eInsecure: false,
+			expectCertData:      false,
+			expectError:         false,
+		},
+		{
+			name: "token precedence - kubectl flag wins over config file",
+			setup: func(opts *KARetrieverOptions) {
+				testToken := "kubectl-token" // #nosec G101 - this is a test token
+				opts.kubeFlags.BearerToken = &testToken
+				opts.host = "https://localhost:8081"
+			},
+			env: map[string]string{
+				"KUBECTL_KA_CONFIG_PATH": filepath.Join("config", "testdata", "test-config-with-token.yaml"),
+			},
+			connectivityFails:   false,
+			expectedK9eHost:     "https://localhost:8081",
+			expectedK9eToken:    "kubectl-token",
+			expectedK9eInsecure: false,
+			expectCertData:      false,
+			expectError:         false,
+		},
 		{
 			name: "certificate error",
 			setup: func(opts *KARetrieverOptions) {

@@ -4,7 +4,7 @@
 package database
 
 import (
-	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/kubearchive/kubearchive/pkg/database/fake"
@@ -16,22 +16,34 @@ func TestNewDatabase(t *testing.T) {
 	tests := []struct {
 		name          string
 		schemaVersion string
-		err           error
+		err           string
 	}{
 		{
 			name:          "zero schema version",
 			schemaVersion: "0",
-			err:           fmt.Errorf("expected database schema version '%s', found '0'", CurrentDatabaseSchemaVersion),
+			err:           "database schema version 0 is outside accepted range [4, 4]",
 		},
 		{
 			name:          "current schema version",
-			schemaVersion: CurrentDatabaseSchemaVersion,
-			err:           nil,
+			schemaVersion: "4",
+		},
+		{
+			name:          "version above max",
+			schemaVersion: "5",
+			err:           "database schema version 5 is outside accepted range [4, 4]",
+		},
+		{
+			name:          "non-numeric schema version",
+			schemaVersion: "v9",
+			err:           `invalid database schema version 'v9': expected an integer: strconv.Atoi: parsing "v9": invalid syntax`,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			once = sync.Once{}
+			db = nil
+
 			t.Setenv("DATABASE_KIND", "fake")
 			t.Setenv("DATABASE_DB", "kubearchive")
 			t.Setenv("DATABASE_USER", "kubearchive")
@@ -39,13 +51,14 @@ func TestNewDatabase(t *testing.T) {
 			t.Setenv("DATABASE_URL", "kubearchive")
 			t.Setenv("DATABASE_PORT", "5432")
 
-			db := fake.NewFakeDatabase([]*unstructured.Unstructured{}, []fake.LogUrlRow{}, "jsonPath")
-			db.CurrentSchemaVersion = test.schemaVersion
-			RegisteredDatabases["fake"] = db
+			fakeDB := fake.NewFakeDatabase([]*unstructured.Unstructured{}, []fake.LogUrlRow{}, "jsonPath")
+			fakeDB.CurrentSchemaVersion = test.schemaVersion
+			DatabaseSchemaVersions["fake"] = SchemaVersionRange{Min: 4, Max: 4}
+			RegisteredDatabases["fake"] = fakeDB
 
 			_, err := newDatabase()
-			if test.err != nil {
-				assert.Equal(t, test.err, err)
+			if test.err != "" {
+				assert.EqualError(t, err, test.err)
 			} else {
 				assert.NoError(t, err)
 			}

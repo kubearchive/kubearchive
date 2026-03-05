@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strconv"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -31,7 +32,16 @@ func main() {
 		panic(err)
 	}
 
-	err = m.Up()
+	if targetVersion := os.Getenv("MIGRATION_VERSION"); targetVersion != "" {
+		v, errParse := strconv.ParseUint(targetVersion, 10, 32)
+		if errParse != nil {
+			panic(fmt.Sprintf("invalid MIGRATION_VERSION %q: %s", targetVersion, errParse))
+		}
+		fmt.Printf("Target migration version requested is %d. Starting migration...\n", v)
+		err = m.Migrate(uint(v))
+	} else {
+		err = m.Up()
+	}
 	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		panic(err)
 	}

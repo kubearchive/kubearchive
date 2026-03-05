@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"strconv"
 	"sync"
 
 	"github.com/kubearchive/kubearchive/pkg/database/env"
@@ -15,7 +16,16 @@ import (
 	"github.com/kubearchive/kubearchive/pkg/database/sql"
 )
 
-var CurrentDatabaseSchemaVersion = "4"
+type SchemaVersionRange struct {
+	Min int
+	Max int
+}
+
+var DatabaseSchemaVersions = map[string]SchemaVersionRange{
+	"postgresql": {Min: 4, Max: 4},
+	"mariadb":    {Min: 1, Max: 1},
+}
+
 var RegisteredDatabases = map[string]interfaces.Database{
 	"postgresql": sql.NewPostgreSQLDatabase(),
 	"mariadb":    sql.NewMariaDBDatabase(),
@@ -36,9 +46,7 @@ func newDatabase() (interfaces.Database, error) {
 	var err error
 
 	once.Do(func() {
-		slog.Info("Initializing database connection",
-			"expected_schema_version", CurrentDatabaseSchemaVersion,
-		)
+		slog.Info("Initializing database connection")
 
 		e, errEnv := env.NewDatabaseEnvironment()
 		if errEnv != nil {
@@ -87,23 +95,42 @@ func newDatabase() (interfaces.Database, error) {
 			return
 		}
 
+		versionRange, hasRange := DatabaseSchemaVersions[dbType]
+		if !hasRange {
+			err = fmt.Errorf("no schema version range defined for database type '%s'", dbType)
+			slog.Error("No schema version range defined", "type", dbType)
+			return
+		}
+
+		dbVersionInt, errParse := strconv.Atoi(dbVersion)
+		if errParse != nil {
+			err = fmt.Errorf("invalid database schema version '%s': expected an integer: %w", dbVersion, errParse)
+			slog.Error("Failed to parse database schema version",
+				"version", dbVersion,
+				"error", errParse.Error(),
+			)
+			return
+		}
+
 		slog.Info("Database schema version check",
-			"expected_version", CurrentDatabaseSchemaVersion,
-			"actual_version", dbVersion,
+			"min_version", versionRange.Min,
+			"max_version", versionRange.Max,
+			"actual_version", dbVersionInt,
 		)
 
-		if dbVersion != CurrentDatabaseSchemaVersion {
-			err = fmt.Errorf("expected database schema version '%s', found '%s'", CurrentDatabaseSchemaVersion, dbVersion)
-			slog.Error("Database schema version mismatch",
-				"expected_version", CurrentDatabaseSchemaVersion,
-				"actual_version", dbVersion,
+		if dbVersionInt < versionRange.Min || dbVersionInt > versionRange.Max {
+			err = fmt.Errorf("database schema version %d is outside accepted range [%d, %d]", dbVersionInt, versionRange.Min, versionRange.Max)
+			slog.Error("Database schema version out of range",
+				"actual_version", dbVersionInt,
+				"min_version", versionRange.Min,
+				"max_version", versionRange.Max,
 			)
 			return
 		}
 
 		slog.Info("Database connection fully established",
 			"type", dbType,
-			"schema_version", dbVersion,
+			"schema_version", dbVersionInt,
 			"status", "ready",
 		)
 	})

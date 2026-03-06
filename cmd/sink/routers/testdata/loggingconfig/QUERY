@@ -1,0 +1,1 @@
+search * | spath "kubernetes.pod_id" | search "kubernetes.pod_id"="{POD_ID}" | spath "kubernetes.container_name" | search "kubernetes.container_name"="{CONTAINER_NAME}" | sort time | table "message"

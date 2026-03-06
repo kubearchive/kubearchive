@@ -1,0 +1,11 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubearchive-logging-writer
+data:
+  POD_ID: "cel:metadata.uid"
+  QUERY: "kubernetes.pod_id:{POD_ID} AND kubernetes.container_name:{CONTAINER_NAME}"
+  LOG_URL: "https://kubearchive-es-http.elastic-system.svc.cluster.local:9200"

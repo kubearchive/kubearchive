@@ -17,6 +17,7 @@ resources:
   - templates/database/database_secret.yaml
   - templates/database/migration_job.yaml
   - templates/logging/configmap.yaml
+  - templates/logging/reader-configmap.yaml
   - templates/logging/secret.yaml
   - templates/operator/certificates.yaml
   - templates/operator/kubearchiveconfig_editor_role.yaml

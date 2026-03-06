@@ -51,7 +51,7 @@ func TestNewDatabase(t *testing.T) {
 			t.Setenv("DATABASE_URL", "kubearchive")
 			t.Setenv("DATABASE_PORT", "5432")
 
-			fakeDB := fake.NewFakeDatabase([]*unstructured.Unstructured{}, []fake.LogUrlRow{}, "jsonPath")
+			fakeDB := fake.NewFakeDatabase([]*unstructured.Unstructured{}, []fake.LogUrlRow{})
 			fakeDB.CurrentSchemaVersion = test.schemaVersion
 			DatabaseSchemaVersions["fake"] = SchemaVersionRange{Min: 4, Max: 4}
 			RegisteredDatabases["fake"] = fakeDB

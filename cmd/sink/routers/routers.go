@@ -53,10 +53,7 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 	defer cancel()
 
 	var urls []models.LogTuple
-	var jsonPath string
 	if c.LogUrlBuilder != nil {
-		jsonPath = c.LogUrlBuilder.GetJsonPath()
-
 		var err error
 		urls, err = c.LogUrlBuilder.Urls(ctx, obj)
 		if err != nil {
@@ -85,7 +82,7 @@ func (c *Controller) writeResource(ctx context.Context, obj *unstructured.Unstru
 		}
 	}
 
-	result, writeResourceErr := c.Db.WriteResource(dbCtx, obj, event.Data(), lastUpdateTs, jsonPath, urls...)
+	result, writeResourceErr := c.Db.WriteResource(dbCtx, obj, event.Data(), lastUpdateTs, urls...)
 	if writeResourceErr != nil {
 		slog.ErrorContext(
 			ctx,

@@ -63,9 +63,8 @@ func TestLogURLsFromNonExistentResource(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrl, jp, err := tt.database.QueryLogURLByName(ctx, kind, cronJobApiVersion, namespace, cronJobName, "")
-			assert.Equal(t, "", logUrl)
-			assert.Equal(t, "", jp)
+			logRecord, err := tt.database.QueryLogURLByName(ctx, kind, cronJobApiVersion, namespace, cronJobName, "")
+			assert.Nil(t, logRecord)
 			assert.ErrorContains(t, err, "resource not found")
 		})
 	}
@@ -134,18 +133,19 @@ func TestCronJobQueryLogURLsByUID(t *testing.T) {
 			)
 			query, args = sb.BuildWithFlavor(flavor)
 
-			rows = sqlmock.NewRows([]string{"url", "json_path"})
-			rows.AddRow("mock-log-url-pod1-container1", jsonPath)
-			rows.AddRow("mock-log-url-pod1-container2", jsonPath)
+			rows = sqlmock.NewRows([]string{"url", "query", "start", "end"})
+			rows.AddRow("mock-log-url-pod1-container1", "test-query", "test-start", "test-end")
+			rows.AddRow("mock-log-url-pod1-container2", "test-query", "test-start", "test-end")
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrl, jp, err := tt.database.QueryLogURLByUID(ctx, kind, cronJobApiVersion, namespace, cronJobUID, "")
+			logRecord, err := tt.database.QueryLogURLByUID(ctx, kind, cronJobApiVersion, namespace, cronJobUID, "")
 			assert.NoError(t, err)
-			assert.Equal(t, "mock-log-url-pod1-container1", logUrl)
-			assert.Equal(t, jsonPath, jp)
+			assert.Equal(t, "mock-log-url-pod1-container1", logRecord.URL)
+			assert.Equal(t, "test-query", logRecord.Query)
+			assert.Equal(t, namespace, logRecord.Namespace)
 
 		})
 	}
@@ -209,18 +209,19 @@ func TestCronJobQueryLogURLs(t *testing.T) {
 			)
 			query, args = sb.BuildWithFlavor(flavor)
 
-			rows = sqlmock.NewRows([]string{"url", "json_path"})
-			rows.AddRow("mock-log-url-pod1-container1", jsonPath)
-			rows.AddRow("mock-log-url-pod1-container2", jsonPath)
+			rows = sqlmock.NewRows([]string{"url", "query", "start", "end"})
+			rows.AddRow("mock-log-url-pod1-container1", "test-query", "test-start", "test-end")
+			rows.AddRow("mock-log-url-pod1-container2", "test-query", "test-start", "test-end")
 			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
-			logUrl, jp, err := tt.database.QueryLogURLByName(ctx, kind, cronJobApiVersion, namespace, cronJobName, "")
+			logRecord, err := tt.database.QueryLogURLByName(ctx, kind, cronJobApiVersion, namespace, cronJobName, "")
 			assert.NoError(t, err)
-			assert.Equal(t, "mock-log-url-pod1-container1", logUrl)
-			assert.Equal(t, jsonPath, jp)
+			assert.Equal(t, "mock-log-url-pod1-container1", logRecord.URL)
+			assert.Equal(t, "test-query", logRecord.Query)
+			assert.Equal(t, namespace, logRecord.Namespace)
 
 		})
 	}
@@ -621,14 +622,14 @@ func TestQueryLogUrlContainerDefault(t *testing.T) {
 					filter.ContainerNameFilter(sb.Cond, innerTest.expectedContainerName),
 				)
 				query, args = sb.BuildWithFlavor(tt.database.getFlavor())
-				rows = sqlmock.NewRows([]string{"url", "json_path"})
-				rows.AddRow(innerTest.expectedLogUrl, "")
+				rows = sqlmock.NewRows([]string{"url", "query", "start", "end"})
+				rows.AddRow(innerTest.expectedLogUrl, "", "", "")
 				mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
 
-				logUrl, jp, err := tt.database.QueryLogURLByName(context.Background(), pod.Kind, pod.APIVersion, pod.Namespace, pod.Name, "")
+				logRecord, err := tt.database.QueryLogURLByName(context.Background(), pod.Kind, pod.APIVersion, pod.Namespace, pod.Name, "")
 				assert.NoError(t, err)
-				assert.Equal(t, innerTest.expectedLogUrl, logUrl)
-				assert.Equal(t, "", jp)
+				assert.Equal(t, innerTest.expectedLogUrl, logRecord.URL)
+				assert.Equal(t, pod.Namespace, logRecord.Namespace)
 			})
 		}
 	}

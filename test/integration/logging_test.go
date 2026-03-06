@@ -16,6 +16,7 @@ import (
 	"github.com/avast/retry-go/v5"
 	"github.com/kubearchive/kubearchive/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -592,4 +593,201 @@ func TestLogGzipCompression(t *testing.T) {
 			t.Logf("✓ Log gzip compression verification passed %s - %d bytes of log content", testCase.name, len(logs))
 		})
 	}
+}
+
+func TestLogTailing(t *testing.T) {
+	t.Parallel()
+
+	clientset, _ := test.GetKubernetesClient(t)
+	port := test.PortForwardApiServer(t, clientset)
+	namespaceName, token := test.CreateTestNamespace(t, false)
+
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	totalLines := 20
+	// Create a pod that generates numbered log lines
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "tail-test",
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:    "logger",
+					Image:   "quay.io/fedora/fedora:latest",
+					Command: []string{"/bin/sh", "-c", fmt.Sprintf(`for i in $(seq 1 %d); do printf "line-%%02d\n" "$i"; done`, totalLines)},
+				},
+			},
+		},
+	}
+	_, err := clientset.CoreV1().Pods(namespaceName).Create(context.Background(), pod, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Wait for all lines to be available via full mode
+	baseURL := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/tail-test/log", port, namespaceName)
+	retryErr := retry.New(retry.Attempts(60), retry.MaxDelay(2*time.Second)).Do(func() error {
+		body, err := test.GetLogs(t, token.Status.Token, baseURL)
+		if err != nil {
+			return err
+		}
+		if len(body) == 0 {
+			return errors.New("could not retrieve the pod log")
+		}
+		lines := strings.Split(strings.TrimSpace(string(body)), "\n")
+		if len(lines) != totalLines {
+			return fmt.Errorf("expected %d lines, got %d", totalLines, len(lines))
+		}
+		return nil
+	})
+	require.NoError(t, retryErr, "all log lines should be available before testing tail")
+
+	tests := []struct {
+		name          string
+		tailLines     int
+		expectedCount int
+		firstLine     string
+		lastLine      string
+	}{
+		{
+			name:          "tail 5 lines",
+			tailLines:     5,
+			expectedCount: 5,
+			firstLine:     "line-16",
+			lastLine:      "line-20",
+		},
+		{
+			name:          "tail 1 line",
+			tailLines:     1,
+			expectedCount: 1,
+			firstLine:     "line-20",
+			lastLine:      "line-20",
+		},
+		{
+			name:          "tail more than available",
+			tailLines:     100,
+			expectedCount: totalLines,
+			firstLine:     "line-01",
+			lastLine:      "line-20",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tailURL := fmt.Sprintf("%s?tailLines=%d", baseURL, tt.tailLines)
+			retryErr := retry.New(retry.Attempts(30), retry.MaxDelay(2*time.Second)).Do(func() error {
+				body, err := test.GetLogs(t, token.Status.Token, tailURL)
+				if err != nil {
+					return err
+				}
+				if len(body) == 0 {
+					return errors.New("could not retrieve tailed log")
+				}
+				lines := strings.Split(strings.TrimSpace(string(body)), "\n")
+				if len(lines) != tt.expectedCount {
+					return fmt.Errorf("expected %d lines, got %d", tt.expectedCount, len(lines))
+				}
+				if lines[0] != tt.firstLine {
+					return fmt.Errorf("expected first line '%s', got '%s'", tt.firstLine, lines[0])
+				}
+				if lines[len(lines)-1] != tt.lastLine {
+					return fmt.Errorf("expected last line '%s', got '%s'", tt.lastLine, lines[len(lines)-1])
+				}
+				// Verify all lines are in sequential order
+				for i := 1; i < len(lines); i++ {
+					if lines[i-1] >= lines[i] {
+						return fmt.Errorf("lines not in order at index %d: '%s' >= '%s'", i, lines[i-1], lines[i])
+					}
+				}
+				t.Logf("tailLines=%d: got %d lines, first='%s', last='%s'", tt.tailLines, len(lines), lines[0], lines[len(lines)-1])
+				return nil
+			})
+			require.NoError(t, retryErr)
+		})
+	}
+}
+
+func TestLogTailingOrder(t *testing.T) {
+	t.Parallel()
+
+	clientset, _ := test.GetKubernetesClient(t)
+	port := test.PortForwardApiServer(t, clientset)
+	namespaceName, token := test.CreateTestNamespace(t, false)
+
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	// Create a pod with two log entries separated by a delay to ensure distinct timestamps
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "tail-order",
+		},
+		Spec: corev1.PodSpec{
+			RestartPolicy: corev1.RestartPolicyNever,
+			Containers: []corev1.Container{
+				{
+					Name:    "logger",
+					Image:   "quay.io/fedora/fedora:latest",
+					Command: []string{"/bin/sh", "-c", "echo First && sleep 5 && echo Second && sleep 5 && echo Third"},
+				},
+			},
+		},
+	}
+	_, err := clientset.CoreV1().Pods(namespaceName).Create(context.Background(), pod, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	// Wait for all 3 lines to be available
+	baseURL := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods/tail-order/log", port, namespaceName)
+	retryErr := retry.New(retry.Attempts(60), retry.MaxDelay(5*time.Second)).Do(func() error {
+		body, err := test.GetLogs(t, token.Status.Token, baseURL)
+		if err != nil {
+			return err
+		}
+		if len(body) == 0 {
+			return errors.New("could not retrieve the pod log")
+		}
+		bodyString := strings.TrimSpace(string(body))
+		if bodyString != "First\nSecond\nThird" {
+			return fmt.Errorf("expected 'First\\nSecond\\nThird', got '%s'", bodyString)
+		}
+		return nil
+	})
+	require.NoError(t, retryErr, "all log lines should be available before testing tail order")
+
+	// Tail the last 2 lines - should get "Second\nThird" in chronological order
+	tailURL := fmt.Sprintf("%s?tailLines=2", baseURL)
+	retryErr = retry.New(retry.Attempts(30), retry.MaxDelay(2*time.Second)).Do(func() error {
+		body, err := test.GetLogs(t, token.Status.Token, tailURL)
+		if err != nil {
+			return err
+		}
+		if len(body) == 0 {
+			return errors.New("could not retrieve tailed log")
+		}
+		bodyString := strings.TrimSpace(string(body))
+		if bodyString != "Second\nThird" {
+			return fmt.Errorf("expected 'Second\\nThird', got '%s'", bodyString)
+		}
+		t.Log("Tail order verified: last 2 lines returned in chronological order")
+		return nil
+	})
+	require.NoError(t, retryErr)
+
+	// Tail the last 1 line - should get just "Third"
+	tailURL = fmt.Sprintf("%s?tailLines=1", baseURL)
+	retryErr = retry.New(retry.Attempts(30), retry.MaxDelay(2*time.Second)).Do(func() error {
+		body, err := test.GetLogs(t, token.Status.Token, tailURL)
+		if err != nil {
+			return err
+		}
+		if len(body) == 0 {
+			return errors.New("could not retrieve tailed log")
+		}
+		bodyString := strings.TrimSpace(string(body))
+		if bodyString != "Third" {
+			return fmt.Errorf("expected 'Third', got '%s'", bodyString)
+		}
+		t.Log("Tail order verified: last 1 line is 'Third'")
+		return nil
+	})
+	require.NoError(t, retryErr)
 }

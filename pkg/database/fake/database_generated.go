@@ -110,9 +110,9 @@ func CreateTestResources() []*unstructured.Unstructured {
 
 func CreateTestLogUrls() []LogUrlRow {
 	ret := make([]LogUrlRow, 0)
-	ret = append(ret, LogUrlRow{Uuid: types.UID("abc-123-xyz"), Url: "fake.com", ContainerName: "container-1"})
-	ret = append(ret, LogUrlRow{Uuid: types.UID("abc-123-xyz"), Url: "fake.org", ContainerName: "container-2"})
-	ret = append(ret, LogUrlRow{Uuid: types.UID("asdf-1234-fdsa"), Url: "fake.org", ContainerName: "foo"})
+	ret = append(ret, LogUrlRow{Uuid: types.UID("abc-123-xyz"), Url: "http://fake.com", ContainerName: "container-1", Query: "test-query", Start: "test-start", End: "test-end"})
+	ret = append(ret, LogUrlRow{Uuid: types.UID("abc-123-xyz"), Url: "http://fake.org", ContainerName: "container-2", Query: "test-query", Start: "test-start", End: "test-end"})
+	ret = append(ret, LogUrlRow{Uuid: types.UID("asdf-1234-fdsa"), Url: "http://fake.org", ContainerName: "foo", Query: "test-query", Start: "test-start", End: "test-end"})
 	return ret
 }
 
@@ -120,20 +120,21 @@ type LogUrlRow struct {
 	Uuid          types.UID
 	Url           string
 	ContainerName string
-	JsonPath      string
+	Query         string
+	Start         string
+	End           string
 }
 
 type fakeDatabase struct {
 	resources            []*unstructured.Unstructured
 	logUrl               []LogUrlRow
-	jsonPath             string
 	err                  error
 	urlErr               error
 	CurrentSchemaVersion string
 }
 
-func NewFakeDatabase(testResources []*unstructured.Unstructured, testLogs []LogUrlRow, jsonPath string) *fakeDatabase {
-	return &fakeDatabase{resources: testResources, logUrl: testLogs, jsonPath: jsonPath}
+func NewFakeDatabase(testResources []*unstructured.Unstructured, testLogs []LogUrlRow) *fakeDatabase {
+	return &fakeDatabase{resources: testResources, logUrl: testLogs}
 }
 
 func NewFakeDatabaseWithError(err error) *fakeDatabase {
@@ -172,19 +173,28 @@ func (f *fakeDatabase) queryResources(_ context.Context, kind, version, _, _ str
 	return f.filterResourcesByKindAndApiVersion(kind, version)
 }
 
-func (f *fakeDatabase) QueryLogURLByName(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (string, string, error) {
+func (f *fakeDatabase) QueryLogURLByName(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (*interfaces.LogRecord, error) {
 	return f.queryLogURL(ctx, kind, apiVersion, namespace, name, containerName)
 }
 
-func (f *fakeDatabase) QueryLogURLByUID(ctx context.Context, kind, apiVersion, namespace, uid, containerName string) (string, string, error) {
+func (f *fakeDatabase) QueryLogURLByUID(ctx context.Context, kind, apiVersion, namespace, uid, containerName string) (*interfaces.LogRecord, error) {
 	return f.queryLogURL(ctx, kind, apiVersion, namespace, uid, containerName)
 }
 
-func (f *fakeDatabase) queryLogURL(_ context.Context, _, _, _, _, _ string) (string, string, error) {
+func (f *fakeDatabase) queryLogURL(_ context.Context, _, _, namespace, name, containerName string) (*interfaces.LogRecord, error) {
 	if len(f.logUrl) == 0 {
-		return "", "", f.err
+		return nil, f.err
 	}
-	return f.logUrl[0].Url, f.jsonPath, f.err
+	return &interfaces.LogRecord{
+		Namespace:     namespace,
+		PodName:       name,
+		PodUUID:       string(f.logUrl[0].Uuid),
+		ContainerName: containerName,
+		URL:           f.logUrl[0].Url,
+		Query:         f.logUrl[0].Query,
+		Start:         f.logUrl[0].Start,
+		End:           f.logUrl[0].End,
+	}, f.err
 }
 
 func (f *fakeDatabase) QueryResourceByUID(ctx context.Context, kind, apiVersion, namespace, uid string) (*models.Resource, error) {
@@ -321,7 +331,7 @@ func (f *fakeDatabase) filterResourcesByKindApiVersionNamespaceAndWildcardName(k
 	return filteredResources
 }
 
-func (f *fakeDatabase) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte, _ time.Time, jsonPath string, logs ...models.LogTuple) (interfaces.WriteResourceResult, error) {
+func (f *fakeDatabase) WriteResource(_ context.Context, k8sObj *unstructured.Unstructured, _ []byte, _ time.Time, logs ...models.LogTuple) (interfaces.WriteResourceResult, error) {
 	if f.err != nil {
 		return interfaces.WriteResourceResultError, f.err
 	}
@@ -343,7 +353,7 @@ func (f *fakeDatabase) WriteResource(_ context.Context, k8sObj *unstructured.Uns
 		f.logUrl = newLogUrls
 
 		for _, url := range logs {
-			f.logUrl = append(f.logUrl, LogUrlRow{Uuid: k8sObj.GetUID(), Url: url.Url, ContainerName: url.ContainerName, JsonPath: jsonPath})
+			f.logUrl = append(f.logUrl, LogUrlRow{Uuid: k8sObj.GetUID(), Url: url.Url, ContainerName: url.ContainerName, Query: url.Query, Start: url.Start, End: url.End})
 		}
 	}
 

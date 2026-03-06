@@ -157,7 +157,6 @@ func (db *mariaDBDatabase) WriteResource(
 	k8sObj *unstructured.Unstructured,
 	data []byte,
 	lastUpdated time.Time,
-	jsonPath string,
 	logs ...models.LogTuple,
 ) (interfaces.WriteResourceResult, error) {
 	if k8sObj == nil {
@@ -192,7 +191,9 @@ func (db *mariaDBDatabase) WriteResource(
 				string(k8sObj.GetUID()),
 				log.Url,
 				log.ContainerName,
-				jsonPath,
+				log.Query,
+				log.Start,
+				log.End,
 			).BuildWithFlavor(db.flavor)
 			_, logQueryErr := tx.ExecContext(ctx, logQuery, logArgs...)
 			if logQueryErr != nil {

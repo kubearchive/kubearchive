@@ -25,9 +25,13 @@ spec:
         - name: tls-secret
           secret:
             secretName: kubearchive-api-server-tls
-        - name: logging-secret
-          secret:
-            secretName: kubearchive-logging
+        - name: logging-config
+          projected:
+            sources:
+            - configMap:
+                name: kubearchive-logging-reader
+            - secret:
+                name: kubearchive-logging
       containers:
         - name: kubearchive-api-server
           image: ko://github.com/kubearchive/kubearchive/cmd/api
@@ -46,7 +50,7 @@ spec:
               readOnly: true
               mountPath: /etc/kubearchive/ssl/
             - mountPath: /data/logging
-              name: logging-secret
+              name: logging-config
           envFrom:
             # Provide DB URL, user, password, database and port as env vars
             - secretRef:

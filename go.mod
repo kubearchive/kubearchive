@@ -40,7 +40,7 @@ require (
 	go.opentelemetry.io/otel/sdk/log v0.17.0
 	go.opentelemetry.io/otel/sdk/metric v1.41.0
 	go.opentelemetry.io/otel/trace v1.41.0
-	google.golang.org/grpc v1.79.1
+	google.golang.org/grpc v1.79.2
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.32.13
 	k8s.io/apimachinery v0.32.13

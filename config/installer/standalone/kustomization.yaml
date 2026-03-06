@@ -1,0 +1,12 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+resources:
+- deployment.yaml
+- service_account.yaml
+- webhooks.yaml
+- role.yaml
+- cluster_roles.yaml
+- leader_election.yaml
+- certificates.yaml
+- kubearchive.org_kubearchiveinstallations.yaml

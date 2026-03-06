@@ -54,3 +54,9 @@ integration-results/*
 # Release and source build binaries
 cli-binaries/
 kubectl-ka
+
+# Installer stuff
+config/installer/standalone/role.yaml
+config/installer/standalone/kubearchive.org_kubearchiveinstallations.yaml
+bundle.Dockerfile
+/bundle/

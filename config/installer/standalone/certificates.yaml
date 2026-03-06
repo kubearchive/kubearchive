@@ -1,0 +1,68 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "kubearchive-installer-ca"
+  namespace: kubearchive-installer
+  labels:
+    app.kubernetes.io/name: kubearchive-installer-ca
+    app.kubernetes.io/component: certs
+    app.kubernetes.io/part-of: kubearchive
+spec:
+  selfSigned: {}
+
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "kubearchive-installer-ca"
+  namespace: kubearchive-installer
+  labels:
+    app.kubernetes.io/name: kubearchive-installer-ca
+    app.kubernetes.io/component: certs
+    app.kubernetes.io/part-of: kubearchive
+spec:
+  isCA: true
+  commonName: kubearchive-ca-certificate
+  secretName: "kubearchive-installer-ca"
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    name: "kubearchive-installer-ca"
+    kind: Issuer
+    group: cert-manager.io
+
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: "kubearchive-installer"
+  namespace: kubearchive-installer
+  labels:
+    app.kubernetes.io/name: kubearchive-installer
+    app.kubernetes.io/component: certs
+    app.kubernetes.io/part-of: kubearchive
+spec:
+  ca:
+    secretName: "kubearchive-installer-ca"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kubearchive-installer-certificate
+  namespace: kubearchive-installer
+  labels:
+    app.kubernetes.io/name: kubearchive-installer-certificate
+    app.kubernetes.io/component: installer
+    app.kubernetes.io/part-of: kubearchive
+spec:
+  dnsNames:
+    - kubearchive-installer-webhooks.kubearchive-installer.svc
+    - kubearchive-installer-webhooks.kubearchive-installer.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: kubearchive-installer
+  secretName: kubearchive-installer-tls

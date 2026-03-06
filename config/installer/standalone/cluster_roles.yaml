@@ -1,0 +1,64 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubearchiveinstallation-admin-role
+rules:
+- apiGroups:
+  - kubearchive.org
+  resources:
+  - kubearchiveinstallations
+  verbs:
+  - '*'
+- apiGroups:
+  - kubearchive.org
+  resources:
+  - kubearchiveinstallations/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubearchiveinstallation-editor-role
+rules:
+- apiGroups:
+  - kubearchive.org
+  resources:
+  - kubearchiveinstallations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kubearchive.org
+  resources:
+  - kubearchiveinstallations/status
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubearchiveinstallation-viewer-role
+rules:
+- apiGroups:
+  - kubearchive.org
+  resources:
+  - kubearchiveinstallations
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kubearchive.org
+  resources:
+  - kubearchiveinstallations/status
+  verbs:
+  - get

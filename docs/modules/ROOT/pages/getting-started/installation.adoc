@@ -47,8 +47,14 @@ A Kubernetes Job named `kubearchive-schema-migration` is installed in the `kubea
 Use this as an example to build your migration automations.
 ====
 
-[_install_and_configure_kubearchive]
 == Install and Configure KubeArchive
+
+There are a couple of ways to install KubeArchive:
+
+=== Standalone KubeArchive
+
+This installation method directly installs KubeArchive in the `kubearchive`
+namespace.
 
 . Apply the release YAML to install KubeArchive:
 +

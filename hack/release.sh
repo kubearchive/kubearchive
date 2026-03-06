@@ -77,6 +77,7 @@ GOOS=darwin GOARCH=arm64 go build -ldflags "${LDFLAGS}" -o ./cli-binaries/kubect
 
 # Build and push container images
 bash cmd/operator/generate.sh
+bash cmd/installer/generate.sh
 kubectl kustomize config/ | envsubst '$NEXT_VERSION' | ko resolve -f - --base-import-paths --tags=${NEXT_VERSION} > kubearchive.yaml
 
 git push

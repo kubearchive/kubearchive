@@ -1,0 +1,78 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubearchive-installer-webhooks
+  namespace: kubearchive-installer
+  labels:
+    app.kubernetes.io/name: kubearchive-installer-webhooks
+    app.kubernetes.io/component: installer
+    app.kubernetes.io/part-of: kubearchive
+  annotations:
+    cert-manager.io/inject-ca-from: kubearchive-installer/kubearchive-installer-certificate
+spec:
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 9443
+      name: webhook-server
+  selector:
+    control-plane: controller-manager
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: mutating-webhook-configuration
+  annotations:
+    cert-manager.io/inject-ca-from: kubearchive-installer/kubearchive-installer-certificate
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: kubearchive-installer-webhooks
+      namespace: kubearchive-installer
+      path: /mutate-kubearchive-org-v1-kubearchiveinstallation
+  failurePolicy: Fail
+  name: mkubearchiveinstallation-v1.kb.io
+  rules:
+  - apiGroups:
+    - kubearchive.org
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - kubearchiveinstallations
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validating-webhook-configuration
+  annotations:
+    cert-manager.io/inject-ca-from: kubearchive-installer/kubearchive-installer-certificate
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: kubearchive-installer-webhooks
+      namespace: kubearchive-installer
+      path: /validate-kubearchive-org-v1-kubearchiveinstallation
+  failurePolicy: Fail
+  name: vkubearchiveinstallation-v1.kb.io
+  rules:
+  - apiGroups:
+    - kubearchive.org
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - kubearchiveinstallations
+  sideEffects: None

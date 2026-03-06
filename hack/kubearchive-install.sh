@@ -19,6 +19,7 @@ echo ${NEXT_VERSION}
 export NEXT_VERSION=${NEXT_VERSION}
 
 bash cmd/operator/generate.sh
+bash cmd/installer/generate.sh
 kubectl kustomize config/ | envsubst '$NEXT_VERSION' | ko apply --tags latest-build -f - --base-import-paths
 
 kubectl -n kubearchive rollout status deployment --timeout=90s

@@ -575,7 +575,7 @@ func TestGetFromAPI(t *testing.T) {
 			var serverURL string
 
 			if tc.unreachable {
-				serverURL = "http://unreachable:12345"
+				serverURL = "http://unreachable:12345/"
 			} else {
 				server = httptest.NewServer(http.HandlerFunc(tc.serverResponse))
 				defer server.Close()

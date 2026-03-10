@@ -46,7 +46,8 @@ func (d *DefaultConnectivityTester) TestKubeArchiveConnectivity(host string, tls
 	}
 
 	// Test the /api/v1/pods?limit=1 endpoint
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/v1/pods?limit=1", host), nil)
+	base := strings.TrimRight(host, "/")
+	req, err := http.NewRequest(http.MethodGet, base+"/api/v1/pods?limit=1", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -98,7 +99,8 @@ func (d *DefaultConnectivityTester) TestKubeArchiveLivezEndpoint(host string, tl
 	}
 
 	// Test the /livez endpoint
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/livez", host), nil)
+	base := strings.TrimRight(host, "/")
+	req, err := http.NewRequest(http.MethodGet, base+"/livez", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

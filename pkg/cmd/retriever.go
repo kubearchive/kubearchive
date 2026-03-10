@@ -233,7 +233,7 @@ func (opts *KARetrieverOptions) GetFromAPI(api API, path string) ([]byte, *APIEr
 	}
 
 	// Build full URL
-	fullURL := baseURL + path
+	fullURL := strings.TrimRight(baseURL, "/") + path
 
 	// Create request
 	response, err := client.Get(fullURL)

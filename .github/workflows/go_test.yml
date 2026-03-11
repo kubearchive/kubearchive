@@ -27,7 +27,9 @@ jobs:
       - name: Display Go version
         run: go version
       - name: Generate operator code
-        run: cmd/operator/generate.sh
+        run: |
+          bash cmd/operator/generate.sh
+          bash cmd/installer/generate.sh
       - name: Build Go code
         run: go build -v ./...
       - name: Test Go code

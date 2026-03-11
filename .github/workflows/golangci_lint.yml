@@ -34,7 +34,9 @@ jobs:
       - name: Display Go version
         run: go version
       - name: Generate operator code
-        run: cmd/operator/generate.sh
+        run: |
+          bash cmd/operator/generate.sh
+          bash cmd/installer/generate.sh
       - name: Lint testing Go code
         uses: golangci/golangci-lint-action@v9
         with:

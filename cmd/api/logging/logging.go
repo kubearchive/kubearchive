@@ -45,12 +45,35 @@ type ProviderConfig struct {
 
 // ApiEndpoint defines how to query a logging backend
 type ApiEndpoint struct {
-	Reverse  bool                   `yaml:"reverse"`
-	Path     string                 `yaml:"path"`
-	Method   string                 `yaml:"method"`
-	Params   map[string]interface{} `yaml:"params"`
-	Body     map[string]interface{} `yaml:"body"`
-	JsonPath string                 `yaml:"json-path"`
+	Reverse    bool                   `yaml:"reverse"`
+	Path       string                 `yaml:"path"`
+	Method     string                 `yaml:"method"`
+	Params     map[string]interface{} `yaml:"params"`
+	Body       map[string]interface{} `yaml:"body"`
+	JsonPath   string                 `yaml:"json-path"`
+	Pagination *PaginationConfig      `yaml:"pagination"`
+	Timeout    string                 `yaml:"timeout"` // Request timeout as a duration string (e.g. "60s", "5m"). Defaults to 60s.
+}
+
+const defaultRequestTimeout = 60 * time.Second
+
+// PaginationConfig defines how to paginate through a logging backend's responses.
+type PaginationConfig struct {
+	NextCursor      string `yaml:"next-cursor"`      // JSONPath to extract cursor values from the response (last match is used)
+	Param           string `yaml:"param"`            // Query parameter to update with the cursor value
+	CursorIncrement int64  `yaml:"cursor-increment"` // Optional increment to apply to integer cursor values
+}
+
+// requestTimeout returns the parsed timeout duration, falling back to the default.
+func (e *ApiEndpoint) requestTimeout() time.Duration {
+	if e.Timeout == "" {
+		return defaultRequestTimeout
+	}
+	d, err := time.ParseDuration(e.Timeout)
+	if err != nil {
+		return defaultRequestTimeout
+	}
+	return d
 }
 
 // validate checks that mandatory fields are set and applies defaults.
@@ -63,6 +86,19 @@ func (e *ApiEndpoint) validate(providerURL, endpointType string) error {
 	}
 	if e.JsonPath == "" {
 		e.JsonPath = "$."
+	}
+	if e.Timeout != "" {
+		if _, err := time.ParseDuration(e.Timeout); err != nil {
+			return fmt.Errorf("provider '%s' endpoint '%s': invalid timeout '%s': %w", providerURL, endpointType, e.Timeout, err)
+		}
+	}
+	if e.Pagination != nil {
+		if e.Pagination.NextCursor == "" {
+			return fmt.Errorf("provider '%s' endpoint '%s' pagination: next-cursor is required", providerURL, endpointType)
+		}
+		if e.Pagination.Param == "" {
+			return fmt.Errorf("provider '%s' endpoint '%s' pagination: param is required", providerURL, endpointType)
+		}
 	}
 	return nil
 }
@@ -334,17 +370,13 @@ func streamLogs(c *gin.Context, reader *bufio.Reader, jsonPathParser jp.Expr, re
 			}
 			return
 		}
-		for _, parsedLine := range parsedLines {
-			if !logsReturned {
-				setLogResponseHeaders(c, record)
-				c.Status(http.StatusOK)
-				logsReturned = true
-			}
-			if _, err := fmt.Fprintln(c.Writer, parsedLine); err != nil { // #nosec G705 -- Content-Type is text/plain
-				slog.ErrorContext(c.Request.Context(), "error writing log line", "error", err)
-				return
-			}
-			c.Writer.Flush()
+		if len(parsedLines) > 0 && !logsReturned {
+			setLogResponseHeaders(c, record)
+			c.Status(http.StatusOK)
+			logsReturned = true
+		}
+		if !writeLogLines(c, parsedLines) {
+			return
 		}
 		if readErr == io.EOF {
 			break
@@ -364,7 +396,7 @@ func LogRetrieval() gin.HandlerFunc {
 	client := http.Client{
 		Transport: otelhttp.NewTransport(&http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}), // #nosec G402
-		Timeout: 60 * time.Second,
+		// No global timeout — per-request timeouts are applied via context using the endpoint's Timeout config.
 	}
 
 	return func(c *gin.Context) {
@@ -466,14 +498,45 @@ func LogRetrieval() gin.HandlerFunc {
 			return
 		}
 
+		// Parse the jsonPath
+		var jsonPathParser jp.Expr
+		if endpoint.JsonPath != "" {
+			var errJP error
+			jsonPathParser, errJP = jp.ParseString(endpoint.JsonPath)
+			if errJP != nil {
+				abort.Abort(c, fmt.Errorf("invalid jsonPath %s: %w", endpoint.JsonPath, errJP), http.StatusInternalServerError)
+				return
+			}
+		}
+
+		tailLinesInt, _ := strconv.Atoi(tailLines)
+
+		// If pagination is configured and we're not tailing or reversing, use paginated streaming
+		if endpoint.Pagination != nil {
+			if tailLinesInt > 0 {
+				slog.Warn("pagination is configured but will be ignored because tailLines is set", "mode", mode, "tailLines", tailLines)
+			} else if endpoint.Reverse {
+				slog.Warn("pagination is configured but will be ignored because reverse is enabled", "mode", mode)
+			} else if legacyFullURL != "" {
+				slog.Warn("pagination is configured but will be ignored for legacy full URLs", "mode", mode)
+			} else {
+				streamPaginatedLogs(c, &client, endpoint, record, extraVars, headers, jsonPathParser, mode)
+				return
+			}
+		}
+
+		// Non-paginated: build and execute a single request
+		reqCtx, reqCancel := context.WithTimeout(c.Request.Context(), endpoint.requestTimeout())
+		defer reqCancel()
+
 		var request *http.Request
 		var errReq error
 		if legacyFullURL != "" {
 			// Legacy full URL: use it as-is instead of interpolating variables
 			// deepcode ignore Server-Side Request Forgery (SSRF): URL comes from the database, originally written by admin-configured sink
-			request, errReq = http.NewRequestWithContext(c.Request.Context(), http.MethodGet, legacyFullURL, nil)
+			request, errReq = http.NewRequestWithContext(reqCtx, http.MethodGet, legacyFullURL, nil)
 		} else {
-			request, errReq = buildProviderRequest(c.Request.Context(), endpoint, record, extraVars)
+			request, errReq = buildProviderRequest(reqCtx, endpoint, record, extraVars)
 		}
 		if errReq != nil {
 			abort.Abort(c, errReq, http.StatusInternalServerError)
@@ -510,25 +573,196 @@ func LogRetrieval() gin.HandlerFunc {
 			return
 		}
 
-		// Parse the jsonPath
-		var jsonPathParser jp.Expr
-		if endpoint.JsonPath != "" {
-			var errJP error
-			jsonPathParser, errJP = jp.ParseString(endpoint.JsonPath)
-			if errJP != nil {
-				abort.Abort(c, fmt.Errorf("invalid jsonPath %s: %w", endpoint.JsonPath, errJP), http.StatusInternalServerError)
-				return
-			}
-		}
-
 		reader := bufio.NewReader(response.Body)
-		tailLinesInt, _ := strconv.Atoi(tailLines)
 
 		if tailLinesInt > 0 || endpoint.Reverse {
 			writeBufferedLogs(c, reader, jsonPathParser, record, requestURL, mode, endpoint.Reverse, tailLinesInt)
 		} else {
 			streamLogs(c, reader, jsonPathParser, record, requestURL, mode)
 		}
+	}
+}
+
+// entriesToStrings converts JSONPath results ([]interface{}) to a slice of non-empty strings.
+func entriesToStrings(entries []interface{}) []string {
+	var results []string
+	for _, entry := range entries {
+		s, ok := entry.(string)
+		if !ok {
+			s = fmt.Sprintf("%v", entry)
+		}
+		if s != "" {
+			results = append(results, s)
+		}
+	}
+	return results
+}
+
+// writeLogLines writes string log lines to the gin response writer and flushes.
+// Returns false if a write error occurred and the caller should stop.
+func writeLogLines(c *gin.Context, lines []string) bool {
+	if len(lines) == 0 {
+		return true
+	}
+	for _, line := range lines {
+		if _, err := fmt.Fprintln(c.Writer, line); err != nil { // #nosec G705 -- Content-Type is text/plain
+			slog.ErrorContext(c.Request.Context(), "error writing log line", "error", err)
+			return false
+		}
+	}
+	c.Writer.Flush()
+	return true
+}
+
+// streamPaginatedLogs retrieves logs from a backend that requires pagination.
+// It makes repeated requests, advancing a cursor parameter between pages, and
+// streams each page's entries to the client. Pagination stops when no entries
+// are returned or the cursor stops advancing.
+func streamPaginatedLogs(c *gin.Context, client *http.Client, endpoint *ApiEndpoint, record *interfaces.LogRecord, extraVars map[string]string, providerHeaders map[string]string, jsonPathParser jp.Expr, mode string) {
+	pagination := endpoint.Pagination
+	cursorParser, err := jp.ParseString(pagination.NextCursor)
+	if err != nil {
+		abort.Abort(c, fmt.Errorf("invalid pagination cursor jsonPath %s: %w", pagination.NextCursor, err), http.StatusInternalServerError)
+		return
+	}
+
+	logsReturned := false
+	var lastCursor string
+	timeout := endpoint.requestTimeout()
+
+	for {
+		reqCtx, reqCancel := context.WithTimeout(c.Request.Context(), timeout)
+		request, errReq := buildProviderRequest(reqCtx, endpoint, record, extraVars)
+		if errReq != nil {
+			reqCancel()
+			if logsReturned {
+				slog.ErrorContext(c.Request.Context(), "error building paginated request", "error", errReq)
+			} else {
+				abort.Abort(c, errReq, http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Override cursor param for subsequent pages
+		if lastCursor != "" {
+			q := request.URL.Query()
+			q.Set(pagination.Param, lastCursor)
+			request.URL.RawQuery = q.Encode()
+		}
+
+		for key, value := range providerHeaders {
+			request.Header.Set(key, value)
+		}
+
+		requestURL := request.URL.String()
+		slog.Info("Sending paginated request to log provider", // #nosec G706 -- URL comes from admin config
+			"request_url", requestURL,
+			"mode", mode,
+			"cursor", lastCursor,
+		)
+
+		response, errReq := client.Do(request) // #nosec G704 -- URL is built from admin-configured LOG_URL and endpoint paths
+		if errReq != nil {
+			reqCancel()
+			if logsReturned {
+				slog.ErrorContext(c.Request.Context(), "error executing paginated request", "error", errReq)
+			} else {
+				abort.Abort(c, errReq, http.StatusInternalServerError)
+			}
+			return
+		}
+
+		body, errRead := io.ReadAll(response.Body)
+		response.Body.Close()
+		reqCancel()
+		if errRead != nil {
+			if logsReturned {
+				slog.ErrorContext(c.Request.Context(), "error reading paginated response", "error", errRead)
+			} else {
+				abort.Abort(c, errRead, http.StatusInternalServerError)
+			}
+			return
+		}
+
+		if response.StatusCode != http.StatusOK {
+			truncatedBody := body
+			if len(truncatedBody) > 1024 {
+				truncatedBody = truncatedBody[:1024]
+			}
+			errMsg := fmt.Errorf("error response: %d - %s", response.StatusCode, truncatedBody)
+			if logsReturned {
+				slog.ErrorContext(c.Request.Context(), "error status in paginated response", "error", errMsg)
+			} else {
+				abort.Abort(c, errMsg, response.StatusCode)
+			}
+			return
+		}
+
+		// Parse the full JSON response
+		parsed, errParse := oj.Parse(body)
+		if errParse != nil {
+			if logsReturned {
+				slog.ErrorContext(c.Request.Context(), "error parsing paginated response JSON", "error", errParse)
+			} else {
+				abort.Abort(c, errParse, http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Extract log entries
+		lines := entriesToStrings(jsonPathParser.Get(parsed))
+		if len(lines) == 0 {
+			break
+		}
+
+		// Stream entries to client
+		if !logsReturned {
+			setLogResponseHeaders(c, record)
+			c.Status(http.StatusOK)
+			logsReturned = true
+		}
+
+		if !writeLogLines(c, lines) {
+			return
+		}
+
+		slog.Info("Paginated page streamed",
+			"entries", len(lines),
+			"mode", mode,
+		)
+
+		// Extract cursor for next page.
+		// When the response contains multiple streams (e.g. Loki's result[*]),
+		// timestamps are interleaved across streams. We must use the maximum
+		// cursor value to avoid re-fetching entries from earlier streams.
+		cursorResults := cursorParser.Get(parsed)
+		if len(cursorResults) == 0 {
+			break
+		}
+
+		cursor := fmt.Sprintf("%v", cursorResults[0])
+		for _, cr := range cursorResults[1:] {
+			s := fmt.Sprintf("%v", cr)
+			if s > cursor {
+				cursor = s
+			}
+		}
+		if cursor == "" || cursor == lastCursor {
+			break
+		}
+
+		// Apply cursor increment if configured (e.g., +1ns for Loki's inclusive start)
+		if pagination.CursorIncrement != 0 {
+			if cursorInt, errParseInt := strconv.ParseInt(cursor, 10, 64); errParseInt == nil {
+				cursor = strconv.FormatInt(cursorInt+pagination.CursorIncrement, 10)
+			}
+		}
+
+		lastCursor = cursor
+	}
+
+	if !logsReturned {
+		abortNoLogsFound(c, record, "", mode)
 	}
 }
 
@@ -562,15 +796,5 @@ func parseLine(line []byte, jsonPathParser jp.Expr) ([]string, error) {
 		return nil, errJson
 	}
 
-	var results []string
-	for _, res := range jsonPathParser.Get(jsonLine) {
-		s, ok := res.(string)
-		if !ok {
-			s = fmt.Sprintf("%v", res)
-		}
-		if s != "" {
-			results = append(results, s)
-		}
-	}
-	return results, nil
+	return entriesToStrings(jsonPathParser.Get(jsonLine)), nil
 }

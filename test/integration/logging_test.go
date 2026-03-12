@@ -17,6 +17,7 @@ import (
 	"github.com/kubearchive/kubearchive/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -704,6 +705,90 @@ func TestLogTailing(t *testing.T) {
 			})
 			require.NoError(t, retryErr)
 		})
+	}
+}
+
+func TestLargeLogRetrieval(t *testing.T) {
+	t.Parallel()
+
+	clientset, _ := test.GetKubernetesClient(t)
+	port := test.PortForwardApiServer(t, clientset)
+	namespaceName, token := test.CreateTestNamespace(t, false)
+
+	test.CreateKAC(t, "testdata/kac-with-resources.yaml", namespaceName)
+
+	expectedLines := 500000
+	// Create a job that generates 500K log lines using flog with no delay
+	jobName := fmt.Sprintf("large-log-%s", test.RandomString())
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: namespaceName,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyNever,
+					Containers: []corev1.Container{
+						{
+							Name:    "flog",
+							Command: []string{"flog", "-n", fmt.Sprintf("%d", expectedLines), "-d", "0"},
+							Image:   "quay.io/kubearchive/mingrammer/flog",
+						},
+					},
+				},
+			},
+		},
+	}
+	_, err := clientset.BatchV1().Jobs(namespaceName).Create(context.Background(), job, metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for the job to complete before attempting log retrieval
+	test.WaitForJob(t, clientset, namespaceName, jobName)
+	t.Log("Job completed, waiting for logs to be ingested...")
+
+	url := fmt.Sprintf("https://localhost:%s/apis/batch/v1/namespaces/%s/jobs/%s/log", port, namespaceName, jobName)
+	retryErr := retry.New(retry.Attempts(120), retry.MaxDelay(5*time.Second)).Do(func() error {
+		body, err := test.GetLogs(t, token.Status.Token, url)
+		if err != nil {
+			return err
+		}
+
+		if len(body) == 0 {
+			return errors.New("could not retrieve the pod log")
+		}
+
+		bodyString := string(body)
+		lines := strings.Split(strings.TrimSpace(bodyString), "\n")
+		t.Logf("Retrieved %d log lines (%d bytes)", len(lines), len(body))
+		if len(lines) > expectedLines {
+			// More lines than expected — likely duplicates at pagination boundaries.
+			// No point retrying, fail immediately with diagnostics.
+			seen := make(map[string]int, len(lines))
+			for _, line := range lines {
+				seen[line]++
+			}
+			duplicateCount := 0
+			for line, count := range seen {
+				if count > 1 {
+					duplicateCount += count - 1
+					if duplicateCount <= 10 {
+						t.Logf("Duplicate line (%dx): %.100s", count, line)
+					}
+				}
+			}
+			t.Fatalf("Expected %d lines, got %d (unique: %d, duplicates: %d)", expectedLines, len(lines), len(seen), duplicateCount)
+		}
+		if len(lines) != expectedLines {
+			return fmt.Errorf("expected %d lines, got %d", expectedLines, len(lines))
+		}
+		return nil
+	})
+
+	if retryErr != nil {
+		t.Fatal(retryErr)
 	}
 }
 

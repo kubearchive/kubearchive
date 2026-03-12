@@ -156,11 +156,11 @@ func main() {
 	httpServer := http.Server{
 		Addr:    "0.0.0.0:8081",
 		Handler: server.router.Handler(),
-		// We do not accept bodies yet, because we are read-only, so we set a
-		// small timeout for headers and complete request. This prevents the
-		// SlowLoris attack (see Wikipedia) by closing open connections fast
+		// ReadHeaderTimeout prevents SlowLoris attacks by closing connections
+		// that take too long to send headers. We intentionally do NOT set
+		// ReadTimeout because it cancels the request context, which would
+		// kill long-running streaming responses (e.g. paginated log retrieval).
 		ReadHeaderTimeout: 2 * time.Second,
-		ReadTimeout:       2 * time.Second,
 	}
 
 	go func() {

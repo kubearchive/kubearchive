@@ -22,9 +22,14 @@ data:
         reverse: false
         path: /loki/api/v1/query_range
         method: GET
+        timeout: 1m
         params:
           query: ${QUERY}
           start: ${START}
-          limit: 10000
+          limit: 300
           direction: forward
         json-path: "$.data.result[*].values[*][1]"
+        pagination:
+          next-cursor: "$.data.result[*].values[*][0]"
+          param: start
+          cursor-increment: 1

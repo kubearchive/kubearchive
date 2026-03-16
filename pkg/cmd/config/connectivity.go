@@ -56,7 +56,7 @@ func (d *DefaultConnectivityTester) TestKubeArchiveConnectivity(host string, tls
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // G704: URL is intentionally from user-configured cluster host
 	if err != nil {
 		return fmt.Errorf("connection failed: %w", err)
 	}
@@ -104,7 +104,7 @@ func (d *DefaultConnectivityTester) TestKubeArchiveLivezEndpoint(host string, tl
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
-	resp, err := client.Do(req)
+	resp, err := client.Do(req) //nolint:gosec // G704: URL is intentionally from user-configured
 	if err != nil {
 		return fmt.Errorf("connection failed: %w", err)
 	}

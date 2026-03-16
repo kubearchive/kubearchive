@@ -479,55 +479,59 @@ func (o *GetOptions) printPaginationMessage(resources []*ResourceWithAvailabilit
 
 	// Build the next command
 	var nextCmd strings.Builder
-	nextCmd.WriteString("kubectl ka get ")
+	fmt.Fprintf(&nextCmd, "kubectl ka get ")
 
 	// Add resource type
 	if o.ResourceInfo.Group == "" {
-		nextCmd.WriteString(o.ResourceInfo.Resource)
+		fmt.Fprint(&nextCmd, o.ResourceInfo.Resource) //nolint:gosec
 	} else {
-		nextCmd.WriteString(fmt.Sprintf("%s.%s.%s", o.ResourceInfo.Resource, o.ResourceInfo.Version, o.ResourceInfo.Group))
+		fmt.Fprintf( //nolint:gosec
+			&nextCmd,
+			"%s.%s.%s",
+			o.ResourceInfo.Resource, o.ResourceInfo.Version, o.ResourceInfo.Group,
+		)
 	}
 
 	// Add namespace if applicable
 	if o.ResourceInfo.Namespaced && !o.AllNamespaces {
 		namespace, _ := o.GetNamespace()
-		nextCmd.WriteString(fmt.Sprintf(" --namespace %s", namespace))
+		fmt.Fprintf(&nextCmd, " --namespace %s", namespace) //nolint:gosec
 	} else if o.AllNamespaces {
-		nextCmd.WriteString(" --all-namespaces")
+		fmt.Fprintf(&nextCmd, " --all-namespaces")
 	}
 
 	// Add label selector if provided
 	if o.LabelSelector != "" {
-		nextCmd.WriteString(fmt.Sprintf(" --selector '%s'", o.LabelSelector))
+		fmt.Fprintf(&nextCmd, " --selector '%s'", o.LabelSelector) //nolint:gosec
 	}
 
 	// Add limit
-	nextCmd.WriteString(fmt.Sprintf(" --limit %d", o.Limit))
+	fmt.Fprintf(&nextCmd, " --limit %d", o.Limit) //nolint:gosec
 
 	// Add before timestamp (set to just before the oldest resource's timestamp to avoid including it)
 	// Subtract 1 nanosecond to ensure we don't include the same resource again
 	// Use UTC to match how Kubernetes stores creation timestamps, ensuring correct string comparison in the DB
 	beforeTimestamp := oldestTimestamp.Add(-1 * time.Nanosecond).UTC()
-	nextCmd.WriteString(fmt.Sprintf(" --before %s", beforeTimestamp.Format(time.RFC3339Nano)))
+	fmt.Fprintf(&nextCmd, " --before %s", beforeTimestamp.Format(time.RFC3339Nano)) //nolint:gosec
 
 	// Add after timestamp if originally provided
 	if !o.After.IsZero() {
-		nextCmd.WriteString(fmt.Sprintf(" --after %s", o.After.Format(time.RFC3339)))
+		fmt.Fprintf(&nextCmd, " --after %s", o.After.Format(time.RFC3339)) //nolint:gosec
 	}
 
 	// Add appropriate flags based on where more resources are likely to be found
 	if moreArchived && !moreInCluster {
-		nextCmd.WriteString(" --archived")
+		fmt.Fprintf(&nextCmd, " --archived")
 	} else if moreInCluster && !moreArchived {
-		nextCmd.WriteString(" --in-cluster")
+		fmt.Fprintf(&nextCmd, " --in-cluster")
 	}
 
 	// Add output format if specified
 	if o.OutputFormat != "" {
-		nextCmd.WriteString(fmt.Sprintf(" --output %s", o.OutputFormat))
+		fmt.Fprintf(&nextCmd, " --output %s", o.OutputFormat) //nolint:gosec
 	}
 
-	fmt.Fprintf(o.ErrOut, "\nResults are trimmed to %d, to get the next page of elements, run:\n  %s\n", len(resources), nextCmd.String())
+	fmt.Fprintf(o.ErrOut, "\nResults are trimmed to %d, to get the next page of elements, run:\n  %s\n", len(resources), nextCmd.String()) //nolint:gosec
 	return nil
 }
 

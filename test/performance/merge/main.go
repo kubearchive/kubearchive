@@ -74,7 +74,7 @@ func readOrPullWorkflowRuns() WorkflowRuns {
 			panic(fmt.Sprintf("error creating the request: %s", err.Error()))
 		}
 
-		res, err := client.Do(req)
+		res, err := client.Do(req) //nolint:gosec // G704: URL constructed for tests
 		if err != nil {
 			panic(fmt.Sprintf("error doing the request: %s", err.Error()))
 		}
@@ -131,7 +131,7 @@ func downloadZips(wr WorkflowRuns, token string) {
 				panic(fmt.Sprintf("error creating artifacts request: %s", err))
 			}
 
-			res, err := client.Do(artifactsReq)
+			res, err := client.Do(artifactsReq) //nolint:gosec // G704: URL constructed for tests
 			if err != nil {
 				panic(fmt.Sprintf("error doing the request: %s", err.Error()))
 			}
@@ -161,7 +161,7 @@ func downloadZips(wr WorkflowRuns, token string) {
 				}
 
 				zipReq.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
-				res, err := client.Do(zipReq)
+				res, err := client.Do(zipReq) //nolint:gosec // G704: URL constructed for tests
 				if err != nil {
 					panic(fmt.Sprintf("error doing the request: %s", err.Error()))
 				}

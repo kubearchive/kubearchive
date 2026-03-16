@@ -21,7 +21,7 @@ func fakeServer(k8sClient kubernetes.Interface, cache *cache.Cache) *Server {
 	if k8sClient == nil {
 		// Replacing deprecated NewSimpleClientset for NewClientset fails because of TokenReview
 		// It may be related to https://github.com/kubernetes/kubernetes/issues/126850 so keeping deprecated.
-		k8sClient = fakeK8s.NewSimpleClientset()
+		k8sClient = fakeK8s.NewSimpleClientset() //nolint:staticcheck // SA1019: see comment above
 	}
 	controller := routers.Controller{Database: fakeDB.NewFakeDatabase(nil, nil)}
 	expirations := &routers.CacheExpirations{Authorized: 1 * time.Second, Unauthorized: 1 * time.Second}
@@ -29,7 +29,7 @@ func fakeServer(k8sClient kubernetes.Interface, cache *cache.Cache) *Server {
 }
 
 func TestNewServer(t *testing.T) {
-	k8sClient := fakeK8s.NewClientset()
+	k8sClient := fakeK8s.NewSimpleClientset() //nolint:staticcheck // SA1019: see https://github.com/kubernetes/kubernetes/issues/126850
 	memCache := cache.New()
 
 	server := fakeServer(k8sClient, memCache)

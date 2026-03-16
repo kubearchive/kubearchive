@@ -84,7 +84,7 @@ func main() {
 				fmt.Printf("Retry #%d: %s\n", n, err)
 			})).Do(
 			func() error {
-				response, errDo := client.Do(req)
+				response, errDo := client.Do(req) //nolint:gosec // G704: URL constructed from known constants
 				if errDo != nil {
 					return fmt.Errorf("error doing the request: %s", err)
 				}

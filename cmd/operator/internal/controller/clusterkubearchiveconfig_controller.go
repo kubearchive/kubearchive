@@ -95,7 +95,7 @@ func updateSinkFilterCluster(ctx context.Context, client client.Client, resource
 	sf := &kubearchivev1.SinkFilter{}
 	err := client.Get(ctx, types.NamespacedName{Name: constants.SinkFilterResourceName, Namespace: constants.KubeArchiveNamespace}, sf)
 	if errors.IsNotFound(err) {
-		sf = desiredSinkFilterCluster(ctx, nil, resources)
+		sf = desiredSinkFilterCluster(nil, resources)
 		err = client.Create(ctx, sf)
 		if err != nil {
 			slog.Error("Failed to create SinkFilter", "error", err, "name", constants.SinkFilterResourceName)
@@ -107,7 +107,7 @@ func updateSinkFilterCluster(ctx context.Context, client client.Client, resource
 		return err
 	}
 
-	sf = desiredSinkFilterCluster(ctx, sf, resources)
+	sf = desiredSinkFilterCluster(sf, resources)
 	err = client.Update(ctx, sf)
 	if err != nil {
 		slog.Error("Failed to update SinkFilter", "error", err, "name", constants.SinkFilterResourceName)
@@ -116,7 +116,7 @@ func updateSinkFilterCluster(ctx context.Context, client client.Client, resource
 	return nil
 }
 
-func desiredSinkFilterCluster(ctx context.Context, sf *kubearchivev1.SinkFilter, resources []kubearchivev1.ClusterKubeArchiveConfigResource) *kubearchivev1.SinkFilter {
+func desiredSinkFilterCluster(sf *kubearchivev1.SinkFilter, resources []kubearchivev1.ClusterKubeArchiveConfigResource) *kubearchivev1.SinkFilter {
 	slog.Info("in desiredSinkFilterCluster")
 
 	if sf == nil {

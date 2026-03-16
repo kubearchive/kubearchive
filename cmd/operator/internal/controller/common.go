@@ -4,7 +4,6 @@
 package controller
 
 import (
-	"context"
 	"log/slog"
 	"slices"
 	"strings"
@@ -47,7 +46,7 @@ func desiredClusterRoleBinding(name string, kind string, subjects ...rbacv1.Subj
 	return binding
 }
 
-func createPolicyRules(ctx context.Context, mapper meta.RESTMapper, resources []kubearchivev1.APIVersionKind, verbs []string) []rbacv1.PolicyRule {
+func createPolicyRules(mapper meta.RESTMapper, resources []kubearchivev1.APIVersionKind, verbs []string) []rbacv1.PolicyRule {
 	groups := make(map[string][]string)
 
 	for _, resource := range resources {

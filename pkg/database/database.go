@@ -22,7 +22,7 @@ type SchemaVersionRange struct {
 }
 
 var DatabaseSchemaVersions = map[string]SchemaVersionRange{
-	"postgresql": {Min: 7, Max: 10},
+	"postgresql": {Min: 10, Max: 13},
 	"mariadb":    {Min: 1, Max: 1},
 }
 

@@ -1,4 +1,4 @@
--- Drop the trigger first
+-- Drop the trigger first (may not exist if later migrations weren't applied)
 DROP TRIGGER IF EXISTS trigger_sync_labels ON resource;
 
 -- Drop the trigger function
@@ -11,5 +11,5 @@ DROP TABLE IF EXISTS public.label_value;
 DROP TABLE IF EXISTS public.label_key;
 
 -- Restore the GIN index on JSONB labels
-CREATE INDEX idx_json_labels ON public.resource
+CREATE INDEX IF NOT EXISTS idx_json_labels ON public.resource
     USING gin ((((data -> 'metadata'::text) -> 'labels'::text)));

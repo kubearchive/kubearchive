@@ -1,2 +1,0 @@
--- No-op: migration 05 down.sql handles dropping all label normalization tables.
--- This backfill migration only inserted data that would be dropped with those tables.

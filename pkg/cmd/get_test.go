@@ -439,6 +439,44 @@ func TestGetComplete(t *testing.T) {
 			expectInCluster: true,
 			expectArchived:  true,
 		},
+		{
+			name:            "count with limit",
+			args:            []string{"pods"},
+			flags:           []string{"--count", "--limit=10", "--archived"},
+			expectError:     true,
+			errorContains:   "cannot use --count with --limit",
+			expectInCluster: false,
+			expectArchived:  true,
+		},
+		{
+			name:            "count with name",
+			args:            []string{"pods", "my-pod"},
+			flags:           []string{"--count", "--archived"},
+			expectError:     true,
+			errorContains:   "cannot use --count with a specific resource name",
+			expectInCluster: false,
+			expectArchived:  true,
+		},
+		{
+			name:            "count without archived",
+			args:            []string{"pods"},
+			flags:           []string{"--count", "--in-cluster"},
+			expectError:     true,
+			errorContains:   "--count requires --archived",
+			expectInCluster: true,
+			expectArchived:  false,
+		},
+		{
+			name:          "count with archived",
+			args:          []string{"pods"},
+			flags:         []string{"--count", "--archived"},
+			resourceInfo: &ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			},
+			expectedApiPath: "/api/v1/namespaces/default/pods",
+			expectInCluster: false,
+			expectArchived:  true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -452,6 +490,7 @@ func TestGetComplete(t *testing.T) {
 			cmd := &cobra.Command{}
 			cmd.Flags().BoolVar(&options.InCluster, "in-cluster", true, "")
 			cmd.Flags().BoolVar(&options.Archived, "archived", true, "")
+			cmd.Flags().BoolVar(&options.Count, "count", false, "")
 			cmd.Flags().IntVar(&options.Limit, "limit", 100, "")
 			cmd.Flags().TimeVar(&options.After, "after", time.Time{}, []string{time.RFC3339}, "")
 			cmd.Flags().TimeVar(&options.Before, "before", time.Now().Add(1*time.Hour), []string{time.RFC3339}, "")

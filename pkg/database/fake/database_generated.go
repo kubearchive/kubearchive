@@ -238,6 +238,17 @@ func (f *fakeDatabase) queryFilteredResources(ctx context.Context, kind, version
 	return resources
 }
 
+func (f *fakeDatabase) CountResources(ctx context.Context, kind, version, namespace, name string,
+	_ *models.LabelFilters,
+	creationTimestampAfter, creationTimestampBefore *time.Time) (int64, error) {
+	if f.err != nil {
+		return 0, f.err
+	}
+	resources := f.queryFilteredResources(ctx, kind, version, namespace, name,
+		"", "", creationTimestampAfter, creationTimestampBefore, 0)
+	return int64(len(resources)), nil
+}
+
 func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namespace, name,
 	continueId, continueDate string, _ *models.LabelFilters,
 	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error) {

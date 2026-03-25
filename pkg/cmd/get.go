@@ -26,6 +26,7 @@ type GetOptions struct {
 	genericiooptions.IOStreams
 	KARetrieverCommand
 	AllNamespaces          bool
+	Count                  bool
 	APIPath                string
 	ResourceInfo           *ResourceInfo
 	Name                   string
@@ -102,6 +103,7 @@ func NewGetCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVarP(&o.AllNamespaces, "all-namespaces", "A", o.AllNamespaces, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
+	cmd.Flags().BoolVar(&o.Count, "count", false, "Only print the count of matching resources (KubeArchive only).")
 	cmd.Flags().StringVarP(&o.LabelSelector, "selector", "l", o.LabelSelector, "Selector (label query) to filter on, supports '=', '==', '!=', 'in', 'notin'.(e.g. -l key1=value1,key2=value2,key3 in (value3)). Matching objects must satisfy all of the specified label constraints.")
 	cmd.Flags().BoolVar(&o.InCluster, "in-cluster", true, "Include resources from the Kubernetes cluster.")
 	cmd.Flags().BoolVar(&o.Archived, "archived", true, "Include resources from KubeArchive.")
@@ -131,7 +133,11 @@ func (o *GetOptions) buildKubeArchiveQueryParams() url.Values {
 	}
 
 	// Add KubeArchive-specific parameters
-	params.Set("limit", fmt.Sprintf("%d", o.Limit))
+	if o.Count {
+		params.Set("count", "true")
+	} else {
+		params.Set("limit", fmt.Sprintf("%d", o.Limit))
+	}
 	if !o.After.IsZero() {
 		params.Set("creationTimestampAfter", o.After.Format(time.RFC3339))
 	}
@@ -167,6 +173,20 @@ func (o *GetOptions) Complete(flags *pflag.FlagSet, args []string) error {
 	}
 	if flags.Changed("in-cluster") && o.InCluster {
 		o.Archived = false
+	}
+
+	// --count only works with KubeArchive (Kubernetes API doesn't support server-side counting)
+	if o.Count {
+		if o.Name != "" {
+			return fmt.Errorf("cannot use --count with a specific resource name")
+		}
+		if !o.Archived {
+			return fmt.Errorf("--count requires --archived (Kubernetes API does not support server-side counting)")
+		}
+		if flags.Changed("limit") {
+			return fmt.Errorf("cannot use --count with --limit")
+		}
+		o.InCluster = false
 	}
 
 	// Validate limit
@@ -370,6 +390,28 @@ func (o *GetOptions) Run() error {
 				strings.Contains(apiErr.Message, "authentication failed") {
 				return fmt.Errorf("KubeArchive authentication required: %s", apiErr.Message)
 			}
+		}
+
+		// Handle count requests as a distinct branch
+		if o.Count {
+			if apiErr != nil {
+				if apiErr.StatusCode == http.StatusNotFound {
+					fmt.Fprintf(o.Out, "0\n")
+					return nil
+				}
+				return apiErr
+			}
+			var countResponse struct {
+				Count int64 `json:"count"`
+			}
+			if err := json.Unmarshal(bodyBytes, &countResponse); err != nil {
+				return fmt.Errorf("error parsing count response: %w", err)
+			}
+			fmt.Fprintf(o.Out, "%d\n", countResponse.Count)
+			return nil
+		}
+
+		if apiErr != nil {
 			// If we have k8s resources, continue with those regardless of the error type
 			if len(sortedResources) > 0 {
 				kubearchiveNotFound = true

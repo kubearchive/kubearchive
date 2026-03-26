@@ -20,6 +20,8 @@ export NEXT_VERSION=${NEXT_VERSION}
 
 bash cmd/operator/generate.sh
 bash cmd/installer/generate.sh
+# Delete the migration job if it already exists because Job specs are immutable.
+kubectl -n kubearchive delete job kubearchive-schema-migration --ignore-not-found
 kubectl kustomize config/ | envsubst '$NEXT_VERSION' | ko apply --tags latest-build -f - --base-import-paths
 
 kubectl -n kubearchive rollout status deployment --timeout=90s

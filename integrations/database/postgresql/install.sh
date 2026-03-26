@@ -69,19 +69,28 @@ else
   exit 1
 fi
 
-# Run migrate from host
-echo "[INFO] Running migrations using migrate CLI..."
-export KUBEARCHIVE_PASSWORD="$(python3 -c "import urllib.parse; print(urllib.parse.quote('Dat!abas]3Pass*w0rd', ''))")"; # notsecret
-if start_port_forward; then
-  # Use 127.0.0.1 instead of localhost to avoid IPv6 resolution issues in CI
-  migrate -verbose \
-    -path migrations/ \
-    -database "postgresql://kubearchive:${KUBEARCHIVE_PASSWORD}@127.0.0.1:${LOCAL_PORT}/kubearchive" \
-    up
-  cleanup_port_forward
-else
-  echo "[ERROR] Failed to establish port-forward for migrations"
-  exit 1
-fi
+# Run migrations using the migration job in the cluster
+echo "[INFO] Running migrations using migration job in cluster..."
+REPO_ROOT="${SCRIPT_DIR}/../../.."
+
+# Ensure the kubearchive namespace and database secret exist
+export NEXT_VERSION="${NEXT_VERSION:-$(cat "${REPO_ROOT}/VERSION")}"
+kubectl create ns kubearchive --dry-run=client -o yaml | kubectl apply -f -
+envsubst '$NEXT_VERSION' < "${REPO_ROOT}/config/templates/database/database_secret.yaml" \
+  | kubectl -n kubearchive apply -f -
+
+# Build the migration image and deploy the Job
+# ko reads .ko.yaml from the working directory, so run from the repo root.
+envsubst '$NEXT_VERSION' < "${REPO_ROOT}/config/templates/database/migration_job.yaml" \
+  | (cd "${REPO_ROOT}" && ko resolve --base-import-paths -f -) \
+  | sed 's/suspend: true/suspend: false/' \
+  | kubectl apply -f -
+
+# Wait for the Job to complete
+kubectl -n kubearchive wait job/kubearchive-schema-migration \
+  --for=condition=complete --timeout=120s
+
+echo "[INFO] Migration job logs:"
+kubectl -n kubearchive logs job/kubearchive-schema-migration
 
 echo "[INFO] Migrations complete."

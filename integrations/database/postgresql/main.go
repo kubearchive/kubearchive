@@ -90,6 +90,16 @@ func main() {
 		}
 	}
 
+	// If the target version is below the current version, migrate down directly.
+	if hasTarget && currentVersion > targetVersion {
+		slog.Info("Migrating down", "from", currentVersion, "to", targetVersion) //nolint:gosec // versions are uints from migrate, not user input
+		if err := m.Migrate(targetVersion); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+			panic(err)
+		}
+		slog.Info("Migration completed successfully", "duration", time.Since(start))
+		return
+	}
+
 	// Step through migrations one at a time, running scripts after each.
 	for {
 		if hasTarget {

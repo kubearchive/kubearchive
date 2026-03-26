@@ -1,0 +1,72 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: migration_test
+run-name: Migration Tests
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  migration:
+    name: KubeArchive Migration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v6
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.25.5'
+      - name: Install latest kubectl
+        run: |
+          set -x
+          curl -Lo ./kubectl "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x ./kubectl
+          sudo mv kubectl /usr/local/bin
+      - name: Install KinD
+        run: |
+          set -x
+          sudo swapoff -a
+          sudo rm -f /swapfile
+          curl -Lo ./kind https://github.com/kubernetes-sigs/kind/releases/download/v0.26.0/kind-$(uname)-amd64
+          chmod +x ./kind
+          sudo mv kind /usr/local/bin
+      - name: Install ko
+        uses: ko-build/setup-ko@v0.9
+      - name: Create KinD cluster
+        run: kind create cluster
+      - name: Install PostgreSQL and run initial migration
+        run: |
+          export KO_DOCKER_REPO="kind.local"
+          bash integrations/database/postgresql/install.sh
+      - name: Seed test data
+        run: |
+          kubectl run seed-data --namespace=postgresql --restart=Never \
+            --image=docker.io/postgres:17 \
+            --env="PGPASSWORD=Dat!abas]3Pass*w0rd" \
+            --command -- psql \
+              -h kubearchive-rw.postgresql.svc.cluster.local \
+              -U kubearchive -d kubearchive -c "
+                INSERT INTO resource (uuid, api_version, kind, name, namespace, cluster_updated_ts, data)
+                VALUES
+                  ('11111111-1111-1111-1111-111111111111', 'v1', 'Pod', 'web-server', 'default', NOW(),
+                   '{\"metadata\": {\"labels\": {\"app\": \"web\", \"env\": \"prod\"}}}'),
+                  ('22222222-2222-2222-2222-222222222222', 'batch/v1', 'Job', 'data-import', 'default', NOW(),
+                   '{\"metadata\": {\"labels\": {\"app\": \"api\", \"env\": \"staging\"}}}'),
+                  ('33333333-3333-3333-3333-333333333333', 'batch/v1', 'CronJob', 'nightly-cleanup', 'kube-system', NOW(),
+                   '{\"metadata\": {\"labels\": {\"app\": \"web\", \"tier\": \"frontend\"}}}');
+              "
+          kubectl wait --namespace=postgresql pod/seed-data --for=condition=Ready --timeout=60s || true
+          kubectl wait --namespace=postgresql pod/seed-data \
+            --for=jsonpath='{.status.phase}'=Succeeded --timeout=60s
+          kubectl logs --namespace=postgresql seed-data
+      - name: Run migration tests
+        run: |
+          go test -v -count=1 -tags=integration -timeout 10m ./integrations/database/postgresql/...

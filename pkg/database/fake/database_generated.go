@@ -216,9 +216,15 @@ func (f *fakeDatabase) QueryResourceByUID(ctx context.Context, kind, apiVersion,
 	return nil, f.err
 }
 
+<<<<<<< HEAD
 func (f *fakeDatabase) queryFilteredResources(ctx context.Context, kind, version, namespace, name,
 	continueId, continueDate string,
 	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) []models.Resource {
+=======
+func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namespace, name,
+	continueId, continueDate string, _ *models.LabelFilters,
+	creationTimestampAfter, creationTimestampBefore *time.Time, prunedFromEtcd *bool, limit int) ([]models.Resource, error) {
+>>>>>>> 2b9a958 (Add prunedFromEtcd filter)
 	var resources []models.Resource
 
 	if name != "" && strings.Contains(name, "*") {
@@ -235,6 +241,7 @@ func (f *fakeDatabase) queryFilteredResources(ctx context.Context, kind, version
 		resources = f.filterResourcesByTimestamp(resources, creationTimestampAfter, creationTimestampBefore)
 	}
 
+<<<<<<< HEAD
 	return resources
 }
 
@@ -243,6 +250,12 @@ func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namesp
 	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error) {
 	resources := f.queryFilteredResources(ctx, kind, version, namespace, name,
 		continueId, continueDate, creationTimestampAfter, creationTimestampBefore, limit)
+=======
+	if prunedFromEtcd != nil {
+		resources = f.filterResourcesByDeletionTimestamp(resources, prunedFromEtcd)
+	}
+
+>>>>>>> 2b9a958 (Add prunedFromEtcd filter)
 	return resources, f.err
 }
 
@@ -283,6 +296,27 @@ func (f *fakeDatabase) filterResourcesByTimestamp(resources []models.Resource,
 		}
 
 		filteredResources = append(filteredResources, resource)
+	}
+
+	return filteredResources
+}
+
+// filterResourcesByDeletionTimestamp filters resources based on presence of deletionTimestamp
+func (f *fakeDatabase) filterResourcesByDeletionTimestamp(resources []models.Resource,
+	prunedFromEtcd *bool) []models.Resource {
+	var filteredResources []models.Resource
+
+	for _, resource := range resources {
+		var obj unstructured.Unstructured
+		err := json.Unmarshal([]byte(resource.Data), &obj)
+		if err != nil {
+			panic(fmt.Sprintf("error while deserializing resource: %s", err))
+		}
+
+		hasDeletionTimestamp := obj.GetDeletionTimestamp() != nil
+		if *prunedFromEtcd == hasDeletionTimestamp {
+			filteredResources = append(filteredResources, resource)
+		}
 	}
 
 	return filteredResources

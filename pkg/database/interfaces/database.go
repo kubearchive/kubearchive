@@ -39,7 +39,7 @@ type DBReader interface {
 	// Unlike QueryResources, it does not load all rows into memory at once.
 	StreamResources(ctx context.Context, kind, apiVersion, namespace,
 		name, continueId, continueDate string, labelFilters *models.LabelFilters,
-		creationTimestampAfter, creationTimestampBefore *time.Time, limit int,
+		creationTimestampAfter, creationTimestampBefore *time.Time, prunedFromEtcd *bool, limit int,
 		fn func(resource models.Resource) error) error
 	QueryResourceByUID(ctx context.Context, kind, apiVersion, namespace, uid string) (*models.Resource, error)
 	QueryLogURLByName(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (*LogRecord, error)

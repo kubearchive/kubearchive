@@ -47,7 +47,7 @@ func (db *sqlDatabaseImpl) QueryResourceByUID(ctx context.Context, kind, apiVers
 // This is shared between QueryResources and StreamResources.
 func (db *sqlDatabaseImpl) buildResourceListQuery(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *models.LabelFilters,
-	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) (*sqlbuilder.SelectBuilder, error) {
+	creationTimestampAfter, creationTimestampBefore *time.Time, prunedFromEtcd *bool, limit int) (*sqlbuilder.SelectBuilder, error) {
 	sb := db.selector.ResourceSelector()
 	sb.Where(db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion))
 	if namespace != "" {

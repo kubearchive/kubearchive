@@ -88,9 +88,9 @@ func (db *sqlDatabaseImpl) buildResourceListQuery(ctx context.Context, kind, api
 
 func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *models.LabelFilters,
-	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error) {
+	creationTimestampAfter, creationTimestampBefore *time.Time, prunedFromEtcd *bool, limit int) ([]models.Resource, error) {
 	sb, err := db.buildResourceListQuery(ctx, kind, apiVersion, namespace, name,
-		continueId, continueDate, labelFilters, creationTimestampAfter, creationTimestampBefore, limit)
+		continueId, continueDate, labelFilters, creationTimestampAfter, creationTimestampBefore, prunedFromEtcd, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -99,10 +99,10 @@ func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion,
 
 func (db *sqlDatabaseImpl) StreamResources(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *models.LabelFilters,
-	creationTimestampAfter, creationTimestampBefore *time.Time, limit int,
+	creationTimestampAfter, creationTimestampBefore *time.Time, prunedFromEtcd *bool, limit int,
 	fn func(resource models.Resource) error) error {
 	sb, err := db.buildResourceListQuery(ctx, kind, apiVersion, namespace, name,
-		continueId, continueDate, labelFilters, creationTimestampAfter, creationTimestampBefore, limit)
+		continueId, continueDate, labelFilters, creationTimestampAfter, creationTimestampBefore, prunedFromEtcd, limit)
 	if err != nil {
 		return err
 	}

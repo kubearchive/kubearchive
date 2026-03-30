@@ -241,27 +241,20 @@ func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namesp
 		resources = f.filterResourcesByTimestamp(resources, creationTimestampAfter, creationTimestampBefore)
 	}
 
-<<<<<<< HEAD
 	return resources
 }
 
 func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namespace, name,
 	continueId, continueDate string, _ *models.LabelFilters,
-	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error) {
+	creationTimestampAfter, creationTimestampBefore *time.Time, prunedFromEtcd *bool, limit int) ([]models.Resource, error) {
 	resources := f.queryFilteredResources(ctx, kind, version, namespace, name,
 		continueId, continueDate, creationTimestampAfter, creationTimestampBefore, limit)
-=======
-	if prunedFromEtcd != nil {
-		resources = f.filterResourcesByDeletionTimestamp(resources, prunedFromEtcd)
-	}
-
->>>>>>> 2b9a958 (Add prunedFromEtcd filter)
 	return resources, f.err
 }
 
 func (f *fakeDatabase) StreamResources(ctx context.Context, kind, version, namespace, name,
 	continueId, continueDate string, _ *models.LabelFilters,
-	creationTimestampAfter, creationTimestampBefore *time.Time, limit int,
+	creationTimestampAfter, creationTimestampBefore *time.Time, prunedFromEtcd *bool, limit int,
 	fn func(resource models.Resource) error) error {
 	if f.err != nil {
 		return f.err

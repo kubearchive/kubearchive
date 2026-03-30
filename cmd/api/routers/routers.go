@@ -97,7 +97,6 @@ func (c *Controller) GetResources(context *gin.Context) {
 		}
 	}
 
-	// Parse prunedFromEtcd filter
 	prunedFromEtcd, err := parseBoolQuery(context, "prunedFromEtcd")
 	if err != nil {
 		abort.Abort(context, err, http.StatusBadRequest)
@@ -114,7 +113,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 		var resources []labelFilter.Resource
 		resources, err = c.Database.QueryResources(
 			context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
-			creationTimestampAfter, creationTimestampBefore, 2)
+			creationTimestampAfter, creationTimestampBefore, prunedFromEtcd, 2)
 		if err != nil {
 			abort.Abort(context, err, http.StatusInternalServerError)
 			return

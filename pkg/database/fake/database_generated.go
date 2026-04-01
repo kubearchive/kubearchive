@@ -216,15 +216,9 @@ func (f *fakeDatabase) QueryResourceByUID(ctx context.Context, kind, apiVersion,
 	return nil, f.err
 }
 
-<<<<<<< HEAD
 func (f *fakeDatabase) queryFilteredResources(ctx context.Context, kind, version, namespace, name,
 	continueId, continueDate string,
 	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) []models.Resource {
-=======
-func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namespace, name,
-	continueId, continueDate string, _ *models.LabelFilters,
-	creationTimestampAfter, creationTimestampBefore *time.Time, prunedFromEtcd *bool, limit int) ([]models.Resource, error) {
->>>>>>> 2b9a958 (Add prunedFromEtcd filter)
 	var resources []models.Resource
 
 	if name != "" && strings.Contains(name, "*") {

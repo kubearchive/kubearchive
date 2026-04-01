@@ -144,7 +144,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 
 	err = c.Database.StreamResources(
 		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
-		creationTimestampAfter, creationTimestampBefore, newLimit,
+		creationTimestampAfter, creationTimestampBefore, prunedFromEtcd, newLimit,
 		func(resource labelFilter.Resource) error {
 			count++
 			if count > limit {

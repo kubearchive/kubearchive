@@ -108,7 +108,7 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := NewFakeDatabase(testResources, testLogUrls)
-			filteredResources, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace, "", "", "", &models.LabelFilters{}, nil, nil, 100)
+			filteredResources, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace, "", "", "", &models.LabelFilters{}, nil, nil, nil, 100)
 			expectedUids := make([]string, 0)
 			for _, resource := range tt.expected {
 				expectedUids = append(expectedUids, string(resource.GetUID()))

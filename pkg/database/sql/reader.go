@@ -75,6 +75,9 @@ func (db *sqlDatabaseImpl) buildResourceListQuery(ctx context.Context, kind, api
 		if creationTimestampBefore != nil {
 			sb.Where(db.filter.CreationTimestampBeforeFilter(sb.Cond, *creationTimestampBefore))
 		}
+		if prunedFromEtcd != nil && *prunedFromEtcd {
+			sb.Where(db.filter.PrunedFromEtcdFilter(sb.Cond))
+		}
 		if !labelFilters.IsEmpty() {
 			if err := db.filter.ApplyLabelFilters(ctx, db.db, sb, labelFilters); err != nil {
 				return nil, err

@@ -82,6 +82,10 @@ func (postgreSQLFilter) CreationTimestampBeforeFilter(cond sqlbuilder.Cond, time
 	)
 }
 
+func (postgreSQLFilter) PrunedFromEtcdFilter(cond sqlbuilder.Cond) string {
+	return fmt.Sprint("resource.data->'metadata'->'deletionTimestamp' IS NOT NULL")
+}
+
 func (postgreSQLFilter) NameWildcardFilter(cond sqlbuilder.Cond, namePattern string) string {
 	return fmt.Sprintf("name ILIKE %s", cond.Var(namePattern))
 }

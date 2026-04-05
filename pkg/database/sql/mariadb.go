@@ -78,10 +78,6 @@ func (mariaDBFilter) CreationTimestampBeforeFilter(cond sqlbuilder.Cond, timesta
 	)
 }
 
-func (mariaDBFilter) PrunedFromEtcdFilter(cond sqlbuilder.Cond) string {
-	return fmt.Sprint("JSON_VALUE(data, '$.metadata.deletionTimestamp') IS NOT NULL")
-}
-
 func (mariaDBFilter) OwnerFilter(cond sqlbuilder.Cond, uuids []string) string {
 	return fmt.Sprintf(
 		"JSON_OVERLAPS(JSON_EXTRACT(data, '$.metadata.ownerReferences.**.uid'), JSON_ARRAY(%s))",

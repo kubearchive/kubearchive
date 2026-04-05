@@ -22,7 +22,6 @@ type DBFilter interface {
 	CreationTSAndIDFilter(cond sqlbuilder.Cond, continueDate, continueId string) string
 	CreationTimestampAfterFilter(cond sqlbuilder.Cond, timestamp time.Time) string
 	CreationTimestampBeforeFilter(cond sqlbuilder.Cond, timestamp time.Time) string
-	PrunedFromEtcdFilter(cond sqlbuilder.Cond) string
 	OwnerFilter(cond sqlbuilder.Cond, ownersUuids []string) string
 	UuidsFilter(cond sqlbuilder.Cond, uuids []string) string
 	UuidFilter(cond sqlbuilder.Cond, uuid string) string

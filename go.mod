@@ -17,7 +17,7 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/google/cel-go v0.28.0
 	github.com/google/uuid v1.6.0
-	github.com/huandu/go-sqlbuilder v1.40.1
+	github.com/huandu/go-sqlbuilder v1.40.2
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.12.3
 	github.com/ohler55/ojg v1.28.1

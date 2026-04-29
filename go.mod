@@ -13,7 +13,7 @@ require (
 	github.com/gin-contrib/gzip v1.2.6
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-logr/logr v1.4.3
-	github.com/go-sql-driver/mysql v1.9.3
+	github.com/go-sql-driver/mysql v1.10.0
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/google/cel-go v0.28.0
 	github.com/google/uuid v1.6.0
@@ -54,7 +54,7 @@ require (
 
 require (
 	cel.dev/expr v0.25.1 // indirect
-	filippo.io/edwards25519 v1.1.1 // indirect
+	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect

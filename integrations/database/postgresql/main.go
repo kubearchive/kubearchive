@@ -22,6 +22,13 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
+// migrator abstracts the subset of migrate.Migrate used by the orchestration logic.
+type migrator interface {
+	Version() (uint, bool, error)
+	Migrate(version uint) error
+	Steps(n int) error
+}
+
 // scriptEntry represents a shell script to run after a specific migration version.
 type scriptEntry struct {
 	afterVersion uint
@@ -79,25 +86,37 @@ func main() {
 		slog.Info("Target migration version requested", "version", targetVersion)
 	}
 
-	// Run any scripts for the current version before stepping forward.
-	// This handles the case where a previous run applied a migration but
-	// its script was interrupted. Scripts are idempotent so re-running is safe.
-	currentVersion, _, _ := m.Version()
-	if currentVersion != 0 {
-		slog.Info("Checking for scripts on current version", "version", currentVersion) //nolint:gosec // version is a uint from migrate, not user input
-		if err := runScriptsForVersion(scripts, currentVersion); err != nil {
-			panic(err)
-		}
+	if err := stepMigrationsWithScripts(m, scripts, targetVersion, hasTarget); err != nil {
+		panic(err)
 	}
 
+	slog.Info("Migration completed successfully", "duration", time.Since(start))
+}
+
+// stepMigrationsWithScripts orchestrates migrations one step at a time,
+// running interleaved scripts after each migration. On downgrade it skips
+// scripts and delegates directly to Migrate.
+func stepMigrationsWithScripts(m migrator, scripts []scriptEntry, targetVersion uint, hasTarget bool) error {
+	currentVersion, _, _ := m.Version()
+
 	// If the target version is below the current version, migrate down directly.
+	// Skip scripts — they only apply when migrating up.
 	if hasTarget && currentVersion > targetVersion {
 		slog.Info("Migrating down", "from", currentVersion, "to", targetVersion) //nolint:gosec // versions are uints from migrate, not user input
 		if err := m.Migrate(targetVersion); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-			panic(err)
+			return err
 		}
-		slog.Info("Migration completed successfully", "duration", time.Since(start))
-		return
+		return nil
+	}
+
+	// Run any scripts for the current version before stepping forward.
+	// This handles the case where a previous run applied a migration but
+	// its script was interrupted. Scripts are idempotent so re-running is safe.
+	if currentVersion != 0 {
+		slog.Info("Checking for scripts on current version", "version", currentVersion) //nolint:gosec // version is a uint from migrate, not user input
+		if err := runScriptsForVersion(scripts, currentVersion); err != nil {
+			return err
+		}
 	}
 
 	// Step through migrations one at a time, running scripts after each.
@@ -115,17 +134,17 @@ func main() {
 			break
 		}
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		newVersion, _, _ := m.Version()
 		slog.Info("Migration applied", "version", newVersion, "duration", time.Since(stepStart)) //nolint:gosec // version is a uint from migrate, not user input
 		if err := runScriptsForVersion(scripts, newVersion); err != nil {
-			panic(err)
+			return err
 		}
 	}
 
-	slog.Info("Migration completed successfully", "duration", time.Since(start))
+	return nil
 }
 
 // runMigrations applies migrations using the original simple logic (no script interleaving).
@@ -200,13 +219,16 @@ func runScriptsForVersion(scripts []scriptEntry, version uint) error {
 
 		slog.Info("Running script", "script", s.name)
 		scriptStart := time.Now()
-		if err := executeScript(s.path); err != nil {
+		if err := executeScriptFunc(s.path); err != nil {
 			return fmt.Errorf("script %s failed: %w", s.name, err)
 		}
 		slog.Info("Script completed successfully", "script", s.name, "duration", time.Since(scriptStart))
 	}
 	return nil
 }
+
+// executeScriptFunc runs a shell script. It is a variable so tests can replace it.
+var executeScriptFunc = executeScript
 
 // executeScript runs a shell script, streaming its output to stdout/stderr.
 func executeScript(scriptPath string) error {

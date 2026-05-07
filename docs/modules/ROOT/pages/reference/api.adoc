@@ -4,7 +4,7 @@ The design of the KubeArchive API makes it offer the same experience
 than the Kubernetes API, so it is compatible with the tools that
 call the Kubernetes API. In addition, the KubeArchive API provides
 some features that make sense for databases: search by `uid`, search
-using wildcard, ... This document contains the endpoints, query paramaters
+using wildcard, ... This document contains the endpoints, query parameters
 and features the KubeArchive API supports.
 
 == General Features

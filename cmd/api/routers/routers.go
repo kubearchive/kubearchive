@@ -209,8 +209,6 @@ func parseTimestampQuery(context *gin.Context, paramName string) (*time.Time, er
 	return &timestamp, nil
 }
 
-// parseBoolQuery parses a boolean query parameter and returns a pointer to bool
-// Returns nil if the parameter is not provided or empty
 func parseBoolQuery(context *gin.Context, paramName string) (*bool, error) {
 	value := context.Query(paramName)
 	if value == "" {

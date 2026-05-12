@@ -187,12 +187,15 @@ func (opts *KARetrieverOptions) CompleteRetriever() error {
 func (opts *KARetrieverOptions) testConnectivity() error {
 	if opts.host == "" {
 		return fmt.Errorf("no host provided")
-	} else if opts.token == "" {
-		return fmt.Errorf("no token provided")
-	} else if err := opts.connectivityTester.TestKubeArchiveConnectivity(opts.host, opts.tlsInsecure, opts.token, opts.certData); err != nil {
-		return err
 	}
-	return nil
+	if opts.token == "" {
+		return fmt.Errorf("no token provided")
+	}
+	ns, errNs := opts.GetNamespace()
+	if errNs != nil {
+		ns = "default"
+	}
+	return opts.connectivityTester.TestKubeArchiveConnectivity(opts.host, opts.tlsInsecure, ns, opts.token, opts.certData)
 }
 
 // AddRetrieverFlags adds all archive-related flags to the given flag set

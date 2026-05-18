@@ -1,2 +1,2 @@
 locust
-cloudevents<2
+cloudevents

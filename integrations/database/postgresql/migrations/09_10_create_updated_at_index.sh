@@ -29,14 +29,16 @@ log "Creating index on resource.updated_at..."
 # Drop any invalid index left by a previously failed CONCURRENTLY build,
 # otherwise IF NOT EXISTS would match the invalid index and skip creation.
 # shellcheck disable=SC2086
-psql ${PSQL_OPTS} -t -A -c "
-  SELECT 1 FROM pg_class c JOIN pg_index i ON c.oid = i.indexrelid
+INVALID=$(psql ${PSQL_OPTS} -t -A -c "
+  SELECT count(*) FROM pg_class c JOIN pg_index i ON c.oid = i.indexrelid
   WHERE c.relname = 'idx_resource_updated_at' AND NOT i.indisvalid;
-" | grep -q 1 && {
+")
+
+if [ "${INVALID:-0}" -gt 0 ]; then
   log "Dropping invalid index idx_resource_updated_at from a previous failed run..."
   # shellcheck disable=SC2086
   psql ${PSQL_OPTS} -c "DROP INDEX IF EXISTS idx_resource_updated_at;"
-}
+fi
 
 # shellcheck disable=SC2086
 psql ${PSQL_OPTS} -c "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_resource_updated_at ON resource (updated_at);"

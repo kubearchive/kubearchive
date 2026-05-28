@@ -29,7 +29,7 @@ type MockConnectivityTester struct {
 }
 
 // TestKubeArchiveConnectivity mocks the connectivity test
-func (m *MockConnectivityTester) TestKubeArchiveConnectivity(host string, tlsInsecure bool, token string, caData []byte) error {
+func (m *MockConnectivityTester) TestKubeArchiveConnectivity(host string, tlsInsecure bool, namespace string, token string, caData []byte) error {
 	if m.shouldFail {
 		if m.failError != nil {
 			return m.failError

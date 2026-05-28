@@ -4,10 +4,128 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 )
+
+// mockMigrator records calls for testing stepMigrationsWithScripts.
+type mockMigrator struct {
+	version      uint
+	migrateCalls []uint
+	stepsCalls   int
+	// versions to step through on successive Steps() calls
+	stepVersions []uint
+	stepIndex    int
+}
+
+func (m *mockMigrator) Version() (uint, bool, error) {
+	return m.version, m.version != 0, nil
+}
+
+func (m *mockMigrator) Migrate(version uint) error {
+	m.migrateCalls = append(m.migrateCalls, version)
+	m.version = version
+	return nil
+}
+
+func (m *mockMigrator) Steps(n int) error {
+	m.stepsCalls++
+	if m.stepIndex >= len(m.stepVersions) {
+		return os.ErrNotExist
+	}
+	m.version = m.stepVersions[m.stepIndex]
+	m.stepIndex++
+	return nil
+}
+
+func TestStepMigrationsWithScripts_DowngradeSkipsScripts(t *testing.T) {
+	mock := &mockMigrator{version: 7}
+
+	scriptRan := false
+	scripts := []scriptEntry{
+		{afterVersion: 7, name: "07_08_populate.sh", path: "/fake/07_08_populate.sh"},
+	}
+
+	origExecuteScript := executeScriptFunc
+	executeScriptFunc = func(path string) error {
+		scriptRan = true
+		return nil
+	}
+	defer func() { executeScriptFunc = origExecuteScript }()
+
+	err := stepMigrationsWithScripts(mock, scripts, 5, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if scriptRan {
+		t.Error("scripts should NOT run during downgrade")
+	}
+
+	if len(mock.migrateCalls) != 1 || mock.migrateCalls[0] != 5 {
+		t.Errorf("expected Migrate(5), got %v", mock.migrateCalls)
+	}
+}
+
+func TestStepMigrationsWithScripts_UpgradeRunsScripts(t *testing.T) {
+	mock := &mockMigrator{
+		version:      7,
+		stepVersions: []uint{8},
+	}
+
+	var scriptsRun []string
+	scripts := []scriptEntry{
+		{afterVersion: 7, name: "07_08_populate.sh", path: "/fake/07_08_populate.sh"},
+		{afterVersion: 8, name: "08_09_index.sh", path: "/fake/08_09_index.sh"},
+	}
+
+	origExecuteScript := executeScriptFunc
+	executeScriptFunc = func(path string) error {
+		scriptsRun = append(scriptsRun, path)
+		return nil
+	}
+	defer func() { executeScriptFunc = origExecuteScript }()
+
+	err := stepMigrationsWithScripts(mock, scripts, 9, true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	expected := []string{"/fake/07_08_populate.sh", "/fake/08_09_index.sh"}
+	if len(scriptsRun) != len(expected) {
+		t.Fatalf("expected scripts %v, got %v", expected, scriptsRun)
+	}
+	for i, e := range expected {
+		if scriptsRun[i] != e {
+			t.Errorf("script[%d]: expected %q, got %q", i, e, scriptsRun[i])
+		}
+	}
+}
+
+func TestStepMigrationsWithScripts_ScriptFailureStopsMigration(t *testing.T) {
+	mock := &mockMigrator{version: 7}
+
+	scripts := []scriptEntry{
+		{afterVersion: 7, name: "07_08_populate.sh", path: "/fake/07_08_populate.sh"},
+	}
+
+	origExecuteScript := executeScriptFunc
+	executeScriptFunc = func(path string) error {
+		return fmt.Errorf("script crashed")
+	}
+	defer func() { executeScriptFunc = origExecuteScript }()
+
+	err := stepMigrationsWithScripts(mock, scripts, 9, true)
+	if err == nil {
+		t.Fatal("expected error from failed script")
+	}
+
+	if mock.stepsCalls != 0 {
+		t.Error("should not have stepped after script failure")
+	}
+}
 
 func TestDiscoverScripts(t *testing.T) {
 	dir := t.TempDir()

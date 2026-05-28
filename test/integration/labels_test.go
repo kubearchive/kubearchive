@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -171,50 +170,34 @@ func TestLabels(t *testing.T) {
 				podsURL = fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods?labelSelector=%s", port, namespaceName, selector)
 			}
 
-			retryErr := retry.New(retry.Attempts(240), retry.MaxDelay(4*time.Second)).Do(func() error {
-				podList, getUrlErr := test.GetUrl(t, token.Status.Token, podsURL, map[string][]string{})
-				if getUrlErr != nil {
-					t.Fatal(getUrlErr)
-				}
-
-				if len(podList.Items) != len(podNames) {
-					msg := fmt.Sprintf("expected '%d' pods, got '%d'", len(podNames), len(podList.Items))
-					t.Log(msg)
-					return errors.New(msg)
-				}
-
-				retrievedPodNames := []string{}
-				for _, pod := range podList.Items {
-					retrievedPodNames = append(retrievedPodNames, pod.GetName())
-				}
-
-				missingPods := []string{}
-				for _, podName := range podNames {
-					found := false
-					for _, retrievedPodName := range retrievedPodNames {
-						if podName == retrievedPodName {
-							found = true
-						}
-					}
-
-					if !found {
-						missingPods = append(missingPods, podName)
-					}
-				}
-
-				if len(missingPods) >= 1 {
-					msg := fmt.Sprintf("There were missing pods: %s", strings.Join(missingPods, ", "))
-					t.Log(msg)
-					return errors.New(msg)
-				}
-
-				t.Log("found expected pods for the selector")
-				return nil
-			})
-
-			if retryErr != nil {
-				t.Fatal(retryErr)
+			podList, getUrlErr := test.GetUrl(t, token.Status.Token, podsURL, map[string][]string{})
+			if getUrlErr != nil {
+				t.Fatal(getUrlErr)
 			}
+
+			retrievedPodNames := []string{}
+			for _, pod := range podList.Items {
+				retrievedPodNames = append(retrievedPodNames, pod.GetName())
+			}
+
+			if len(podList.Items) != len(podNames) {
+				t.Fatalf("expected '%d' pods %v, got '%d' %v", len(podNames), podNames, len(podList.Items), retrievedPodNames)
+			}
+
+			for _, podName := range podNames {
+				found := false
+				for _, retrievedPodName := range retrievedPodNames {
+					if podName == retrievedPodName {
+						found = true
+					}
+				}
+
+				if !found {
+					t.Fatalf("missing pod '%s' in results %v", podName, retrievedPodNames)
+				}
+			}
+
+			t.Log("found expected pods for the selector")
 		})
 	}
 }

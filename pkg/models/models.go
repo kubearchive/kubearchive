@@ -42,6 +42,9 @@ func OptionalTimestamp(timestamp *metav1.Time) sql.NullString {
 type LogTuple struct {
 	ContainerName string
 	Url           string
+	Query         string
+	Start         string
+	End           string
 }
 
 type Resource struct {

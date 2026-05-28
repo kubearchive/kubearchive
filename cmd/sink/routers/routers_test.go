@@ -93,7 +93,7 @@ func TestReceiveCloudEvents(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{}, "$.")
+			db := fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{})
 			builder, _ := logs.NewUrlBuilder()
 			router := setupRouter(t, db, nil, builder)
 			res := httptest.NewRecorder()
@@ -446,7 +446,7 @@ func TestLogUrlWriteFails(t *testing.T) {
 }
 
 func TestLivez(t *testing.T) {
-	db := fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{}, "$.")
+	db := fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{})
 	builder, _ := logs.NewUrlBuilder()
 	router := setupRouter(t, db, nil, builder)
 	res := httptest.NewRecorder()
@@ -492,7 +492,7 @@ func TestReadyz(t *testing.T) {
 			var db interfaces.DBWriter
 			builder, _ := logs.NewUrlBuilder()
 			if tt.dbConnReady {
-				db = fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{}, "$.")
+				db = fakeDb.NewFakeDatabase([]*unstructured.Unstructured{}, []fakeDb.LogUrlRow{})
 			} else {
 				db = fakeDb.NewFakeDatabaseWithError(errors.New("test error"))
 			}

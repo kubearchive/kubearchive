@@ -6,3 +6,5 @@ defaultLdflags:
   - -X main.commit={{ .Git.FullCommit }}
   - -X main.date={{ .Date }}
 defaultBaseImage: registry.access.redhat.com/ubi10/ubi-minimal
+baseImageOverrides:
+  github.com/kubearchive/kubearchive/integrations/database/postgresql: ghcr.io/cloudnative-pg/postgresql:17

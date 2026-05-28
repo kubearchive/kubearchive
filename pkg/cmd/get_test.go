@@ -823,8 +823,14 @@ func TestRun(t *testing.T) {
 
 				// Normalize dynamic timestamps in pagination commands for predictable testing
 				if strings.Contains(actualOutput, "--before") {
+					// Verify the --before timestamp is in UTC (ends with Z)
+					re := regexp.MustCompile(`--before (\S+)`)
+					matches := re.FindStringSubmatch(actualOutput)
+					if len(matches) == 2 {
+						assert.True(t, strings.HasSuffix(matches[1], "Z"),
+							"pagination --before timestamp should be in UTC (ending with Z), got: %s", matches[1])
+					}
 					// Replace dynamic timestamp with placeholder for comparison
-					re := regexp.MustCompile(`--before \S+`)
 					actualOutput = re.ReplaceAllString(actualOutput, "--before <timestamp-placeholder>")
 				}
 
@@ -843,6 +849,35 @@ func TestRun(t *testing.T) {
 					assert.Equal(t, expectedOutput, actualOutput)
 				}
 			}
+		})
+	}
+}
+
+func TestBeforeParamProperlyWorking(t *testing.T) {
+	testCases := []struct {
+		name     string
+		before   time.Time
+		expected string
+	}{
+		{
+			name:     "before is really before now",
+			before:   time.Now().Add(-1 * time.Hour),
+			expected: time.Now().Add(-1 * time.Hour).Format(time.RFC3339),
+		},
+		{
+			name:     "before is after now",
+			before:   time.Now().Add(1 * time.Hour),
+			expected: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			o := GetOptions{}
+			o.Before = tc.before
+			params := o.buildKubeArchiveQueryParams()
+
+			assert.Equal(t, tc.expected, params.Get("creationTimestampBefore"))
 		})
 	}
 }

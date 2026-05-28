@@ -253,7 +253,11 @@ func (o *SetOptions) setToken(clusterConfig *config.ClusterConfig, token string)
 
 	// Test token against KubeArchive API if host is configured
 	if clusterConfig.Host != "" {
-		if err := o.tester.TestKubeArchiveConnectivity(clusterConfig.Host, true, token, nil); err != nil {
+		ns, errNs := o.GetNamespace()
+		if errNs != nil {
+			ns = "default"
+		}
+		if err := o.tester.TestKubeArchiveConnectivity(clusterConfig.Host, true, ns, token, nil); err != nil {
 			return fmt.Errorf("token validation failed: %w", err)
 		}
 	}

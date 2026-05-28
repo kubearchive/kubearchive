@@ -118,6 +118,16 @@ func (opts *KARetrieverOptions) CompleteRetriever() error {
 		opts.token = *opts.kubeFlags.BearerToken
 	}
 
+	// Load token from persistent config if not already set by --token flag or env var
+	if opts.token == "" {
+		cm := config.NewFileConfigManager()
+		if loadErr := cm.LoadConfig(opts.k8sRESTConfig); loadErr == nil {
+			if cc, ccErr := cm.GetCurrentClusterConfig(); ccErr == nil && cc != nil && cc.Token != "" {
+				opts.token = cc.Token
+			}
+		}
+	}
+
 	if opts.token == "" && opts.k8sRESTConfig.BearerToken != "" {
 		opts.token = opts.k8sRESTConfig.BearerToken
 	}
@@ -177,12 +187,15 @@ func (opts *KARetrieverOptions) CompleteRetriever() error {
 func (opts *KARetrieverOptions) testConnectivity() error {
 	if opts.host == "" {
 		return fmt.Errorf("no host provided")
-	} else if opts.token == "" {
-		return fmt.Errorf("no token provided")
-	} else if err := opts.connectivityTester.TestKubeArchiveConnectivity(opts.host, opts.tlsInsecure, opts.token, opts.certData); err != nil {
-		return err
 	}
-	return nil
+	if opts.token == "" {
+		return fmt.Errorf("no token provided")
+	}
+	ns, errNs := opts.GetNamespace()
+	if errNs != nil {
+		ns = "default"
+	}
+	return opts.connectivityTester.TestKubeArchiveConnectivity(opts.host, opts.tlsInsecure, ns, opts.token, opts.certData)
 }
 
 // AddRetrieverFlags adds all archive-related flags to the given flag set
@@ -223,7 +236,7 @@ func (opts *KARetrieverOptions) GetFromAPI(api API, path string) ([]byte, *APIEr
 	}
 
 	// Build full URL
-	fullURL := baseURL + path
+	fullURL := strings.TrimRight(baseURL, "/") + path
 
 	// Create request
 	response, err := client.Get(fullURL)
@@ -296,7 +309,9 @@ func (opts *KARetrieverOptions) GetNamespace() (string, error) {
 	return "", fmt.Errorf("unable to retrieve namespace from kubeconfig context")
 }
 
-// ResolveResourceSpec resolves a resource specification using Kubernetes discovery API
+// ResolveResourceSpec resolves a resource specification using Kubernetes discovery API.
+// Supported formats: resource, resource.group, resource.version.group
+// Groups may contain dots (e.g., tekton.dev), so parsing joins remaining parts accordingly.
 func (opts *KARetrieverOptions) ResolveResourceSpec(resourceSpec string) (*ResourceInfo, error) {
 	parts := strings.Split(resourceSpec, ".")
 
@@ -304,23 +319,21 @@ func (opts *KARetrieverOptions) ResolveResourceSpec(resourceSpec string) (*Resou
 		return nil, fmt.Errorf("resource name cannot be empty")
 	}
 
-	if len(parts) > 3 {
-		return nil, fmt.Errorf("invalid resource specification format: %s", resourceSpec)
-	}
-
 	resourceName := parts[0]
 	var requestedVersion, requestedGroup string
 
-	switch len(parts) {
-	case 1:
-		// resource only - need to discover both version and group
-	case 2:
-		// resource.group - need to discover the version for the group
-		requestedGroup = parts[1]
-	case 3:
-		// resource.version.group - everything specified
-		requestedVersion = parts[1]
-		requestedGroup = parts[2]
+	if len(parts) > 1 {
+		// Check if the second part looks like a version (starts with 'v' followed by a digit)
+		if len(parts[1]) >= 2 && parts[1][0] == 'v' && parts[1][1] >= '0' && parts[1][1] <= '9' {
+			// resource.version or resource.version.group (group may contain dots)
+			requestedVersion = parts[1]
+			if len(parts) > 2 {
+				requestedGroup = strings.Join(parts[2:], ".")
+			}
+		} else {
+			// resource.group (group may contain dots)
+			requestedGroup = strings.Join(parts[1:], ".")
+		}
 	}
 
 	// Find the resource using discovery

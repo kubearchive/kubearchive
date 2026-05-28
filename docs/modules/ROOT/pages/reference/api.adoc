@@ -232,6 +232,33 @@ Parameters allowed:
 
 * `container`: name of the container to select the log from, defaults to an
 empty string.
+* `tailLines`: number of lines to return from the end of the log. The count
+is based on actual lines (separated by `\n`), so `tailLines=N` always returns
+exactly _N_ lines. When this parameter is provided, the API uses the `tail`
+endpoint configuration from the logging provider. When omitted, the `full`
+endpoint is used.
+
+==== Response Headers
+
+Log responses include the following headers with metadata about the source:
+
+* `X-Pod-Name`: the name of the Pod whose logs are returned.
+* `X-Pod-UUID`: the UID of the Pod whose logs are returned.
+* `X-Container-Name`: the name of the container whose logs are returned.
+
+==== Streaming
+
+When the logging provider configuration has `reverse: false`, log lines are
+streamed directly to the client as they are received from the backend. When
+`reverse: true`, all lines are buffered, reversed, and returned at once.
+
+[TIP]
+====
+Do not use `reverse: true` if you expect a large amount of logs to avoid
+causing an Out Of Memory error on the KubeArchive API.
+====
+
+==== Resource Resolution
 
 When `/log` endpoint is called for a resource other than a `Pod`, KubeArchive
 searches, recursively, for any `Pod` owned by the resource. If a `Pod` is found

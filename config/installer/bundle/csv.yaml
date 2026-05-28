@@ -1,0 +1,58 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: "[]"
+    capabilities: Basic Install
+  name: kubearchive-operator.v0.0.1
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+      - description: KubeArchiveInstallation is the Schema for the kubearchiveinstallations
+          API.
+        displayName: Kube Archive Installation
+        kind: KubeArchiveInstallation
+        name: kubearchiveinstallations.kubearchive.org
+        version: v1
+  description: Operator to install KubeArchive, an application that stores Kubernetes
+    resources out of the cluster
+  displayName: KubeArchive
+  icon:
+    - base64data: ""
+      mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+    - supported: false
+      type: OwnNamespace
+    - supported: false
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: true
+      type: AllNamespaces
+  keywords:
+    - resources
+    - batch
+    - storage
+    - long-term
+    - off-cluster
+  links:
+    - name: Kubearchive Operator
+      url: https://github.com/kubearchive/kubearchive-operator
+  maintainers:
+    - email: hemartin@redhat.com
+      name: Hector Martinez
+  maturity: alpha
+  minKubeVersion: 1.32.0
+  provider:
+    name: KubeArchive
+    url: https://github.com/kubearchive
+  version: 0.0.1

@@ -32,3 +32,22 @@ func (q queryPerformer[T]) performQuery(ctx context.Context, builder sqlbuilder.
 	err := sqlx.SelectContext(ctx, q.querier, &res, query, args...)
 	return res, err
 }
+
+func (q queryPerformer[T]) performStreamQuery(ctx context.Context, builder sqlbuilder.Builder, fn func(T) error) error {
+	query, args := builder.BuildWithFlavor(q.flavor)
+	rows, err := q.querier.QueryxContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var t T
+		if err := rows.StructScan(&t); err != nil {
+			return err
+		}
+		if err := fn(t); err != nil {
+			return err
+		}
+	}
+	return rows.Err()
+}

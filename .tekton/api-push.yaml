@@ -18,7 +18,8 @@ metadata:
             files.all.exists(x, !x.matches("^cmd/"))
           )
         ) ||
-        files.all.exists(x, x.matches("go\\.(mod|sum)$"))
+        files.all.exists(x, x.matches("go\\.(mod|sum)$")) ||
+        files.all.exists(x, x.matches("^.tekton/ko-build-pipeline.yaml$"))
       )
   creationTimestamp: null
   labels:

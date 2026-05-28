@@ -28,6 +28,126 @@ All migrations have two files: `up` for upgrades and `down` for downgrades.
 Each file should start with a two digit number and an underscore (for example
 `01_initial.up.sql` and `01_initial.down.sql`).
 
+=== Intermediate scripts
+
+The `migrate` tool applies SQL migrations inside transactions. For large tables, this causes
+problems:
+
+* **Long-held locks**: multi-statement migrations run in a single transaction. Any DDL that
+  takes a heavy lock (e.g. `CREATE TRIGGER`, `DROP INDEX`) holds that lock for the entire
+  duration, including slow bulk inserts that precede it.
+* **Transaction bloat**: a long-running transaction prevents PostgreSQL from vacuuming rows
+  modified since the transaction started, causing table bloat and WAL accumulation.
+* **All-or-nothing rollback**: if anything fails mid-transaction, all work is lost and the
+  rollback itself can be slow.
+
+To work around these limitations the migration runner supports **intermediate shell scripts**
+that execute between SQL migrations. Scripts run outside the `migrate` tool's transaction
+management, so each operation commits independently.
+
+==== Naming convention
+
+Scripts follow the pattern:
+
+[source]
+----
+{after}_{before}_{description}.sh
+----
+
+* `after` -- the migration version after which the script runs.
+* `before` -- the next migration version (documentation only, not validated by the runner).
+* `description` -- a human-readable name.
+
+For example, `07_08_populate_label_tables.sh` runs after migration 07 completes and before
+migration 08 is applied.
+
+Scripts live in the same `migrations/` directory as the SQL files:
+
+[source]
+----
+migrations/
+  07_label_normalization_tables.up.sql
+  07_label_normalization_tables.down.sql
+  07_08_populate_label_tables.sh          <-- runs between 07 and 08
+  08_label_resource_constraints.up.sql
+  08_label_resource_constraints.down.sql
+----
+
+==== Script requirements
+
+Scripts must be:
+
+Idempotent::
+Running a script multiple times must produce the same result as running it once. Use
+`ON CONFLICT DO NOTHING` or equivalent techniques. The runner does not track which scripts
+have been executed -- it relies entirely on idempotency.
+
+Data-only::
+Scripts must not modify the database schema (no `CREATE TABLE`, `ALTER TABLE`, etc.). Schema
+changes belong in SQL migration files. Scripts are for bulk data operations that benefit from
+running outside a transaction, such as batched inserts.
+
+Self-contained::
+Scripts receive the database connection details through the same environment variables as the
+migration runner (`DATABASE_URL`, `DATABASE_PORT`, `DATABASE_DB`, `DATABASE_USER`,
+`DATABASE_PASSWORD`). They must not depend on external state beyond these variables.
+
+==== How the runner discovers and executes scripts
+
+The migration runner (`integrations/database/postgresql/main.go`) works as follows:
+
+. On startup it scans the `migrations/` directory for files matching the pattern
+  `{digits}_{digits}_{description}.sh`.
+. The first number group is parsed as the **after version**.
+. If no scripts are found, the runner falls back to the standard `migrate up` behavior with
+  no overhead.
+. When scripts exist, the runner steps through migrations one at a time using `m.Steps(1)`.
+  After each migration, it runs any scripts whose **after version** matches the version just
+  applied.
+. Multiple scripts for the same version are executed in alphabetical order.
+. On startup, before stepping forward, the runner also checks for scripts matching the current
+  version. This handles recovery when a previous run applied a migration but the subsequent
+  script was interrupted.
+
+==== Down migrations
+
+Scripts are skipped entirely during down migrations. SQL down migrations drop the tables
+created by their corresponding up migration, which removes the data that the scripts
+populated.
+
+== Schema version compatibility
+
+The KubeArchive API and sink verify at startup that the database schema version falls within
+an accepted range. This range is declared in `pkg/database/database.go`:
+
+[source,go]
+----
+var DatabaseSchemaVersions = map[string]SchemaVersionRange{
+    "postgresql": {Min: 10, Max: 13},
+    "mariadb":    {Min: 1, Max: 1},
+}
+----
+
+* `Min` -- the oldest migration version the application can work with.
+* `Max` -- the newest migration version the application understands.
+
+If the database schema version (read from the `schema_migrations` table managed by the
+`migrate` tool) is outside this range, the application refuses to start with an error.
+
+This mechanism supports multi-phase deployments. For example, when a release adds migrations
+10 through 13:
+
+. Apply migrations up to version 10 (`MIGRATION_VERSION=10`). This creates the new tables,
+  runs population scripts, and activates the trigger.
+. Deploy the new application version. It starts successfully because the schema version (10)
+  is within `[Min=10, Max=13]`.
+. Apply the remaining migrations 11-13 (index changes, cleanup). The application continues
+  running because these versions are still within the accepted range.
+
+When adding new migrations, update `Min` and `Max` in `DatabaseSchemaVersions` to reflect the
+range of schema versions that the new code supports. `Min` should be the lowest version
+at which all required tables, columns, indexes, and triggers exist for the code to function.
+
 == Execution
 
 === Apply all migrations to get the schema up-to-date
@@ -38,6 +158,17 @@ migrate \
     -path migrations/ \
     -database <driver>://<username>:<password>@<ip/dns>:<port>/<database> \
     up
+----
+
+=== Apply migrations up to a specific version
+
+Set the `MIGRATION_VERSION` environment variable to stop at a particular version. This is
+useful during multi-phase deployments where you need to upgrade the application between
+migration batches.
+
+[source,bash]
+----
+MIGRATION_VERSION=10 ./migration-runner
 ----
 
 === Downgrade one version

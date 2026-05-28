@@ -20,7 +20,6 @@ import (
 const (
 	celPrefix        = "cel:"
 	containerNameCel = "cel:spec.containers.map(c, c.name) + (has(spec.initContainers) ? spec.initContainers.map(c, c.name) : [])"
-	jsonPathKey      = "LOG_URL_JSONPATH"
 )
 
 func getKubeArchiveLoggingConfig() (map[string]string, error) {
@@ -44,8 +43,7 @@ func getKubeArchiveLoggingConfig() (map[string]string, error) {
 }
 
 type UrlBuilder struct {
-	jsonPath string
-	logMap   map[string]interface{}
+	logMap map[string]interface{}
 }
 
 func NewUrlBuilder() (*UrlBuilder, error) {
@@ -76,13 +74,9 @@ func NewUrlBuilder() (*UrlBuilder, error) {
 			logMap[key] = val
 		}
 	}
-	return &UrlBuilder{jsonPath: loggingConf[jsonPathKey], logMap: logMap}, nil
+	return &UrlBuilder{logMap: logMap}, nil
 }
 
 func (ub *UrlBuilder) Urls(ctx context.Context, data *unstructured.Unstructured) ([]models.LogTuple, error) {
 	return logurls.GenerateLogURLs(ctx, ub.logMap, data)
-}
-
-func (ub *UrlBuilder) GetJsonPath() string {
-	return ub.jsonPath
 }

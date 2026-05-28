@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"github.com/kubearchive/kubearchive/test"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -71,7 +71,7 @@ func TestTimestampFiltering(t *testing.T) {
 	// Wait for all pods to be archived
 	url := fmt.Sprintf("https://localhost:%s/api/v1/namespaces/%s/pods", port, namespaceName)
 	var allPods *unstructured.UnstructuredList
-	err := retry.Do(func() error {
+	err := retry.New(retry.Attempts(240), retry.MaxDelay(4*time.Second)).Do(func() error {
 		var getUrlErr error
 		allPods, getUrlErr = test.GetUrl(t, token.Status.Token, url, map[string][]string{})
 		if getUrlErr != nil {
@@ -81,7 +81,7 @@ func TestTimestampFiltering(t *testing.T) {
 			return nil
 		}
 		return errors.New("could not retrieve all Pods from the API")
-	}, retry.Attempts(240), retry.MaxDelay(4*time.Second))
+	})
 
 	if err != nil {
 		t.Fatal(err)

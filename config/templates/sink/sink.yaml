@@ -24,7 +24,7 @@ spec:
       volumes:
         - name: logging-config
           configMap:
-            name: kubearchive-logging
+            name: kubearchive-logging-writer
       containers:
         - name: kubearchive-sink
           image: ko://github.com/kubearchive/kubearchive/cmd/sink

@@ -1,0 +1,1 @@
+{stream="{NAMESPACE}"} | pod_id = `{POD_ID}` | container = `{CONTAINER_NAME}`

@@ -79,6 +79,16 @@ func newMockDiscoveryClient() *MockDiscoveryClient {
 						Version:      "v1",
 					},
 				},
+				{
+					Name: "tekton.dev",
+					Versions: []metav1.GroupVersionForDiscovery{
+						{GroupVersion: "tekton.dev/v1", Version: "v1"},
+					},
+					PreferredVersion: metav1.GroupVersionForDiscovery{
+						GroupVersion: "tekton.dev/v1",
+						Version:      "v1",
+					},
+				},
 			},
 		},
 		serverResources: map[string]*metav1.APIResourceList{
@@ -145,6 +155,17 @@ func newMockDiscoveryClient() *MockDiscoveryClient {
 						SingularName: "job",
 						Namespaced:   true,
 						Kind:         "Job",
+					},
+				},
+			},
+			"tekton.dev/v1": {
+				GroupVersion: "tekton.dev/v1",
+				APIResources: []metav1.APIResource{
+					{
+						Name:         "pipelineruns",
+						SingularName: "pipelinerun",
+						Namespaced:   true,
+						Kind:         "PipelineRun",
 					},
 				},
 			},
@@ -332,6 +353,54 @@ func TestCompleteRetriever(t *testing.T) {
 			expectCertData:      true,
 			expectError:         false,
 		},
+		{ // #nosec G101 - test token
+			name: "token from config file wins over kubeconfig",
+			setup: func(opts *KARetrieverOptions) {
+				opts.host = "https://localhost:8081"
+			},
+			env: map[string]string{
+				"KUBECTL_KA_CONFIG_PATH": filepath.Join("config", "testdata", "test-config-with-token.yaml"),
+			},
+			connectivityFails:   false,
+			expectedK9eHost:     "https://localhost:8081",
+			expectedK9eToken:    "config-file-token",
+			expectedK9eInsecure: false,
+			expectCertData:      false,
+			expectError:         false,
+		},
+		{
+			name: "token precedence - env var wins over config file",
+			setup: func(opts *KARetrieverOptions) {
+				opts.host = "https://localhost:8081"
+			},
+			env: map[string]string{
+				"KUBECTL_PLUGIN_KA_TOKEN": "env-token",
+				"KUBECTL_KA_CONFIG_PATH":  filepath.Join("config", "testdata", "test-config-with-token.yaml"),
+			},
+			connectivityFails:   false,
+			expectedK9eHost:     "https://localhost:8081",
+			expectedK9eToken:    "env-token",
+			expectedK9eInsecure: false,
+			expectCertData:      false,
+			expectError:         false,
+		},
+		{
+			name: "token precedence - kubectl flag wins over config file",
+			setup: func(opts *KARetrieverOptions) {
+				testToken := "kubectl-token" // #nosec G101 - this is a test token
+				opts.kubeFlags.BearerToken = &testToken
+				opts.host = "https://localhost:8081"
+			},
+			env: map[string]string{
+				"KUBECTL_KA_CONFIG_PATH": filepath.Join("config", "testdata", "test-config-with-token.yaml"),
+			},
+			connectivityFails:   false,
+			expectedK9eHost:     "https://localhost:8081",
+			expectedK9eToken:    "kubectl-token",
+			expectedK9eInsecure: false,
+			expectCertData:      false,
+			expectError:         false,
+		},
 		{
 			name: "certificate error",
 			setup: func(opts *KARetrieverOptions) {
@@ -506,7 +575,7 @@ func TestGetFromAPI(t *testing.T) {
 			var serverURL string
 
 			if tc.unreachable {
-				serverURL = "http://unreachable:12345"
+				serverURL = "http://unreachable:12345/"
 			} else {
 				server = httptest.NewServer(http.HandlerFunc(tc.serverResponse))
 				defer server.Close()
@@ -622,16 +691,42 @@ func TestResolveResourceSpec(t *testing.T) {
 			expectedKind:     "Deployment",
 		},
 		{
+			name:             "dotted group - plural with group",
+			resourceSpec:     "pipelineruns.tekton.dev",
+			expectedResource: "pipelineruns",
+			expectedVersion:  "v1",
+			expectedGroup:    "tekton.dev",
+			expectedKind:     "PipelineRun",
+		},
+		{
+			name:             "dotted group - singular with group",
+			resourceSpec:     "pipelinerun.tekton.dev",
+			expectedResource: "pipelineruns",
+			expectedVersion:  "v1",
+			expectedGroup:    "tekton.dev",
+			expectedKind:     "PipelineRun",
+		},
+		{
+			name:             "dotted group - plural with version and group",
+			resourceSpec:     "pipelineruns.v1.tekton.dev",
+			expectedResource: "pipelineruns",
+			expectedVersion:  "v1",
+			expectedGroup:    "tekton.dev",
+			expectedKind:     "PipelineRun",
+		},
+		{
+			name:             "dotted group - singular with version and group",
+			resourceSpec:     "pipelinerun.v1.tekton.dev",
+			expectedResource: "pipelineruns",
+			expectedVersion:  "v1",
+			expectedGroup:    "tekton.dev",
+			expectedKind:     "PipelineRun",
+		},
+		{
 			name:          "empty resource",
 			resourceSpec:  "",
 			expectError:   true,
 			errorContains: "resource name cannot be empty",
-		},
-		{
-			name:          "too many parts",
-			resourceSpec:  "pods.v1.core.extra",
-			expectError:   true,
-			errorContains: "invalid resource specification format",
 		},
 		{
 			name:          "resource not found",

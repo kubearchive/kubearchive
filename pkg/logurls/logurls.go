@@ -21,6 +21,9 @@ const (
 	variableRegex string = "\\{([A-Za-z0-9_]+)\\}"
 	LogURL        string = "LOG_URL"
 	ContainerName string = "CONTAINER_NAME"
+	QueryKey      string = "QUERY"
+	StartKey      string = "START"
+	EndKey        string = "END"
 )
 
 func GenerateLogURLs(ctx context.Context, cm map[string]interface{}, data *unstructured.Unstructured) ([]models.LogTuple, error) {
@@ -46,7 +49,17 @@ func GenerateLogURLs(ctx context.Context, cm map[string]interface{}, data *unstr
 
 	var vmaps = generateSubstitutionMaps(m)
 	for _, vmap := range vmaps {
-		urls = append(urls, interpolate(vmap[LogURL], vmap, r))
+		url := interpolateString(vmap[LogURL], vmap, r)
+		query := interpolateString(vmap[QueryKey], vmap, r)
+		start := vmap[StartKey]
+		end := vmap[EndKey]
+		urls = append(urls, models.LogTuple{
+			ContainerName: vmap[ContainerName],
+			Url:           url,
+			Query:         query,
+			Start:         start,
+			End:           end,
+		})
 	}
 	return urls, nil
 }
@@ -89,15 +102,15 @@ func generateSubstitutionMaps(m map[string]interface{}) []map[string]string {
 	return vmaps
 }
 
-func interpolate(val string, env map[string]string, r *regexp.Regexp) models.LogTuple {
+func interpolateString(val string, env map[string]string, r *regexp.Regexp) string {
 	matches := r.FindAllStringSubmatch(val, -1)
 	if matches == nil {
 		// Finished, nothing more to substitute.
-		return models.LogTuple{ContainerName: env[ContainerName], Url: val}
+		return val
 	}
 
 	for _, m := range matches {
 		val = strings.ReplaceAll(val, string(m[0]), env[string(m[1])])
 	}
-	return interpolate(val, env, r)
+	return interpolateString(val, env, r)
 }

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 	"github.com/kubearchive/kubearchive/test"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -139,7 +139,7 @@ func TestWildcardNameFilteringIntegration(t *testing.T) {
 				return
 			}
 
-			retryErr := retry.Do(func() error {
+			retryErr := retry.New(retry.Attempts(240), retry.MaxDelay(4*time.Second)).Do(func() error {
 				result, getUrlErr := test.GetUrl(t, token.Status.Token, url, nil)
 				if getUrlErr != nil {
 					return getUrlErr
@@ -180,7 +180,7 @@ func TestWildcardNameFilteringIntegration(t *testing.T) {
 
 				t.Logf("Found expected pods for wildcard pattern: %v", actualNames)
 				return nil
-			}, retry.Attempts(240), retry.MaxDelay(4*time.Second))
+			})
 
 			if retryErr != nil {
 				t.Fatal(retryErr)

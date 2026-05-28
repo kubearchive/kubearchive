@@ -221,8 +221,6 @@ Collector, which sends the data to the LGTM's Collector.
     ```bash
     bash integrations/observability/grafana/install.sh
     ```
-    **Note**: Knative's APIServerSource created before applying this change do not emit traces. Recreate
-    the KubeArchiveConfig to trigger the recreation of the APIServerSource.
 1. Forward the Grafana UI port to localhost:
     ```bash
     kubectl port-forward -n observability svc/grafana-lgtm 3000:3000 &
@@ -245,31 +243,6 @@ log URLs.
 * [ElasticSearch](./integrations/logging/elasticsearch/README.md)
 * [Splunk](./integrations/logging/splunk/README.md)
 * [Datadog](./integrations/logging/datadog/README.md)
-
-## Kafka
-
-Knative Eventing can be configured to use Kafka Brokers to achieve better event delivery guarantees. This requires
-setting up a kafka cluster and installing the Knative Eventing Kafka Extensions. For development we use
-[Strimzi](https://strimzi.io)
-to create a Kafka cluster.
-
-After installing KubeArchive, run:
-```bash
-bash integrations/kafka/install.sh
-```
-***Note***: You may encounter containers failing to start due to a too many files open error. You can fix this by
-following
-[these](https://kind.sigs.k8s.io/docs/user/known-issues/#pod-errors-due-to-too-many-open-files)
-instructions.
-
-If you want to stop using the Knative Eventing Kafka Brokers without having to redeploy your development environment,
-you can run:
-```bash
-bash integrations/kafka/uninstall.sh
-```
-***Note***: Strimzi, your Kafka cluster, and the Knative Eventing Kafka extensions will still be installed in your
-development cluster, but Knative will not be configured to use them by default after running the uninstall script.
-
 
 ## Known issues
 

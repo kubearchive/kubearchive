@@ -1,0 +1,1 @@
+cel:status.?startTime == optional.none() ? int(now()-duration('1h'))*1000000000: status.startTime

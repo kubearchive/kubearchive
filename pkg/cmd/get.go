@@ -135,7 +135,7 @@ func (o *GetOptions) buildKubeArchiveQueryParams() url.Values {
 	if !o.After.IsZero() {
 		params.Set("creationTimestampAfter", o.After.Format(time.RFC3339))
 	}
-	if !o.Before.Before(time.Now()) {
+	if o.Before.Before(time.Now()) {
 		params.Set("creationTimestampBefore", o.Before.Format(time.RFC3339))
 	}
 
@@ -506,7 +506,8 @@ func (o *GetOptions) printPaginationMessage(resources []*ResourceWithAvailabilit
 
 	// Add before timestamp (set to just before the oldest resource's timestamp to avoid including it)
 	// Subtract 1 nanosecond to ensure we don't include the same resource again
-	beforeTimestamp := oldestTimestamp.Add(-1 * time.Nanosecond)
+	// Use UTC to match how Kubernetes stores creation timestamps, ensuring correct string comparison in the DB
+	beforeTimestamp := oldestTimestamp.Add(-1 * time.Nanosecond).UTC()
 	nextCmd.WriteString(fmt.Sprintf(" --before %s", beforeTimestamp.Format(time.RFC3339Nano)))
 
 	// Add after timestamp if originally provided

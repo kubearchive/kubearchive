@@ -6,6 +6,8 @@ package routers
 import (
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -30,8 +32,6 @@ type Controller struct {
 	Database           interfaces.DBReader
 	CacheConfiguration CacheExpirations
 }
-
-const listString = `{"kind": "List", "apiVersion": "v1", "metadata": {"continue": "%s"}, "items": [%s]}`
 
 func (c *Controller) GetResources(context *gin.Context) {
 	limit, id, date := pagination.GetValuesFromContext(context)
@@ -102,21 +102,16 @@ func (c *Controller) GetResources(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
-	// We send namespace even if it's an empty string (non-namespaced resources) the Database
-	// knows what to do
-	// We send limit+1 because we want to know if there are more resources than requested
-	// later we just returned what we were asked to return
-	newLimit := limit + 1
-	resources, err := c.Database.QueryResources(
-		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
-		creationTimestampAfter, creationTimestampBefore, newLimit)
-
-	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
-		return
-	}
-
+	// Single resource by exact name - no streaming needed
 	if name != "" && !strings.Contains(name, "*") {
+		var resources []labelFilter.Resource
+		resources, err = c.Database.QueryResources(
+			context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
+			creationTimestampAfter, creationTimestampBefore, 2)
+		if err != nil {
+			abort.Abort(context, err, http.StatusInternalServerError)
+			return
+		}
 		if len(resources) == 0 {
 			abort.Abort(context, errors.New("resource not found"), http.StatusNotFound)
 			return
@@ -124,24 +119,67 @@ func (c *Controller) GetResources(context *gin.Context) {
 			abort.Abort(context, errors.New("more than one resource found"), http.StatusInternalServerError)
 			return
 		}
-		context.String(http.StatusOK, resources[0].Data)
+		context.Data(http.StatusOK, "application/json", []byte(resources[0].Data))
 		return
 	}
 
-	returnedResources := resources
-	continueToken := ""
-	// There are more resources in the DB than requested, so populate the continue token
-	// and modify which resources need to be returned
-	if len(resources) > limit {
-		continueToken = pagination.CreateToken(resources[len(resources)-2].Id, resources[len(resources)-2].Date)
-		returnedResources = resources[:len(resources)-1] // all but the last
+	// List/wildcard case - stream the response directly to the writer to avoid
+	// buffering the entire JSON payload in memory. This prevents OOM kills when
+	// serving large result sets (e.g. limit=500 with large PipelineRuns).
+	//
+	// Items are written before metadata so the continue token can be determined
+	// after iterating all rows. JSON key order does not affect parsers.
+	newLimit := limit + 1
+	var count int
+	var lastWritten labelFilter.Resource
+	var hasMore bool
+	var headerWritten bool
+	w := context.Writer
+
+	err = c.Database.StreamResources(
+		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
+		creationTimestampAfter, creationTimestampBefore, newLimit,
+		func(resource labelFilter.Resource) error {
+			count++
+			if count > limit {
+				hasMore = true
+				return nil
+			}
+			if !headerWritten {
+				context.Status(http.StatusOK)
+				context.Header("Content-Type", "application/json")
+				io.WriteString(w, `{"kind": "List", "apiVersion": "v1", "items": [`) //nolint:errcheck
+				headerWritten = true
+			} else {
+				io.WriteString(w, ",") //nolint:errcheck
+			}
+			io.WriteString(w, resource.Data) //nolint:errcheck
+			lastWritten = resource
+			return nil
+		})
+
+	if err != nil {
+		if !headerWritten {
+			abort.Abort(context, err, http.StatusInternalServerError)
+			return
+		}
+		// Response already started - log the error, client will see truncated JSON
+		slog.ErrorContext(context.Request.Context(), "error streaming resources", "error", err)
+		return
 	}
 
-	resourceStrings := []string{}
-	for _, resource := range returnedResources {
-		resourceStrings = append(resourceStrings, resource.Data)
+	if !headerWritten {
+		// No rows returned - write a complete empty response
+		context.Status(http.StatusOK)
+		context.Header("Content-Type", "application/json")
+		io.WriteString(w, `{"kind": "List", "apiVersion": "v1", "items": [`) //nolint:errcheck
 	}
-	context.String(http.StatusOK, listString, continueToken, strings.Join(resourceStrings, ","))
+
+	continueToken := ""
+	if hasMore {
+		continueToken = pagination.CreateToken(lastWritten.Id, lastWritten.Date)
+	}
+	fmt.Fprintf(w, `], "metadata": {"continue": "%s"}}`, continueToken) //nolint:errcheck
 }
 
 // parseTimestampQuery parses a timestamp query parameter and returns a pointer to time.Time
@@ -190,12 +228,12 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
-	var logURL, jsonPath string
+	var logRecord *interfaces.LogRecord
 	if name != "" {
-		logURL, jsonPath, err = c.Database.QueryLogURLByName(
+		logRecord, err = c.Database.QueryLogURLByName(
 			context.Request.Context(), kind, apiVersion, namespace, name, containerName)
 	} else {
-		logURL, jsonPath, err = c.Database.QueryLogURLByUID(
+		logRecord, err = c.Database.QueryLogURLByUID(
 			context.Request.Context(), kind, apiVersion, namespace, uid, containerName)
 	}
 
@@ -208,8 +246,7 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 		return
 	}
 
-	context.Set("logURL", logURL)
-	context.Set("jsonPath", jsonPath)
+	context.Set("logRecord", logRecord)
 }
 
 func (c *Controller) GetResourceByUID(context *gin.Context) {

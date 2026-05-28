@@ -48,6 +48,8 @@ func TestUrlBuilderUrls(t *testing.T) {
 	splunkWithContainerNames := "testdata/splunk/container-names"
 	esNoContainerNames := "testdata/es/no-container-names"
 	esWithContainerNames := "testdata/es/container-names"
+	lokiNoContainerNames := "testdata/loki/no-container-names"
+	lokiWithContainerNames := "testdata/loki/container-names"
 
 	tests := []struct {
 		name             string
@@ -108,6 +110,18 @@ func TestUrlBuilderUrls(t *testing.T) {
 			loggingConfigDir: splunkWithContainerNames,
 			data:             loadData(t, "testdata/test3-data.json"),
 			expected:         loadExpected(t, "testdata/splunk-test3-urls.json"),
+		},
+		{
+			name:             "loki urls for pod with container and init container",
+			loggingConfigDir: lokiWithContainerNames,
+			data:             loadData(t, "testdata/test3-data.json"),
+			expected:         loadExpected(t, "testdata/loki-test3-urls.json"),
+		},
+		{
+			name:             "loki urls for pod with container and init container without container name",
+			loggingConfigDir: lokiNoContainerNames,
+			data:             loadData(t, "testdata/test3-data.json"),
+			expected:         loadExpected(t, "testdata/loki-test3-urls.json"),
 		},
 	}
 

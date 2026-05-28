@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
@@ -18,13 +19,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
-
-// log is for logging in this package.
-var kaclog = logf.Log.WithName("kubearchiveconfig-resource")
 
 func SetupKACWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
@@ -50,7 +47,7 @@ func (kaccd *KubeArchiveConfigCustomDefaulter) Default(_ context.Context, obj ru
 	if !ok {
 		return fmt.Errorf("expected an KubeArchiveConfig object but got %T", obj)
 	}
-	kaclog.Info("default", "namespace", kac.Namespace, "name", kac.Name)
+	slog.Info("kubearchiveconfig default", "namespace", kac.Namespace, "name", kac.Name)
 
 	// Set default values for KeepLastWhen rules
 	for i := range kac.Spec.Resources {
@@ -82,7 +79,7 @@ func (kaccv *KubeArchiveConfigCustomValidator) ValidateCreate(ctx context.Contex
 	if !ok {
 		return nil, fmt.Errorf("expected an KubeArchiveConfig object but got %T", obj)
 	}
-	kaclog.Info("validate create", "namespace", kac.Namespace, "name", kac.Name)
+	slog.Info("kubearchiveconfig validate create", "namespace", kac.Namespace, "name", kac.Name)
 
 	return kaccv.validateKAC(ctx, kac)
 }
@@ -93,7 +90,7 @@ func (kaccv *KubeArchiveConfigCustomValidator) ValidateUpdate(ctx context.Contex
 	if !ok {
 		return nil, fmt.Errorf("expected an KubeArchiveConfig object but got %T", new)
 	}
-	kaclog.Info("validate update", "namespace", kac.Namespace, "name", kac.Name)
+	slog.Info("kubearchiveconfig validate update", "namespace", kac.Namespace, "name", kac.Name)
 
 	return kaccv.validateKAC(ctx, kac)
 }
@@ -104,7 +101,7 @@ func (kaccv *KubeArchiveConfigCustomValidator) ValidateDelete(_ context.Context,
 	if !ok {
 		return nil, fmt.Errorf("expected an KubeArchiveConfig object but got %T", new)
 	}
-	kaclog.Info("validate delete", "namespace", kac.Namespace, "name", kac.Name)
+	slog.Info("kubearchiveconfig validate delete", "namespace", kac.Namespace, "name", kac.Name)
 
 	return nil, nil
 }

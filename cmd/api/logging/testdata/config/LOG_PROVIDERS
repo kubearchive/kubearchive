@@ -1,0 +1,15 @@
+http://localhost:8080:
+  tail:
+    reverse: false
+    path: /api/v1/query_range
+    method: GET
+    params:
+      query: ${QUERY}
+    json-path: "$.data.result[*].values[*][1]"
+  full:
+    reverse: false
+    path: /api/v1/query_range
+    method: GET
+    params:
+      query: ${QUERY}
+    json-path: "$.data.result[*].values[*][1]"

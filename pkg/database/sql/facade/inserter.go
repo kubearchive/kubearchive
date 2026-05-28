@@ -18,15 +18,15 @@ type DBInserter interface {
 		clusterDeletedTs sql.NullString,
 		data []byte,
 	) *sqlbuilder.InsertBuilder
-	UrlInserter(uuid, url, containerName, jsonPath string) *sqlbuilder.InsertBuilder
+	UrlInserter(uuid, url, containerName, query, start, end string) *sqlbuilder.InsertBuilder
 }
 
 type PartialDBInserterImpl struct{}
 
-func (PartialDBInserterImpl) UrlInserter(uuid, url, containerName, jsonPath string) *sqlbuilder.InsertBuilder {
+func (PartialDBInserterImpl) UrlInserter(uuid, url, containerName, query, start, end string) *sqlbuilder.InsertBuilder {
 	ib := sqlbuilder.NewInsertBuilder()
 	ib.InsertInto("log_url")
-	ib.Cols("uuid", "url", "container_name", "json_path")
-	ib.Values(uuid, url, containerName, jsonPath)
+	ib.Cols("uuid", "url", "container_name", "query", "start", `"end"`)
+	ib.Values(uuid, url, containerName, query, start, end)
 	return ib
 }

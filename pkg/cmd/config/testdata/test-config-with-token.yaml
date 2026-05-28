@@ -1,0 +1,8 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+clusters:
+    test-cluster:
+        server_url: https://test-cluster:6443
+        host: https://kubearchive.test.com
+        token: config-file-token

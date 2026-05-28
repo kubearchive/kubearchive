@@ -23,7 +23,6 @@ import (
 
 var testResources = fake.CreateTestResources()
 var testLogUrls = fake.CreateTestLogUrls()
-var testLogJsonPath = "$."
 var nonCoreResources = testResources[:4] // First 4 are crontabs
 var coreResources = testResources[4:5]   // Last 1 is pod
 
@@ -32,7 +31,13 @@ type List struct {
 }
 
 func retrieveLogURL(c *gin.Context) {
-	c.JSON(http.StatusOK, fmt.Sprintf("%s-%s", c.GetString("logURL"), c.GetString("jsonPath")))
+	recordVal, exists := c.Get("logRecord")
+	if !exists || recordVal == nil {
+		c.JSON(http.StatusNotFound, "no log record")
+		return
+	}
+	record := recordVal.(*interfaces.LogRecord)
+	c.JSON(http.StatusOK, fmt.Sprintf("%s-%s-%s-%s-%s-%s-%s", record.URL, record.Query, record.Start, record.End, record.PodName, record.PodUUID, record.ContainerName))
 }
 
 // setupRouter set up the router the same way that NewServer does without the middleware
@@ -68,7 +73,7 @@ func setupRouter(db interfaces.DBReader, core bool) *gin.Engine {
 }
 
 func TestLabelSelectorQueryParameter(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), false)
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), false)
 	tests := []struct {
 		name          string
 		labelSelector string
@@ -162,14 +167,14 @@ func TestGetResourcesLogURLS(t *testing.T) {
 			api:          "/api/v1/namespaces/ns/pods/my-pod/log",
 			isCore:       true,
 			expectedCode: http.StatusOK,
-			expectedBody: fmt.Sprintf("\"%s-%s\"", testLogUrls[0].Url, testLogJsonPath),
+			expectedBody: fmt.Sprintf("\"%s-%s-%s-%s-%s-%s-%s\"", testLogUrls[0].Url, testLogUrls[0].Query, testLogUrls[0].Start, testLogUrls[0].End, "my-pod", testLogUrls[0].Uuid, ""),
 		},
 		{
 			name:         "my-cronjob",
 			api:          "/apis/batch/v1/namespaces/ns/cronjobs/my-cronjob/log",
 			isCore:       false,
 			expectedCode: http.StatusOK,
-			expectedBody: fmt.Sprintf("\"%s-%s\"", testLogUrls[0].Url, testLogJsonPath),
+			expectedBody: fmt.Sprintf("\"%s-%s-%s-%s-%s-%s-%s\"", testLogUrls[0].Url, testLogUrls[0].Query, testLogUrls[0].Start, testLogUrls[0].End, "my-cronjob", testLogUrls[0].Uuid, ""),
 		},
 		{
 			name:         "my-pod",
@@ -183,14 +188,14 @@ func TestGetResourcesLogURLS(t *testing.T) {
 			api:          fmt.Sprintf("/api/v1/namespaces/ns/pods/uid/%s/log", coreResources[0].GetUID()),
 			isCore:       true,
 			expectedCode: http.StatusOK,
-			expectedBody: fmt.Sprintf("\"%s-%s\"", testLogUrls[0].Url, testLogJsonPath),
+			expectedBody: fmt.Sprintf("\"%s-%s-%s-%s-%s-%s-%s\"", testLogUrls[0].Url, testLogUrls[0].Query, testLogUrls[0].Start, testLogUrls[0].End, coreResources[0].GetUID(), testLogUrls[0].Uuid, ""),
 		},
 		{
 			name:         "my-cronjob-uid",
 			api:          fmt.Sprintf("/apis/batch/v1/namespaces/ns/cronjobs/uid/%s/log", nonCoreResources[0].GetUID()),
 			isCore:       false,
 			expectedCode: http.StatusOK,
-			expectedBody: fmt.Sprintf("\"%s-%s\"", testLogUrls[0].Url, testLogJsonPath),
+			expectedBody: fmt.Sprintf("\"%s-%s-%s-%s-%s-%s-%s\"", testLogUrls[0].Url, testLogUrls[0].Query, testLogUrls[0].Start, testLogUrls[0].End, nonCoreResources[0].GetUID(), testLogUrls[0].Uuid, ""),
 		},
 		{
 			name:         "not-found-uid",
@@ -203,7 +208,7 @@ func TestGetResourcesLogURLS(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), test.isCore)
+			router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), test.isCore)
 			res := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, test.api, nil)
 			router.ServeHTTP(res, req)
@@ -268,7 +273,7 @@ func TestGetResources(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), test.isCore)
+			router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), test.isCore)
 			res := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, test.api, nil)
 			router.ServeHTTP(res, req)
@@ -321,7 +326,7 @@ func TestGetResourceByUID(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := setupRouter(fake.NewFakeDatabase(tt.givenResources, testLogUrls, testLogJsonPath), tt.isCore)
+			router := setupRouter(fake.NewFakeDatabase(tt.givenResources, testLogUrls), tt.isCore)
 			res := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, tt.endpoint, nil)
 			router.ServeHTTP(res, req)
@@ -393,7 +398,7 @@ func TestGetResourceByName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := setupRouter(fake.NewFakeDatabase(tt.givenResources, testLogUrls, testLogJsonPath), tt.isCore)
+			router := setupRouter(fake.NewFakeDatabase(tt.givenResources, testLogUrls), tt.isCore)
 			res := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, tt.endpoint, nil)
 			router.ServeHTTP(res, req)
@@ -416,7 +421,7 @@ func TestDBError(t *testing.T) {
 }
 
 func TestGetResourcesEmpty(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase([]*unstructured.Unstructured{}, []fake.LogUrlRow{}, testLogJsonPath), false)
+	router := setupRouter(fake.NewFakeDatabase([]*unstructured.Unstructured{}, []fake.LogUrlRow{}), false)
 
 	res := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespaces/test/crontabs", nil)
@@ -433,7 +438,7 @@ func TestGetResourcesEmpty(t *testing.T) {
 func TestNoAPIResourceInContextError(t *testing.T) {
 	// Setting a router without a middleware that sets the api resource
 	router := gin.Default()
-	ctrl := Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath)}
+	ctrl := Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls)}
 	router.GET("/api/:version/:resourceType", ctrl.GetResources)
 
 	res := httptest.NewRecorder()
@@ -447,7 +452,7 @@ func TestNoAPIResourceInContextError(t *testing.T) {
 
 func TestLivez(t *testing.T) {
 	router := gin.Default()
-	ctrl := Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath),
+	ctrl := Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls),
 		CacheConfiguration: CacheExpirations{Authorized: 60, Unauthorized: 5}}
 	router.GET("/livez", ctrl.Livez)
 	res := httptest.NewRecorder()
@@ -487,7 +492,7 @@ func TestReadyz(t *testing.T) {
 		router := gin.Default()
 		var ctrl Controller
 		if testCase.dbConnReady {
-			ctrl = Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath)}
+			ctrl = Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls)}
 		} else {
 			ctrl = Controller{Database: fake.NewFakeDatabaseWithError(errors.New("test error"))}
 		}
@@ -587,7 +592,7 @@ func TestWildcardNameFiltering(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), tt.isCore)
+			router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), tt.isCore)
 			res := httptest.NewRecorder()
 			req := httptest.NewRequest(http.MethodGet, tt.api, nil)
 			router.ServeHTTP(res, req)
@@ -622,7 +627,7 @@ func TestWildcardNameFiltering(t *testing.T) {
 }
 
 func TestTimestampQueryParameters(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), false)
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), false)
 	tests := []struct {
 		name                    string
 		creationTimestampAfter  string
@@ -711,7 +716,7 @@ func TestTimestampQueryParameters(t *testing.T) {
 }
 
 func TestTimestampValidationErrorMessages(t *testing.T) {
-	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls, testLogJsonPath), true)
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), true)
 
 	tests := []struct {
 		name                    string

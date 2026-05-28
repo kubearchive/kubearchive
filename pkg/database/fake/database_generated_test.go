@@ -18,7 +18,6 @@ import (
 
 var testResources = CreateTestResources()
 var testLogUrls = CreateTestLogUrls()
-var testJsonPath = "$."
 
 func TestNewFakeDatabase(t *testing.T) {
 	tests := []struct {
@@ -39,7 +38,7 @@ func TestNewFakeDatabase(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := NewFakeDatabase(tt.resources, tt.logUrls, testJsonPath)
+			db := NewFakeDatabase(tt.resources, tt.logUrls)
 			assert.Equal(t, tt.resources, db.resources)
 			assert.Equal(t, tt.logUrls, db.logUrl)
 		})
@@ -108,7 +107,7 @@ func TestQueryResourcesWithoutNamespace(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
+			db := NewFakeDatabase(testResources, testLogUrls)
 			filteredResources, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace, "", "", "", &models.LabelFilters{}, nil, nil, 100)
 			expectedUids := make([]string, 0)
 			for _, resource := range tt.expected {
@@ -202,7 +201,7 @@ func TestQueryNamespacedResourceByName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := NewFakeDatabase(tt.testData, testLogUrls, testJsonPath)
+			db := NewFakeDatabase(tt.testData, testLogUrls)
 			filteredResources, err := db.QueryResources(context.TODO(), tt.kind, tt.version, tt.namespace,
 				tt.resourceName, "", "", &models.LabelFilters{}, nil, nil, 100)
 
@@ -237,12 +236,10 @@ func TestWriteUrls(t *testing.T) {
 		{Url: "https://github.com/kubearchive", ContainerName: "container-1"},
 		{Url: "https://example.com", ContainerName: "container-2"},
 	}
-	jsonPath := "$.hits.hits[*]._source.message"
 	tests := []struct {
 		name           string
 		initialLogUrls []LogUrlRow
 		obj            *unstructured.Unstructured
-		jsonPath       string
 		newUrls        []models.LogTuple
 		expected       []LogUrlRow
 		error          error
@@ -252,11 +249,10 @@ func TestWriteUrls(t *testing.T) {
 			name:           "Insert log urls into empty table",
 			initialLogUrls: []LogUrlRow{},
 			obj:            k8sObj,
-			jsonPath:       jsonPath,
 			newUrls:        newUrls,
 			expected: []LogUrlRow{
-				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName, JsonPath: jsonPath},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName, JsonPath: jsonPath},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName},
 			},
 			error: nil,
 		},
@@ -265,13 +261,12 @@ func TestWriteUrls(t *testing.T) {
 			initialLogUrls: []LogUrlRow{
 				{Uuid: types.UID("asdf-1234-fdsa"), Url: "https://fake.com"},
 			},
-			obj:      k8sObj,
-			jsonPath: jsonPath,
-			newUrls:  newUrls,
+			obj:     k8sObj,
+			newUrls: newUrls,
 			expected: []LogUrlRow{
 				{Uuid: types.UID("asdf-1234-fdsa"), Url: "https://fake.com"},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName, JsonPath: jsonPath},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName, JsonPath: jsonPath},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName},
 			},
 			error: nil,
 		},
@@ -279,12 +274,11 @@ func TestWriteUrls(t *testing.T) {
 			name:           "Insert log urls into table with uuid matches",
 			initialLogUrls: testLogUrls,
 			obj:            k8sObj,
-			jsonPath:       jsonPath,
 			newUrls:        newUrls,
 			expected: []LogUrlRow{
-				{Uuid: types.UID("asdf-1234-fdsa"), Url: "fake.org", ContainerName: "foo"},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName, JsonPath: jsonPath},
-				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName, JsonPath: jsonPath},
+				{Uuid: types.UID("asdf-1234-fdsa"), Url: "http://fake.org", ContainerName: "foo", Query: "test-query", Start: "test-start", End: "test-end"},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[0].Url, ContainerName: newUrls[0].ContainerName},
+				{Uuid: k8sObj.GetUID(), Url: newUrls[1].Url, ContainerName: newUrls[1].ContainerName},
 			},
 			error: nil,
 		},
@@ -292,7 +286,6 @@ func TestWriteUrls(t *testing.T) {
 			name:           "Nil k8sObj returns error with no change to database",
 			initialLogUrls: testLogUrls,
 			obj:            nil,
-			jsonPath:       jsonPath,
 			newUrls:        newUrls,
 			expected:       testLogUrls,
 			error:          errors.New("kubernetes object was 'nil', something went wrong"),
@@ -301,7 +294,6 @@ func TestWriteUrls(t *testing.T) {
 			name:           "WriteUrls fails when urlErr is not nil",
 			initialLogUrls: []LogUrlRow{},
 			obj:            k8sObj,
-			jsonPath:       jsonPath,
 			newUrls:        newUrls,
 			expected:       []LogUrlRow{},
 			error:          nil,
@@ -316,9 +308,9 @@ func TestWriteUrls(t *testing.T) {
 			if tt.urlErr != nil {
 				db = NewFakeDatabaseWithUrlError(tt.urlErr)
 			} else {
-				db = NewFakeDatabase(testResources, tt.initialLogUrls, testJsonPath)
+				db = NewFakeDatabase(testResources, tt.initialLogUrls)
 			}
-			_, err := db.WriteResource(context.Background(), tt.obj, []byte(""), time.Now(), tt.jsonPath, tt.newUrls...)
+			_, err := db.WriteResource(context.Background(), tt.obj, []byte(""), time.Now(), tt.newUrls...)
 			if tt.urlErr != nil {
 				assert.Equal(t, tt.urlErr, err)
 			} else {
@@ -339,20 +331,20 @@ func TestQueryLogURLs(t *testing.T) {
 		{
 			name:     "Logs from one pod",
 			kind:     "Pod",
-			expected: "fake.com",
+			expected: "http://fake.com",
 		},
 		{
 			name:     "Logs from another resource",
 			kind:     "Job",
-			expected: "fake.com",
+			expected: "http://fake.com",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db := NewFakeDatabase(testResources, testLogUrls, testJsonPath)
-			url, jsonPath, _ := db.QueryLogURLByName(context.Background(), tt.kind, "", "", "", "")
-			assert.Equal(t, tt.expected, url)
-			assert.Equal(t, testJsonPath, jsonPath)
+			db := NewFakeDatabase(testResources, testLogUrls)
+			record, _ := db.QueryLogURLByName(context.Background(), tt.kind, "", "", "", "")
+			assert.Equal(t, tt.expected, record.URL)
+			assert.Equal(t, "test-query", record.Query)
 		})
 	}
 }
@@ -385,9 +377,9 @@ func TestWriteResources(t *testing.T) {
 			if tt.err != nil {
 				db = NewFakeDatabaseWithError(tt.err)
 			} else {
-				db = NewFakeDatabase([]*unstructured.Unstructured{}, []LogUrlRow{}, "$.")
+				db = NewFakeDatabase([]*unstructured.Unstructured{}, []LogUrlRow{})
 			}
-			_, err := db.WriteResource(context.Background(), tt.obj, tt.data, time.Now(), "jsonPath", []models.LogTuple{}...)
+			_, err := db.WriteResource(context.Background(), tt.obj, tt.data, time.Now(), []models.LogTuple{}...)
 			if tt.err != nil {
 				assert.Error(t, err)
 				assert.Equal(t, tt.err, err)
@@ -426,7 +418,7 @@ func TestQueryResourcesWithWildcardName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.namePattern, func(t *testing.T) {
-			db := NewFakeDatabase(testResources, []LogUrlRow{}, "$.")
+			db := NewFakeDatabase(testResources, []LogUrlRow{})
 			resources, err := db.QueryResources(context.TODO(), "Pod", "v1", "test",
 				tt.namePattern, "", "", &models.LabelFilters{}, nil, nil, 100)
 

@@ -4,10 +4,10 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: kubearchive-logging
+  name: kubearchive-logging-writer
   namespace: kubearchive
   labels:
-    app.kubernetes.io/name: kubearchive-logging
+    app.kubernetes.io/name: kubearchive-logging-writer
     app.kubernetes.io/component: logging
     app.kubernetes.io/part-of: kubearchive
     app.kubernetes.io/version: "${NEXT_VERSION}"

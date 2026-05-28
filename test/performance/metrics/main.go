@@ -14,7 +14,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/avast/retry-go/v4"
+	"github.com/avast/retry-go/v5"
 )
 
 type PromResult struct {
@@ -79,7 +79,10 @@ func main() {
 		req.URL.RawQuery = q.Encode()
 
 		var responseBytes []byte
-		retryErr := retry.Do(
+		retryErr := retry.New(
+			retry.OnRetry(func(n uint, err error) {
+				fmt.Printf("Retry #%d: %s\n", n, err)
+			})).Do(
 			func() error {
 				response, errDo := client.Do(req)
 				if errDo != nil {
@@ -99,9 +102,7 @@ func main() {
 				}
 
 				return nil
-			}, retry.OnRetry(func(n uint, err error) {
-				fmt.Printf("Retry #%d: %s\n", n, err)
-			}))
+			})
 
 		if retryErr != nil {
 			panic(fmt.Sprintf("error calling Prometheus: %s", err))

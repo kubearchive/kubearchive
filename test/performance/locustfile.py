@@ -6,8 +6,8 @@ from string import Template
 from uuid import uuid4
 from pathlib import Path
 from locust import HttpUser, task
-from cloudevents.http import CloudEvent
-from cloudevents.conversion import to_binary
+from cloudevents.v1.http import CloudEvent
+from cloudevents.v1.conversion import to_binary
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -94,7 +94,7 @@ class CreatePods(HttpUser):
 
         attributes = dict(
             source="localhost:443",
-            type="dev.knative.apiserver.resource.update",
+            type="org.kubearchive.sinkfilters.resource.archive-when",
             datacontenttype="application/json",
         )
         event = CloudEvent(attributes, json.loads(data))

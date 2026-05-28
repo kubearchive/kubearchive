@@ -338,7 +338,7 @@ func (is *InteractiveSetup) getTokenForKubeArchive(host string) (string, error) 
 		token = k8sConfig.BearerToken
 	}
 
-	if is.discoverer.connectivityTester.TestKubeArchiveConnectivity(host, true, token, nil) == nil {
+	if is.discoverer.connectivityTester.TestKubeArchiveConnectivity(host, true, is.namespace, token, nil) == nil {
 		return "", nil // empty token is returned for kubectl token
 	}
 

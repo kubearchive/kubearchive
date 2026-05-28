@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"k8s.io/client-go/rest"
@@ -14,7 +15,7 @@ import (
 
 // ConnectivityTester defines the interface for testing KubeArchive connectivity.
 type ConnectivityTester interface {
-	TestKubeArchiveConnectivity(host string, tlsInsecure bool, token string, caData []byte) error
+	TestKubeArchiveConnectivity(host string, tlsInsecure bool, namespace string, token string, caData []byte) error
 	TestKubeArchiveLivezEndpoint(host string, tlsInsecure bool, caData []byte) error
 }
 
@@ -22,7 +23,7 @@ type ConnectivityTester interface {
 type DefaultConnectivityTester struct{}
 
 // TestKubeArchiveConnectivity calls the real connectivity test function
-func (d *DefaultConnectivityTester) TestKubeArchiveConnectivity(host string, tlsInsecure bool, token string, caData []byte) error {
+func (d *DefaultConnectivityTester) TestKubeArchiveConnectivity(host string, tlsInsecure bool, namespace string, token string, caData []byte) error {
 	// Create REST config with the provided parameters
 	restConfig := &rest.Config{
 		Host: host,
@@ -45,8 +46,11 @@ func (d *DefaultConnectivityTester) TestKubeArchiveConnectivity(host string, tls
 		return fmt.Errorf("failed to create HTTP client: %w", err)
 	}
 
-	// Test the /api/v1/pods?limit=1 endpoint
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/v1/pods?limit=1", host), nil)
+	if namespace == "" {
+		namespace = "default"
+	}
+	base := strings.TrimRight(host, "/")
+	req, err := http.NewRequest(http.MethodGet, base+"/api/v1/namespaces/"+url.PathEscape(namespace)+"/pods?limit=1", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -98,7 +102,8 @@ func (d *DefaultConnectivityTester) TestKubeArchiveLivezEndpoint(host string, tl
 	}
 
 	// Test the /livez endpoint
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/livez", host), nil)
+	base := strings.TrimRight(host, "/")
+	req, err := http.NewRequest(http.MethodGet, base+"/livez", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

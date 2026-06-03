@@ -148,6 +148,20 @@ func (o *GetOptions) buildKubeArchiveQueryParams() url.Values {
 	return params
 }
 
+func (o *GetOptions) handleCountResponse(bodyBytes []byte, apiErr *APIError) error {
+	if apiErr != nil {
+		return apiErr
+	}
+	var countResponse struct {
+		Count int64 `json:"count"`
+	}
+	if err := json.Unmarshal(bodyBytes, &countResponse); err != nil {
+		return fmt.Errorf("error parsing count response: %w", err)
+	}
+	fmt.Fprintf(o.Out, "%d\n", countResponse.Count)
+	return nil
+}
+
 func (o *GetOptions) Complete(flags *pflag.FlagSet, args []string) error {
 	err := o.CompleteRetriever()
 	if err != nil {
@@ -392,23 +406,8 @@ func (o *GetOptions) Run() error {
 			}
 		}
 
-		// Handle count requests as a distinct branch
 		if o.Count {
-			if apiErr != nil {
-				if apiErr.StatusCode == http.StatusNotFound {
-					fmt.Fprintf(o.Out, "0\n")
-					return nil
-				}
-				return apiErr
-			}
-			var countResponse struct {
-				Count int64 `json:"count"`
-			}
-			if err := json.Unmarshal(bodyBytes, &countResponse); err != nil {
-				return fmt.Errorf("error parsing count response: %w", err)
-			}
-			fmt.Fprintf(o.Out, "%d\n", countResponse.Count)
-			return nil
+			return o.handleCountResponse(bodyBytes, apiErr)
 		}
 
 		if apiErr != nil {

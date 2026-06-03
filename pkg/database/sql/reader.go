@@ -44,7 +44,8 @@ func (db *sqlDatabaseImpl) QueryResourceByUID(ctx context.Context, kind, apiVers
 }
 
 // applyResourceFilters applies common filters (kind, namespace, name, timestamps, labels)
-// to a select builder. Returns true if the query is a list/wildcard query (not an exact name lookup).
+// to a select builder. Returns true if the query targets multiple resources (list or wildcard),
+// false for an exact single-resource lookup.
 func (db *sqlDatabaseImpl) applyResourceFilters(ctx context.Context, sb *sqlbuilder.SelectBuilder,
 	kind, apiVersion, namespace, name string, labelFilters *models.LabelFilters,
 	creationTimestampAfter, creationTimestampBefore *time.Time) (bool, error) {
@@ -66,17 +67,15 @@ func (db *sqlDatabaseImpl) applyResourceFilters(ctx context.Context, sb *sqlbuil
 		isListQuery = true
 	}
 
-	if isListQuery {
-		if creationTimestampAfter != nil {
-			sb.Where(db.filter.CreationTimestampAfterFilter(sb.Cond, *creationTimestampAfter))
-		}
-		if creationTimestampBefore != nil {
-			sb.Where(db.filter.CreationTimestampBeforeFilter(sb.Cond, *creationTimestampBefore))
-		}
-		if !labelFilters.IsEmpty() {
-			if err := db.filter.ApplyLabelFilters(ctx, db.db, sb, labelFilters); err != nil {
-				return false, err
-			}
+	if creationTimestampAfter != nil {
+		sb.Where(db.filter.CreationTimestampAfterFilter(sb.Cond, *creationTimestampAfter))
+	}
+	if creationTimestampBefore != nil {
+		sb.Where(db.filter.CreationTimestampBeforeFilter(sb.Cond, *creationTimestampBefore))
+	}
+	if !labelFilters.IsEmpty() {
+		if err := db.filter.ApplyLabelFilters(ctx, db.db, sb, labelFilters); err != nil {
+			return false, err
 		}
 	}
 

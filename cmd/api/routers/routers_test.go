@@ -808,6 +808,13 @@ func TestCountResources(t *testing.T) {
 			expectedCode:  http.StatusOK,
 			expectedCount: 0,
 		},
+		{
+			name:          "count with label selector",
+			api:           "/apis/stable.example.com/v1/namespaces/test/crontabs?count=true&labelSelector=app%3Dtest",
+			isCore:        false,
+			expectedCode:  http.StatusOK,
+			expectedCount: int64(len(nonCoreResources)),
+		},
 	}
 
 	for _, tt := range tests {

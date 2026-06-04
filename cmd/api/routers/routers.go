@@ -4,6 +4,7 @@
 package routers
 
 import (
+	stdctx "context"
 	"errors"
 	"fmt"
 	"io"
@@ -112,8 +113,10 @@ func (c *Controller) GetResources(context *gin.Context) {
 			abort.Abort(context, errors.New("cannot use 'continue' with 'count'"), http.StatusBadRequest)
 			return
 		}
+		countCtx, cancel := stdctx.WithTimeout(context.Request.Context(), 30*time.Second)
+		defer cancel()
 		count, err := c.Database.CountResources(
-			context.Request.Context(), kind, apiVersion, namespace, name, labelFilters,
+			countCtx, kind, apiVersion, namespace, name, labelFilters,
 			creationTimestampAfter, creationTimestampBefore)
 		if err != nil {
 			abort.Abort(context, err, http.StatusInternalServerError)

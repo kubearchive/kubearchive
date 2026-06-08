@@ -97,6 +97,12 @@ func (c *Controller) GetResources(context *gin.Context) {
 		}
 	}
 
+	prunedFromEtcd, err := parseBoolQuery(context, "prunedFromEtcd")
+	if err != nil {
+		abort.Abort(context, err, http.StatusBadRequest)
+		return
+	}
+
 	apiVersion := version
 	if group != "" {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
@@ -107,7 +113,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 		var resources []labelFilter.Resource
 		resources, err = c.Database.QueryResources(
 			context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
-			creationTimestampAfter, creationTimestampBefore, 2)
+			creationTimestampAfter, creationTimestampBefore, prunedFromEtcd, 2)
 		if err != nil {
 			abort.Abort(context, err, http.StatusInternalServerError)
 			return
@@ -138,7 +144,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 
 	err = c.Database.StreamResources(
 		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
-		creationTimestampAfter, creationTimestampBefore, newLimit,
+		creationTimestampAfter, creationTimestampBefore, prunedFromEtcd, newLimit,
 		func(resource labelFilter.Resource) error {
 			count++
 			if count > limit {
@@ -201,6 +207,23 @@ func parseTimestampQuery(context *gin.Context, paramName string) (*time.Time, er
 	}
 
 	return &timestamp, nil
+}
+
+func parseBoolQuery(context *gin.Context, paramName string) (*bool, error) {
+	value := context.Query(paramName)
+	if value == "" {
+		return nil, nil //nolint:nilnil // This is intentional - empty parameter means no filter
+	}
+
+	if value == "true" {
+		result := true
+		return &result, nil
+	} else if value == "false" {
+		result := false
+		return &result, nil
+	}
+
+	return nil, fmt.Errorf("invalid %s format: %s. Expected 'true' or 'false'", paramName, value)
 }
 
 func (c *Controller) GetLogURL(context *gin.Context) {

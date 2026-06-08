@@ -999,3 +999,141 @@ func TestQueryResourceByUID(t *testing.T) {
 		})
 	}
 }
+
+func TestCountResources(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := tt.database.getFilter()
+			sb := tt.database.getSelector().ResourceCountSelector()
+			sb.Where(
+				filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion),
+				filter.NamespaceFilter(sb.Cond, namespace),
+			)
+			query, args := sb.BuildWithFlavor(tt.database.getFlavor())
+
+			for _, ttt := range subtests {
+				t.Run(ttt.name, func(t *testing.T) {
+					db, mock := NewMock()
+					tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+
+					rows := sqlmock.NewRows([]string{"count"})
+					if ttt.data {
+						rows.AddRow(int64(42))
+					} else {
+						rows.AddRow(int64(0))
+					}
+					mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+					ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+					defer cancel()
+
+					count, err := tt.database.CountResources(ctx, podKind, version, namespace,
+						"", &models.LabelFilters{}, nil, nil)
+					assert.NoError(t, err)
+					if ttt.data {
+						assert.Equal(t, int64(42), count)
+					} else {
+						assert.Equal(t, int64(0), count)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestCountResourcesWithoutNamespace(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := tt.database.getFilter()
+			sb := tt.database.getSelector().ResourceCountSelector()
+			sb.Where(
+				filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion),
+			)
+			query, args := sb.BuildWithFlavor(tt.database.getFlavor())
+
+			db, mock := NewMock()
+			tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+
+			rows := sqlmock.NewRows([]string{"count"})
+			rows.AddRow(int64(10))
+			mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+
+			count, err := tt.database.CountResources(ctx, podKind, version, "",
+				"", &models.LabelFilters{}, nil, nil)
+			assert.NoError(t, err)
+			assert.Equal(t, int64(10), count)
+		})
+	}
+}
+
+func TestCountResourcesWithTimestampFilters(t *testing.T) {
+	timestampTests := []struct {
+		name                    string
+		creationTimestampAfter  *time.Time
+		creationTimestampBefore *time.Time
+	}{
+		{
+			name: "creationTimestampAfter only",
+			creationTimestampAfter: func() *time.Time {
+				t := time.Date(2023, 6, 1, 12, 0, 0, 0, time.UTC)
+				return &t
+			}(),
+		},
+		{
+			name: "creationTimestampBefore only",
+			creationTimestampBefore: func() *time.Time {
+				t := time.Date(2023, 12, 31, 23, 59, 59, 0, time.UTC)
+				return &t
+			}(),
+		},
+		{
+			name: "both timestamp filters",
+			creationTimestampAfter: func() *time.Time {
+				t := time.Date(2023, 1, 1, 0, 0, 0, 0, time.UTC)
+				return &t
+			}(),
+			creationTimestampBefore: func() *time.Time {
+				t := time.Date(2023, 12, 31, 23, 59, 59, 0, time.UTC)
+				return &t
+			}(),
+		},
+	}
+
+	for _, tt := range tests {
+		for _, timestampTest := range timestampTests {
+			t.Run(fmt.Sprintf("%s %s", tt.name, timestampTest.name), func(t *testing.T) {
+				filter := tt.database.getFilter()
+				sb := tt.database.getSelector().ResourceCountSelector()
+				sb.Where(filter.KindApiVersionFilter(sb.Cond, podKind, podApiVersion))
+
+				if timestampTest.creationTimestampAfter != nil {
+					sb.Where(filter.CreationTimestampAfterFilter(sb.Cond, *timestampTest.creationTimestampAfter))
+				}
+				if timestampTest.creationTimestampBefore != nil {
+					sb.Where(filter.CreationTimestampBeforeFilter(sb.Cond, *timestampTest.creationTimestampBefore))
+				}
+
+				query, args := sb.BuildWithFlavor(tt.database.getFlavor())
+				assert.Contains(t, query, "creationTimestamp")
+
+				db, mock := NewMock()
+				tt.database.setConn(sqlx.NewDb(db, "sqlmock"))
+
+				rows := sqlmock.NewRows([]string{"count"})
+				rows.AddRow(int64(5))
+				mock.ExpectQuery(regexp.QuoteMeta(query)).WithArgs(sliceOfAny2sliceOfValue(args)...).WillReturnRows(rows)
+
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+				defer cancel()
+
+				count, err := tt.database.CountResources(ctx, podKind, podApiVersion, "", "",
+					&models.LabelFilters{}, timestampTest.creationTimestampAfter, timestampTest.creationTimestampBefore)
+				assert.NoError(t, err)
+				assert.Equal(t, int64(5), count)
+			})
+		}
+	}
+}

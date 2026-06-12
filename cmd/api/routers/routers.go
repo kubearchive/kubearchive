@@ -112,11 +112,11 @@ func (c *Controller) GetResources(context *gin.Context) {
 			abort.Abort(context, errors.New("cannot use 'continue' with 'count'"), http.StatusBadRequest)
 			return
 		}
-		count, err := c.Database.CountResources(
+		count, countErr := c.Database.CountResources(
 			context.Request.Context(), kind, apiVersion, namespace, name, labelFilters,
 			creationTimestampAfter, creationTimestampBefore)
-		if err != nil {
-			abort.Abort(context, err, http.StatusInternalServerError)
+		if countErr != nil {
+			abort.Abort(context, countErr, http.StatusInternalServerError)
 			return
 		}
 		context.JSON(http.StatusOK, gin.H{"count": count})

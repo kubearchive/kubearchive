@@ -467,9 +467,9 @@ func TestGetComplete(t *testing.T) {
 			expectArchived:  false,
 		},
 		{
-			name:          "count with archived",
-			args:          []string{"pods"},
-			flags:         []string{"--count", "--archived"},
+			name:  "count with archived",
+			args:  []string{"pods"},
+			flags: []string{"--count", "--archived"},
 			resourceInfo: &ResourceInfo{
 				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
 			},

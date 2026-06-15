@@ -25,7 +25,12 @@ func fakeServer(k8sClient kubernetes.Interface, cache *cache.Cache) *Server {
 	}
 	controller := routers.Controller{Database: fakeDB.NewFakeDatabase(nil, nil)}
 	expirations := &routers.CacheExpirations{Authorized: 1 * time.Second, Unauthorized: 1 * time.Second}
-	return NewServer(k8sClient, controller, cache, expirations)
+	rateLimits := RateLimitConfig{
+		OverallRPS: 20, LogRPS: 2,
+		OverallBurst: 20, LogBurst: 2,
+		MaxConcurrent: 50, MaxConcurrentLog: 5,
+	}
+	return NewServer(k8sClient, controller, cache, expirations, rateLimits)
 }
 
 func TestNewServer(t *testing.T) {

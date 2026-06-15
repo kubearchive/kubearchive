@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -35,6 +36,13 @@ const (
 	otelServiceName                   = "kubearchive.api"
 	cacheExpirationAuthorizedEnvVar   = "CACHE_EXPIRATION_AUTHORIZED"
 	cacheExpirationUnauthorizedEnvVar = "CACHE_EXPIRATION_UNAUTHORIZED"
+
+	rateLimitOverallRPSEnvVar      = "API_RATE_LIMIT_OVERALL_RPS"
+	rateLimitLogRPSEnvVar          = "API_RATE_LIMIT_LOG_RPS"
+	rateLimitOverallBurstEnvVar    = "API_RATE_LIMIT_OVERALL_BURST"
+	rateLimitLogBurstEnvVar        = "API_RATE_LIMIT_LOG_BURST"
+	maxConcurrentRequestsEnvVar    = "API_MAX_CONCURRENT_REQUESTS"
+	maxConcurrentLogRequestsEnvVar = "API_MAX_CONCURRENT_LOG_REQUESTS"
 )
 
 var (
@@ -43,13 +51,23 @@ var (
 	date    = ""
 )
 
+// RateLimitConfig holds the configuration for the API rate limiters.
+type RateLimitConfig struct {
+	OverallRPS         float64
+	LogRPS             float64
+	OverallBurst       int
+	LogBurst           int
+	MaxConcurrent      int
+	MaxConcurrentLog   int
+}
+
 type Server struct {
 	k8sClient kubernetes.Interface
 	router    *gin.Engine
 }
 
 func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, cache *cache.Cache,
-	cacheExpirations *routers.CacheExpirations) *Server {
+	cacheExpirations *routers.CacheExpirations, rateLimits RateLimitConfig) *Server {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(otelgin.Middleware("", otelgin.WithDisableGinErrorsOnMetrics(true))) // Empty string so the library sets the proper server
@@ -73,28 +91,35 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 		group.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache,
 			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 		group.Use(pagination.Middleware())
+		group.Use(middleware.RateLimiter(rateLimits.OverallRPS, rateLimits.OverallBurst))
+		group.Use(middleware.ConcurrentLimiter(rateLimits.MaxConcurrent))
 	}
 
 	router.GET("/livez", controller.Livez)
 	router.GET("/readyz", controller.Readyz)
 
+	logMiddleware := []gin.HandlerFunc{
+		middleware.RateLimiter(rateLimits.LogRPS, rateLimits.LogBurst),
+		middleware.ConcurrentLimiter(rateLimits.MaxConcurrentLog),
+	}
+
 	apisGroup.GET("/:group/:version/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append(logMiddleware, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/uid/:uid", controller.GetResourceByUID)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append(logMiddleware, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 
 	apiGroup.GET("/:version/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append(logMiddleware, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/uid/:uid", controller.GetResourceByUID)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append(logMiddleware, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 
 	return &Server{
 		router:    router,
@@ -118,6 +143,7 @@ func main() {
 	if err != nil {
 		slog.Error(err.Error())
 	}
+	rateLimits := getRateLimitConfig()
 	memCache := cache.New()
 
 	slog.Info("Establishing database connection for API server")
@@ -152,7 +178,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	server := NewServer(k8sClient, controller, memCache, cacheExpirations)
+	server := NewServer(k8sClient, controller, memCache, cacheExpirations, rateLimits)
 	httpServer := http.Server{
 		Addr:    "0.0.0.0:8081",
 		Handler: server.router.Handler(),
@@ -201,6 +227,60 @@ func main() {
 	// This blocks until the context expires
 	<-ctx.Done()
 	slog.Debug("Shutdown reached timeout")
+}
+
+func getRateLimitConfig() RateLimitConfig {
+	cfg := RateLimitConfig{
+		OverallRPS:       20,
+		LogRPS:           2,
+		OverallBurst:     20,
+		LogBurst:         2,
+		MaxConcurrent:    50,
+		MaxConcurrentLog: 5,
+	}
+	if v := os.Getenv(rateLimitOverallRPSEnvVar); v != "" {
+		if parsed, err := strconv.ParseFloat(v, 64); err == nil {
+			cfg.OverallRPS = parsed
+		} else {
+			slog.Warn("Could not parse env var, using default", "var", rateLimitOverallRPSEnvVar, "value", v)
+		}
+	}
+	if v := os.Getenv(rateLimitLogRPSEnvVar); v != "" {
+		if parsed, err := strconv.ParseFloat(v, 64); err == nil {
+			cfg.LogRPS = parsed
+		} else {
+			slog.Warn("Could not parse env var, using default", "var", rateLimitLogRPSEnvVar, "value", v)
+		}
+	}
+	if v := os.Getenv(rateLimitOverallBurstEnvVar); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil {
+			cfg.OverallBurst = parsed
+		} else {
+			slog.Warn("Could not parse env var, using default", "var", rateLimitOverallBurstEnvVar, "value", v)
+		}
+	}
+	if v := os.Getenv(rateLimitLogBurstEnvVar); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil {
+			cfg.LogBurst = parsed
+		} else {
+			slog.Warn("Could not parse env var, using default", "var", rateLimitLogBurstEnvVar, "value", v)
+		}
+	}
+	if v := os.Getenv(maxConcurrentRequestsEnvVar); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil {
+			cfg.MaxConcurrent = parsed
+		} else {
+			slog.Warn("Could not parse env var, using default", "var", maxConcurrentRequestsEnvVar, "value", v)
+		}
+	}
+	if v := os.Getenv(maxConcurrentLogRequestsEnvVar); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil {
+			cfg.MaxConcurrentLog = parsed
+		} else {
+			slog.Warn("Could not parse env var, using default", "var", maxConcurrentLogRequestsEnvVar, "value", v)
+		}
+	}
+	return cfg
 }
 
 func getCacheExpirations() (*routers.CacheExpirations, error) {

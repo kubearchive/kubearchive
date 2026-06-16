@@ -41,6 +41,9 @@ type DBReader interface {
 		name, continueId, continueDate string, labelFilters *models.LabelFilters,
 		creationTimestampAfter, creationTimestampBefore *time.Time, limit int,
 		fn func(resource models.Resource) error) error
+	CountResources(ctx context.Context, kind, apiVersion, namespace, name string,
+		labelFilters *models.LabelFilters,
+		creationTimestampAfter, creationTimestampBefore *time.Time) (int64, error)
 	QueryResourceByUID(ctx context.Context, kind, apiVersion, namespace, uid string) (*models.Resource, error)
 	QueryLogURLByName(ctx context.Context, kind, apiVersion, namespace, name, containerName string) (*LogRecord, error)
 	QueryLogURLByUID(ctx context.Context, kind, apiVersion, namespace, uid, containerName string) (*LogRecord, error)

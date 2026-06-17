@@ -36,13 +36,12 @@ const (
 	otelServiceName                   = "kubearchive.api"
 	cacheExpirationAuthorizedEnvVar   = "CACHE_EXPIRATION_AUTHORIZED"
 	cacheExpirationUnauthorizedEnvVar = "CACHE_EXPIRATION_UNAUTHORIZED"
-
-	rateLimitOverallRPSEnvVar      = "API_RATE_LIMIT_OVERALL_RPS"
-	rateLimitLogRPSEnvVar          = "API_RATE_LIMIT_LOG_RPS"
-	rateLimitOverallBurstEnvVar    = "API_RATE_LIMIT_OVERALL_BURST"
-	rateLimitLogBurstEnvVar        = "API_RATE_LIMIT_LOG_BURST"
-	maxConcurrentRequestsEnvVar    = "API_MAX_CONCURRENT_REQUESTS"
-	maxConcurrentLogRequestsEnvVar = "API_MAX_CONCURRENT_LOG_REQUESTS"
+	rateLimitOverallRPSEnvVar         = "API_RATE_LIMIT_OVERALL_RPS"
+	rateLimitLogRPSEnvVar             = "API_RATE_LIMIT_LOG_RPS"
+	rateLimitOverallBurstEnvVar       = "API_RATE_LIMIT_OVERALL_BURST"
+	rateLimitLogBurstEnvVar           = "API_RATE_LIMIT_LOG_BURST"
+	maxConcurrentRequestsEnvVar       = "API_MAX_CONCURRENT_REQUESTS"
+	maxConcurrentLogRequestsEnvVar    = "API_MAX_CONCURRENT_LOG_REQUESTS"
 )
 
 var (
@@ -53,12 +52,12 @@ var (
 
 // RateLimitConfig holds the configuration for the API rate limiters.
 type RateLimitConfig struct {
-	OverallRPS         float64
-	LogRPS             float64
-	OverallBurst       int
-	LogBurst           int
-	MaxConcurrent      int
-	MaxConcurrentLog   int
+	OverallRPS       float64
+	LogRPS           float64
+	OverallBurst     int
+	LogBurst         int
+	MaxConcurrent    int
+	MaxConcurrentLog int
 }
 
 type Server struct {
@@ -242,42 +241,42 @@ func getRateLimitConfig() RateLimitConfig {
 		if parsed, err := strconv.ParseFloat(v, 64); err == nil {
 			cfg.OverallRPS = parsed
 		} else {
-			slog.Warn("Could not parse env var, using default", "var", rateLimitOverallRPSEnvVar, "value", v)
+			slog.Warn("Could not parse env var, using default", "var", rateLimitOverallRPSEnvVar, "value", fmt.Sprintf("%q", v))
 		}
 	}
 	if v := os.Getenv(rateLimitLogRPSEnvVar); v != "" {
 		if parsed, err := strconv.ParseFloat(v, 64); err == nil {
 			cfg.LogRPS = parsed
 		} else {
-			slog.Warn("Could not parse env var, using default", "var", rateLimitLogRPSEnvVar, "value", v)
+			slog.Warn("Could not parse env var, using default", "var", rateLimitLogRPSEnvVar, "value", fmt.Sprintf("%q", v))
 		}
 	}
 	if v := os.Getenv(rateLimitOverallBurstEnvVar); v != "" {
 		if parsed, err := strconv.Atoi(v); err == nil {
 			cfg.OverallBurst = parsed
 		} else {
-			slog.Warn("Could not parse env var, using default", "var", rateLimitOverallBurstEnvVar, "value", v)
+			slog.Warn("Could not parse env var, using default", "var", rateLimitOverallBurstEnvVar, "value", fmt.Sprintf("%q", v))
 		}
 	}
 	if v := os.Getenv(rateLimitLogBurstEnvVar); v != "" {
 		if parsed, err := strconv.Atoi(v); err == nil {
 			cfg.LogBurst = parsed
 		} else {
-			slog.Warn("Could not parse env var, using default", "var", rateLimitLogBurstEnvVar, "value", v)
+			slog.Warn("Could not parse env var, using default", "var", rateLimitLogBurstEnvVar, "value", fmt.Sprintf("%q", v))
 		}
 	}
 	if v := os.Getenv(maxConcurrentRequestsEnvVar); v != "" {
 		if parsed, err := strconv.Atoi(v); err == nil {
 			cfg.MaxConcurrent = parsed
 		} else {
-			slog.Warn("Could not parse env var, using default", "var", maxConcurrentRequestsEnvVar, "value", v)
+			slog.Warn("Could not parse env var, using default", "var", maxConcurrentRequestsEnvVar, "value", fmt.Sprintf("%q", v))
 		}
 	}
 	if v := os.Getenv(maxConcurrentLogRequestsEnvVar); v != "" {
 		if parsed, err := strconv.Atoi(v); err == nil {
 			cfg.MaxConcurrentLog = parsed
 		} else {
-			slog.Warn("Could not parse env var, using default", "var", maxConcurrentLogRequestsEnvVar, "value", v)
+			slog.Warn("Could not parse env var, using default", "var", maxConcurrentLogRequestsEnvVar, "value", fmt.Sprintf("%q", v))
 		}
 	}
 	return cfg

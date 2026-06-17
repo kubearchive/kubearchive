@@ -21,15 +21,15 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.12.3
 	github.com/ohler55/ojg v1.28.1
-	github.com/onsi/ginkgo/v2 v2.29.0
+	github.com/onsi/ginkgo/v2 v2.30.0
 	github.com/onsi/gomega v1.40.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
-	go.opentelemetry.io/contrib/bridges/otelslog v0.18.0
-	go.opentelemetry.io/contrib/instrumentation/host v0.68.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.68.0
-	go.opentelemetry.io/contrib/instrumentation/runtime v0.68.0
+	go.opentelemetry.io/contrib/bridges/otelslog v0.19.0
+	go.opentelemetry.io/contrib/instrumentation/host v0.69.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
+	go.opentelemetry.io/contrib/instrumentation/runtime v0.69.0
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.20.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.44.0
@@ -67,7 +67,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/ebitengine/purego v0.10.0 // indirect
+	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
@@ -138,10 +138,10 @@ require (
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.17.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
-	github.com/quic-go/quic-go v0.59.0 // indirect
-	github.com/shirou/gopsutil/v4 v4.26.3 // indirect
-	github.com/tklauser/go-sysconf v0.3.16 // indirect
-	github.com/tklauser/numcpus v0.11.0 // indirect
+	github.com/quic-go/quic-go v0.59.1 // indirect
+	github.com/shirou/gopsutil/v4 v4.26.4 // indirect
+	github.com/tklauser/go-sysconf v0.4.0 // indirect
+	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect

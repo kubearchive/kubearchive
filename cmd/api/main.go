@@ -35,6 +35,8 @@ const (
 	otelServiceName                   = "kubearchive.api"
 	cacheExpirationAuthorizedEnvVar   = "CACHE_EXPIRATION_AUTHORIZED"
 	cacheExpirationUnauthorizedEnvVar = "CACHE_EXPIRATION_UNAUTHORIZED"
+	queryTimeoutEnvVar                = "KUBEARCHIVE_QUERY_TIMEOUT"
+	defaultQueryTimeout               = 5 * time.Minute
 )
 
 var (
@@ -145,7 +147,23 @@ func main() {
 		}
 	}(db)
 
-	controller := routers.Controller{Database: db, CacheConfiguration: *cacheExpirations}
+	queryTimeout := defaultQueryTimeout
+	if s := os.Getenv(queryTimeoutEnvVar); s != "" {
+		d, parseErr := time.ParseDuration(s)
+		if parseErr != nil {
+			slog.Error("invalid query timeout, using default",
+				"env", queryTimeoutEnvVar,
+				"value", s,
+				"default", defaultQueryTimeout,
+				"error", parseErr.Error(),
+			)
+		} else {
+			queryTimeout = d
+		}
+	}
+	slog.Info("Database query timeout configured", "timeout", queryTimeout)
+
+	controller := routers.Controller{Database: db, CacheConfiguration: *cacheExpirations, QueryTimeout: queryTimeout}
 	k8sClient, err := k8sclient.NewInstrumentedKubernetesClient()
 	if err != nil {
 		slog.Error("Could not create instrumented kubernetes client", "error", err.Error())

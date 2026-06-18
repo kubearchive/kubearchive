@@ -4,6 +4,7 @@
 package routers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,11 +13,13 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/pagination"
 	"github.com/kubearchive/kubearchive/pkg/database/fake"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
+	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -864,4 +867,159 @@ func TestCountResourcesWithInvalidParams(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, res.Code)
 		})
 	}
+}
+
+// slowDBReader is a test double for interfaces.DBReader whose query methods block
+// until the supplied context is cancelled, then return ctx.Err(). This lets us
+// verify that the Controller's QueryTimeout correctly cancels in-flight DB calls.
+type slowDBReader struct {
+	// blockFor is the maximum time each method will block before checking the context.
+	// Setting it longer than QueryTimeout guarantees the timeout fires first.
+	blockFor time.Duration
+}
+
+func (s *slowDBReader) block(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(s.blockFor):
+		return nil
+	}
+}
+
+func (s *slowDBReader) QueryResources(ctx context.Context, _, _, _, _, _, _ string, _ *models.LabelFilters, _, _ *time.Time, _ int) ([]models.Resource, error) {
+	return nil, s.block(ctx)
+}
+
+func (s *slowDBReader) StreamResources(ctx context.Context, _, _, _, _, _, _ string, _ *models.LabelFilters, _, _ *time.Time, _ int, _ func(models.Resource) error) error {
+	return s.block(ctx)
+}
+
+func (s *slowDBReader) CountResources(ctx context.Context, _, _, _, _ string, _ *models.LabelFilters, _, _ *time.Time) (int64, error) {
+	return 0, s.block(ctx)
+}
+
+func (s *slowDBReader) QueryResourceByUID(ctx context.Context, _, _, _, _ string) (*models.Resource, error) {
+	return nil, s.block(ctx)
+}
+
+func (s *slowDBReader) QueryLogURLByName(ctx context.Context, _, _, _, _, _ string) (*interfaces.LogRecord, error) {
+	return nil, s.block(ctx)
+}
+
+func (s *slowDBReader) QueryLogURLByUID(ctx context.Context, _, _, _, _, _ string) (*interfaces.LogRecord, error) {
+	return nil, s.block(ctx)
+}
+
+func (s *slowDBReader) Ping(_ context.Context) error                    { return nil }
+func (s *slowDBReader) QueryDatabaseSchemaVersion(_ context.Context) (string, error) {
+	return "", nil
+}
+func (s *slowDBReader) CloseDB() error                  { return nil }
+func (s *slowDBReader) Init(_ map[string]string) error  { return nil }
+
+// setupRouterWithTimeout creates a test router backed by db and applies queryTimeout.
+func setupRouterWithTimeout(db interfaces.DBReader, core bool, queryTimeout time.Duration) *gin.Engine {
+	router := gin.Default()
+	ctrl := Controller{Database: db, QueryTimeout: queryTimeout}
+	router.Use(func(c *gin.Context) {
+		if core {
+			c.Set("apiResourceKind", "Pod")
+		} else {
+			c.Set("apiResourceKind", "Crontab")
+		}
+	})
+	router.Use(pagination.Middleware())
+	router.GET("/apis/:group/:version/:resourceType", ctrl.GetResources)
+	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType", ctrl.GetResources)
+	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/:name", ctrl.GetResources)
+	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/uid/:uid", ctrl.GetResourceByUID)
+	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/:name/log",
+		ctrl.GetLogURL, retrieveLogURL)
+	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
+		ctrl.GetLogURL, retrieveLogURL)
+	router.GET("/api/:version/:resourceType", ctrl.GetResources)
+	router.GET("/api/:version/namespaces/:namespace/:resourceType", ctrl.GetResources)
+	router.GET("/api/:version/namespaces/:namespace/:resourceType/:name", ctrl.GetResources)
+	router.GET("/api/:version/namespaces/:namespace/:resourceType/uid/:uid", ctrl.GetResourceByUID)
+	router.GET("/api/:version/namespaces/:namespace/:resourceType/:name/log",
+		ctrl.GetLogURL, retrieveLogURL)
+	router.GET("/api/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
+		ctrl.GetLogURL, retrieveLogURL)
+	return router
+}
+
+// TestQueryTimeout verifies that Controller.QueryTimeout causes DB-bound handlers
+// to abort with 500 (context deadline exceeded) before the slow DB finishes,
+// and that the response arrives well within the blockFor budget.
+func TestQueryTimeout(t *testing.T) {
+	const timeout = 50 * time.Millisecond
+	const blockFor = 500 * time.Millisecond // much longer than the timeout
+
+	slow := &slowDBReader{blockFor: blockFor}
+
+	tests := []struct {
+		name   string
+		isCore bool
+		url    string
+	}{
+		{
+			name:   "GetResources list times out",
+			isCore: false,
+			url:    "/apis/stable.example.com/v1/namespaces/test/crontabs",
+		},
+		{
+			name:   "GetResources by name times out",
+			isCore: false,
+			url:    "/apis/stable.example.com/v1/namespaces/test/crontabs/my-crontab",
+		},
+		{
+			name:   "GetResources count times out",
+			isCore: false,
+			url:    "/apis/stable.example.com/v1/namespaces/test/crontabs?count=true",
+		},
+		{
+			name:   "GetResourceByUID times out",
+			isCore: false,
+			url:    "/apis/stable.example.com/v1/namespaces/test/crontabs/uid/some-uid",
+		},
+		{
+			name:   "GetLogURL times out",
+			isCore: true,
+			url:    "/api/v1/namespaces/test/pods/my-pod/log",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := setupRouterWithTimeout(slow, tt.isCore, timeout)
+
+			start := time.Now()
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tt.url, nil)
+			router.ServeHTTP(res, req)
+			elapsed := time.Since(start)
+
+			// Handler must return an error status — the DB never returned data.
+			assert.Equal(t, http.StatusInternalServerError, res.Code,
+				"expected 500 when DB call times out")
+
+			// The response must arrive well before the DB's blockFor duration,
+			// confirming the timeout fired rather than the DB finishing naturally.
+			assert.Less(t, elapsed, blockFor,
+				"response took %v but blockFor is %v — timeout should have fired first", elapsed, blockFor)
+		})
+	}
+}
+
+// TestQueryTimeoutDisabled verifies that when QueryTimeout is zero the handler
+// does NOT impose a timeout — the fast fake DB returns normally.
+func TestQueryTimeoutDisabled(t *testing.T) {
+	router := setupRouterWithTimeout(fake.NewFakeDatabase(testResources, testLogUrls), false, 0)
+
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespaces/test/crontabs", nil)
+	router.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusOK, res.Code, "zero QueryTimeout should not block successful requests")
 }

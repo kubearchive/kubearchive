@@ -25,7 +25,6 @@ func newTestRouter(handlers ...gin.HandlerFunc) *gin.Engine {
 func TestRateLimiter(t *testing.T) {
 	const burst = 3
 	r := newTestRouter(RateLimiter(float64(burst), burst))
-
 	var ok, limited int
 	for range burst * 2 {
 		w := httptest.NewRecorder()
@@ -110,9 +109,9 @@ func TestConcurrentLimiter(t *testing.T) {
 
 func TestGetRateLimitConfig(t *testing.T) {
 	tests := []struct {
-		name     string
-		envVars  map[string]string
-		want     RateLimitConfig
+		name    string
+		envVars map[string]string
+		want    RateLimitConfig
 	}{
 		{
 			name:    "all defaults",

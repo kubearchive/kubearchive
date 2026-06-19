@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/pkg/abort"
@@ -74,32 +75,38 @@ func ConcurrentLimiter(max int) gin.HandlerFunc {
 	return concurrentLimiter
 }
 
-func getEnvFloat64(envVar string, defaultVal float64) (float64, error) {
-	var err error
-	var result float64 = defaultVal
+// sanitizeLogValue strips newline and carriage-return characters from s to
+// prevent log injection when env var values are written to structured logs.
+func sanitizeLogValue(s string) string {
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	return fmt.Sprintf("%q", s)
+}
+
+func getEnvFloat64(envVar string, defaultVal float64) float64 {
+	result := defaultVal
 	if v := os.Getenv(envVar); v != "" {
 		if r, err := strconv.ParseFloat(v, 64); err == nil {
 			result = r
 		} else {
-			slog.Warn("Could not parse env var, using default", "var", defaultVal, "value", fmt.Sprintf("%q", v))
+			slog.Warn("Could not parse env var, using default", "var", defaultVal, "value", sanitizeLogValue(v))
 			result = defaultVal
 		}
 	}
-	return result, err
+	return result
 }
 
-func getEnvInt(envVar string, defaultVal int) (int, error) {
-	var err error
-	var result int = defaultVal
+func getEnvInt(envVar string, defaultVal int) int {
+	result := defaultVal
 	if v := os.Getenv(envVar); v != "" {
 		if r, err := strconv.Atoi(v); err == nil {
 			result = r
 		} else {
-			slog.Warn("Could not parse env var, using default", "var", defaultVal, "value", fmt.Sprintf("%q", v))
+			slog.Warn("Could not parse env var, using default", "var", defaultVal, "value", sanitizeLogValue(v))
 			result = defaultVal
 		}
 	}
-	return result, err
+	return result
 }
 
 func GetRateLimitConfig() RateLimitConfig {
@@ -117,12 +124,12 @@ func GetRateLimitConfig() RateLimitConfig {
 		MaxConcurrentLog: 20,
 	}
 
-	cfg.OverallRPS, _ = getEnvFloat64(rateLimitOverallRPSEnvVar, cfg.OverallRPS)
-	cfg.LogRPS, _ = getEnvFloat64(rateLimitLogRPSEnvVar, cfg.LogRPS)
-	cfg.OverallBurst, _ = getEnvInt(rateLimitOverallBurstEnvVar, cfg.OverallBurst)
-	cfg.LogBurst, _ = getEnvInt(rateLimitLogBurstEnvVar, cfg.LogBurst)
-	cfg.MaxConcurrent, _ = getEnvInt(maxConcurrentRequestsEnvVar, cfg.MaxConcurrent)
-	cfg.MaxConcurrentLog, _ = getEnvInt(maxConcurrentLogRequestsEnvVar, cfg.MaxConcurrentLog)
+	cfg.OverallRPS = getEnvFloat64(rateLimitOverallRPSEnvVar, cfg.OverallRPS)
+	cfg.LogRPS = getEnvFloat64(rateLimitLogRPSEnvVar, cfg.LogRPS)
+	cfg.OverallBurst = getEnvInt(rateLimitOverallBurstEnvVar, cfg.OverallBurst)
+	cfg.LogBurst = getEnvInt(rateLimitLogBurstEnvVar, cfg.LogBurst)
+	cfg.MaxConcurrent = getEnvInt(maxConcurrentRequestsEnvVar, cfg.MaxConcurrent)
+	cfg.MaxConcurrentLog = getEnvInt(maxConcurrentLogRequestsEnvVar, cfg.MaxConcurrentLog)
 
 	if cfg.OverallRPS <= 0 || cfg.LogRPS <= 0 ||
 		cfg.OverallBurst <= 0 || cfg.LogBurst <= 0 ||

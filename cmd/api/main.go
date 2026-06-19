@@ -59,8 +59,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 		"/readyz": "DEBUG",
 	}}))
 
-	var rateLimits middleware.RateLimitConfig
-	rateLimits = middleware.GetRateLimitConfig()
+	rateLimits := middleware.GetRateLimitConfig()
 
 	apiGroup := router.Group("/api")
 	apisGroup := router.Group("/apis")

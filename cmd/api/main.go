@@ -157,6 +157,12 @@ func main() {
 				"default", defaultQueryTimeout,
 				"error", parseErr.Error(),
 			)
+		} else if d <= 0 {
+			slog.Error("invalid query timeout, using default",
+				"env", queryTimeoutEnvVar,
+				"value", s,
+				"default", defaultQueryTimeout,
+			)
 		} else {
 			queryTimeout = d
 		}

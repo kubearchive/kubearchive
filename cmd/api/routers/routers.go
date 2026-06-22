@@ -35,11 +35,16 @@ type Controller struct {
 	QueryTimeout       time.Duration
 }
 
-func (c *Controller) queryContext(ctx context.Context) (context.Context, context.CancelFunc) {
-	if c.QueryTimeout <= 0 {
-		return context.WithCancel(ctx)
+// queryContext creates a child context bounded by the configured QueryTimeout for use during
+// database query execution only — not for the full response lifecycle — so that callers which
+// stream results can pass it solely to the initial cursor-open call; returns DeadlineExceeded
+// immediately if the parent context is already expired.
+func (c *Controller) queryContext(ctx context.Context) (context.Context, context.CancelFunc, error) {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return nil, func() {}, context.DeadlineExceeded
 	}
-	return context.WithTimeout(ctx, c.QueryTimeout)
+	newCtx, cancel := context.WithTimeout(ctx, c.QueryTimeout)
+	return newCtx, cancel, nil
 }
 
 func (c *Controller) GetResources(context *gin.Context) {
@@ -121,7 +126,11 @@ func (c *Controller) GetResources(context *gin.Context) {
 			abort.Abort(context, errors.New("cannot use 'continue' with 'count'"), http.StatusBadRequest)
 			return
 		}
-		queryCtx, cancel := c.queryContext(context.Request.Context())
+		queryCtx, cancel, err := c.queryContext(context.Request.Context())
+		if err != nil {
+			abort.Abort(context, err, http.StatusGatewayTimeout)
+			return
+		}
 		defer cancel()
 		count, countErr := c.Database.CountResources(
 			queryCtx, kind, apiVersion, namespace, name, labelFilters,
@@ -136,7 +145,11 @@ func (c *Controller) GetResources(context *gin.Context) {
 
 	// Single resource by exact name - no streaming needed
 	if name != "" && !strings.Contains(name, "*") {
-		queryCtx, cancel := c.queryContext(context.Request.Context())
+		queryCtx, cancel, err := c.queryContext(context.Request.Context())
+		if err != nil {
+			abort.Abort(context, err, http.StatusGatewayTimeout)
+			return
+		}
 		defer cancel()
 		var resources []labelFilter.Resource
 		resources, err = c.Database.QueryResources(
@@ -170,10 +183,15 @@ func (c *Controller) GetResources(context *gin.Context) {
 	var headerWritten bool
 	w := context.Writer
 
-	streamCtx, streamCancel := c.queryContext(context.Request.Context())
-	defer streamCancel()
+	reqCtx := context.Request.Context()
+	queryCtx, queryCancel, err := c.queryContext(reqCtx)
+	if err != nil {
+		abort.Abort(context, err, http.StatusGatewayTimeout)
+		return
+	}
+	defer queryCancel()
 	err = c.Database.StreamResources(
-		streamCtx, kind, apiVersion, namespace, name, id, date, labelFilters,
+		queryCtx, reqCtx, kind, apiVersion, namespace, name, id, date, labelFilters,
 		creationTimestampAfter, creationTimestampBefore, newLimit,
 		func(resource labelFilter.Resource) error {
 			count++
@@ -264,7 +282,11 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
-	queryCtx, cancel := c.queryContext(context.Request.Context())
+	queryCtx, cancel, err := c.queryContext(context.Request.Context())
+	if err != nil {
+		abort.Abort(context, err, http.StatusGatewayTimeout)
+		return
+	}
 	defer cancel()
 	var logRecord *interfaces.LogRecord
 	if name != "" {
@@ -309,7 +331,11 @@ func (c *Controller) GetResourceByUID(context *gin.Context) {
 		return
 	}
 
-	queryCtx, cancel := c.queryContext(context.Request.Context())
+	queryCtx, cancel, err := c.queryContext(context.Request.Context())
+	if err != nil {
+		abort.Abort(context, err, http.StatusGatewayTimeout)
+		return
+	}
 	defer cancel()
 	resource, err := c.Database.QueryResourceByUID(queryCtx, kind, apiVersion, namespace, uid)
 	if err != nil {

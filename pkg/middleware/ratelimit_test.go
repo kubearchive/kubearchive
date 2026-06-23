@@ -107,6 +107,133 @@ func TestConcurrentLimiter(t *testing.T) {
 	}
 }
 
+func TestUserRateLimiter_PerUserIsolation(t *testing.T) {
+	// Each user gets their own bucket of size burst=2.
+	// Sending burst*2 requests per user should allow exactly burst per user
+	// and reject the rest — regardless of what other users are doing.
+	const burst = 2
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/log", UserRateLimiter(float64(burst), burst), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	sendN := func(n int, header, value string) (ok, limited int) {
+		for range n {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/log", nil)
+			if header != "" {
+				req.Header.Set(header, value)
+			}
+			router.ServeHTTP(w, req)
+			switch w.Code {
+			case http.StatusOK:
+				ok++
+			case http.StatusTooManyRequests:
+				limited++
+			default:
+				t.Errorf("unexpected status %d", w.Code)
+			}
+		}
+		return
+	}
+
+	// User A exhausts their budget.
+	okA, limitedA := sendN(burst*2, "Impersonate-User", "user-a")
+	if okA != burst {
+		t.Errorf("user-a ok = %d, want %d", okA, burst)
+	}
+	if limitedA != burst {
+		t.Errorf("user-a limited = %d, want %d", limitedA, burst)
+	}
+
+	// User B has an independent budget — none of A's requests should affect B.
+	okB, limitedB := sendN(burst, "Impersonate-User", "user-b")
+	if okB != burst {
+		t.Errorf("user-b ok = %d, want %d (A's exhausted budget must not affect B)", okB, burst)
+	}
+	if limitedB != 0 {
+		t.Errorf("user-b limited = %d, want 0", limitedB)
+	}
+}
+
+func TestUserRateLimiter_KeyPrecedence(t *testing.T) {
+	// Verify that the key falls through: Impersonate-User > Bearer token > IP.
+	// We use burst=1 so a second identical-key request is always rejected, and
+	// a different-key request is always accepted.
+	const burst = 1
+
+	tests := []struct {
+		name        string
+		impersonate string
+		auth        string
+		// Two requests with the same headers: first must be 200, second must be 429.
+	}{
+		{name: "impersonate header takes priority over bearer", impersonate: "alice", auth: "Bearer tok-alice"},
+		{name: "bearer token used when no impersonate header", impersonate: "", auth: "Bearer tok-bob"},
+		{name: "full auth header value used when not bearer prefix", impersonate: "", auth: "Basic dXNlcjpwYXNz"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset by creating a fresh router for each sub-test.
+			r := gin.New()
+			r.GET("/log", UserRateLimiter(float64(burst), burst), func(c *gin.Context) {
+				c.Status(http.StatusOK)
+			})
+			doReq := func() int {
+				w := httptest.NewRecorder()
+				req := httptest.NewRequest(http.MethodGet, "/log", nil)
+				if tt.impersonate != "" {
+					req.Header.Set("Impersonate-User", tt.impersonate)
+				}
+				if tt.auth != "" {
+					req.Header.Set("Authorization", tt.auth)
+				}
+				r.ServeHTTP(w, req)
+				return w.Code
+			}
+			if got := doReq(); got != http.StatusOK {
+				t.Errorf("%s: first request = %d, want 200", tt.name, got)
+			}
+			if got := doReq(); got != http.StatusTooManyRequests {
+				t.Errorf("%s: second request = %d, want 429", tt.name, got)
+			}
+		})
+	}
+
+	// Confirm Impersonate-User beats Authorization: same token but different
+	// impersonate values should give each their own bucket.
+	r2 := gin.New()
+	r2.GET("/log", UserRateLimiter(float64(burst), burst), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	sendWith := func(impersonate, auth string) int {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/log", nil)
+		if impersonate != "" {
+			req.Header.Set("Impersonate-User", impersonate)
+		}
+		if auth != "" {
+			req.Header.Set("Authorization", auth)
+		}
+		r2.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	if got := sendWith("alice", "Bearer shared-token"); got != http.StatusOK {
+		t.Errorf("alice first = %d, want 200", got)
+	}
+	// alice's bucket is now empty; bob uses same bearer but different impersonate — fresh bucket.
+	if got := sendWith("bob", "Bearer shared-token"); got != http.StatusOK {
+		t.Errorf("bob first (same bearer, different impersonate) = %d, want 200", got)
+	}
+	// alice's second request must be rejected.
+	if got := sendWith("alice", "Bearer shared-token"); got != http.StatusTooManyRequests {
+		t.Errorf("alice second = %d, want 429", got)
+	}
+}
+
 func TestGetRateLimitConfig(t *testing.T) {
 	tests := []struct {
 		name    string

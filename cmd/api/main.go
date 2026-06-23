@@ -59,20 +59,30 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 		"/readyz": "DEBUG",
 	}}))
 
-	rateLimits := middleware.GetRateLimitConfig()
+	rateLimits, err := middleware.GetRateLimitConfig()
+	if err != nil {
+		slog.Error("Could not get rate limit config", "error", err.Error())
+		os.Exit(1)
+	}
 
 	apiGroup := router.Group("/api")
 	apisGroup := router.Group("/apis")
 	groups := [...]*gin.RouterGroup{apisGroup, apiGroup}
 
+	overallRL := middleware.RateLimiter(rateLimits.OverallRPS, rateLimits.OverallBurst)
+	overallCL := middleware.ConcurrentLimiter(rateLimits.MaxConcurrent)
+	logRL := middleware.RateLimiter(rateLimits.LogRPS, rateLimits.LogBurst)
+	logCL := middleware.ConcurrentLimiter(rateLimits.MaxConcurrentLog)
+
 	rateLimitMiddleware := []gin.HandlerFunc{
-		middleware.RateLimiter(rateLimits.LogRPS, rateLimits.LogBurst),
-		middleware.ConcurrentLimiter(rateLimits.MaxConcurrentLog),
+		logRL,
+		logCL,
 	}
+
 	// Set up middleware for each group
 	for _, group := range groups {
 		group.Use(gzip.Gzip(gzip.DefaultCompression))
-		group.Use(middleware.RateLimiter(rateLimits.OverallRPS, rateLimits.OverallBurst))
+		group.Use(overallRL)
 		group.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews(), cache,
 			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 		group.Use(auth.Impersonation(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache,
@@ -81,7 +91,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 		group.Use(auth.RBACAuthorization(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache,
 			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 		group.Use(pagination.Middleware())
-		group.Use(middleware.ConcurrentLimiter(rateLimits.MaxConcurrent))
+		group.Use(overallCL)
 	}
 
 	router.GET("/livez", controller.Livez)

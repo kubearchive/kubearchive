@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -26,9 +27,6 @@ const (
 	maxConcurrentLogRequestsEnvVar = "API_MAX_CONCURRENT_LOG_REQUESTS"
 )
 
-var rateLimiter gin.HandlerFunc = nil
-var concurrentLimiter gin.HandlerFunc = nil
-
 // RateLimitConfig holds the configuration for the API rate limiters.
 type RateLimitConfig struct {
 	OverallRPS       float64
@@ -42,37 +40,31 @@ type RateLimitConfig struct {
 // RateLimiter returns middleware that enforces a token-bucket rate limit.
 // Requests exceeding the limit are rejected immediately with 429.
 func RateLimiter(rps float64, burst int) gin.HandlerFunc {
-	if rateLimiter == nil {
-		limiter := rate.NewLimiter(rate.Limit(rps), burst)
-		rateLimiter = func(c *gin.Context) {
-			if !limiter.Allow() {
-				abort.Abort(c, errors.New("too many requests"), http.StatusTooManyRequests)
-				return
-			}
-			c.Next()
+	limiter := rate.NewLimiter(rate.Limit(rps), burst)
+	return func(c *gin.Context) {
+		if !limiter.Allow() {
+			abort.Abort(c, errors.New("too many requests"), http.StatusTooManyRequests)
+			return
 		}
+		c.Next()
 	}
-	return rateLimiter
 }
 
 // ConcurrentLimiter returns middleware that enforces a maximum number of
 // in-flight requests using a semaphore channel. Requests that arrive when
 // the semaphore is full are rejected immediately with 429.
 func ConcurrentLimiter(max int) gin.HandlerFunc {
-	if concurrentLimiter == nil {
-		sem := make(chan struct{}, max)
-		concurrentLimiter = func(c *gin.Context) {
-			select {
-			case sem <- struct{}{}:
-			default:
-				abort.Abort(c, errors.New("too many requests"), http.StatusTooManyRequests)
-				return
-			}
-			defer func() { <-sem }()
-			c.Next()
+	sem := make(chan struct{}, max)
+	return func(c *gin.Context) {
+		select {
+		case sem <- struct{}{}:
+		default:
+			abort.Abort(c, errors.New("too many requests"), http.StatusTooManyRequests)
+			return
 		}
+		defer func() { <-sem }()
+		c.Next()
 	}
-	return concurrentLimiter
 }
 
 // sanitizeLogValue strips newline and carriage-return characters from s to
@@ -87,9 +79,13 @@ func getEnvFloat64(envVar string, defaultVal float64) float64 {
 	result := defaultVal
 	if v := os.Getenv(envVar); v != "" {
 		if r, err := strconv.ParseFloat(v, 64); err == nil {
+			if math.IsInf(r, 0) || math.IsNaN(r) {
+				slog.Warn("Invalid float value for env var, using default", "var", envVar, "value", v)
+				result = defaultVal
+			}
 			result = r
 		} else {
-			slog.Warn("Could not parse env var, using default", "var", defaultVal, "value", sanitizeLogValue(v))
+			slog.Warn("Could not parse env var, using default", "var", envVar, "value", sanitizeLogValue(v))
 			result = defaultVal
 		}
 	}
@@ -102,14 +98,14 @@ func getEnvInt(envVar string, defaultVal int) int {
 		if r, err := strconv.Atoi(v); err == nil {
 			result = r
 		} else {
-			slog.Warn("Could not parse env var, using default", "var", defaultVal, "value", sanitizeLogValue(v))
+			slog.Warn("Could not parse env var, using default", "var", envVar, "value", sanitizeLogValue(v))
 			result = defaultVal
 		}
 	}
 	return result
 }
 
-func GetRateLimitConfig() RateLimitConfig {
+func GetRateLimitConfig() (RateLimitConfig, error) {
 	// Rate limits sized as last line of defense after HAProxy route limiting (60 conn/sec)
 	// and DB connection pooling (SetMaxOpenConns=10). Defaults allow legitimate CI/CD bursts
 	// (incident: 8 builds = 824 events/sec) while preventing resource exhaustion from
@@ -134,9 +130,10 @@ func GetRateLimitConfig() RateLimitConfig {
 	if cfg.OverallRPS <= 0 || cfg.LogRPS <= 0 ||
 		cfg.OverallBurst <= 0 || cfg.LogBurst <= 0 ||
 		cfg.MaxConcurrent <= 0 || cfg.MaxConcurrentLog <= 0 {
+
 		slog.Error("Invalid rate limit configuration: all values must be positive")
-		os.Exit(1)
+		return RateLimitConfig{}, errors.New("invalid rate limit configuration: all values must be positive")
 	}
 
-	return cfg
+	return cfg, nil
 }

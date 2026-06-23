@@ -354,7 +354,7 @@ func TestGetRateLimitConfig(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			got := GetRateLimitConfig()
+			got, _ := GetRateLimitConfig()
 
 			if got.OverallRPS != tt.want.OverallRPS {
 				t.Errorf("GetRateLimitConfig() OverallRPS = %v, want %v", got.OverallRPS, tt.want.OverallRPS)

@@ -71,7 +71,7 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 
 	overallRL := middleware.RateLimiter(rateLimits.OverallRPS, rateLimits.OverallBurst)
 	overallCL := middleware.ConcurrentLimiter(rateLimits.MaxConcurrent)
-	logRL := middleware.RateLimiter(rateLimits.LogRPS, rateLimits.LogBurst)
+	logRL := middleware.UserRateLimiter(rateLimits.LogRPS, rateLimits.LogBurst)
 	logCL := middleware.ConcurrentLimiter(rateLimits.MaxConcurrentLog)
 
 	rateLimitMiddleware := []gin.HandlerFunc{

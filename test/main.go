@@ -328,7 +328,7 @@ func makeHTTPRequest(t testing.TB, token string, url string, extraHeaders map[st
 		}
 	}
 
-	response, err := client.Do(request)
+	response, err := client.Do(request) //nolint:gosec // G704: URL constructed for tests
 	if err != nil {
 		t.Logf("Could not get an HTTP response, %s", err)
 		return nil, err

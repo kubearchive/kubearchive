@@ -136,12 +136,11 @@ func getEnvFloat64(envVar string, defaultVal float64) float64 {
 		if r, err := strconv.ParseFloat(v, 64); err == nil {
 			if math.IsInf(r, 0) || math.IsNaN(r) {
 				slog.Warn("Invalid float value for env var, using default", "var", envVar, "value", v)
-				result = defaultVal
+			} else {
+				result = r
 			}
-			result = r
 		} else {
 			slog.Warn("Could not parse env var, using default", "var", envVar, "value", sanitizeLogValue(v))
-			result = defaultVal
 		}
 	}
 	return result
@@ -154,7 +153,6 @@ func getEnvInt(envVar string, defaultVal int) int {
 			result = r
 		} else {
 			slog.Warn("Could not parse env var, using default", "var", envVar, "value", sanitizeLogValue(v))
-			result = defaultVal
 		}
 	}
 	return result

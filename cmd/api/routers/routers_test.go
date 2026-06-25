@@ -911,12 +911,12 @@ func (s *slowDBReader) QueryLogURLByUID(ctx context.Context, _, _, _, _, _ strin
 	return nil, s.block(ctx)
 }
 
-func (s *slowDBReader) Ping(_ context.Context) error                    { return nil }
+func (s *slowDBReader) Ping(_ context.Context) error { return nil }
 func (s *slowDBReader) QueryDatabaseSchemaVersion(_ context.Context) (string, error) {
 	return "", nil
 }
-func (s *slowDBReader) CloseDB() error                  { return nil }
-func (s *slowDBReader) Init(_ map[string]string) error  { return nil }
+func (s *slowDBReader) CloseDB() error                 { return nil }
+func (s *slowDBReader) Init(_ map[string]string) error { return nil }
 
 // setupRouterWithTimeout creates a test router backed by db and applies queryTimeout.
 func setupRouterWithTimeout(db interfaces.DBReader, core bool, queryTimeout time.Duration) *gin.Engine {

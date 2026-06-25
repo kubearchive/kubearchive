@@ -126,9 +126,9 @@ func (c *Controller) GetResources(context *gin.Context) {
 			abort.Abort(context, errors.New("cannot use 'continue' with 'count'"), http.StatusBadRequest)
 			return
 		}
-		queryCtx, cancel, err := c.queryContext(context.Request.Context())
-		if err != nil {
-			abort.Abort(context, err, http.StatusGatewayTimeout)
+		queryCtx, cancel, queryErr := c.queryContext(context.Request.Context())
+		if queryErr != nil {
+			abort.Abort(context, queryErr, http.StatusGatewayTimeout)
 			return
 		}
 		defer cancel()
@@ -145,9 +145,9 @@ func (c *Controller) GetResources(context *gin.Context) {
 
 	// Single resource by exact name - no streaming needed
 	if name != "" && !strings.Contains(name, "*") {
-		queryCtx, cancel, err := c.queryContext(context.Request.Context())
-		if err != nil {
-			abort.Abort(context, err, http.StatusGatewayTimeout)
+		queryCtx, cancel, queryErr := c.queryContext(context.Request.Context())
+		if queryErr != nil {
+			abort.Abort(context, queryErr, http.StatusGatewayTimeout)
 			return
 		}
 		defer cancel()

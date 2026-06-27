@@ -45,7 +45,7 @@ func TestGetAPIResource(t *testing.T) {
 	validVersion := testAPIResourceList[0].APIResources[0].Version
 	validResource := testAPIResourceList[0].APIResources[0].Name
 
-	k8sClient := fakeK8s.NewSimpleClientset()
+	k8sClient := fakeK8s.NewSimpleClientset() //nolint:staticcheck // See https://github.com/kubernetes/kubernetes/issues/126850
 	k8sClient.Resources = testAPIResourceList
 
 	tests := []struct {

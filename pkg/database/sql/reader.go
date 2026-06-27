@@ -138,16 +138,16 @@ func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion,
 	return db.performResourceQuery(ctx, sb)
 }
 
-func (db *sqlDatabaseImpl) StreamResources(ctx context.Context, kind, apiVersion, namespace, name,
+func (db *sqlDatabaseImpl) StreamResources(queryCtx, iterCtx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *models.LabelFilters,
 	creationTimestampAfter, creationTimestampBefore *time.Time, limit int,
 	fn func(resource models.Resource) error) error {
-	sb, err := db.buildResourceListQuery(ctx, kind, apiVersion, namespace, name,
+	sb, err := db.buildResourceListQuery(queryCtx, kind, apiVersion, namespace, name,
 		continueId, continueDate, labelFilters, creationTimestampAfter, creationTimestampBefore, limit)
 	if err != nil {
 		return err
 	}
-	return newQueryPerformer[models.Resource](db.db, db.flavor).performStreamQuery(ctx, sb, fn)
+	return newQueryPerformer[models.Resource](db.db, db.flavor).performStreamQuery(queryCtx, iterCtx, sb, fn)
 }
 
 type uuidKindDate struct {

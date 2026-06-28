@@ -41,7 +41,7 @@ type Controller struct {
 // immediately if the parent context is already expired.
 func (c *Controller) queryContext(ctx context.Context) (context.Context, context.CancelFunc, error) {
 	if c.QueryTimeout <= 0 {
-		return ctx, func() {}, nil
+		return ctx, func() {}, errors.New("Query timeout must be greater than zero")
 	}
 	newCtx, cancel := context.WithTimeout(ctx, c.QueryTimeout)
 	return newCtx, cancel, nil

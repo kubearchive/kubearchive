@@ -40,8 +40,8 @@ type Controller struct {
 // stream results can pass it solely to the initial cursor-open call; returns DeadlineExceeded
 // immediately if the parent context is already expired.
 func (c *Controller) queryContext(ctx context.Context) (context.Context, context.CancelFunc, error) {
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return nil, func() {}, context.DeadlineExceeded
+	if c.QueryTimeout <= 0 {
+		return ctx, func() {}, nil
 	}
 	newCtx, cancel := context.WithTimeout(ctx, c.QueryTimeout)
 	return newCtx, cancel, nil
@@ -135,6 +135,7 @@ func (c *Controller) GetResources(context *gin.Context) {
 		count, countErr := c.Database.CountResources(
 			queryCtx, kind, apiVersion, namespace, name, labelFilters,
 			creationTimestampAfter, creationTimestampBefore)
+
 		if countErr != nil {
 			abort.Abort(context, countErr, http.StatusInternalServerError)
 			return

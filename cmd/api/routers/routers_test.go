@@ -43,10 +43,10 @@ func retrieveLogURL(c *gin.Context) {
 	c.JSON(http.StatusOK, fmt.Sprintf("%s-%s-%s-%s-%s-%s-%s", record.URL, record.Query, record.Start, record.End, record.PodName, record.PodUUID, record.ContainerName))
 }
 
-// setupRouter set up the router the same way that NewServer does without the middleware
-func setupRouter(db interfaces.DBReader, core bool) *gin.Engine {
+// buildRouter constructs a gin.Engine wired to ctrl with the standard test routes.
+// setupRouter and setupRouterWithTimeout are thin wrappers around this function.
+func buildRouter(ctrl Controller, core bool) *gin.Engine {
 	router := gin.Default()
-	ctrl := Controller{Database: db}
 	router.Use(func(c *gin.Context) {
 		if core {
 			c.Set("apiResourceKind", "Pod")
@@ -54,7 +54,6 @@ func setupRouter(db interfaces.DBReader, core bool) *gin.Engine {
 			c.Set("apiResourceKind", "Crontab")
 		}
 	})
-
 	router.Use(pagination.Middleware())
 	router.GET("/apis/:group/:version/:resourceType", ctrl.GetResources)
 	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType", ctrl.GetResources)
@@ -73,6 +72,11 @@ func setupRouter(db interfaces.DBReader, core bool) *gin.Engine {
 	router.GET("/api/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
 		ctrl.GetLogURL, retrieveLogURL)
 	return router
+}
+
+// setupRouter sets up the router the same way that NewServer does without the middleware.
+func setupRouter(db interfaces.DBReader, core bool) *gin.Engine {
+	return buildRouter(Controller{Database: db}, core)
 }
 
 func TestLabelSelectorQueryParameter(t *testing.T) {
@@ -920,33 +924,7 @@ func (s *slowDBReader) Init(_ map[string]string) error { return nil }
 
 // setupRouterWithTimeout creates a test router backed by db and applies queryTimeout.
 func setupRouterWithTimeout(db interfaces.DBReader, core bool, queryTimeout time.Duration) *gin.Engine {
-	router := gin.Default()
-	ctrl := Controller{Database: db, QueryTimeout: queryTimeout}
-	router.Use(func(c *gin.Context) {
-		if core {
-			c.Set("apiResourceKind", "Pod")
-		} else {
-			c.Set("apiResourceKind", "Crontab")
-		}
-	})
-	router.Use(pagination.Middleware())
-	router.GET("/apis/:group/:version/:resourceType", ctrl.GetResources)
-	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType", ctrl.GetResources)
-	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/:name", ctrl.GetResources)
-	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/uid/:uid", ctrl.GetResourceByUID)
-	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/:name/log",
-		ctrl.GetLogURL, retrieveLogURL)
-	router.GET("/apis/:group/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
-		ctrl.GetLogURL, retrieveLogURL)
-	router.GET("/api/:version/:resourceType", ctrl.GetResources)
-	router.GET("/api/:version/namespaces/:namespace/:resourceType", ctrl.GetResources)
-	router.GET("/api/:version/namespaces/:namespace/:resourceType/:name", ctrl.GetResources)
-	router.GET("/api/:version/namespaces/:namespace/:resourceType/uid/:uid", ctrl.GetResourceByUID)
-	router.GET("/api/:version/namespaces/:namespace/:resourceType/:name/log",
-		ctrl.GetLogURL, retrieveLogURL)
-	router.GET("/api/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
-		ctrl.GetLogURL, retrieveLogURL)
-	return router
+	return buildRouter(Controller{Database: db, QueryTimeout: queryTimeout}, core)
 }
 
 // TestQueryTimeout verifies that Controller.QueryTimeout causes DB-bound handlers

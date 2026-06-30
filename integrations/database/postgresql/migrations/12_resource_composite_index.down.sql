@@ -1,1 +1,0 @@
-DROP INDEX IF EXISTS idx_resource_kind_apiversion_ns_ts_id;

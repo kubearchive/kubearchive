@@ -17,11 +17,11 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/google/cel-go v0.28.1
 	github.com/google/uuid v1.6.0
-	github.com/huandu/go-sqlbuilder v1.41.0
+	github.com/huandu/go-sqlbuilder v1.42.1
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.12.3
 	github.com/ohler55/ojg v1.28.1
-	github.com/onsi/ginkgo/v2 v2.31.0
+	github.com/onsi/ginkgo/v2 v2.32.0
 	github.com/onsi/gomega v1.40.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10

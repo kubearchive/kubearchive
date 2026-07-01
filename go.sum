@@ -186,8 +186,8 @@ github.com/huandu/go-assert v1.1.6 h1:oaAfYxq9KNDi9qswn/6aE0EydfxSa+tWZC1KabNitY
 github.com/huandu/go-assert v1.1.6/go.mod h1:JuIfbmYG9ykwvuxoJ3V8TB5QP+3+ajIA54Y44TmkMxs=
 github.com/huandu/go-clone v1.7.3 h1:rtQODA+ABThEn6J5LBTppJfKmZy/FwfpMUWa8d01TTQ=
 github.com/huandu/go-clone v1.7.3/go.mod h1:ReGivhG6op3GYr+UY3lS6mxjKp7MIGTknuU5TbTVaXE=
-github.com/huandu/go-sqlbuilder v1.41.0 h1:oWa6DOKkyRf/oYWrAA5tyEyolDJg39oTTf0+FYy94/E=
-github.com/huandu/go-sqlbuilder v1.41.0/go.mod h1:zdONH67liL+/TvoUMwnZP/sUYGSSvHh9psLe/HpXn8E=
+github.com/huandu/go-sqlbuilder v1.42.1 h1:9DVQbKg1uFNGaVqgWMpaBNkM3Fv58p2m/+AxWkTrCYc=
+github.com/huandu/go-sqlbuilder v1.42.1/go.mod h1:BEm32AHl29lzKDeV3HAIkzrz9cgRyumkDohHeGYYBoM=
 github.com/huandu/xstrings v1.5.0 h1:2ag3IFq9ZDANvthTwTiqSSZLjDc+BedvHPAp5tJy2TI=
 github.com/huandu/xstrings v1.5.0/go.mod h1:y5/lhBue+AyNmUVz9RLU9xbLR0o4KIIExikq4ovT0aE=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
@@ -255,8 +255,8 @@ github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f h1:y5//uYreIhSUg3J
 github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f/go.mod h1:ZdcZmHo+o7JKHSa8/e818NopupXU1YMK5fe1lsApnBw=
 github.com/ohler55/ojg v1.28.1 h1:Xy93DelhLSZNeWv8GPKtP6qMqkUlZlAxBP/AQcC5RfY=
 github.com/ohler55/ojg v1.28.1/go.mod h1:/Y5dGWkekv9ocnUixuETqiL58f+5pAsUfg5P8e7Pa2o=
-github.com/onsi/ginkgo/v2 v2.31.0 h1:GtuJos5DFUV9EerYJo8RhYxosYNGvOdDE5haKq6Grfs=
-github.com/onsi/ginkgo/v2 v2.31.0/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
+github.com/onsi/ginkgo/v2 v2.32.0 h1:Hw7s2pVrQo/8Yz5N77qdnpHaoc+c6cC9WIV1Jce+J6E=
+github.com/onsi/ginkgo/v2 v2.32.0/go.mod h1:+aXOY+vzZ5mu2iI2HpTZUPmM//oQfsNFX6gU9kNcA44=
 github.com/onsi/gomega v1.40.0 h1:Vtol0e1MghCD2ZVIilPDIg44XSL9l2QAn8ZNaljWcJc=
 github.com/onsi/gomega v1.40.0/go.mod h1:M/Uqpu/8qTjtzCLUA2zJHX9Iilrau25x1PdoSRbWh5A=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=

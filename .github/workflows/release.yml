@@ -17,7 +17,7 @@ jobs:
       contents: write
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ssh-key: ${{ secrets.PUSH_TO_MAIN_DEPLOY_KEY }}
       # Checkout 'fetch-tags' does not work properly, see https://github.com/actions/checkout/issues/701
@@ -28,7 +28,7 @@ jobs:
         with:
           go-version: '1.25.5'
       - name: Install ko
-        uses: ko-build/setup-ko@v0.9
+        uses: ko-build/setup-ko@v0.10
       - name: Install 'release-notes'
         run: |
           curl -Lo ./release-notes https://github.com/kubernetes/release/releases/download/v0.17.1/release-notes-amd64-linux

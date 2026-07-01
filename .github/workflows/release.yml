@@ -28,7 +28,7 @@ jobs:
         with:
           go-version: '1.25.5'
       - name: Install ko
-        uses: ko-build/setup-ko@v0.9
+        uses: ko-build/setup-ko@v0.10
       - name: Install 'release-notes'
         run: |
           curl -Lo ./release-notes https://github.com/kubernetes/release/releases/download/v0.17.1/release-notes-amd64-linux

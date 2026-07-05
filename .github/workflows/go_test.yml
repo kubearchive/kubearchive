@@ -38,7 +38,7 @@ jobs:
           export KUBEBUILDER_ASSETS=${PWD}/`cmd/operator/bin/setup-envtest use --bin-dir cmd/operator/bin -p path`
           go test -v -coverprofile=coverage.out -covermode=atomic ./...
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           use_oidc: true
           flags: unit-tests

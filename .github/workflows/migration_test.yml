@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
@@ -39,7 +39,7 @@ jobs:
           chmod +x ./kind
           sudo mv kind /usr/local/bin
       - name: Install ko
-        uses: ko-build/setup-ko@v0.9
+        uses: ko-build/setup-ko@v0.10
       - name: Create KinD cluster
         run: kind create cluster
       - name: Install PostgreSQL and run initial migration

@@ -102,6 +102,27 @@ func (c *Controller) GetResources(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
+	// Count-only request
+	if context.Query("count") == "true" {
+		if context.Query("limit") != "" {
+			abort.Abort(context, errors.New("cannot use 'limit' with 'count'"), http.StatusBadRequest)
+			return
+		}
+		if context.Query("continue") != "" {
+			abort.Abort(context, errors.New("cannot use 'continue' with 'count'"), http.StatusBadRequest)
+			return
+		}
+		count, countErr := c.Database.CountResources(
+			context.Request.Context(), kind, apiVersion, namespace, name, labelFilters,
+			creationTimestampAfter, creationTimestampBefore)
+		if countErr != nil {
+			abort.Abort(context, countErr, http.StatusInternalServerError)
+			return
+		}
+		context.JSON(http.StatusOK, gin.H{"count": count})
+		return
+	}
+
 	// Single resource by exact name - no streaming needed
 	if name != "" && !strings.Contains(name, "*") {
 		var resources []labelFilter.Resource

@@ -1,0 +1,32 @@
+# Copyright KubeArchive Authors
+# SPDX-License-Identifier: Apache-2.0
+---
+name: "AGENTS.md quarterly review reminder"
+on:
+  schedule:
+    - cron: '0 9 1 1,4,7,10 *'
+  workflow_dispatch:
+
+jobs:
+  open-review-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Check for existing open issue
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          open=$(gh issue list --repo "${{ github.repository }}" --state open --search "AGENTS.md quarterly review" --json number --jq 'length')
+          echo "open_count=$open" >> "$GITHUB_OUTPUT"
+
+      - name: Create review issue
+        if: steps.check.outputs.open_count == '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create --repo "${{ github.repository }}" \
+            --title "AGENTS.md quarterly review" \
+            --body "It's time for the quarterly review of \`AGENTS.md\`. Please verify that the file is still accurate and up to date with the current state of the repository." \
+            --label "kind/documentation"

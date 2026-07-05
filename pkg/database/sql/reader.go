@@ -43,47 +43,88 @@ func (db *sqlDatabaseImpl) QueryResourceByUID(ctx context.Context, kind, apiVers
 	return &resources[0], nil
 }
 
+// applyResourceFilters applies common filters (kind, namespace, name, timestamps, labels)
+// to a select builder. Returns true if the query targets multiple resources (list or wildcard),
+// false for an exact single-resource lookup.
+func (db *sqlDatabaseImpl) applyResourceFilters(ctx context.Context, sb *sqlbuilder.SelectBuilder,
+	kind, apiVersion, namespace, name string, labelFilters *models.LabelFilters,
+	creationTimestampAfter, creationTimestampBefore *time.Time) (bool, error) {
+	sb.Where(db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion))
+	if namespace != "" {
+		sb.Where(db.filter.NamespaceFilter(sb.Cond, namespace))
+	}
+
+	isListQuery := false
+	if name != "" {
+		if strings.Contains(name, "*") {
+			sqlPattern := strings.ReplaceAll(name, "*", "%")
+			sb.Where(db.filter.NameWildcardFilter(sb.Cond, sqlPattern))
+			isListQuery = true
+		} else {
+			sb.Where(db.filter.NameFilter(sb.Cond, name))
+		}
+	} else {
+		isListQuery = true
+	}
+
+	if creationTimestampAfter != nil {
+		sb.Where(db.filter.CreationTimestampAfterFilter(sb.Cond, *creationTimestampAfter))
+	}
+	if creationTimestampBefore != nil {
+		sb.Where(db.filter.CreationTimestampBeforeFilter(sb.Cond, *creationTimestampBefore))
+	}
+	if !labelFilters.IsEmpty() {
+		if err := db.filter.ApplyLabelFilters(ctx, db.db, sb, labelFilters); err != nil {
+			return false, err
+		}
+	}
+
+	return isListQuery, nil
+}
+
 // buildResourceListQuery builds the SQL select query for listing resources.
 // This is shared between QueryResources and StreamResources.
 func (db *sqlDatabaseImpl) buildResourceListQuery(ctx context.Context, kind, apiVersion, namespace, name,
 	continueId, continueDate string, labelFilters *models.LabelFilters,
 	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) (*sqlbuilder.SelectBuilder, error) {
 	sb := db.selector.ResourceSelector()
-	sb.Where(db.filter.KindApiVersionFilter(sb.Cond, kind, apiVersion))
-	if namespace != "" {
-		sb.Where(db.filter.NamespaceFilter(sb.Cond, namespace))
+	isListQuery, err := db.applyResourceFilters(ctx, sb, kind, apiVersion, namespace, name,
+		labelFilters, creationTimestampAfter, creationTimestampBefore)
+	if err != nil {
+		return nil, err
 	}
-
-	isWildcardQuery := false
-	if name != "" {
-		if strings.Contains(name, "*") {
-			sqlPattern := strings.ReplaceAll(name, "*", "%")
-			sb.Where(db.filter.NameWildcardFilter(sb.Cond, sqlPattern))
-			isWildcardQuery = true
-		} else {
-			sb.Where(db.filter.NameFilter(sb.Cond, name))
-		}
-	}
-
-	if name == "" || isWildcardQuery {
+	if isListQuery {
 		if continueId != "" && continueDate != "" {
 			sb.Where(db.filter.CreationTSAndIDFilter(sb.Cond, continueDate, continueId))
-		}
-		if creationTimestampAfter != nil {
-			sb.Where(db.filter.CreationTimestampAfterFilter(sb.Cond, *creationTimestampAfter))
-		}
-		if creationTimestampBefore != nil {
-			sb.Where(db.filter.CreationTimestampBeforeFilter(sb.Cond, *creationTimestampBefore))
-		}
-		if !labelFilters.IsEmpty() {
-			if err := db.filter.ApplyLabelFilters(ctx, db.db, sb, labelFilters); err != nil {
-				return nil, err
-			}
 		}
 		sb = db.sorter.CreationTSAndIDSorter(sb)
 		sb.Limit(limit)
 	}
 	return sb, nil
+}
+
+// buildResourceCountQuery builds the SQL count query for counting matching resources.
+func (db *sqlDatabaseImpl) buildResourceCountQuery(ctx context.Context, kind, apiVersion, namespace, name string,
+	labelFilters *models.LabelFilters,
+	creationTimestampAfter, creationTimestampBefore *time.Time) (*sqlbuilder.SelectBuilder, error) {
+	sb := db.selector.ResourceCountSelector()
+	_, err := db.applyResourceFilters(ctx, sb, kind, apiVersion, namespace, name,
+		labelFilters, creationTimestampAfter, creationTimestampBefore)
+	if err != nil {
+		return nil, err
+	}
+	return sb, nil
+}
+
+func (db *sqlDatabaseImpl) CountResources(ctx context.Context, kind, apiVersion, namespace, name string,
+	labelFilters *models.LabelFilters,
+	creationTimestampAfter, creationTimestampBefore *time.Time) (int64, error) {
+	sb, err := db.buildResourceCountQuery(ctx, kind, apiVersion, namespace, name,
+		labelFilters, creationTimestampAfter, creationTimestampBefore)
+	if err != nil {
+		return 0, err
+	}
+	return newQueryPerformer[int64](db.db, db.flavor).performSingleRowQuery(ctx, sb)
 }
 
 func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,

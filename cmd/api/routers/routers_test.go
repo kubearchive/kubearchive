@@ -778,3 +778,90 @@ func TestTimestampValidationErrorMessages(t *testing.T) {
 		})
 	}
 }
+
+func TestCountResources(t *testing.T) {
+	tests := []struct {
+		name          string
+		api           string
+		isCore        bool
+		expectedCode  int
+		expectedCount int64
+	}{
+		{
+			name:          "count non-core resources",
+			api:           "/apis/stable.example.com/v1/namespaces/test/crontabs?count=true",
+			isCore:        false,
+			expectedCode:  http.StatusOK,
+			expectedCount: int64(len(nonCoreResources)),
+		},
+		{
+			name:          "count core resources",
+			api:           "/api/v1/namespaces/test/pods?count=true",
+			isCore:        true,
+			expectedCode:  http.StatusOK,
+			expectedCount: int64(len(coreResources)),
+		},
+		{
+			name:          "count with no matching resources",
+			api:           "/apis/stable.example.com/v1/namespaces/nonexistent/crontabs?count=true",
+			isCore:        false,
+			expectedCode:  http.StatusOK,
+			expectedCount: 0,
+		},
+		{
+			name:          "count with label selector",
+			api:           "/apis/stable.example.com/v1/namespaces/test/crontabs?count=true&labelSelector=app%3Dtest",
+			isCore:        false,
+			expectedCode:  http.StatusOK,
+			expectedCount: int64(len(nonCoreResources)),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), tt.isCore)
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tt.api, nil)
+			router.ServeHTTP(res, req)
+
+			assert.Equal(t, tt.expectedCode, res.Code)
+			var response map[string]int64
+			err := json.NewDecoder(res.Body).Decode(&response)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.expectedCount, response["count"])
+		})
+	}
+}
+
+func TestCountResourcesWithError(t *testing.T) {
+	router := setupRouter(fake.NewFakeDatabaseWithError(errors.New("database error")), false)
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/apis/stable.example.com/v1/namespaces/test/crontabs?count=true", nil)
+	router.ServeHTTP(res, req)
+	assert.Equal(t, http.StatusInternalServerError, res.Code)
+}
+
+func TestCountResourcesWithInvalidParams(t *testing.T) {
+	router := setupRouter(fake.NewFakeDatabase(testResources, testLogUrls), false)
+	tests := []struct {
+		name string
+		api  string
+	}{
+		{
+			name: "count with limit",
+			api:  "/apis/stable.example.com/v1/namespaces/test/crontabs?count=true&limit=10",
+		},
+		{
+			name: "count with continue",
+			api:  "/apis/stable.example.com/v1/namespaces/test/crontabs?count=true&continue=MSAyMDI1LTAxLTAxVDAwOjAwOjAwWg==",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tt.api, nil)
+			router.ServeHTTP(res, req)
+			assert.Equal(t, http.StatusBadRequest, res.Code)
+		})
+	}
+}

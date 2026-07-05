@@ -481,7 +481,10 @@ func TestGetRateLimitConfig(t *testing.T) {
 				t.Setenv(k, v)
 			}
 
-			got, _ := GetRateLimitConfig()
+			got, err := GetRateLimitConfig()
+			if err != nil {
+				t.Fatalf("GetRateLimitConfig() unexpected error = %v", err)
+			}
 
 			if got.OverallRPS != tt.want.OverallRPS {
 				t.Errorf("GetRateLimitConfig() OverallRPS = %v, want %v", got.OverallRPS, tt.want.OverallRPS)
@@ -500,6 +503,163 @@ func TestGetRateLimitConfig(t *testing.T) {
 			}
 			if got.MaxConcurrentLog != tt.want.MaxConcurrentLog {
 				t.Errorf("GetRateLimitConfig() MaxConcurrentLog = %v, want %v", got.MaxConcurrentLog, tt.want.MaxConcurrentLog)
+			}
+		})
+	}
+}
+
+func TestGetRateLimitConfig_InvalidValues(t *testing.T) {
+	tests := []struct {
+		name    string
+		envVars map[string]string
+		wantErr bool
+	}{
+		{
+			name: "zero OverallRPS",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_OVERALL_RPS": "0",
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative OverallRPS",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_OVERALL_RPS": "-10",
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero LogRPS",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_LOG_RPS": "0",
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative LogRPS",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_LOG_RPS": "-5",
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero OverallBurst",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_OVERALL_BURST": "0",
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative OverallBurst",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_OVERALL_BURST": "-100",
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero LogBurst",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_LOG_BURST": "0",
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative LogBurst",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_LOG_BURST": "-50",
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero MaxConcurrent",
+			envVars: map[string]string{
+				"API_MAX_CONCURRENT_REQUESTS": "0",
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative MaxConcurrent",
+			envVars: map[string]string{
+				"API_MAX_CONCURRENT_REQUESTS": "-200",
+			},
+			wantErr: true,
+		},
+		{
+			name: "zero MaxConcurrentLog",
+			envVars: map[string]string{
+				"API_MAX_CONCURRENT_LOG_REQUESTS": "0",
+			},
+			wantErr: true,
+		},
+		{
+			name: "negative MaxConcurrentLog",
+			envVars: map[string]string{
+				"API_MAX_CONCURRENT_LOG_REQUESTS": "-20",
+			},
+			wantErr: true,
+		},
+		{
+			name: "multiple invalid values",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_OVERALL_RPS":      "-100",
+				"API_RATE_LIMIT_LOG_RPS":          "0",
+				"API_MAX_CONCURRENT_LOG_REQUESTS": "-5",
+			},
+			wantErr: true,
+		},
+		{
+			name: "all values zero",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_OVERALL_RPS":      "0",
+				"API_RATE_LIMIT_LOG_RPS":          "0",
+				"API_RATE_LIMIT_OVERALL_BURST":    "0",
+				"API_RATE_LIMIT_LOG_BURST":        "0",
+				"API_MAX_CONCURRENT_REQUESTS":     "0",
+				"API_MAX_CONCURRENT_LOG_REQUESTS": "0",
+			},
+			wantErr: true,
+		},
+		{
+			name: "all values negative",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_OVERALL_RPS":      "-1",
+				"API_RATE_LIMIT_LOG_RPS":          "-1",
+				"API_RATE_LIMIT_OVERALL_BURST":    "-1",
+				"API_RATE_LIMIT_LOG_BURST":        "-1",
+				"API_MAX_CONCURRENT_REQUESTS":     "-1",
+				"API_MAX_CONCURRENT_LOG_REQUESTS": "-1",
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid config returns no error",
+			envVars: map[string]string{
+				"API_RATE_LIMIT_OVERALL_RPS":      "200",
+				"API_RATE_LIMIT_LOG_RPS":          "20",
+				"API_RATE_LIMIT_OVERALL_BURST":    "600",
+				"API_RATE_LIMIT_LOG_BURST":        "60",
+				"API_MAX_CONCURRENT_REQUESTS":     "400",
+				"API_MAX_CONCURRENT_LOG_REQUESTS": "40",
+			},
+			wantErr: false,
+		},
+		{
+			name:    "defaults return no error",
+			envVars: map[string]string{},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.envVars {
+				t.Setenv(k, v)
+			}
+
+			_, err := GetRateLimitConfig()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetRateLimitConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

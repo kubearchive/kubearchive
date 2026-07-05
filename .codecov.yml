@@ -18,3 +18,13 @@ coverage:
 comment:
   layout: "reach,diff,flags,files,footer"
   require_changes: true
+
+flags:
+  unit-tests:
+    carryforward: true
+
+ignore:
+  - "test/**"
+  - "hack/**"
+  - "config/**"
+  - "**/zz_generated*.go"

@@ -6,106 +6,10 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
-	"sync"
-	"sync/atomic"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 )
-
-func newTestRouter(handlers ...gin.HandlerFunc) *gin.Engine {
-	gin.SetMode(gin.TestMode)
-	r := gin.New()
-	r.GET("/test", append(handlers, func(c *gin.Context) {
-		c.Status(http.StatusOK)
-	})...)
-	return r
-}
-
-func TestRateLimiter(t *testing.T) {
-	const burst = 3
-	r := newTestRouter(RateLimiter(float64(burst), burst))
-	var ok, limited int
-	for range burst * 2 {
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/test", nil)
-		r.ServeHTTP(w, req)
-		switch w.Code {
-		case http.StatusOK:
-			ok++
-		case http.StatusTooManyRequests:
-			limited++
-		default:
-			t.Errorf("unexpected status %d", w.Code)
-		}
-	}
-
-	if ok != burst {
-		t.Errorf("RateLimiter ok = %d, want %d", ok, burst)
-	}
-	if limited != burst {
-		t.Errorf("RateLimiter limited = %d, want %d", limited, burst)
-	}
-}
-
-func TestConcurrentLimiter(t *testing.T) {
-	const max = 3
-	const total = max * 2
-
-	// started is closed once all goroutines have begun their ServeHTTP call.
-	// release is closed to let the held goroutines finish.
-	started := make(chan struct{})
-	release := make(chan struct{})
-	var startOnce sync.Once
-
-	// Track how many goroutines have started.
-	var startCount atomic.Int32
-
-	r := newTestRouter(
-		// Record that this goroutine has started before the semaphore check.
-		func(c *gin.Context) {
-			if startCount.Add(1) == total {
-				startOnce.Do(func() { close(started) })
-			}
-			c.Next()
-		},
-		ConcurrentLimiter(max),
-		func(c *gin.Context) {
-			<-release
-		},
-	)
-
-	var ok, limited int32
-	var wg sync.WaitGroup
-	wg.Add(total)
-
-	for range total {
-		go func() {
-			defer wg.Done()
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "/test", nil)
-			r.ServeHTTP(w, req)
-			switch w.Code {
-			case http.StatusOK:
-				atomic.AddInt32(&ok, 1)
-			case http.StatusTooManyRequests:
-				atomic.AddInt32(&limited, 1)
-			}
-		}()
-	}
-
-	// Wait until all goroutines have entered ServeHTTP, then release the held ones.
-	<-started
-	close(release)
-	wg.Wait()
-
-	if int(ok) != max {
-		t.Errorf("ConcurrentLimiter ok = %d, want %d", ok, max)
-	}
-	if int(limited) != total-max {
-		t.Errorf("ConcurrentLimiter limited = %d, want %d", limited, total-max)
-	}
-}
 
 func TestUserRateLimiter_PerUserIsolation(t *testing.T) {
 	// Each user gets their own bucket of size burst=2.
@@ -244,12 +148,10 @@ func TestGetRateLimitConfig(t *testing.T) {
 			name:    "all defaults",
 			envVars: map[string]string{},
 			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           10,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
+				OverallRPS:   100,
+				LogRPS:       10,
+				OverallBurst: 300,
+				LogBurst:     30,
 			},
 		},
 		{
@@ -258,12 +160,10 @@ func TestGetRateLimitConfig(t *testing.T) {
 				"API_RATE_LIMIT_OVERALL_RPS": "200",
 			},
 			want: RateLimitConfig{
-				OverallRPS:       200,
-				LogRPS:           10,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
+				OverallRPS:   200,
+				LogRPS:       10,
+				OverallBurst: 300,
+				LogBurst:     30,
 			},
 		},
 		{
@@ -272,12 +172,10 @@ func TestGetRateLimitConfig(t *testing.T) {
 				"API_RATE_LIMIT_LOG_RPS": "20",
 			},
 			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           20,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
+				OverallRPS:   100,
+				LogRPS:       20,
+				OverallBurst: 300,
+				LogBurst:     30,
 			},
 		},
 		{
@@ -286,12 +184,10 @@ func TestGetRateLimitConfig(t *testing.T) {
 				"API_RATE_LIMIT_OVERALL_BURST": "500",
 			},
 			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           10,
-				OverallBurst:     500,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
+				OverallRPS:   100,
+				LogRPS:       10,
+				OverallBurst: 500,
+				LogBurst:     30,
 			},
 		},
 		{
@@ -300,59 +196,25 @@ func TestGetRateLimitConfig(t *testing.T) {
 				"API_RATE_LIMIT_LOG_BURST": "50",
 			},
 			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           10,
-				OverallBurst:     300,
-				LogBurst:         50,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
-			},
-		},
-		{
-			name: "override MaxConcurrent only",
-			envVars: map[string]string{
-				"API_MAX_CONCURRENT_REQUESTS": "400",
-			},
-			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           10,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    400,
-				MaxConcurrentLog: 20,
-			},
-		},
-		{
-			name: "override MaxConcurrentLog only",
-			envVars: map[string]string{
-				"API_MAX_CONCURRENT_LOG_REQUESTS": "40",
-			},
-			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           10,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 40,
+				OverallRPS:   100,
+				LogRPS:       10,
+				OverallBurst: 300,
+				LogBurst:     50,
 			},
 		},
 		{
 			name: "all overridden",
 			envVars: map[string]string{
-				"API_RATE_LIMIT_OVERALL_RPS":      "250",
-				"API_RATE_LIMIT_LOG_RPS":          "25",
-				"API_RATE_LIMIT_OVERALL_BURST":    "600",
-				"API_RATE_LIMIT_LOG_BURST":        "60",
-				"API_MAX_CONCURRENT_REQUESTS":     "500",
-				"API_MAX_CONCURRENT_LOG_REQUESTS": "50",
+				"API_RATE_LIMIT_OVERALL_RPS":   "250",
+				"API_RATE_LIMIT_LOG_RPS":       "25",
+				"API_RATE_LIMIT_OVERALL_BURST": "600",
+				"API_RATE_LIMIT_LOG_BURST":     "60",
 			},
 			want: RateLimitConfig{
-				OverallRPS:       250,
-				LogRPS:           25,
-				OverallBurst:     600,
-				LogBurst:         60,
-				MaxConcurrent:    500,
-				MaxConcurrentLog: 50,
+				OverallRPS:   250,
+				LogRPS:       25,
+				OverallBurst: 600,
+				LogBurst:     60,
 			},
 		},
 		{
@@ -362,12 +224,10 @@ func TestGetRateLimitConfig(t *testing.T) {
 				"API_RATE_LIMIT_LOG_RPS":     "0.25",
 			},
 			want: RateLimitConfig{
-				OverallRPS:       0.5,
-				LogRPS:           0.25,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
+				OverallRPS:   0.5,
+				LogRPS:       0.25,
+				OverallBurst: 300,
+				LogBurst:     30,
 			},
 		},
 		{
@@ -376,12 +236,10 @@ func TestGetRateLimitConfig(t *testing.T) {
 				"API_RATE_LIMIT_OVERALL_RPS": "not-a-number",
 			},
 			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           10,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
+				OverallRPS:   100,
+				LogRPS:       10,
+				OverallBurst: 300,
+				LogBurst:     30,
 			},
 		},
 		{
@@ -390,12 +248,10 @@ func TestGetRateLimitConfig(t *testing.T) {
 				"API_RATE_LIMIT_LOG_RPS": "invalid",
 			},
 			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           10,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
+				OverallRPS:   100,
+				LogRPS:       10,
+				OverallBurst: 300,
+				LogBurst:     30,
 			},
 		},
 		{
@@ -404,12 +260,10 @@ func TestGetRateLimitConfig(t *testing.T) {
 				"API_RATE_LIMIT_OVERALL_BURST": "xyz",
 			},
 			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           10,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
+				OverallRPS:   100,
+				LogRPS:       10,
+				OverallBurst: 300,
+				LogBurst:     30,
 			},
 		},
 		{
@@ -418,59 +272,25 @@ func TestGetRateLimitConfig(t *testing.T) {
 				"API_RATE_LIMIT_LOG_BURST": "abc",
 			},
 			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           10,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
-			},
-		},
-		{
-			name: "invalid MaxConcurrent uses default",
-			envVars: map[string]string{
-				"API_MAX_CONCURRENT_REQUESTS": "bad-value",
-			},
-			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           10,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
-			},
-		},
-		{
-			name: "invalid MaxConcurrentLog uses default",
-			envVars: map[string]string{
-				"API_MAX_CONCURRENT_LOG_REQUESTS": "wrong",
-			},
-			want: RateLimitConfig{
-				OverallRPS:       100,
-				LogRPS:           10,
-				OverallBurst:     300,
-				LogBurst:         30,
-				MaxConcurrent:    200,
-				MaxConcurrentLog: 20,
+				OverallRPS:   100,
+				LogRPS:       10,
+				OverallBurst: 300,
+				LogBurst:     30,
 			},
 		},
 		{
 			name: "mixed valid and invalid values",
 			envVars: map[string]string{
-				"API_RATE_LIMIT_OVERALL_RPS":      "150",
-				"API_RATE_LIMIT_LOG_RPS":          "invalid",
-				"API_RATE_LIMIT_OVERALL_BURST":    "450",
-				"API_RATE_LIMIT_LOG_BURST":        "not-an-int",
-				"API_MAX_CONCURRENT_REQUESTS":     "300",
-				"API_MAX_CONCURRENT_LOG_REQUESTS": "bad",
+				"API_RATE_LIMIT_OVERALL_RPS":   "150",
+				"API_RATE_LIMIT_LOG_RPS":       "invalid",
+				"API_RATE_LIMIT_OVERALL_BURST": "450",
+				"API_RATE_LIMIT_LOG_BURST":     "not-an-int",
 			},
 			want: RateLimitConfig{
-				OverallRPS:       150,
-				LogRPS:           10,
-				OverallBurst:     450,
-				LogBurst:         30,
-				MaxConcurrent:    300,
-				MaxConcurrentLog: 20,
+				OverallRPS:   150,
+				LogRPS:       10,
+				OverallBurst: 450,
+				LogBurst:     30,
 			},
 		},
 	}
@@ -497,12 +317,6 @@ func TestGetRateLimitConfig(t *testing.T) {
 			}
 			if got.LogBurst != tt.want.LogBurst {
 				t.Errorf("GetRateLimitConfig() LogBurst = %v, want %v", got.LogBurst, tt.want.LogBurst)
-			}
-			if got.MaxConcurrent != tt.want.MaxConcurrent {
-				t.Errorf("GetRateLimitConfig() MaxConcurrent = %v, want %v", got.MaxConcurrent, tt.want.MaxConcurrent)
-			}
-			if got.MaxConcurrentLog != tt.want.MaxConcurrentLog {
-				t.Errorf("GetRateLimitConfig() MaxConcurrentLog = %v, want %v", got.MaxConcurrentLog, tt.want.MaxConcurrentLog)
 			}
 		})
 	}
@@ -571,75 +385,40 @@ func TestGetRateLimitConfig_InvalidValues(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "zero MaxConcurrent",
-			envVars: map[string]string{
-				"API_MAX_CONCURRENT_REQUESTS": "0",
-			},
-			wantErr: true,
-		},
-		{
-			name: "negative MaxConcurrent",
-			envVars: map[string]string{
-				"API_MAX_CONCURRENT_REQUESTS": "-200",
-			},
-			wantErr: true,
-		},
-		{
-			name: "zero MaxConcurrentLog",
-			envVars: map[string]string{
-				"API_MAX_CONCURRENT_LOG_REQUESTS": "0",
-			},
-			wantErr: true,
-		},
-		{
-			name: "negative MaxConcurrentLog",
-			envVars: map[string]string{
-				"API_MAX_CONCURRENT_LOG_REQUESTS": "-20",
-			},
-			wantErr: true,
-		},
-		{
 			name: "multiple invalid values",
 			envVars: map[string]string{
-				"API_RATE_LIMIT_OVERALL_RPS":      "-100",
-				"API_RATE_LIMIT_LOG_RPS":          "0",
-				"API_MAX_CONCURRENT_LOG_REQUESTS": "-5",
+				"API_RATE_LIMIT_OVERALL_RPS": "-100",
+				"API_RATE_LIMIT_LOG_RPS":     "0",
 			},
 			wantErr: true,
 		},
 		{
 			name: "all values zero",
 			envVars: map[string]string{
-				"API_RATE_LIMIT_OVERALL_RPS":      "0",
-				"API_RATE_LIMIT_LOG_RPS":          "0",
-				"API_RATE_LIMIT_OVERALL_BURST":    "0",
-				"API_RATE_LIMIT_LOG_BURST":        "0",
-				"API_MAX_CONCURRENT_REQUESTS":     "0",
-				"API_MAX_CONCURRENT_LOG_REQUESTS": "0",
+				"API_RATE_LIMIT_OVERALL_RPS":   "0",
+				"API_RATE_LIMIT_LOG_RPS":       "0",
+				"API_RATE_LIMIT_OVERALL_BURST": "0",
+				"API_RATE_LIMIT_LOG_BURST":     "0",
 			},
 			wantErr: true,
 		},
 		{
 			name: "all values negative",
 			envVars: map[string]string{
-				"API_RATE_LIMIT_OVERALL_RPS":      "-1",
-				"API_RATE_LIMIT_LOG_RPS":          "-1",
-				"API_RATE_LIMIT_OVERALL_BURST":    "-1",
-				"API_RATE_LIMIT_LOG_BURST":        "-1",
-				"API_MAX_CONCURRENT_REQUESTS":     "-1",
-				"API_MAX_CONCURRENT_LOG_REQUESTS": "-1",
+				"API_RATE_LIMIT_OVERALL_RPS":   "-1",
+				"API_RATE_LIMIT_LOG_RPS":       "-1",
+				"API_RATE_LIMIT_OVERALL_BURST": "-1",
+				"API_RATE_LIMIT_LOG_BURST":     "-1",
 			},
 			wantErr: true,
 		},
 		{
 			name: "valid config returns no error",
 			envVars: map[string]string{
-				"API_RATE_LIMIT_OVERALL_RPS":      "200",
-				"API_RATE_LIMIT_LOG_RPS":          "20",
-				"API_RATE_LIMIT_OVERALL_BURST":    "600",
-				"API_RATE_LIMIT_LOG_BURST":        "60",
-				"API_MAX_CONCURRENT_REQUESTS":     "400",
-				"API_MAX_CONCURRENT_LOG_REQUESTS": "40",
+				"API_RATE_LIMIT_OVERALL_RPS":   "200",
+				"API_RATE_LIMIT_LOG_RPS":       "20",
+				"API_RATE_LIMIT_OVERALL_BURST": "600",
+				"API_RATE_LIMIT_LOG_BURST":     "60",
 			},
 			wantErr: false,
 		},

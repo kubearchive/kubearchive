@@ -100,10 +100,6 @@ spec:
               value: "300"
             - name: API_RATE_LIMIT_LOG_BURST
               value: "30"
-            - name: API_MAX_CONCURRENT_REQUESTS
-              value: "200"
-            - name: API_MAX_CONCURRENT_LOG_REQUESTS
-              value: "20"
           ports:
             - containerPort: 8081
               name: server

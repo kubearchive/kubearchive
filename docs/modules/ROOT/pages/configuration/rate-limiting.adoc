@@ -1,38 +1,34 @@
 = Rate Limiting
 
-KubeArchive protects the API server from overload using rate limiting
-middleware. The middleware applies three types of limiters to control traffic:
+KubeArchive protects the API server from overload using per-user rate limiting
+middleware. The middleware applies token-bucket limiters to control traffic:
 
-* **Global rate limiter**: token-bucket limiter applied to all API requests,
-  using a shared bucket with configurable requests-per-second (RPS) and burst capacity.
+* **Per-user overall rate limiter**: token-bucket limiter applied to all API
+  requests. Each user (identified by `Impersonate-User` header, Bearer token, or
+  client IP) gets their own bucket with configurable requests-per-second (RPS) and
+  burst capacity.
 * **Per-user log rate limiter**: token-bucket limiter applied only to log endpoints
-  (`/log`). Each user (identified by `Impersonate-User` header, Bearer token, or
-  client IP) gets their own bucket.
-* **Concurrent request limiter**: semaphore-based limiter that restricts the number
-  of in-flight requests. Applied both globally and to log endpoints separately.
+  (`/log`). Each user gets their own bucket with tighter limits, since log
+  retrieval is more resource-intensive.
 
 When any limit is exceeded, the API server returns HTTP 429 (Too Many Requests)
 with a `Retry-After` header indicating when the client should retry.
 
-There are six environment variables that control rate limiting behavior:
+There are four environment variables that control rate limiting behavior:
 
-* `API_RATE_LIMIT_OVERALL_RPS`: overall requests per second (token refill rate).
+* `API_RATE_LIMIT_OVERALL_RPS`: per-user overall requests per second (token refill rate).
     If not set, the default value is **100**.
 * `API_RATE_LIMIT_LOG_RPS`: per-user log endpoint requests per second.
     If not set, the default value is **10**.
-* `API_RATE_LIMIT_OVERALL_BURST`: overall burst capacity (maximum tokens in bucket).
+* `API_RATE_LIMIT_OVERALL_BURST`: per-user overall burst capacity (maximum tokens in bucket).
     If not set, the default value is **300**.
 * `API_RATE_LIMIT_LOG_BURST`: per-user log endpoint burst capacity.
     If not set, the default value is **30**.
-* `API_MAX_CONCURRENT_REQUESTS`: maximum concurrent in-flight requests.
-    If not set, the default value is **200**.
-* `API_MAX_CONCURRENT_LOG_REQUESTS`: maximum concurrent in-flight log requests.
-    If not set, the default value is **20**.
 
 [NOTE]
 ====
 All rate limiting values must be positive numbers. The RPS values can be
-decimal (e.g., `10.5`). The burst and concurrent request values must be integers.
+decimal (e.g., `10.5`). The burst values must be integers.
 ====
 
 To modify rate limiting settings, perform the following steps:
@@ -59,10 +55,6 @@ spec:
           value: "600"
         - name: API_RATE_LIMIT_LOG_BURST
           value: "60"
-        - name: API_MAX_CONCURRENT_REQUESTS
-          value: "400"
-        - name: API_MAX_CONCURRENT_LOG_REQUESTS
-          value: "40"
 ----
 +
 [WARNING]

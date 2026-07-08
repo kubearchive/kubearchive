@@ -38,7 +38,7 @@ type sqlDatabaseImpl struct {
 }
 
 func (db *sqlDatabaseImpl) Init(env map[string]string) error {
-	conn, err := establishConnection(db.creator.GetDriverName(), db.creator.GetConnectionString(env))
+	conn, err := establishConnection(db.creator.GetDriverName(), db.creator.GetConnectionString(env), env)
 	if err != nil {
 		return err
 	}

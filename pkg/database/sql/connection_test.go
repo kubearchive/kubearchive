@@ -6,6 +6,7 @@ package sql
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestExtractConnectionInfo(t *testing.T) {
@@ -102,5 +103,137 @@ func TestExtractConnectionInfoEdgeCases(t *testing.T) {
 	result = extractConnectionInfo("postgres", longString)
 	if result.user != "test" {
 		t.Errorf("Expected 'test' user for long connection string, got %s", result.user)
+	}
+}
+
+func TestGetEnvInt(t *testing.T) {
+	tests := []struct {
+		name         string
+		envValue     string
+		setEnv       bool
+		defaultValue int
+		expected     int
+	}{
+		{
+			name:         "env not set returns default",
+			setEnv:       false,
+			defaultValue: 10,
+			expected:     10,
+		},
+		{
+			name:         "valid integer value",
+			envValue:     "20",
+			setEnv:       true,
+			defaultValue: 10,
+			expected:     20,
+		},
+		{
+			name:         "invalid integer value returns default",
+			envValue:     "not-a-number",
+			setEnv:       true,
+			defaultValue: 10,
+			expected:     10,
+		},
+		{
+			name:         "empty string returns default",
+			envValue:     "",
+			setEnv:       true,
+			defaultValue: 10,
+			expected:     10,
+		},
+		{
+			name:         "zero returns default",
+			envValue:     "0",
+			setEnv:       true,
+			defaultValue: 10,
+			expected:     10,
+		},
+		{
+			name:         "negative number returns default",
+			envValue:     "-10",
+			setEnv:       true,
+			defaultValue: 10,
+			expected:     10,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := "TEST_GET_ENV_INT"
+			envMap := make(map[string]string)
+			if tt.setEnv {
+				envMap[key] = tt.envValue
+			}
+			got := getEnvInt(envMap, key, tt.defaultValue)
+			if got != tt.expected {
+				t.Errorf("getEnvInt() = %d, want %d", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetEnvDuration(t *testing.T) {
+	tests := []struct {
+		name         string
+		envValue     string
+		setEnv       bool
+		defaultValue time.Duration
+		expected     time.Duration
+	}{
+		{
+			name:         "env not set returns default",
+			setEnv:       false,
+			defaultValue: 5 * time.Minute,
+			expected:     5 * time.Minute,
+		},
+		{
+			name:         "valid duration value",
+			envValue:     "10m",
+			setEnv:       true,
+			defaultValue: 5 * time.Minute,
+			expected:     10 * time.Minute,
+		},
+		{
+			name:         "valid duration in seconds",
+			envValue:     "30s",
+			setEnv:       true,
+			defaultValue: 5 * time.Minute,
+			expected:     30 * time.Second,
+		},
+		{
+			name:         "invalid duration returns default",
+			envValue:     "not-a-duration",
+			setEnv:       true,
+			defaultValue: 5 * time.Minute,
+			expected:     5 * time.Minute,
+		},
+		{
+			name:         "empty string returns default",
+			envValue:     "",
+			setEnv:       true,
+			defaultValue: 5 * time.Minute,
+			expected:     5 * time.Minute,
+		},
+		{
+			name:         "negative duration returns default",
+			envValue:     "-5m",
+			setEnv:       true,
+			defaultValue: 5 * time.Minute,
+			expected:     5 * time.Minute,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := "TEST_GET_ENV_DURATION"
+			envMap := make(map[string]string)
+			if tt.setEnv {
+				envMap[key] = tt.envValue
+			}
+			got := getEnvDuration(envMap, key, tt.defaultValue)
+			if got != tt.expected {
+				t.Errorf("getEnvDuration() = %v, want %v", got, tt.expected)
+			}
+		})
 	}
 }

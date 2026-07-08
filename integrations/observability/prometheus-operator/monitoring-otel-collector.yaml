@@ -76,7 +76,7 @@ spec:
             readOnlyRootFilesystem: true
             runAsNonRoot: true
         - name: otel-collector
-          image: quay.io/kubearchive/opentelemetry-collector-contrib:0.141.0
+          image: quay.io/kubearchive/opentelemetry-collector-contrib:0.155.0
           command:
             - '/otelcol-contrib'
             - '--config=/conf/otel-collector-config.yaml'

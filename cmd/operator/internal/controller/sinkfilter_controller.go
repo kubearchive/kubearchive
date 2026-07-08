@@ -616,7 +616,7 @@ func (r *SinkFilterReconciler) extractResources(sinkFilter *kubearchivev1.SinkFi
 
 func (r *SinkFilterReconciler) reconcileClusterRole(ctx context.Context, sinkFilter *kubearchivev1.SinkFilter) error {
 	resources := r.extractResources(sinkFilter)
-	rules := createPolicyRules(ctx, r.Mapper, resources, []string{"get", "list", "watch"})
+	rules := createPolicyRules(r.Mapper, resources, []string{"get", "list", "watch"})
 
 	desired := desiredClusterRole(constants.KubeArchiveSinkFilterName, rules)
 

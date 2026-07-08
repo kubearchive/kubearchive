@@ -353,7 +353,7 @@ func TestSetOptions_setToken(t *testing.T) {
 			expectError:   true,
 			errorContains: "invalid JWT format: token must have 3 parts separated by dots",
 		},
-		{
+		{ //nolint:gosec
 			name:              "connectivity test fails with token",
 			token:             "valid.unauth.token",
 			clusterHost:       "https://kubearchive.example.com",

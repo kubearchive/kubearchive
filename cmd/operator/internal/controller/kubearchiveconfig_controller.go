@@ -154,7 +154,7 @@ func (r *KubeArchiveConfigReconciler) reconcileSinkRole(ctx context.Context, kac
 		slog.Error("Unable to get ClusterKubeArchiveConfig when reconciling sink role", "error", err)
 	}
 
-	role, err := r.reconcileRole(ctx, kaconfig, kaconfig.Namespace, constants.KubeArchiveSinkName, createPolicyRules(ctx, r.Mapper, resources, []string{"delete"}))
+	role, err := r.reconcileRole(ctx, kaconfig, kaconfig.Namespace, constants.KubeArchiveSinkName, createPolicyRules(r.Mapper, resources, []string{"delete"}))
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +354,7 @@ func (r *KubeArchiveConfigReconciler) reconcileVacuumRole(ctx context.Context, k
 		}
 	}
 
-	role, err := r.reconcileRole(ctx, kaconfig, kaconfig.Namespace, constants.KubeArchiveVacuumName, createPolicyRules(ctx, r.Mapper, resources, []string{"get", "list"}))
+	role, err := r.reconcileRole(ctx, kaconfig, kaconfig.Namespace, constants.KubeArchiveVacuumName, createPolicyRules(r.Mapper, resources, []string{"get", "list"}))
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +399,7 @@ func updateSinkFilterNamespace(ctx context.Context, client client.Client, namesp
 	sf := &kubearchivev1.SinkFilter{}
 	err := client.Get(ctx, types.NamespacedName{Name: constants.SinkFilterResourceName, Namespace: constants.KubeArchiveNamespace}, sf)
 	if errors.IsNotFound(err) {
-		sf = desiredSinkFilterNamespace(ctx, nil, namespace, resources)
+		sf = desiredSinkFilterNamespace(nil, namespace, resources)
 		err = client.Create(ctx, sf)
 		if err != nil {
 			slog.Error("Failed to create SinkFilter", "error", err, "name", constants.SinkFilterResourceName)
@@ -411,7 +411,7 @@ func updateSinkFilterNamespace(ctx context.Context, client client.Client, namesp
 		return err
 	}
 
-	sf = desiredSinkFilterNamespace(ctx, sf, namespace, resources)
+	sf = desiredSinkFilterNamespace(sf, namespace, resources)
 	err = client.Update(ctx, sf)
 	if err != nil {
 		slog.Error("Failed to update SinkFilter", "error", err, "name", constants.SinkFilterResourceName)
@@ -420,8 +420,7 @@ func updateSinkFilterNamespace(ctx context.Context, client client.Client, namesp
 	return nil
 }
 
-func desiredSinkFilterNamespace(ctx context.Context, sf *kubearchivev1.SinkFilter, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) *kubearchivev1.SinkFilter {
-
+func desiredSinkFilterNamespace(sf *kubearchivev1.SinkFilter, namespace string, resources []kubearchivev1.KubeArchiveConfigResource) *kubearchivev1.SinkFilter {
 	slog.Info("in desiredSinkFilterNamespace")
 
 	if sf == nil {

@@ -17,8 +17,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/pagination"
-	"github.com/kubearchive/kubearchive/pkg/database/fake"
 	dbErrors "github.com/kubearchive/kubearchive/pkg/database/errors"
+	"github.com/kubearchive/kubearchive/pkg/database/fake"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/stretchr/testify/assert"

@@ -15,48 +15,48 @@ import (
 func TestWrapQueryError(t *testing.T) {
 	tests := []struct {
 		name     string
-		ctx      context.Context
+		ctxFunc  func() context.Context
 		err      error
 		expected error
 	}{
 		{
 			name:     "nil error returns nil",
-			ctx:      context.Background(),
+			ctxFunc:  func() context.Context { return context.Background() },
 			err:      nil,
 			expected: nil,
 		},
 		{
 			name:     "context deadline exceeded",
-			ctx:      context.Background(),
+			ctxFunc:  func() context.Context { return context.Background() },
 			err:      context.DeadlineExceeded,
 			expected: ErrQueryTimeout,
 		},
 		{
 			name: "context deadline exceeded from context",
-			ctx: func() context.Context {
+			ctxFunc: func() context.Context {
 				ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 				defer cancel()
 				time.Sleep(2 * time.Millisecond)
 				return ctx
-			}(),
+			},
 			err:      errors.New("some database error"),
 			expected: ErrQueryTimeout,
 		},
 		{
 			name:     "postgresql error 57014 query_canceled",
-			ctx:      context.Background(),
+			ctxFunc:  func() context.Context { return context.Background() },
 			err:      &pq.Error{Code: "57014", Message: "canceling statement due to user request"},
 			expected: ErrQueryTimeout,
 		},
 		{
 			name:     "other postgresql error not wrapped",
-			ctx:      context.Background(),
+			ctxFunc:  func() context.Context { return context.Background() },
 			err:      &pq.Error{Code: "42P01", Message: "relation does not exist"},
 			expected: &pq.Error{Code: "42P01", Message: "relation does not exist"},
 		},
 		{
 			name:     "generic error not wrapped",
-			ctx:      context.Background(),
+			ctxFunc:  func() context.Context { return context.Background() },
 			err:      errors.New("some other error"),
 			expected: errors.New("some other error"),
 		},
@@ -64,7 +64,8 @@ func TestWrapQueryError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := WrapQueryError(tt.ctx, tt.err)
+			ctx := tt.ctxFunc()
+			result := WrapQueryError(ctx, tt.err)
 
 			if tt.expected == nil {
 				if result != nil {

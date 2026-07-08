@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"maps"
+	"os"
 	"strconv"
 	"sync"
 
@@ -100,6 +101,19 @@ func newDatabase() (interfaces.Database, error) {
 			err = fmt.Errorf("no schema version range defined for database type '%s'", dbType)
 			slog.Error("No schema version range defined", "type", dbType)
 			return
+		}
+
+		if minStr := os.Getenv("SCHEMA_MIN_VERSION"); minStr != "" {
+			if v, errParse := strconv.Atoi(minStr); errParse == nil {
+				versionRange.Min = v
+				slog.Info("Schema min version overridden by environment", "min", v)
+			}
+		}
+		if maxStr := os.Getenv("SCHEMA_MAX_VERSION"); maxStr != "" {
+			if v, errParse := strconv.Atoi(maxStr); errParse == nil {
+				versionRange.Max = v
+				slog.Info("Schema max version overridden by environment", "max", v)
+			}
 		}
 
 		dbVersionInt, errParse := strconv.Atoi(dbVersion)

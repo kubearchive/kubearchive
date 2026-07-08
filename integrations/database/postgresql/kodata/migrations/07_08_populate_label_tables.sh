@@ -45,6 +45,16 @@ fi
 
 log "Resource ID range: ${MIN_ID} to ${MAX_ID}"
 
+# Check if a previous run made partial progress by looking at the highest
+# resource_id already recorded in resource_label.
+# shellcheck disable=SC2086
+RESUME_ID=$(psql ${PSQL_OPTS} -c "SELECT COALESCE(MAX(resource_id), 0) FROM resource_label;")
+
+if [ "${RESUME_ID}" -gt "${MIN_ID}" ]; then
+    log "Resuming from resource ID ${RESUME_ID} (previous progress detected)"
+    MIN_ID="${RESUME_ID}"
+fi
+
 # ============================================================================
 # Single-pass batched population of all label tables.
 #

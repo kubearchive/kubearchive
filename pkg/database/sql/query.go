@@ -8,6 +8,7 @@ import (
 
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
+	dbErrors "github.com/kubearchive/kubearchive/pkg/database/errors"
 )
 
 type queryPerformer[T any] struct {
@@ -23,14 +24,14 @@ func (q queryPerformer[T]) performSingleRowQuery(ctx context.Context, builder sq
 	var t T
 	query, args := builder.BuildWithFlavor(q.flavor)
 	err := sqlx.GetContext(ctx, q.querier, &t, query, args...)
-	return t, err
+	return t, dbErrors.WrapQueryError(ctx, err)
 }
 
 func (q queryPerformer[T]) performQuery(ctx context.Context, builder sqlbuilder.Builder) ([]T, error) {
 	var res []T
 	query, args := builder.BuildWithFlavor(q.flavor)
 	err := sqlx.SelectContext(ctx, q.querier, &res, query, args...)
-	return res, err
+	return res, dbErrors.WrapQueryError(ctx, err)
 }
 
 // performStreamQuery executes the query using queryCtx (e.g. one with a deadline) and
@@ -40,7 +41,7 @@ func (q queryPerformer[T]) performStreamQuery(queryCtx, iterCtx context.Context,
 	query, args := builder.BuildWithFlavor(q.flavor)
 	rows, err := q.querier.QueryxContext(queryCtx, query, args...)
 	if err != nil {
-		return err
+		return dbErrors.WrapQueryError(queryCtx, err)
 	}
 	defer rows.Close()
 	for rows.Next() {
@@ -55,5 +56,5 @@ func (q queryPerformer[T]) performStreamQuery(queryCtx, iterCtx context.Context,
 			return err
 		}
 	}
-	return rows.Err()
+	return dbErrors.WrapQueryError(queryCtx, rows.Err())
 }

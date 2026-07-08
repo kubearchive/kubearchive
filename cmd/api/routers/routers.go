@@ -41,7 +41,7 @@ type Controller struct {
 // immediately if the parent context is already expired.
 func (c *Controller) queryContext(ctx context.Context) (context.Context, context.CancelFunc, error) {
 	if c.QueryTimeout <= 0 {
-		return ctx, func() {}, errors.New("Query timeout must be greater than zero")
+		return ctx, func() {}, nil
 	}
 	newCtx, cancel := context.WithTimeout(ctx, c.QueryTimeout)
 	return newCtx, cancel, nil
@@ -137,7 +137,11 @@ func (c *Controller) GetResources(context *gin.Context) {
 			creationTimestampAfter, creationTimestampBefore)
 
 		if countErr != nil {
-			abort.Abort(context, countErr, http.StatusInternalServerError)
+			if errors.Is(countErr, dbErrors.ErrQueryTimeout) {
+				abort.Abort(context, countErr, http.StatusGatewayTimeout)
+			} else {
+				abort.Abort(context, countErr, http.StatusInternalServerError)
+			}
 			return
 		}
 		context.JSON(http.StatusOK, gin.H{"count": count})
@@ -157,7 +161,11 @@ func (c *Controller) GetResources(context *gin.Context) {
 			queryCtx, kind, apiVersion, namespace, name, id, date, labelFilters,
 			creationTimestampAfter, creationTimestampBefore, 2)
 		if err != nil {
-			abort.Abort(context, err, http.StatusInternalServerError)
+			if errors.Is(err, dbErrors.ErrQueryTimeout) {
+				abort.Abort(context, err, http.StatusGatewayTimeout)
+			} else {
+				abort.Abort(context, err, http.StatusInternalServerError)
+			}
 			return
 		}
 		if len(resources) == 0 {
@@ -215,7 +223,11 @@ func (c *Controller) GetResources(context *gin.Context) {
 
 	if err != nil {
 		if !headerWritten {
-			abort.Abort(context, err, http.StatusInternalServerError)
+			if errors.Is(err, dbErrors.ErrQueryTimeout) {
+				abort.Abort(context, err, http.StatusGatewayTimeout)
+			} else {
+				abort.Abort(context, err, http.StatusInternalServerError)
+			}
 			return
 		}
 		// Response already started - log the error, client will see truncated JSON
@@ -303,7 +315,11 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 		return
 	}
 	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
+		if errors.Is(err, dbErrors.ErrQueryTimeout) {
+			abort.Abort(context, err, http.StatusGatewayTimeout)
+		} else {
+			abort.Abort(context, err, http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -340,7 +356,11 @@ func (c *Controller) GetResourceByUID(context *gin.Context) {
 	defer cancel()
 	resource, err := c.Database.QueryResourceByUID(queryCtx, kind, apiVersion, namespace, uid)
 	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
+		if errors.Is(err, dbErrors.ErrQueryTimeout) {
+			abort.Abort(context, err, http.StatusGatewayTimeout)
+		} else {
+			abort.Abort(context, err, http.StatusInternalServerError)
+		}
 		return
 	}
 

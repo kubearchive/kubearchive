@@ -18,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kubearchive/kubearchive/cmd/api/pagination"
 	"github.com/kubearchive/kubearchive/pkg/database/fake"
+	dbErrors "github.com/kubearchive/kubearchive/pkg/database/errors"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/models"
 	"github.com/stretchr/testify/assert"
@@ -885,7 +886,7 @@ type slowDBReader struct {
 func (s *slowDBReader) block(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return dbErrors.WrapQueryError(ctx, ctx.Err())
 	case <-time.After(s.blockFor):
 		return nil
 	}
@@ -928,7 +929,7 @@ func setupRouterWithTimeout(db interfaces.DBReader, core bool, queryTimeout time
 }
 
 // TestQueryTimeout verifies that Controller.QueryTimeout causes DB-bound handlers
-// to abort with 500 (context deadline exceeded) before the slow DB finishes,
+// to abort with 504 (context deadline exceeded) before the slow DB finishes,
 // and that the response arrives well within the blockFor budget.
 func TestQueryTimeout(t *testing.T) {
 	const timeout = 50 * time.Millisecond
@@ -979,8 +980,8 @@ func TestQueryTimeout(t *testing.T) {
 			elapsed := time.Since(start)
 
 			// Handler must return an error status — the DB never returned data.
-			assert.Equal(t, http.StatusInternalServerError, res.Code,
-				"expected 500 when DB call times out")
+			assert.Equal(t, http.StatusGatewayTimeout, res.Code,
+				"expected 504 when DB call times out")
 
 			// The response must arrive well before the DB's blockFor duration,
 			// confirming the timeout fired rather than the DB finishing naturally.

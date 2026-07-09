@@ -21,7 +21,7 @@ func fakeServer(k8sClient kubernetes.Interface, cache *cache.Cache) *Server {
 	if k8sClient == nil {
 		// Replacing deprecated NewSimpleClientset for NewClientset fails because of TokenReview.
 		// It may be related to https://github.com/kubernetes/kubernetes/issues/126850 so keeping deprecated.
-		k8sClient = fakeK8s.NewSimpleClientset() //nolint:staticcheck
+		k8sClient = fakeK8s.NewSimpleClientset() //nolint:staticcheck // needed for TokenReview tests
 	}
 	controller := routers.Controller{Database: fakeDB.NewFakeDatabase(nil, nil)}
 	expirations := &routers.CacheExpirations{Authorized: 1 * time.Second, Unauthorized: 1 * time.Second}
@@ -102,4 +102,70 @@ func TestGetCacheExpirationsWorkingProperly(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 10*time.Second, expirations.Authorized)
 	assert.Equal(t, 10*time.Second, expirations.Unauthorized)
+}
+
+func TestGetQueryTimeout(t *testing.T) {
+	testCases := []struct {
+		name         string
+		envValue     string
+		wantDuration time.Duration
+	}{
+		{
+			name:         "env var not set",
+			envValue:     "",
+			wantDuration: defaultQueryTimeout,
+		},
+		{
+			name:         "valid duration 30s",
+			envValue:     "30s",
+			wantDuration: 30 * time.Second,
+		},
+		{
+			name:         "valid duration 2m",
+			envValue:     "2m",
+			wantDuration: 2 * time.Minute,
+		},
+		{
+			name:         "valid duration 1h",
+			envValue:     "1h",
+			wantDuration: 1 * time.Hour,
+		},
+		{
+			name:         "invalid duration string abc",
+			envValue:     "abc",
+			wantDuration: defaultQueryTimeout,
+		},
+		{
+			name:         "invalid duration string 10",
+			envValue:     "10",
+			wantDuration: defaultQueryTimeout,
+		},
+		{
+			name:         "zero duration",
+			envValue:     "0s",
+			wantDuration: defaultQueryTimeout,
+		},
+		{
+			name:         "negative duration",
+			envValue:     "-5s",
+			wantDuration: defaultQueryTimeout,
+		},
+		{
+			name:         "negative duration minutes",
+			envValue:     "-2m",
+			wantDuration: defaultQueryTimeout,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.envValue != "" {
+				t.Setenv(queryTimeoutEnvVar, tc.envValue)
+			}
+
+			got := getQueryTimeout()
+
+			assert.Equal(t, tc.wantDuration, got)
+		})
+	}
 }

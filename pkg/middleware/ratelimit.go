@@ -74,14 +74,14 @@ func UserRateLimiter(rps float64, burst int) gin.HandlerFunc {
 		limiter := v.(*rate.Limiter)
 		r := limiter.Reserve()
 		if !r.OK() {
-			abort.Abort(c, errors.New("Could not reserve token, too many requests"), http.StatusTooManyRequests)
+			abort.Abort(c, errors.New("could not reserve token, too many requests"), http.StatusTooManyRequests)
 			return
 		}
 		if d := r.Delay(); d > 0 {
 			r.Cancel()
 			retryAfter := max(int(math.Ceil(d.Seconds())), 1)
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
-			abort.Abort(c, errors.New("Too many requests"), http.StatusTooManyRequests)
+			abort.Abort(c, errors.New("too many requests"), http.StatusTooManyRequests)
 			return
 		}
 		c.Next()

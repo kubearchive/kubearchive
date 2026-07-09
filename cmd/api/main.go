@@ -59,12 +59,23 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 		"/readyz": "DEBUG",
 	}}))
 
+	rateLimits, err := middleware.GetRateLimitConfig()
+	if err != nil {
+		slog.Error("Could not get rate limit config", "error", err.Error())
+		os.Exit(1)
+	}
+
 	apiGroup := router.Group("/api")
 	apisGroup := router.Group("/apis")
 	groups := [...]*gin.RouterGroup{apisGroup, apiGroup}
+
+	overallRL := middleware.UserRateLimiter(rateLimits.OverallRPS, rateLimits.OverallBurst)
+	logRL := middleware.UserRateLimiter(rateLimits.LogRPS, rateLimits.LogBurst)
+
 	// Set up middleware for each group
 	for _, group := range groups {
 		group.Use(gzip.Gzip(gzip.DefaultCompression))
+		group.Use(overallRL)
 		group.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews(), cache,
 			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 		group.Use(auth.Impersonation(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache,
@@ -82,19 +93,19 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append([]gin.HandlerFunc{logRL}, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/uid/:uid", controller.GetResourceByUID)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append([]gin.HandlerFunc{logRL}, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 
 	apiGroup.GET("/:version/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append([]gin.HandlerFunc{logRL}, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/uid/:uid", controller.GetResourceByUID)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append([]gin.HandlerFunc{logRL}, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 
 	return &Server{
 		router:    router,

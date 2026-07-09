@@ -1,0 +1,92 @@
+= Database Connection Pool
+
+KubeArchive limits the number of concurrent connections each pod opens to the
+database. This prevents connection exhaustion errors when the application
+receives a high volume of requests.
+
+The following environment variables control connection pool behavior:
+
+* `DATABASE_MAX_OPEN_CONNS`: maximum number of open connections to the database.
+    If not set, the default value is **25**.
+* `DATABASE_MAX_IDLE_CONNS`: maximum number of idle connections kept in the pool.
+    If not set, the default value is **10**.
+* `DATABASE_CONN_MAX_LIFETIME`: maximum time a connection can be reused.
+    If not set, the default value is **5m** (5 minutes).
+* `DATABASE_CONN_MAX_IDLE_TIME`: maximum time a connection can remain idle before being closed.
+    If not set, the default value is **2m** (2 minutes).
+
+Duration values must be parseable by
+link:https://pkg.go.dev/time#ParseDuration[time.ParseDuration]
+(e.g. `5m`, `30s`, `2h`).
+
+[WARNING]
+====
+The `DATABASE_MAX_OPEN_CONNS` value is **per pod**. The total number of
+connections to the database is this value multiplied by the number of pods
+that access the database (by default: 2 API + 1 sink = 3 pods).
+
+Ensure the total does not exceed your database's `max_connections` setting
+(PostgreSQL default: 100).
+====
+
+To modify the connection pool settings, edit or patch the relevant Deployment
+in the `kubearchive` namespace:
+
+[source,yaml]
+----
+---
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+      - name: kubearchive-api-server
+        env:
+        - name: DATABASE_MAX_OPEN_CONNS
+          value: "15"
+        - name: DATABASE_MAX_IDLE_CONNS
+          value: "7"
+        - name: DATABASE_CONN_MAX_LIFETIME
+          value: "10m"
+        - name: DATABASE_CONN_MAX_IDLE_TIME
+          value: "3m"
+----
+
+Apply the patch to both deployments that access the database:
+
+[source,bash]
+----
+kubectl patch -n kubearchive deployment kubearchive-api-server --patch-file path/to/patch.yaml
+kubectl patch -n kubearchive deployment kubearchive-sink --patch-file path/to/patch.yaml
+----
+
+[NOTE]
+====
+The same environment variables apply to both `kubearchive-api-server` and
+`kubearchive-sink` since both connect to the database. Ensure you configure
+both deployments consistently.
+====
+
+== Edge Cases
+
+* **Invalid, zero, or negative values**: If an environment variable is set to a
+  non-numeric string, an unparseable duration, zero, or a negative value, the
+  application logs a warning and falls back to the default. Zero is rejected
+  because in Go's `database/sql`, `SetMaxOpenConns(0)` means unlimited
+  connections and `SetConnMaxLifetime(0)` means connections are never recycled.
+
+* **Very high `DATABASE_MAX_OPEN_CONNS`**: Setting a large value (e.g. 1000)
+  effectively disables pool limiting and may exhaust the database's
+  `max_connections` (PostgreSQL default: 100), causing the same connection
+  errors this feature is designed to prevent.
+
+* **Very long `DATABASE_CONN_MAX_LIFETIME` or `DATABASE_CONN_MAX_IDLE_TIME`**:
+  Setting durations too high (e.g. hours or days) can lead to stale
+  connections that are not recycled after a database failover, network
+  interruption, or configuration change. The defaults (5m lifetime, 2m idle)
+  balance connection reuse with timely recovery.
+
+* **`DATABASE_MAX_IDLE_CONNS` greater than `DATABASE_MAX_OPEN_CONNS`**: The
+  idle count is capped internally by Go's `database/sql` to never exceed the
+  max open count. Setting a higher idle value has no effect.

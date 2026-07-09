@@ -14,6 +14,8 @@
 ** xref:configuration/global-filters.adoc[Global Filters]
 ** xref:configuration/delayed-deletes.adoc[]
 ** xref:configuration/cache-expiration-time.adoc[Cache Expiration Time]
+** xref:configuration/database-connection-pool.adoc[Database Connection Pool]
+** xref:configuration/rate-limiting.adoc[Rate Limiting]
 ** xref:configuration/observability.adoc[Observability]
 ** xref:configuration/impersonation.adoc[]
 ** xref:configuration/kubearchive-logs.adoc[]

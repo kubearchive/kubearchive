@@ -143,7 +143,7 @@ func TestGetQueryTimeout(t *testing.T) {
 		{
 			name:         "zero duration",
 			envValue:     "0s",
-			wantDuration: defaultQueryTimeout,
+			wantDuration: 0,
 		},
 		{
 			name:         "negative duration",

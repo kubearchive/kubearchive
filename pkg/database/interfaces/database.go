@@ -37,9 +37,7 @@ type DBReader interface {
 		creationTimestampAfter, creationTimestampBefore *time.Time, limit int) ([]models.Resource, error)
 	// StreamResources iterates over matching resources row by row, calling fn for each.
 	// Unlike QueryResources, it does not load all rows into memory at once.
-	// queryCtx governs the initial query execution (cursor open); iterCtx governs row iteration.
-	// Separating them lets callers apply a short deadline to the query without cutting off the stream mid-write.
-	StreamResources(queryCtx, iterCtx context.Context, kind, apiVersion, namespace,
+	StreamResources(ctx context.Context, kind, apiVersion, namespace,
 		name, continueId, continueDate string, labelFilters *models.LabelFilters,
 		creationTimestampAfter, creationTimestampBefore *time.Time, limit int,
 		fn func(resource models.Resource) error) error

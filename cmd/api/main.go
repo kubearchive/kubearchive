@@ -230,7 +230,7 @@ func getQueryTimeout() time.Duration {
 				"default", defaultQueryTimeout,
 				"error", parseErr.Error(),
 			)
-		} else if d <= 0 {
+		} else if d < 0 {
 			slog.Error("invalid query timeout, using default", //nolint:gosec
 				"env", queryTimeoutEnvVar,
 				"value", s,

@@ -896,7 +896,7 @@ func (s *slowDBReader) QueryResources(ctx context.Context, _, _, _, _, _, _ stri
 	return nil, s.block(ctx)
 }
 
-func (s *slowDBReader) StreamResources(queryCtx, _ context.Context, _, _, _, _, _, _ string, _ *models.LabelFilters, _, _ *time.Time, _ int, _ func(models.Resource) error) error {
+func (s *slowDBReader) StreamResources(queryCtx context.Context, _, _, _, _, _, _ string, _ *models.LabelFilters, _, _ *time.Time, _ int, _ func(models.Resource) error) error {
 	return s.block(queryCtx)
 }
 

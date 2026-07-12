@@ -257,7 +257,7 @@ func (f *fakeDatabase) QueryResources(ctx context.Context, kind, version, namesp
 	return resources, f.err
 }
 
-func (f *fakeDatabase) StreamResources(queryCtx, _ context.Context, kind, version, namespace, name,
+func (f *fakeDatabase) StreamResources(queryCtx context.Context, kind, version, namespace, name,
 	continueId, continueDate string, _ *models.LabelFilters,
 	creationTimestampAfter, creationTimestampBefore *time.Time, limit int,
 	fn func(resource models.Resource) error) error {

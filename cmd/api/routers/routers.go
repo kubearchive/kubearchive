@@ -184,11 +184,10 @@ func (c *Controller) GetResources(context *gin.Context) {
 	var headerWritten bool
 	w := context.Writer
 
-	reqCtx := context.Request.Context()
-	queryCtx, queryCancel := c.queryContext(reqCtx)
+	queryCtx, queryCancel := c.queryContext(context.Request.Context())
 	defer queryCancel()
 	err = c.Database.StreamResources(
-		queryCtx, reqCtx, kind, apiVersion, namespace, name, id, date, labelFilters,
+		queryCtx, kind, apiVersion, namespace, name, id, date, labelFilters,
 		creationTimestampAfter, creationTimestampBefore, newLimit,
 		func(resource labelFilter.Resource) error {
 			count++

@@ -50,11 +50,13 @@ The timeout applies to every database read issued by the API server:
 * Resource count queries (`?count=true`)
 * Log URL queries (`GET .../log`)
 
+[NOTE]
+====
 For streaming responses (collection queries that return multiple
-resources), the timeout governs the initial database cursor open.
-Once rows begin streaming to the client, the response uses the
-original request context so that a short query timeout does not
-truncate an otherwise healthy transfer.
+resources), timeout covers both query execution and resource collection
+iteration time, this should be taken into account when configuring 
+the timeout for namespaces which produce a large amounts of resources.
+====
 
 == Disabling the timeout
 

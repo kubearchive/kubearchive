@@ -6,6 +6,7 @@ package errors
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -29,7 +30,7 @@ func TestWrapQueryError(t *testing.T) {
 			name:     "context deadline exceeded",
 			ctxFunc:  func() context.Context { return context.Background() },
 			err:      context.DeadlineExceeded,
-			expected: ErrQueryTimeout,
+			expected: fmt.Errorf("%w: %w", ErrDatabaseTimeout, context.DeadlineExceeded),
 		},
 		{
 			name: "context deadline exceeded from context",
@@ -40,13 +41,13 @@ func TestWrapQueryError(t *testing.T) {
 				return ctx
 			},
 			err:      errors.New("some database error"),
-			expected: ErrQueryTimeout,
+			expected: ErrContextQueryTimeout,
 		},
 		{
 			name:     "postgresql error 57014 query_canceled",
 			ctxFunc:  func() context.Context { return context.Background() },
 			err:      &pq.Error{Code: "57014", Message: "canceling statement due to user request"},
-			expected: ErrQueryTimeout,
+			expected: ErrContextQueryTimeout,
 		},
 		{
 			name:     "other postgresql error not wrapped",
@@ -74,9 +75,9 @@ func TestWrapQueryError(t *testing.T) {
 				return
 			}
 
-			if tt.expected == ErrQueryTimeout {
-				if !errors.Is(result, ErrQueryTimeout) {
-					t.Errorf("expected ErrQueryTimeout, got %v", result)
+			if tt.expected == ErrContextQueryTimeout {
+				if !errors.Is(result, ErrContextQueryTimeout) {
+					t.Errorf("expected ErrContextQueryTimeout, got %v", result)
 				}
 				return
 			}

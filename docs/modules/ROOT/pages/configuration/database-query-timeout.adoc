@@ -21,7 +21,7 @@ To modify the timeout, perform the following steps:
 [source,yaml]
 ----
 ---
-apiVersion: v1
+apiVersion: apps/v1
 kind: Deployment
 spec:
   template:

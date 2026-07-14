@@ -37,8 +37,9 @@ type Controller struct {
 
 // queryContext creates a child context bounded by the configured QueryTimeout for use during
 // database query execution only — not for the full response lifecycle — so that callers which
-// stream results can pass it solely to the initial cursor-open call; returns DeadlineExceeded
-// immediately if the parent context is already expired.
+// stream results can pass it solely to the initial cursor-open call;
+// queryContext returns a child context with the configured QueryTimeout applied.
+// If QueryTimeout is zero or negative, the parent context is returned unchanged.
 func (c *Controller) queryContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	if c.QueryTimeout <= 0 {
 		return ctx, func() {}

@@ -12,8 +12,10 @@ import (
 )
 
 var (
-	ErrResourceNotFound = errors.New("resource not found")
-	ErrQueryTimeout     = errors.New("context deadline exceeded")
+	ErrResourceNotFound    = errors.New("resource not found")
+	ErrContextQueryTimeout = errors.New("context deadline exceeded")
+	ErrDatabaseTimeout     = errors.New("database query timeout")
+	ErrContextCancelled    = errors.New("user context cancelled")
 )
 
 const pgQueryCancelled = "57014"
@@ -26,19 +28,21 @@ func WrapQueryError(ctx context.Context, err error) error {
 	}
 
 	// Check context error first in case query was cancelled
-	if ctxErr := ctx.Err(); ctxErr == context.Canceled || ctxErr == context.DeadlineExceeded {
-		return fmt.Errorf("%w: %w", ErrQueryTimeout, ctxErr)
+	if ctxErr := ctx.Err(); ctxErr == context.Canceled {
+		return fmt.Errorf("%w: %w", ErrContextCancelled, ctxErr)
+	} else if ctxErr == context.DeadlineExceeded {
+		return fmt.Errorf("%w: %w", ErrContextQueryTimeout, ctxErr)
 	}
 
 	// Check if context deadline was exceeded
 	if errors.Is(err, context.DeadlineExceeded) {
-		return fmt.Errorf("%w: %w", ErrQueryTimeout, err)
+		return fmt.Errorf("%w: %w", ErrDatabaseTimeout, err)
 	}
 
 	// Check for PostgreSQL error code 57014 (query_canceled)
 	var pqErr *pq.Error
 	if errors.As(err, &pqErr) && pqErr.Code == pgQueryCancelled {
-		return fmt.Errorf("%w: %w", ErrQueryTimeout, pqErr)
+		return fmt.Errorf("%w: %w", ErrDatabaseTimeout, pqErr)
 	}
 
 	return err

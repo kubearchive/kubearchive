@@ -14,8 +14,8 @@ import (
 var (
 	ErrResourceNotFound    = errors.New("resource not found")
 	ErrQueryTimeout        = errors.New("query timeout")
-	ErrContextQueryTimeout = fmt.Errorf("context deadline exceeded: %w", ErrQueryTimeout)
-	ErrDatabaseTimeout     = fmt.Errorf("database query timeout: %w", ErrQueryTimeout)
+	ErrContextQueryTimeout = errors.New("context deadline exceeded")
+	ErrDatabaseTimeout     = errors.New("database query timeout")
 	ErrContextCancelled    = errors.New("user context cancelled")
 )
 

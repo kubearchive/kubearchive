@@ -48,7 +48,7 @@ jobs:
         with:
           path: "*.png"
       - name: Send notification using Slack
-        uses: slackapi/slack-github-action@v3.0.4
+        uses: slackapi/slack-github-action@v3.0.5
         with:
           webhook: ${{ secrets.SLACK_KUBEARCHIVE_CI_WEBHOOK }}
           webhook-type: incoming-webhook

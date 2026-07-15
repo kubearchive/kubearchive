@@ -78,7 +78,7 @@ When a query exceeds the timeout the API returns:
 
 [source,json]
 ----
-{"message": "context deadline exceeded"}
+{"message": "context deadline exceeded: query timeout: context deadline exceeded"}
 ----
 
 with HTTP status `504 Gateway Timeout`. Clients can retry the request

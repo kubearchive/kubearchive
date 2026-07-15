@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/lib/pq"
+	"github.com/lib/pq/pqerror"
 )
 
 var (
@@ -18,8 +19,6 @@ var (
 	ErrDatabaseTimeout     = fmt.Errorf("database query timeout: %w", ErrQueryTimeout)
 	ErrContextCancelled    = errors.New("user context cancelled")
 )
-
-const pgQueryCancelled = "57014"
 
 // WrapQueryError wraps database query errors to detect timeout conditions.
 // Returns ErrQueryTimeout if the error was caused by context deadline or PostgreSQL query cancellation.
@@ -40,10 +39,8 @@ func WrapQueryError(ctx context.Context, err error) error {
 		return fmt.Errorf("%w: %w", ErrDatabaseTimeout, err)
 	}
 
-	// Check for PostgreSQL error code 57014 (query_canceled)
-	var pqErr *pq.Error
-	if errors.As(err, &pqErr) && pqErr.Code == pgQueryCancelled {
-		return fmt.Errorf("%w: %w", ErrContextQueryTimeout, pqErr)
+	if pqErr := pq.As(err, pqerror.QueryCanceled); pqErr != nil {
+		return fmt.Errorf("%w: %w", ErrQueryTimeout, pqErr)
 	}
 
 	return err

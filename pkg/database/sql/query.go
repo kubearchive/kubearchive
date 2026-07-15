@@ -34,9 +34,8 @@ func (q queryPerformer[T]) performQuery(ctx context.Context, builder sqlbuilder.
 	return res, dbErrors.WrapQueryError(ctx, err)
 }
 
-// performStreamQuery executes the query using queryCtx (e.g. one with a deadline) and
-// iterates rows under iterCtx. Separating the two contexts lets callers apply a timeout
-// only to the query-execution phase without aborting row iteration mid-stream.
+// performStreamQuery executes the query and iterates rows under query context ctx.
+// If ctx has a timeout configured, it covers both query execution and row iteration.
 func (q queryPerformer[T]) performStreamQuery(ctx context.Context, builder sqlbuilder.Builder, fn func(T) error) error {
 	query, args := builder.BuildWithFlavor(q.flavor)
 	rows, err := q.querier.QueryxContext(ctx, query, args...)

@@ -47,7 +47,7 @@ func TestWrapQueryError(t *testing.T) {
 			name:     "postgresql error 57014 query_canceled",
 			ctxFunc:  func() context.Context { return context.Background() },
 			err:      &pq.Error{Code: "57014", Message: "canceling statement due to user request"},
-			expected: ErrContextQueryTimeout,
+			expected: fmt.Errorf("%w: %w", ErrQueryTimeout, &pq.Error{Code: "57014", Message: "canceling statement due to user request"}),
 		},
 		{
 			name:     "other postgresql error not wrapped",

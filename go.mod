@@ -6,7 +6,7 @@ require (
 	github.com/Cyprinus12138/otelgin v1.0.3
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/XSAM/otelsql v0.42.0
+	github.com/XSAM/otelsql v0.43.0
 	github.com/avast/retry-go/v5 v5.0.0
 	github.com/cloudevents/sdk-go/observability/opentelemetry/v2 v2.16.2
 	github.com/cloudevents/sdk-go/v2 v2.16.2
@@ -165,7 +165,7 @@ require (
 	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect

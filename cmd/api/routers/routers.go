@@ -4,6 +4,7 @@
 package routers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -31,6 +32,17 @@ type CacheExpirations struct {
 type Controller struct {
 	Database           interfaces.DBReader
 	CacheConfiguration CacheExpirations
+	QueryTimeout       time.Duration
+}
+
+// queryContext returns a child context with the configured QueryTimeout applied.
+// If QueryTimeout is zero or negative, the parent context is returned unchanged.
+func (c *Controller) queryContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if c.QueryTimeout <= 0 {
+		return ctx, func() {}
+	}
+	newCtx, cancel := context.WithTimeout(ctx, c.QueryTimeout)
+	return newCtx, cancel
 }
 
 func (c *Controller) GetResources(context *gin.Context) {
@@ -112,11 +124,18 @@ func (c *Controller) GetResources(context *gin.Context) {
 			abort.Abort(context, errors.New("cannot use 'continue' with 'count'"), http.StatusBadRequest)
 			return
 		}
+		queryCtx, cancel := c.queryContext(context.Request.Context())
+		defer cancel()
 		count, countErr := c.Database.CountResources(
-			context.Request.Context(), kind, apiVersion, namespace, name, labelFilters,
+			queryCtx, kind, apiVersion, namespace, name, labelFilters,
 			creationTimestampAfter, creationTimestampBefore)
+
 		if countErr != nil {
-			abort.Abort(context, countErr, http.StatusInternalServerError)
+			if errors.Is(countErr, dbErrors.ErrQueryTimeout) {
+				abort.Abort(context, countErr, http.StatusGatewayTimeout)
+			} else {
+				abort.Abort(context, countErr, http.StatusInternalServerError)
+			}
 			return
 		}
 		context.JSON(http.StatusOK, gin.H{"count": count})
@@ -125,12 +144,18 @@ func (c *Controller) GetResources(context *gin.Context) {
 
 	// Single resource by exact name - no streaming needed
 	if name != "" && !strings.Contains(name, "*") {
+		queryCtx, cancel := c.queryContext(context.Request.Context())
+		defer cancel()
 		var resources []labelFilter.Resource
 		resources, err = c.Database.QueryResources(
-			context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
+			queryCtx, kind, apiVersion, namespace, name, id, date, labelFilters,
 			creationTimestampAfter, creationTimestampBefore, 2)
 		if err != nil {
-			abort.Abort(context, err, http.StatusInternalServerError)
+			if errors.Is(err, dbErrors.ErrQueryTimeout) {
+				abort.Abort(context, err, http.StatusGatewayTimeout)
+			} else {
+				abort.Abort(context, err, http.StatusInternalServerError)
+			}
 			return
 		}
 		if len(resources) == 0 {
@@ -157,8 +182,10 @@ func (c *Controller) GetResources(context *gin.Context) {
 	var headerWritten bool
 	w := context.Writer
 
+	queryCtx, queryCancel := c.queryContext(context.Request.Context())
+	defer queryCancel()
 	err = c.Database.StreamResources(
-		context.Request.Context(), kind, apiVersion, namespace, name, id, date, labelFilters,
+		queryCtx, kind, apiVersion, namespace, name, id, date, labelFilters,
 		creationTimestampAfter, creationTimestampBefore, newLimit,
 		func(resource labelFilter.Resource) error {
 			count++
@@ -181,7 +208,11 @@ func (c *Controller) GetResources(context *gin.Context) {
 
 	if err != nil {
 		if !headerWritten {
-			abort.Abort(context, err, http.StatusInternalServerError)
+			if errors.Is(err, dbErrors.ErrQueryTimeout) {
+				abort.Abort(context, err, http.StatusGatewayTimeout)
+			} else {
+				abort.Abort(context, err, http.StatusInternalServerError)
+			}
 			return
 		}
 		// Response already started - log the error, client will see truncated JSON
@@ -249,13 +280,15 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 		apiVersion = fmt.Sprintf("%s/%s", group, version)
 	}
 
+	queryCtx, cancel := c.queryContext(context.Request.Context())
+	defer cancel()
 	var logRecord *interfaces.LogRecord
 	if name != "" {
 		logRecord, err = c.Database.QueryLogURLByName(
-			context.Request.Context(), kind, apiVersion, namespace, name, containerName)
+			queryCtx, kind, apiVersion, namespace, name, containerName)
 	} else {
 		logRecord, err = c.Database.QueryLogURLByUID(
-			context.Request.Context(), kind, apiVersion, namespace, uid, containerName)
+			queryCtx, kind, apiVersion, namespace, uid, containerName)
 	}
 
 	if errors.Is(err, dbErrors.ErrResourceNotFound) {
@@ -263,7 +296,11 @@ func (c *Controller) GetLogURL(context *gin.Context) {
 		return
 	}
 	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
+		if errors.Is(err, dbErrors.ErrQueryTimeout) {
+			abort.Abort(context, err, http.StatusGatewayTimeout)
+		} else {
+			abort.Abort(context, err, http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -292,9 +329,15 @@ func (c *Controller) GetResourceByUID(context *gin.Context) {
 		return
 	}
 
-	resource, err := c.Database.QueryResourceByUID(context.Request.Context(), kind, apiVersion, namespace, uid)
+	queryCtx, cancel := c.queryContext(context.Request.Context())
+	defer cancel()
+	resource, err := c.Database.QueryResourceByUID(queryCtx, kind, apiVersion, namespace, uid)
 	if err != nil {
-		abort.Abort(context, err, http.StatusInternalServerError)
+		if errors.Is(err, dbErrors.ErrQueryTimeout) {
+			abort.Abort(context, err, http.StatusGatewayTimeout)
+		} else {
+			abort.Abort(context, err, http.StatusInternalServerError)
+		}
 		return
 	}
 

@@ -16,6 +16,7 @@
 ** xref:configuration/cache-expiration-time.adoc[Cache Expiration Time]
 ** xref:configuration/database-connection-pool.adoc[Database Connection Pool]
 ** xref:configuration/rate-limiting.adoc[Rate Limiting]
+** xref:configuration/database-query-timeout.adoc[Database Query Timeout]
 ** xref:configuration/observability.adoc[Observability]
 ** xref:configuration/impersonation.adoc[]
 ** xref:configuration/kubearchive-logs.adoc[]

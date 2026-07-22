@@ -168,7 +168,7 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 
 	resources, err := db.performResourceQuery(ctx, sb)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve resource '%s/%s': %s", namespace, name, err.Error())
+		return nil, fmt.Errorf("could not retrieve resource '%s/%s': %w", namespace, name, err)
 	}
 
 	if len(resources) == 0 {
@@ -179,7 +179,7 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 	var pod corev1.Pod
 	err = json.Unmarshal([]byte(resource.Data), &pod)
 	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize pod '%s/%s': %s", namespace, name, err.Error())
+		return nil, fmt.Errorf("failed to deserialize pod '%s/%s': %w", namespace, name, err)
 	}
 
 	if containerName == "" {

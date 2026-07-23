@@ -16,7 +16,7 @@ jobs:
       pull-requests: read
     runs-on: ubuntu-latest
     name: Check if required labels are assigned to the PR
-    if: github.actor != 'kubearchive-renovate[bot]'
+    if: github.actor != 'kubearchive-renovate[bot]' && !startsWith(github.actor, 'fullsend-ai-')
     steps:
       - name: Check labels
         id: check-labels

@@ -15,7 +15,7 @@ jobs:
       pull-requests: write
     name: assign and unassign reviewers
     runs-on: ubuntu-latest
-    if: github.actor != 'kubearchive-renovate[bot]'
+    if: github.actor != 'kubearchive-renovate[bot]' && !startsWith(github.actor, 'fullsend-ai-')
     steps:
       - name: Assign reviewers by label
         id: assign-reviewers

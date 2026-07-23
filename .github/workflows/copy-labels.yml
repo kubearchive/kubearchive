@@ -15,7 +15,7 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     name: Copy labels from linked issues
-    if: github.actor != 'kubearchive-renovate[bot]'
+    if: github.actor != 'kubearchive-renovate[bot]' && !startsWith(github.actor, 'fullsend-ai-')
     steps:
       - name: Copy labels
         id: copy-labels
@@ -27,7 +27,7 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-latest
     name: Add assignee to the PR
-    if: github.actor != 'kubearchive-renovate[bot]'
+    if: github.actor != 'kubearchive-renovate[bot]' && !startsWith(github.actor, 'fullsend-ai-')
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v7
@@ -57,7 +57,7 @@ jobs:
       pull-requests: read
     runs-on: ubuntu-latest
     name: Check issue linked to PR
-    if: github.actor != 'kubearchive-renovate[bot]'
+    if: github.actor != 'kubearchive-renovate[bot]' && !startsWith(github.actor, 'fullsend-ai-')
     steps:
       - name: Get linked issues
         id: get-linked-issues

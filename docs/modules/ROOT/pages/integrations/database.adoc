@@ -119,6 +119,49 @@ kubectl rollout -n kubearchive restart deployment kubearchive-sink kubearchive-a
 ----
 ====
 
+=== Password Rotation
+
+To rotate the password of the `kubearchive` database user, follow these steps:
+
+. Change the password on the database side. A database administrator should
+update the `kubearchive` user password. For PostgreSQL:
++
+[source, sql]
+----
+ALTER USER kubearchive WITH PASSWORD 'new-password'; -- <1>
+----
+<1> Replace with the new password.
+
+. Update the `kubearchive-database-credentials` Secret in the `kubearchive` namespace:
++
+[source, bash]
+----
+kubectl patch secret -n kubearchive kubearchive-database-credentials \
+--patch='{"stringData": {
+"DATABASE_PASSWORD": "new-password" <1>
+}}'
+----
+<1> Replace with the new password.
+
+. Rollout restart the KubeArchive deployments that access the database:
++
+[source, bash]
+----
+kubectl rollout -n kubearchive restart deployment kubearchive-sink kubearchive-api-server
+----
+
+. Verify that the deployments are running correctly:
++
+[source, bash]
+----
+kubectl rollout -n kubearchive status deployment kubearchive-sink kubearchive-api-server
+----
+
+[IMPORTANT]
+====
+Both the database password and the Kubernetes Secret must be updated to match.
+If they are out of sync, the KubeArchive components will fail to connect to the database.
+====
 
 == Adding a New Database engine
 

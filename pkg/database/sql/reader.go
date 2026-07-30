@@ -54,18 +54,46 @@ func (db *sqlDatabaseImpl) buildResourceListQuery(ctx context.Context, kind, api
 		sb.Where(db.filter.NamespaceFilter(sb.Cond, namespace))
 	}
 
-	isWildcardQuery := false
+	isListQuery := false
 	if name != "" {
 		if strings.Contains(name, "*") {
 			sqlPattern := strings.ReplaceAll(name, "*", "%")
 			sb.Where(db.filter.NameWildcardFilter(sb.Cond, sqlPattern))
-			isWildcardQuery = true
+			isListQuery = true
 		} else {
 			sb.Where(db.filter.NameFilter(sb.Cond, name))
 		}
+	} else {
+		isListQuery = true
 	}
 
-	if name == "" || isWildcardQuery {
+	if creationTimestampAfter != nil {
+		sb.Where(db.filter.CreationTimestampAfterFilter(sb.Cond, *creationTimestampAfter))
+	}
+	if creationTimestampBefore != nil {
+		sb.Where(db.filter.CreationTimestampBeforeFilter(sb.Cond, *creationTimestampBefore))
+	}
+	if !labelFilters.IsEmpty() {
+		if err := db.filter.ApplyLabelFilters(ctx, db.db, sb, labelFilters); err != nil {
+			return false, err
+		}
+	}
+
+	return isListQuery, nil
+}
+
+// buildResourceListQuery builds the SQL select query for listing resources.
+// This is shared between QueryResources and StreamResources.
+func (db *sqlDatabaseImpl) buildResourceListQuery(ctx context.Context, kind, apiVersion, namespace, name,
+	continueId, continueDate string, labelFilters *models.LabelFilters,
+	creationTimestampAfter, creationTimestampBefore *time.Time, limit int) (*sqlbuilder.SelectBuilder, error) {
+	sb := db.selector.ResourceSelector()
+	isListQuery, err := db.applyResourceFilters(ctx, sb, kind, apiVersion, namespace, name,
+		labelFilters, creationTimestampAfter, creationTimestampBefore)
+	if err != nil {
+		return nil, err
+	}
+	if isListQuery {
 		if continueId != "" && continueDate != "" {
 			sb.Where(db.filter.CreationTSAndIDFilter(sb.Cond, continueDate, continueId))
 		}
@@ -87,6 +115,30 @@ func (db *sqlDatabaseImpl) buildResourceListQuery(ctx context.Context, kind, api
 		sb.Limit(limit)
 	}
 	return sb, nil
+}
+
+// buildResourceCountQuery builds the SQL count query for counting matching resources.
+func (db *sqlDatabaseImpl) buildResourceCountQuery(ctx context.Context, kind, apiVersion, namespace, name string,
+	labelFilters *models.LabelFilters,
+	creationTimestampAfter, creationTimestampBefore *time.Time) (*sqlbuilder.SelectBuilder, error) {
+	sb := db.selector.ResourceCountSelector()
+	_, err := db.applyResourceFilters(ctx, sb, kind, apiVersion, namespace, name,
+		labelFilters, creationTimestampAfter, creationTimestampBefore)
+	if err != nil {
+		return nil, err
+	}
+	return sb, nil
+}
+
+func (db *sqlDatabaseImpl) CountResources(ctx context.Context, kind, apiVersion, namespace, name string,
+	labelFilters *models.LabelFilters,
+	creationTimestampAfter, creationTimestampBefore *time.Time) (int64, error) {
+	sb, err := db.buildResourceCountQuery(ctx, kind, apiVersion, namespace, name,
+		labelFilters, creationTimestampAfter, creationTimestampBefore)
+	if err != nil {
+		return 0, err
+	}
+	return newQueryPerformer[int64](db.db, db.flavor).performSingleRowQuery(ctx, sb)
 }
 
 func (db *sqlDatabaseImpl) QueryResources(ctx context.Context, kind, apiVersion, namespace, name,
@@ -130,7 +182,7 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 
 	resources, err := db.performResourceQuery(ctx, sb)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve resource '%s/%s': %s", namespace, name, err.Error())
+		return nil, fmt.Errorf("could not retrieve resource '%s/%s': %w", namespace, name, err)
 	}
 
 	if len(resources) == 0 {
@@ -141,7 +193,7 @@ func (db *sqlDatabaseImpl) getLogsForPodSelector(ctx context.Context, sb *sqlbui
 	var pod corev1.Pod
 	err = json.Unmarshal([]byte(resource.Data), &pod)
 	if err != nil {
-		return nil, fmt.Errorf("failed to deserialize pod '%s/%s': %s", namespace, name, err.Error())
+		return nil, fmt.Errorf("failed to deserialize pod '%s/%s': %w", namespace, name, err)
 	}
 
 	if containerName == "" {

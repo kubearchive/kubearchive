@@ -35,6 +35,8 @@ const (
 	otelServiceName                   = "kubearchive.api"
 	cacheExpirationAuthorizedEnvVar   = "CACHE_EXPIRATION_AUTHORIZED"
 	cacheExpirationUnauthorizedEnvVar = "CACHE_EXPIRATION_UNAUTHORIZED"
+	queryTimeoutEnvVar                = "KUBEARCHIVE_QUERY_TIMEOUT"
+	defaultQueryTimeout               = 5 * time.Minute
 )
 
 var (
@@ -59,12 +61,23 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 		"/readyz": "DEBUG",
 	}}))
 
+	rateLimits, err := middleware.GetRateLimitConfig()
+	if err != nil {
+		slog.Error("Could not get rate limit config", "error", err.Error())
+		os.Exit(1)
+	}
+
 	apiGroup := router.Group("/api")
 	apisGroup := router.Group("/apis")
 	groups := [...]*gin.RouterGroup{apisGroup, apiGroup}
+
+	overallRL := middleware.UserRateLimiter(rateLimits.OverallRPS, rateLimits.OverallBurst)
+	logRL := middleware.UserRateLimiter(rateLimits.LogRPS, rateLimits.LogBurst)
+
 	// Set up middleware for each group
 	for _, group := range groups {
 		group.Use(gzip.Gzip(gzip.DefaultCompression))
+		group.Use(overallRL)
 		group.Use(auth.Authentication(k8sClient.AuthenticationV1().TokenReviews(), cache,
 			cacheExpirations.Authorized, cacheExpirations.Unauthorized))
 		group.Use(auth.Impersonation(k8sClient.AuthorizationV1().SubjectAccessReviews(), cache,
@@ -82,19 +95,19 @@ func NewServer(k8sClient kubernetes.Interface, controller routers.Controller, ca
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/:name/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append([]gin.HandlerFunc{logRL}, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/uid/:uid", controller.GetResourceByUID)
 	apisGroup.GET("/:group/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append([]gin.HandlerFunc{logRL}, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 
 	apiGroup.GET("/:version/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name", controller.GetResources)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/:name/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append([]gin.HandlerFunc{logRL}, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/uid/:uid", controller.GetResourceByUID)
 	apiGroup.GET("/:version/namespaces/:namespace/:resourceType/uid/:uid/log",
-		logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())
+		append([]gin.HandlerFunc{logRL}, logging.SetLoggingConfig(), controller.GetLogURL, logging.LogRetrieval())...)
 
 	return &Server{
 		router:    router,
@@ -145,7 +158,10 @@ func main() {
 		}
 	}(db)
 
-	controller := routers.Controller{Database: db, CacheConfiguration: *cacheExpirations}
+	queryTimeout := getQueryTimeout()
+	slog.Info("Database query timeout configured", "timeout", queryTimeout)
+
+	controller := routers.Controller{Database: db, CacheConfiguration: *cacheExpirations, QueryTimeout: queryTimeout}
 	k8sClient, err := k8sclient.NewInstrumentedKubernetesClient()
 	if err != nil {
 		slog.Error("Could not create instrumented kubernetes client", "error", err.Error())
@@ -201,6 +217,30 @@ func main() {
 	// This blocks until the context expires
 	<-ctx.Done()
 	slog.Debug("Shutdown reached timeout")
+}
+
+func getQueryTimeout() time.Duration {
+	queryTimeout := defaultQueryTimeout
+	if s := os.Getenv(queryTimeoutEnvVar); s != "" {
+		d, parseErr := time.ParseDuration(s)
+		if parseErr != nil {
+			slog.Error("invalid query timeout, using default", //nolint:gosec
+				"env", queryTimeoutEnvVar,
+				"value", s,
+				"default", defaultQueryTimeout,
+				"error", parseErr.Error(),
+			)
+		} else if d < 0 {
+			slog.Error("invalid query timeout, using default", //nolint:gosec
+				"env", queryTimeoutEnvVar,
+				"value", s,
+				"default", defaultQueryTimeout,
+			)
+		} else {
+			queryTimeout = d
+		}
+	}
+	return queryTimeout
 }
 
 func getCacheExpirations() (*routers.CacheExpirations, error) {

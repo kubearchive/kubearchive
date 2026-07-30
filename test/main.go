@@ -265,6 +265,11 @@ func GetUrl(t testing.TB, token string, url string, extraHeaders map[string][]st
 	return &data, nil
 }
 
+// GetRawUrl makes an authenticated GET request and returns the raw response body.
+func GetRawUrl(t testing.TB, token string, url string, extraHeaders map[string][]string) ([]byte, error) {
+	return getUrl(t, token, url, extraHeaders)
+}
+
 func GetLogs(t testing.TB, token string, url string) ([]byte, error) {
 	return getUrl(t, token, url, map[string][]string{})
 }

@@ -6,16 +6,18 @@ package sql
 import (
 	"database/sql"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/XSAM/otelsql"
 	"github.com/avast/retry-go/v5"
 	"github.com/jmoiron/sqlx"
+	"github.com/kubearchive/kubearchive/pkg/database/env"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
-func establishConnection(driver, connectionString string) (*sqlx.DB, error) {
+func establishConnection(driver, connectionString string, dbEnv map[string]string) (*sqlx.DB, error) {
 	slog.Info("Establishing database connection")
 	configs := []retry.Option{
 		retry.Attempts(10),
@@ -39,12 +41,15 @@ func establishConnection(driver, connectionString string) (*sqlx.DB, error) {
 		return nil, errRetry
 	}
 
+	slog.Info("Successfully connected to the database")
+
+	configureConnectionPool(conn, dbEnv)
+
 	_, err = otelsql.RegisterDBStatsMetrics(conn, otelsql.WithAttributes(semconv.DBSystemKey.String(driver)))
 	if err != nil {
 		slog.Error("Unable to instrument the DB properly", "error", err.Error())
 		return nil, err
 	}
-	slog.Info("Successfully connected to the database")
 
 	// Extract connection info for logging
 	connectionInfo := extractConnectionInfo(driver, connectionString)
@@ -57,6 +62,63 @@ func establishConnection(driver, connectionString string) (*sqlx.DB, error) {
 		"ssl_mode", connectionInfo.sslMode,
 	)
 	return sqlx.NewDb(conn, driver), nil
+}
+
+func configureConnectionPool(db *sql.DB, dbEnv map[string]string) {
+	maxOpenConns := getEnvInt(dbEnv, env.DbMaxOpenConnsEnvVar, env.DbDefaultMaxOpenConns)
+	maxIdleConns := getEnvInt(dbEnv, env.DbMaxIdleConnsEnvVar, env.DbDefaultMaxIdleConns)
+	connMaxLifetime := getEnvDuration(dbEnv, env.DbConnMaxLifetimeEnvVar, env.DbDefaultConnMaxLifetime)
+	connMaxIdleTime := getEnvDuration(dbEnv, env.DbConnMaxIdleTimeEnvVar, env.DbDefaultConnMaxIdleTime)
+
+	db.SetMaxOpenConns(maxOpenConns)
+	db.SetMaxIdleConns(maxIdleConns)
+	db.SetConnMaxLifetime(connMaxLifetime)
+	db.SetConnMaxIdleTime(connMaxIdleTime)
+
+	slog.Info("Database connection pool configured",
+		"max_open_conns", maxOpenConns,
+		"max_idle_conns", maxIdleConns,
+		"conn_max_lifetime", connMaxLifetime,
+		"conn_max_idle_time", connMaxIdleTime,
+	)
+}
+
+func getEnvInt(dbEnv map[string]string, key string, defaultValue int) int {
+	val, exists := dbEnv[key]
+	if !exists || val == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.Atoi(val)
+	if err != nil {
+		slog.Warn("Invalid integer value for environment variable, using default",
+			"key", key, "value", val, "default", defaultValue)
+		return defaultValue
+	}
+	if parsed <= 0 {
+		slog.Warn("Zero or negative value for environment variable is not allowed, using default",
+			"key", key, "value", parsed, "default", defaultValue)
+		return defaultValue
+	}
+	return parsed
+}
+
+func getEnvDuration(dbEnv map[string]string, key string, defaultValue time.Duration) time.Duration {
+	val, exists := dbEnv[key]
+	if !exists || val == "" {
+		return defaultValue
+	}
+	parsed, err := time.ParseDuration(val)
+	if err != nil {
+		slog.Warn("Invalid duration value for environment variable, using default",
+			"key", key, "value", val, "default", defaultValue)
+		return defaultValue
+	}
+	if parsed <= 0 {
+		slog.Warn("Zero or negative duration for environment variable is not allowed, using default",
+			"key", key, "value", parsed, "default", defaultValue)
+		return defaultValue
+	}
+	return parsed
 }
 
 // connectionInfo holds parsed connection details for logging

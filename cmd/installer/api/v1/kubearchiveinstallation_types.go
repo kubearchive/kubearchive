@@ -4,18 +4,38 @@
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+// ComponentSpec defines resource configuration for a KubeArchive component.
+type ComponentSpec struct {
+	// Resources defines the compute resource requirements for this component.
+	// +optional
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+}
+
 // KubeArchiveInstallationSpec defines the desired state of KubeArchiveInstallation.
 type KubeArchiveInstallationSpec struct {
-	// Important: Run "make" to regenerate code after modifying this file
+	// Important: Run "cmd/installer/generate.sh" to regenerate code after modifying this file
 
 	// Version is the version of KubeArchive to install. See https://github.com/kubearchive/kubearchive/releases
 	// for a list of available versions
 	Version string `json:"version"`
+
+	// API defines resource configuration for the API server component.
+	// +optional
+	API *ComponentSpec `json:"api,omitempty"`
+
+	// Operator defines resource configuration for the operator component.
+	// +optional
+	Operator *ComponentSpec `json:"operator,omitempty"`
+
+	// Sink defines resource configuration for the sink component.
+	// +optional
+	Sink *ComponentSpec `json:"sink,omitempty"`
 }
 
 type Manifest struct {

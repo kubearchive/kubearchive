@@ -47,13 +47,14 @@ Examples:
 
 Parameters allowed:
 
-* `limit`: defaults to 100. Not higher than 1000. Limits the number of entries returned.
+* `limit`: defaults to 100. Not higher than 1000. Limits the number of entries returned. Cannot be used with `count`.
 * `continue`: token to access the next page of the pagination. Retrieve it at `.metadata.continue`
-of the returned `List` resource. An empty string if there are no more pages remaining.
+of the returned `List` resource. An empty string if there are no more pages remaining. Cannot be used with `count`.
 * `labelSelector`: allows filtering resources based on label filtering.
 * `creationTimestampAfter`: filters resources created after the specified timestamp (RFC3339 format, e.g., `2023-01-01T12:00:00Z`).
 * `creationTimestampBefore`: filters resources created before the specified timestamp (RFC3339 format, e.g., `2023-12-31T23:59:59Z`).
 * `name`: allows filtering resources by name with wildcard support (see Name Filtering section below).
+* `count`: when set to `true`, returns the count of matching resources instead of the resources themselves. Cannot be used with `limit` or `continue`.
 
 === Timestamp Filters
 
@@ -171,6 +172,34 @@ Examples:
 - Cannot specify both path name parameter and query name parameter (returns 400 Bad Request)
 - Wildcard characters (*) are not allowed in path parameters, use query parameters instead (returns 400 Bad Request)
 ====
+
+=== Resource Count
+
+The `count` parameter returns the number of matching resources instead of the resources themselves.
+The response is a JSON object with a single `count` field:
+
+[source,json]
+----
+{"count": 5610}
+----
+
+All filters (`labelSelector`, `creationTimestampAfter`, `creationTimestampBefore`, `name`) can be
+combined with `count`. Pagination parameters (`limit`, `continue`) cannot be used with `count`
+and will return a 400 Bad Request error.
+
+Examples:
+
+[source,text]
+----
+/api/v1/namespaces/default/pods?count=true <1>
+/api/v1/namespaces/default/pods?count=true&labelSelector=app%3Dnginx <2>
+/api/v1/namespaces/default/pods?count=true&creationTimestampAfter=2023-01-01T00:00:00Z <3>
+/api/v1/namespaces/default/pods?count=true&creationTimestampAfter=2023-01-01T00:00:00Z&creationTimestampBefore=2023-12-31T23:59:59Z <4>
+----
+<1> Count all pods in the default namespace
+<2> Count pods matching a label selector
+<3> Count pods created after a specific date
+<4> Count pods created within a date range
 
 == Individual Resources
 

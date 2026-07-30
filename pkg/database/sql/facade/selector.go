@@ -8,6 +8,7 @@ import "github.com/huandu/go-sqlbuilder"
 // DBSelector encapsulates all the selector functions that must be implemented by the drivers
 type DBSelector interface {
 	ResourceSelector() *sqlbuilder.SelectBuilder
+	ResourceCountSelector() *sqlbuilder.SelectBuilder
 	UUIDResourceSelector() *sqlbuilder.SelectBuilder
 	OwnedResourceSelector() *sqlbuilder.SelectBuilder
 	UrlFromResourceSelector() *sqlbuilder.SelectBuilder
@@ -18,6 +19,11 @@ type DBSelector interface {
 // PartialDBSelectorImpl implements partially the DBSelector interface
 // with the default selectors with non-specific DBMS functions
 type PartialDBSelectorImpl struct{}
+
+func (PartialDBSelectorImpl) ResourceCountSelector() *sqlbuilder.SelectBuilder {
+	sb := sqlbuilder.NewSelectBuilder()
+	return sb.Select("COUNT(*)").From("resource")
+}
 
 func (PartialDBSelectorImpl) UUIDResourceSelector() *sqlbuilder.SelectBuilder {
 	sb := sqlbuilder.NewSelectBuilder()

@@ -31,16 +31,16 @@ The easiest way to install the kubectl plugin is to download a pre-built binary 
 [source,bash,subs="attributes"]
 ----
 # For Linux AMD64
-curl -LO {download-path}/kubectl-ka-linux-amd64
+curl -sSfLO {download-path}/kubectl-ka-linux-amd64
 
 # For Linux ARM64
-curl -LO {download-path}/kubectl-ka-linux-arm64
+curl -sSfLO {download-path}/kubectl-ka-linux-arm64
 
 # For Darwin AMD64
-curl -LO {download-path}/kubectl-ka-darwin-amd64
+curl -sSfLO {download-path}/kubectl-ka-darwin-amd64
 
 # For Darwin ARM64
-curl -LO {download-path}/kubectl-ka-darwin-arm64
+curl -sSfLO {download-path}/kubectl-ka-darwin-arm64
 ----
 
 2. **Make the binary executable:**

@@ -5,6 +5,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	kubearchiveorgv1 "github.com/kubearchive/kubearchive/cmd/installer/api/v1"
 	"gopkg.in/yaml.v3"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -132,6 +134,21 @@ func (r *KubeArchiveInstallationReconciler) Reconcile(ctx context.Context, req c
 		resources = append(resources, resource)
 	}
 
+	componentResources := map[string]*kubearchiveorgv1.ComponentSpec{
+		"kubearchive-api-server": kaInstallation.Spec.API,
+		"kubearchive-operator":   kaInstallation.Spec.Operator,
+		"kubearchive-sink":       kaInstallation.Spec.Sink,
+	}
+	for i := range resources {
+		if resources[i].GetKind() == "Deployment" {
+			if compSpec, ok := componentResources[resources[i].GetName()]; ok && compSpec != nil {
+				if err := setContainerResources(&resources[i], compSpec.Resources); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to set resources for %s: %w", resources[i].GetName(), err)
+				}
+			}
+		}
+	}
+
 	var manifests []kubearchiveorgv1.Manifest
 	for _, resource := range resources {
 		err := r.Client.Patch(ctx, &resource, client.Apply, &client.PatchOptions{FieldManager: "kubearchive-installer"})
@@ -167,4 +184,31 @@ func (r *KubeArchiveInstallationReconciler) SetupWithManager(mgr ctrl.Manager) e
 		For(&kubearchiveorgv1.KubeArchiveInstallation{}).
 		Named("kubearchiveinstallation").
 		Complete(r)
+}
+
+// setContainerResources sets the resource requirements on the first container of a Deployment.
+func setContainerResources(deployment *unstructured.Unstructured, resources corev1.ResourceRequirements) error {
+	containers, found, err := unstructured.NestedSlice(deployment.Object, "spec", "template", "spec", "containers")
+	if err != nil || !found || len(containers) == 0 {
+		return fmt.Errorf("no containers found in deployment %s", deployment.GetName())
+	}
+
+	// We need the resouces as a map, so we need to convert it to JSON and back to a map
+	resourcesJSON, err := json.Marshal(resources)
+	if err != nil {
+		return fmt.Errorf("failed to marshal resources: %w", err)
+	}
+	var resourcesMap map[string]any
+	if err := json.Unmarshal(resourcesJSON, &resourcesMap); err != nil {
+		return fmt.Errorf("failed to unmarshal resources: %w", err)
+	}
+
+	container, ok := containers[0].(map[string]any)
+	if !ok {
+		return fmt.Errorf("unexpected container type in deployment %s", deployment.GetName())
+	}
+	container["resources"] = resourcesMap
+	containers[0] = container
+
+	return unstructured.SetNestedSlice(deployment.Object, containers, "spec", "template", "spec", "containers")
 }

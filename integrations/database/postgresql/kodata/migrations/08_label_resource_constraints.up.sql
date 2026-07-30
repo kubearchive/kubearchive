@@ -4,7 +4,7 @@
 -- This runs after the population script has filled all label tables.
 
 -- Index for label lookups (get all resources with a specific label pair)
-CREATE INDEX IF NOT EXISTS idx_resource_label_key_value ON resource_label(label_id);
+CREATE INDEX IF NOT EXISTS idx_resource_label_label_resource ON resource_label(label_id, resource_id);
 
 -- Foreign keys with NOT VALID to avoid scanning/locking referenced tables.
 -- NOT VALID skips validation of existing rows. Future inserts/updates are

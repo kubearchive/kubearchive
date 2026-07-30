@@ -93,7 +93,7 @@ spec:
     spec:
       containers:
         - name: otel-collector
-          image: otel/opentelemetry-collector-contrib:latest
+          image: quay.io/kubearchive/opentelemetry-collector-contrib:0.155.0
           command:
             - "/otelcol-contrib"
             - "--config=/conf/otel-collector-config.yaml"

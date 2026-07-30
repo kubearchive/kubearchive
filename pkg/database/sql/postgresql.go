@@ -16,6 +16,7 @@ import (
 	"github.com/huandu/go-sqlbuilder"
 	"github.com/jmoiron/sqlx"
 	"github.com/kubearchive/kubearchive/pkg/database/env"
+	dbErrors "github.com/kubearchive/kubearchive/pkg/database/errors"
 	"github.com/kubearchive/kubearchive/pkg/database/interfaces"
 	"github.com/kubearchive/kubearchive/pkg/database/sql/facade"
 	"github.com/kubearchive/kubearchive/pkg/models"
@@ -114,7 +115,7 @@ func resolveKeyIDs(ctx context.Context, querier sqlx.QueryerContext, keys []stri
 
 	rows, err := querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("resolving label key IDs: %w", err)
+		return nil, fmt.Errorf("resolving label key IDs: %w", dbErrors.WrapQueryError(ctx, err))
 	}
 	defer rows.Close()
 
@@ -153,7 +154,7 @@ func resolveLabelIDs(ctx context.Context, querier sqlx.QueryerContext, labels ma
 
 	rows, err := querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("resolving label IDs: %w", err)
+		return nil, fmt.Errorf("resolving label IDs: %w", dbErrors.WrapQueryError(ctx, err))
 	}
 	defer rows.Close()
 
@@ -194,7 +195,7 @@ func resolveLabelIDsMulti(ctx context.Context, querier sqlx.QueryerContext, labe
 
 	rows, err := querier.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("resolving label IDs (multi): %w", err)
+		return nil, fmt.Errorf("resolving label IDs (multi): %w", dbErrors.WrapQueryError(ctx, err))
 	}
 	defer rows.Close()
 

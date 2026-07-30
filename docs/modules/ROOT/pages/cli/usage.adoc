@@ -74,6 +74,22 @@ For example, `pods`, `pod`, `po` resolve to the Pod resource.
 |Include resources from KubeArchive
 |`true`
 
+|`--count`
+|Print only the count of matching resources (KubeArchive only)
+|`false`
+
+|`--limit`
+|Maximum number of resources to return
+|`100`
+
+|`--after`
+|Only return resources created after this timestamp (RFC3339 format)
+|(none)
+
+|`--before`
+|Only return resources created before this timestamp (RFC3339 format)
+|(none)
+
 |===
 
 [NOTE]
@@ -104,6 +120,12 @@ kubectl ka get pods --in-cluster
 
 # Get only archived resources (no cluster query)
 kubectl ka get pods --archived
+
+# Count archived pods matching a label selector
+kubectl ka get pods -l app=nginx --archived --count
+
+# Count archived pods created in the last 30 days
+kubectl ka get pods --after 2023-06-01T00:00:00Z --archived --count
 ----
 
 [NOTE]
@@ -117,6 +139,12 @@ The command deduplicates resources with the same UID from both sources and shows
 You cannot use label selectors (`-l`) together with specifying a resource name. Use either a label selector to filter
 multiple resources (`kubectl ka get pods -l app=nginx`) OR specify a specific resource name
 (`kubectl ka get pod nginx-pod`), but not both.
+====
+
+[NOTE]
+====
+The `--count` flag only works with KubeArchive (`--archived`) and cannot be combined with `--limit` or a specific resource name.
+It prints a single integer to stdout, making it suitable for use in scripts: `COUNT=$(kubectl ka get pods --archived --count)`.
 ====
 
 [TIP]

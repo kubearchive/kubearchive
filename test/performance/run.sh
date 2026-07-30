@@ -38,7 +38,7 @@ sleep 30
 kubectl port-forward -n kubearchive svc/kubearchive-sink 8082:80 &
 SINK_FORWARD_PID=$!
 # This step will take 10 minutes to run. To check if it's still running do: `ps aux | grep locust | grep -v grep`
-./venv/bin/locust -f ${SCRIPT_DIR}/locustfile.py --headless --users 2 -r 2 -t 600s -H https://localhost:8081 --only-summary --processes -1 CreatePods --csv perf-results/create &> perf-results/create.txt
+./venv/bin/locust -f ${SCRIPT_DIR}/locustfile.py --headless --users 2 -r 2 -t 600s -H https://localhost:8081 --only-summary --processes -1 CreatePods --csv perf-results/create |& tee perf-results/create.txt
 kill $SINK_FORWARD_PID
 sleep 30
 END=$(date +%s)
@@ -52,7 +52,7 @@ START=$(date +%s)
 sleep 30
 kubectl port-forward -n kubearchive svc/kubearchive-api-server 8081:8081 &
 SINK_FORWARD_PID=$!
-./venv/bin/locust -f ${SCRIPT_DIR}/locustfile.py --headless --users 2 -r 2 -t 600s -H https://localhost:8081 --only-summary --processes -1 GetPods --csv perf-results/get &> perf-results/get.txt
+./venv/bin/locust -f ${SCRIPT_DIR}/locustfile.py --headless --users 2 -r 2 -t 600s -H https://localhost:8081 --only-summary --processes -1 GetPods --csv perf-results/get |& tee perf-results/get.txt
 kill $SINK_FORWARD_PID
 sleep 30
 END=$(date +%s)

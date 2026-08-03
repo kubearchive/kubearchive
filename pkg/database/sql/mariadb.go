@@ -138,6 +138,16 @@ func (f mariaDBFilter) ApplyLabelFilters(_ context.Context, _ sqlx.QueryerContex
 	return nil
 }
 
+func (mariaDBFilter) DeletionTimestampFilter(cond sqlbuilder.Cond, prunedFromEtcd *bool) string {
+	if prunedFromEtcd == nil {
+		return ""
+	}
+	if *prunedFromEtcd {
+		return "JSON_VALUE(data, '$.metadata.deletionTimestamp') IS NOT NULL"
+	}
+	return "JSON_VALUE(data, '$.metadata.deletionTimestamp') IS NULL"
+}
+
 type mariaDBSorter struct{}
 
 func (mariaDBSorter) CreationTSAndIDSorter(sb *sqlbuilder.SelectBuilder) *sqlbuilder.SelectBuilder {

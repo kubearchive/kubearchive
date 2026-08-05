@@ -70,7 +70,7 @@ psql -U admin \ <1>
 
 The `kubearchive-database-credentials` Secret stores the information to connect KubeArchive with the Database.
 
-The default content of this Secret when KubeArchive is installed is:
+The Secret ships with empty values and must be populated before KubeArchive can connect to the database:
 
 [source, yaml]
 ----
@@ -80,17 +80,17 @@ metadata:
   name: kubearchive-database-credentials
   namespace: kubearchive
 stringData:
-  DATABASE_KIND: postgresql
-  DATABASE_PORT: "5432"
-  DATABASE_URL: "kubearchive-rw.postgresql.svc.cluster.local"
-  DATABASE_DB: "kubearchive"
-  DATABASE_USER: "kubearchive"
-  DATABASE_PASSWORD: "Databas3Passw0rd"  # notsecret
+  DATABASE_KIND: ""
+  DATABASE_PORT: ""
+  DATABASE_URL: ""
+  DATABASE_DB: ""
+  DATABASE_USER: ""
+  DATABASE_PASSWORD: ""
 ----
 
-Update the secret with the specific values of your database and
+Populate the secret with the specific values of your database and
 restart the pods accordingly to pick the new values.
-The command for changing the most common values, URL and password, is:
+The command for setting the most common values, URL and password, is:
 
 [source, bash]
 ----

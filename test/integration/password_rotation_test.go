@@ -39,6 +39,9 @@ func TestPasswordRotation(t *testing.T) {
 		t.Fatalf("Failed to get kubearchive-database-credentials secret: %v", err)
 	}
 	originalPassword := string(secret.Data["DATABASE_PASSWORD"])
+	if originalPassword == "" {
+		t.Fatal("kubearchive-database-credentials secret has no DATABASE_PASSWORD set, cannot proceed with password rotation test")
+	}
 	t.Logf("Retrieved original database password from Secret")
 
 	newPassword := "Rotated-P@ss-" + test.RandomString()
@@ -73,7 +76,10 @@ func TestPasswordRotation(t *testing.T) {
 	t.Log("Step 1: updating kubearchive-database-credentials Secret")
 	setDatabasePassword(t, clientset, newPassword)
 
-	// Step 2: rollout restart the KubeArchive deployments
+	// Step 2: rollout restart the KubeArchive deployments.
+	// scaleRestartDeployment scales to zero first, guaranteeing entirely new pods with fresh logs.
+	// This makes the waitForLogMessage assertion in Step 3 unambiguous. If the restart strategy
+	// is ever changed to a rolling restart, a SinceTime filter must be added to waitForLogMessage.
 	t.Log("Step 2: restarting kubearchive-sink")
 	scaleRestartDeployment(t, clientset, "kubearchive-sink")
 	t.Log("Step 2: restarting kubearchive-api-server")

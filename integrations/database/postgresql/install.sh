@@ -7,6 +7,11 @@ set -euo pipefail
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd ${SCRIPT_DIR}
 
+if ! command -v jq &> /dev/null; then
+  echo "[ERROR] jq is required but not installed. Please install jq and try again."
+  exit 1
+fi
+
 # renovate: datasource=github-releases depName=cloudnative-pg packageName=cloudnative-pg/cloudnative-pg
 VERSION=1.24.1
 NAMESPACE="postgresql"
@@ -78,6 +83,23 @@ export NEXT_VERSION="${NEXT_VERSION:-$(cat "${REPO_ROOT}/VERSION")}"
 kubectl create ns kubearchive --dry-run=client -o yaml | kubectl apply -f -
 envsubst '$NEXT_VERSION' < "${REPO_ROOT}/config/templates/database/database_secret.yaml" \
   | kubectl -n kubearchive apply -f -
+
+# Populate the database credentials.
+# The Secret ships with empty values; the actual credentials are set here.
+# The values below match the kubearchive user created in setup.sql.
+echo "[INFO] Patching kubearchive-database-credentials secret..."
+DB_PASSWORD="Dat!abas]3Pass*w0rd" # notsecret - matches setup.sql
+PATCH_FILE=$(mktemp)
+trap 'rm -f "${PATCH_FILE}"' EXIT
+jq -n \
+  --arg kind "postgresql" \
+  --arg url "${SERVICE}.${NAMESPACE}.svc.cluster.local" \
+  --arg port "${REMOTE_PORT}" \
+  --arg db "kubearchive" \
+  --arg user "kubearchive" \
+  --arg password "${DB_PASSWORD}" \
+  '{"stringData": {"DATABASE_KIND": $kind, "DATABASE_URL": $url, "DATABASE_PORT": $port, "DATABASE_DB": $db, "DATABASE_USER": $user, "DATABASE_PASSWORD": $password}}' > "${PATCH_FILE}"
+kubectl patch -n kubearchive secret kubearchive-database-credentials --patch-file "${PATCH_FILE}"
 
 # Build the migration image and deploy the Job
 # ko reads .ko.yaml from the working directory, so run from the repo root.

@@ -70,7 +70,7 @@ psql -U admin \ <1>
 
 The `kubearchive-database-credentials` Secret stores the information to connect KubeArchive with the Database.
 
-The default content of this Secret when KubeArchive is installed is:
+The Secret ships with empty values and must be populated before KubeArchive can connect to the database:
 
 [source, yaml]
 ----
@@ -80,17 +80,17 @@ metadata:
   name: kubearchive-database-credentials
   namespace: kubearchive
 stringData:
-  DATABASE_KIND: postgresql
-  DATABASE_PORT: "5432"
-  DATABASE_URL: "kubearchive-rw.postgresql.svc.cluster.local"
-  DATABASE_DB: "kubearchive"
-  DATABASE_USER: "kubearchive"
-  DATABASE_PASSWORD: "Databas3Passw0rd"  # notsecret
+  DATABASE_KIND: ""
+  DATABASE_PORT: ""
+  DATABASE_URL: ""
+  DATABASE_DB: ""
+  DATABASE_USER: ""
+  DATABASE_PASSWORD: ""
 ----
 
-Update the secret with the specific values of your database and
+Populate the secret with the specific values of your database and
 restart the pods accordingly to pick the new values.
-The command for changing the most common values, URL and password, is:
+The command for setting the most common values, URL and password, is:
 
 [source, bash]
 ----
@@ -119,6 +119,49 @@ kubectl rollout -n kubearchive restart deployment kubearchive-sink kubearchive-a
 ----
 ====
 
+=== Password Rotation
+
+To rotate the password of the `kubearchive` database user, follow these steps:
+
+. Change the password on the database side. A database administrator should
+update the `kubearchive` user password. For PostgreSQL:
++
+[source, sql]
+----
+ALTER USER kubearchive WITH PASSWORD 'new-password'; -- <1>
+----
+<1> Replace with the new password.
+
+. Update the `kubearchive-database-credentials` Secret in the `kubearchive` namespace:
++
+[source, bash]
+----
+kubectl patch secret -n kubearchive kubearchive-database-credentials \
+--patch='{"stringData": {
+"DATABASE_PASSWORD": "new-password" <1>
+}}'
+----
+<1> Replace with the new password.
+
+. Rollout restart the KubeArchive deployments that access the database:
++
+[source, bash]
+----
+kubectl rollout -n kubearchive restart deployment kubearchive-sink kubearchive-api-server
+----
+
+. Verify that the deployments are running correctly:
++
+[source, bash]
+----
+kubectl rollout -n kubearchive status deployment kubearchive-sink kubearchive-api-server
+----
+
+[IMPORTANT]
+====
+Both the database password and the Kubernetes Secret must be updated to match.
+If they are out of sync, the KubeArchive components will fail to connect to the database.
+====
 
 == Adding a New Database engine
 

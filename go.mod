@@ -27,9 +27,9 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/contrib/bridges/otelslog v0.20.0
-	go.opentelemetry.io/contrib/instrumentation/host v0.69.0
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0
-	go.opentelemetry.io/contrib/instrumentation/runtime v0.69.0
+	go.opentelemetry.io/contrib/instrumentation/host v0.70.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.70.0
+	go.opentelemetry.io/contrib/instrumentation/runtime v0.70.0
 	go.opentelemetry.io/otel v1.45.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.21.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.45.0
@@ -68,11 +68,11 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/ebitengine/purego v0.10.1 // indirect
+	github.com/ebitengine/purego v0.10.2 // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
-	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.13 // indirect
@@ -119,7 +119,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de // indirect
-	github.com/lufia/plan9stats v0.0.0-20260330125221-c963978e514e // indirect
+	github.com/lufia/plan9stats v0.0.0-20260802145828-341c2f0c90b5 // indirect
 	github.com/mailru/easyjson v0.9.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-sqlite3 v1.14.33 // indirect
@@ -140,7 +140,7 @@ require (
 	github.com/prometheus/procfs v0.17.0 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.59.1 // indirect
-	github.com/shirou/gopsutil/v4 v4.26.4 // indirect
+	github.com/shirou/gopsutil/v4 v4.26.7 // indirect
 	github.com/tklauser/go-sysconf v0.4.0 // indirect
 	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect

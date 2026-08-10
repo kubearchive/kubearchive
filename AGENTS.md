@@ -10,6 +10,14 @@ KubeArchive archives Kubernetes resources to a JSON-capable relational database 
 - `hack/` — Dev/install/release scripts
 - `test/` — Integration and performance tests
 - `integrations/` — Database, logging, observability setup
+  - **Observability config sync:** OTel collector configs in
+    `integrations/observability/prometheus-operator/otel-collector-config.yaml`
+    and `integrations/observability/grafana/otel-collector-grafana.yaml` both
+    target the same `quay.io/kubearchive/opentelemetry-collector-contrib` image.
+    When bumping the collector version, check both directories for required
+    config syntax changes (e.g., OTTL statement updates). The grafana
+    directory's `otel-collector` container is separate from the
+    `grafana/otel-lgtm` stack — they use different images.
 
 ## Prerequisites
 

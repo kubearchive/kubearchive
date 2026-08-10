@@ -26,9 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version: '1.25.5'
       - name: Display Go version
@@ -38,13 +38,13 @@ jobs:
           bash cmd/operator/generate.sh
           bash cmd/installer/generate.sh
       - name: Lint testing Go code
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@0a35821d5c230e903fcfe077583637dea1b27b47
         with:
           version: latest
           # When is scheduled, show all issues
           only-new-issues: ${{ github.event_name != 'schedule' }}
       - name: Notify golangci-lint failed
-        uses: jayqi/failed-build-issue-action@v1
+        uses: jayqi/failed-build-issue-action@db97fb9faf4090cee7fb0d88deb6ffa724854f62
         if: failure() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'kubearchive/kubearchive'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

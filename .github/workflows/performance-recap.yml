@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Cache Performance results
         uses: actions/cache@v6
         with:
@@ -24,7 +24,7 @@ jobs:
           path: |
             ./merge
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version: '1.25.5'
       - name: Display Go version
@@ -44,11 +44,11 @@ jobs:
           gnuplot -e "name='Requests during GET'; filename='merge/get-req.csv'; outfile='get-req.png'" test/performance/req.gnuplot
           gnuplot -e "name='Requests during POST'; filename='merge/create-req.csv'; outfile='create-req.png'" test/performance/req.gnuplot
       - name: Upload graphs
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           path: "*.png"
       - name: Send notification using Slack
-        uses: slackapi/slack-github-action@v4.0.0
+        uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d
         with:
           webhook: ${{ secrets.SLACK_KUBEARCHIVE_CI_WEBHOOK }}
           webhook-type: incoming-webhook

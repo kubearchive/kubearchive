@@ -15,6 +15,9 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/genericiooptions"
 	"k8s.io/client-go/rest"
@@ -127,6 +130,8 @@ func createTestResponse(t *testing.T, opts TestResponseOptions) string {
 type MockKARetrieverCommandForGet struct {
 	k8sResponse      string
 	k9eResponse      string
+	k9eResponses     []string
+	k9eCallCount     int
 	k8sError         *APIError
 	k9eError         *APIError
 	completeError    error
@@ -155,6 +160,13 @@ func (m *MockKARetrieverCommandForGet) GetFromAPI(api API, _ string) ([]byte, *A
 		}
 		return []byte(m.k8sResponse), nil
 	case KubeArchive:
+		if len(m.k9eResponses) > 0 {
+			idx := m.k9eCallCount
+			m.k9eCallCount++
+			if idx < len(m.k9eResponses) {
+				return []byte(m.k9eResponses[idx]), nil
+			}
+		}
 		if m.k9eError != nil {
 			return nil, m.k9eError
 		}
@@ -422,20 +434,35 @@ func TestGetComplete(t *testing.T) {
 			expectArchived:  true,
 		},
 		{
-			name:            "invalid limit too small",
+			name:            "invalid limit negative",
 			args:            []string{"pods"},
 			flags:           []string{"--limit=-5"},
 			expectError:     true,
-			errorContains:   "limit must be between 1 and 1000",
+			errorContains:   "limit must be 0 (all) or a positive number",
 			expectInCluster: true,
 			expectArchived:  true,
 		},
 		{
-			name:            "invalid limit too large",
-			args:            []string{"pods"},
-			flags:           []string{"--limit=2000"},
-			expectError:     true,
-			errorContains:   "limit must be between 1 and 1000",
+			name: "limit zero is valid",
+			args: []string{"pods"},
+			resourceInfo: &ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			},
+			flags:           []string{"--limit=0"},
+			expectedApiPath: "/api/v1/namespaces/default/pods",
+			expectError:     false,
+			expectInCluster: true,
+			expectArchived:  true,
+		},
+		{
+			name: "limit above server max is valid",
+			args: []string{"pods"},
+			resourceInfo: &ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			},
+			flags:           []string{"--limit=5000"},
+			expectedApiPath: "/api/v1/namespaces/default/pods",
+			expectError:     false,
 			expectInCluster: true,
 			expectArchived:  true,
 		},
@@ -477,6 +504,35 @@ func TestGetComplete(t *testing.T) {
 			expectInCluster: false,
 			expectArchived:  true,
 		},
+		{
+			name:            "invalid page-size negative",
+			args:            []string{"pods"},
+			flags:           []string{"--page-size=-1"},
+			expectError:     true,
+			errorContains:   "page-size must be between 0 and 1000",
+			expectInCluster: true,
+			expectArchived:  true,
+		},
+		{
+			name:            "invalid page-size too large",
+			args:            []string{"pods"},
+			flags:           []string{"--page-size=5000"},
+			expectError:     true,
+			errorContains:   "page-size must be between 0 and 1000",
+			expectInCluster: true,
+			expectArchived:  true,
+		},
+		{
+			name: "valid page-size",
+			args: []string{"pods"},
+			resourceInfo: &ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			},
+			flags:           []string{"--page-size=500"},
+			expectedApiPath: "/api/v1/namespaces/default/pods",
+			expectInCluster: true,
+			expectArchived:  true,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -492,6 +548,7 @@ func TestGetComplete(t *testing.T) {
 			cmd.Flags().BoolVar(&options.Archived, "archived", true, "")
 			cmd.Flags().BoolVar(&options.Count, "count", false, "")
 			cmd.Flags().IntVar(&options.Limit, "limit", 100, "")
+			cmd.Flags().IntVar(&options.PageSize, "page-size", 0, "")
 			cmd.Flags().TimeVar(&options.After, "after", time.Time{}, []string{time.RFC3339}, "")
 			cmd.Flags().TimeVar(&options.Before, "before", time.Now().Add(1*time.Hour), []string{time.RFC3339}, "")
 
@@ -892,6 +949,133 @@ func TestRun(t *testing.T) {
 	}
 }
 
+func TestPageSize(t *testing.T) {
+	testCases := []struct {
+		limit    int
+		pageSize int
+		expected int
+	}{
+		{0, 0, 1000},
+		{50, 0, 50},
+		{100, 0, 100},
+		{1000, 0, 1000},
+		{5000, 0, 1000},
+		{0, 500, 500},
+		{50, 500, 500},
+		{5000, 500, 500},
+		{0, 2000, 1000},
+	}
+	for _, tc := range testCases {
+		o := &GetOptions{Limit: tc.limit, PageSize: tc.pageSize}
+		assert.Equal(t, tc.expected, o.pageSize(), "pageSize() for limit=%d, PageSize=%d", tc.limit, tc.pageSize)
+	}
+}
+
+func TestAutoPagination(t *testing.T) {
+	page1 := createTestResponse(t, TestResponseOptions{
+		IsKubeArchive: true,
+		ContinueToken: "abc123",
+		Pods: []PodSpec{
+			{"pod-a", "2024-06-01T10:03:00Z", "Running", "uid-a"},
+			{"pod-b", "2024-06-01T10:02:00Z", "Running", "uid-b"},
+			{"pod-c", "2024-06-01T10:01:00Z", "Running", "uid-c"},
+		},
+	})
+	page2 := createTestResponse(t, TestResponseOptions{
+		IsKubeArchive: true,
+		Pods: []PodSpec{
+			{"pod-d", "2024-06-01T10:00:00Z", "Running", "uid-d"},
+			{"pod-e", "2024-06-01T09:59:00Z", "Running", "uid-e"},
+		},
+	})
+	emptyK8s := createTestResponse(t, TestResponseOptions{})
+
+	testCases := []struct {
+		name          string
+		k9eResponses  []string
+		limit         int
+		expectCount   int
+		expectPagMsg  bool
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:         "limit 0 fetches all pages",
+			k9eResponses: []string{page1, page2},
+			limit:        0,
+			expectCount:  5,
+			expectPagMsg: false,
+		},
+		{
+			name:         "limit larger than total fetches all",
+			k9eResponses: []string{page1, page2},
+			limit:        10,
+			expectCount:  5,
+			expectPagMsg: false,
+		},
+		{
+			name:         "limit stops mid-pagination",
+			k9eResponses: []string{page1, page2},
+			limit:        3,
+			expectCount:  3,
+			expectPagMsg: true,
+		},
+		{
+			name:         "single page no continue token",
+			k9eResponses: []string{page2},
+			limit:        0,
+			expectCount:  2,
+			expectPagMsg: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCli := NewMockKARetrieverCommandForGet(nil, nil)
+			mockCli.k8sResponse = emptyK8s
+			mockCli.k9eResponses = tc.k9eResponses
+
+			opts := NewTestGetOptions(mockCli)
+			opts.InCluster = true
+			opts.Archived = true
+			opts.Limit = tc.limit
+			opts.Before = time.Now()
+			opts.ResourceInfo = &ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			}
+			opts.kubearchiveQueryParams = opts.buildKubeArchiveQueryParams()
+			opts.APIPath = "/api/v1/namespaces/default/pods"
+
+			var outBuf, errBuf bytes.Buffer
+			opts.IOStreams = genericiooptions.IOStreams{Out: &outBuf, ErrOut: &errBuf}
+
+			err := opts.Run()
+
+			if tc.expectError {
+				assert.Error(t, err)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+				return
+			}
+
+			assert.NoError(t, err)
+
+			lines := strings.Split(strings.TrimSpace(outBuf.String()), "\n")
+			// first line is the header
+			dataLines := lines[1:]
+			assert.Equal(t, tc.expectCount, len(dataLines), "expected %d resources, got %d", tc.expectCount, len(dataLines))
+
+			errOutput := errBuf.String()
+			if tc.expectPagMsg {
+				assert.Contains(t, errOutput, "Results are trimmed")
+			} else {
+				assert.Empty(t, errOutput)
+			}
+		})
+	}
+}
+
 func TestBeforeParamProperlyWorking(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -917,6 +1101,304 @@ func TestBeforeParamProperlyWorking(t *testing.T) {
 			params := o.buildKubeArchiveQueryParams()
 
 			assert.Equal(t, tc.expected, params.Get("creationTimestampBefore"))
+		})
+	}
+}
+
+func TestExtractWatermark(t *testing.T) {
+	makeResource := func(name, timestamp string) *unstructured.Unstructured {
+		ts, _ := time.Parse(time.RFC3339, timestamp)
+		r := &unstructured.Unstructured{}
+		r.SetName(name)
+		r.SetCreationTimestamp(metav1.Time{Time: ts})
+		return r
+	}
+
+	t.Run("empty slice", func(t *testing.T) {
+		wm := extractWatermark(nil)
+		assert.True(t, wm.IsZero())
+	})
+
+	t.Run("single resource", func(t *testing.T) {
+		resources := []*unstructured.Unstructured{
+			makeResource("pod-a", "2024-06-01T10:00:00Z"),
+		}
+		wm := extractWatermark(resources)
+		expected, _ := time.Parse(time.RFC3339, "2024-06-01T10:00:00Z")
+		assert.True(t, wm.Equal(expected))
+	})
+
+	t.Run("multiple resources newest-first", func(t *testing.T) {
+		resources := []*unstructured.Unstructured{
+			makeResource("pod-a", "2024-06-01T10:03:00Z"),
+			makeResource("pod-b", "2024-06-01T10:02:00Z"),
+			makeResource("pod-c", "2024-06-01T10:01:00Z"),
+		}
+		wm := extractWatermark(resources)
+		expected, _ := time.Parse(time.RFC3339, "2024-06-01T10:01:00Z")
+		assert.True(t, wm.Equal(expected))
+	})
+}
+
+func TestSplitByWatermark(t *testing.T) {
+	makeResource := func(name, timestamp string) *unstructured.Unstructured {
+		ts, _ := time.Parse(time.RFC3339, timestamp)
+		r := &unstructured.Unstructured{}
+		r.SetName(name)
+		r.SetCreationTimestamp(metav1.Time{Time: ts})
+		return r
+	}
+
+	t.Run("zero watermark returns all above", func(t *testing.T) {
+		resources := []*unstructured.Unstructured{
+			makeResource("pod-a", "2024-06-01T10:03:00Z"),
+			makeResource("pod-b", "2024-06-01T10:01:00Z"),
+		}
+		above, below := splitByWatermark(resources, time.Time{})
+		assert.Equal(t, 2, len(above))
+		assert.Equal(t, 0, len(below))
+	})
+
+	t.Run("all above watermark", func(t *testing.T) {
+		resources := []*unstructured.Unstructured{
+			makeResource("pod-a", "2024-06-01T10:03:00Z"),
+			makeResource("pod-b", "2024-06-01T10:02:00Z"),
+		}
+		wm, _ := time.Parse(time.RFC3339, "2024-06-01T10:00:00Z")
+		above, below := splitByWatermark(resources, wm)
+		assert.Equal(t, 2, len(above))
+		assert.Equal(t, 0, len(below))
+	})
+
+	t.Run("all below watermark", func(t *testing.T) {
+		resources := []*unstructured.Unstructured{
+			makeResource("pod-a", "2024-06-01T09:00:00Z"),
+			makeResource("pod-b", "2024-06-01T08:00:00Z"),
+		}
+		wm, _ := time.Parse(time.RFC3339, "2024-06-01T10:00:00Z")
+		above, below := splitByWatermark(resources, wm)
+		assert.Equal(t, 0, len(above))
+		assert.Equal(t, 2, len(below))
+	})
+
+	t.Run("split at watermark boundary", func(t *testing.T) {
+		resources := []*unstructured.Unstructured{
+			makeResource("pod-a", "2024-06-01T10:03:00Z"),
+			makeResource("pod-b", "2024-06-01T10:02:00Z"),
+			makeResource("pod-c", "2024-06-01T09:00:00Z"),
+		}
+		wm, _ := time.Parse(time.RFC3339, "2024-06-01T10:00:00Z")
+		above, below := splitByWatermark(resources, wm)
+		assert.Equal(t, 2, len(above))
+		assert.Equal(t, "pod-a", above[0].GetName())
+		assert.Equal(t, "pod-b", above[1].GetName())
+		assert.Equal(t, 1, len(below))
+		assert.Equal(t, "pod-c", below[0].GetName())
+	})
+
+	t.Run("resource at exact watermark is above", func(t *testing.T) {
+		resources := []*unstructured.Unstructured{
+			makeResource("pod-a", "2024-06-01T10:00:00Z"),
+		}
+		wm, _ := time.Parse(time.RFC3339, "2024-06-01T10:00:00Z")
+		above, below := splitByWatermark(resources, wm)
+		assert.Equal(t, 1, len(above))
+		assert.Equal(t, 0, len(below))
+	})
+}
+
+func TestMergeSortedResources(t *testing.T) {
+	makeResource := func(name, timestamp, uid string) *unstructured.Unstructured {
+		ts, _ := time.Parse(time.RFC3339, timestamp)
+		r := &unstructured.Unstructured{}
+		r.SetName(name)
+		r.SetCreationTimestamp(metav1.Time{Time: ts})
+		r.SetUID(types.UID(uid))
+		return r
+	}
+
+	t.Run("merge into empty", func(t *testing.T) {
+		resources := []*unstructured.Unstructured{
+			makeResource("pod-a", "2024-06-01T10:03:00Z", "uid-a"),
+			makeResource("pod-b", "2024-06-01T10:01:00Z", "uid-b"),
+		}
+		result := mergeSortedResources(nil, resources, true)
+		assert.Equal(t, 2, len(result))
+		assert.True(t, result[0].InCluster)
+		assert.False(t, result[0].Archived)
+	})
+
+	t.Run("dedup by UID sets both flags", func(t *testing.T) {
+		init := []*ResourceWithAvailability{
+			{Resource: makeResource("pod-a", "2024-06-01T10:00:00Z", "uid-shared"), Archived: true},
+		}
+		k8s := []*unstructured.Unstructured{
+			makeResource("pod-a", "2024-06-01T10:00:00Z", "uid-shared"),
+		}
+		result := mergeSortedResources(init, k8s, true)
+		assert.Equal(t, 1, len(result))
+		assert.True(t, result[0].InCluster)
+		assert.True(t, result[0].Archived)
+	})
+
+	t.Run("merge preserves sort order", func(t *testing.T) {
+		archived := []*unstructured.Unstructured{
+			makeResource("arch-1", "2024-06-01T10:05:00Z", "uid-1"),
+			makeResource("arch-2", "2024-06-01T10:01:00Z", "uid-2"),
+		}
+		k8s := []*unstructured.Unstructured{
+			makeResource("k8s-1", "2024-06-01T10:03:00Z", "uid-3"),
+		}
+		batch := mergeSortedResources(nil, archived, false)
+		batch = mergeSortedResources(batch, k8s, true)
+		assert.Equal(t, 3, len(batch))
+		assert.Equal(t, "arch-1", batch[0].Resource.GetName())
+		assert.Equal(t, "k8s-1", batch[1].Resource.GetName())
+		assert.Equal(t, "arch-2", batch[2].Resource.GetName())
+	})
+}
+
+func TestStreamingMerge(t *testing.T) {
+	page1 := createTestResponse(t, TestResponseOptions{
+		IsKubeArchive: true,
+		ContinueToken: "token1",
+		Pods: []PodSpec{
+			{"arch-a", "2024-06-01T10:05:00Z", "", "uid-a"},
+			{"arch-b", "2024-06-01T10:03:00Z", "", "uid-b"},
+		},
+	})
+	page2 := createTestResponse(t, TestResponseOptions{
+		IsKubeArchive: true,
+		Pods: []PodSpec{
+			{"arch-c", "2024-06-01T10:01:00Z", "", "uid-c"},
+		},
+	})
+
+	// K8s resource at 10:04 - between page1's resources, should interleave
+	k8sResponse := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{
+			{"k8s-1", "2024-06-01T10:04:00Z", "", "uid-k1"},
+			{"k8s-2", "2024-06-01T10:00:00Z", "", "uid-k2"},
+		},
+	})
+
+	// K8s resource that shares UID with an archived resource for dedup testing
+	k8sDuplicateResponse := createTestResponse(t, TestResponseOptions{
+		Pods: []PodSpec{
+			{"arch-a", "2024-06-01T10:05:00Z", "Running", "uid-a"},
+		},
+	})
+
+	testCases := []struct {
+		name           string
+		k8sResponse    string
+		k9eResponses   []string
+		limit          int
+		outputFormat   string
+		expectedNames  []string
+		expectPagMsg   bool
+	}{
+		{
+			name:          "k8s resources interleave across pages",
+			k8sResponse:   k8sResponse,
+			k9eResponses:  []string{page1, page2},
+			limit:         0,
+			expectedNames: []string{"arch-a", "k8s-1", "arch-b", "arch-c", "k8s-2"},
+		},
+		{
+			name:          "k8s resources interleave across pages (json)",
+			k8sResponse:   k8sResponse,
+			k9eResponses:  []string{page1, page2},
+			limit:         0,
+			outputFormat:  "json",
+			expectedNames: []string{"arch-a", "k8s-1", "arch-b", "arch-c", "k8s-2"},
+		},
+		{
+			name:          "k8s resources interleave across pages (yaml)",
+			k8sResponse:   k8sResponse,
+			k9eResponses:  []string{page1, page2},
+			limit:         0,
+			outputFormat:  "yaml",
+			expectedNames: []string{"arch-a", "k8s-1", "arch-b", "arch-c", "k8s-2"},
+		},
+		{
+			name:          "dedup across k8s and kubearchive",
+			k8sResponse:   k8sDuplicateResponse,
+			k9eResponses:  []string{page1, page2},
+			limit:         0,
+			expectedNames: []string{"arch-a", "arch-b", "arch-c"},
+		},
+		{
+			name:           "limit trims across streaming batches",
+			k8sResponse:    k8sResponse,
+			k9eResponses:   []string{page1, page2},
+			limit:          3,
+			expectedNames:  []string{"arch-a", "k8s-1", "arch-b"},
+			expectPagMsg:   true,
+		},
+		{
+			name:           "limit trims across streaming batches (json)",
+			k8sResponse:    k8sResponse,
+			k9eResponses:   []string{page1, page2},
+			limit:          3,
+			outputFormat:   "json",
+			expectedNames:  []string{"arch-a", "k8s-1", "arch-b"},
+			expectPagMsg:   true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCli := NewMockKARetrieverCommandForGet(nil, nil)
+			mockCli.k8sResponse = tc.k8sResponse
+			mockCli.k9eResponses = tc.k9eResponses
+
+			opts := NewTestGetOptions(mockCli)
+			opts.InCluster = true
+			opts.Archived = true
+			opts.Limit = tc.limit
+			opts.OutputFormat = tc.outputFormat
+			opts.Before = time.Now()
+			opts.ResourceInfo = &ResourceInfo{
+				Resource: "pods", Version: "v1", Group: "", GroupVersion: "v1", Kind: "Pod", Namespaced: true,
+			}
+			opts.kubearchiveQueryParams = opts.buildKubeArchiveQueryParams()
+			opts.APIPath = "/api/v1/namespaces/default/pods"
+
+			var outBuf, errBuf bytes.Buffer
+			opts.IOStreams = genericiooptions.IOStreams{Out: &outBuf, ErrOut: &errBuf}
+
+			err := opts.Run()
+			assert.NoError(t, err)
+
+			var actualNames []string
+			switch tc.outputFormat {
+			case "json":
+				var list KubeArchiveResponse
+				require.NoError(t, json.Unmarshal(outBuf.Bytes(), &list), "output must be valid JSON")
+				for _, item := range list.Items {
+					actualNames = append(actualNames, item.GetName())
+				}
+			case "yaml":
+				var list KubeArchiveResponse
+				require.NoError(t, yaml.Unmarshal(outBuf.Bytes(), &list), "output must be valid YAML")
+				for _, item := range list.Items {
+					actualNames = append(actualNames, item.GetName())
+				}
+			default:
+				lines := strings.Split(strings.TrimSpace(outBuf.String()), "\n")
+				for _, line := range lines[1:] {
+					actualNames = append(actualNames, strings.Fields(line)[0])
+				}
+			}
+
+			assert.Equal(t, tc.expectedNames, actualNames)
+
+			if tc.expectPagMsg {
+				assert.Contains(t, errBuf.String(), "Results are trimmed")
+			} else {
+				assert.Empty(t, errBuf.String())
+			}
 		})
 	}
 }

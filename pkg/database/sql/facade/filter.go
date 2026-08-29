@@ -31,6 +31,7 @@ type DBFilter interface {
 	ApplyLabelFilters(ctx context.Context, querier sqlx.QueryerContext, sb *sqlbuilder.SelectBuilder, labelFilters *models.LabelFilters) error
 
 	ContainerNameFilter(cond sqlbuilder.Cond, containerName string) string
+	DeletionTimestampFilter(cond sqlbuilder.Cond, prunedFromEtcd *bool) string
 }
 
 // PartialDBFilterImpl implements partially the DBFilter interface

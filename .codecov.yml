@@ -28,3 +28,8 @@ ignore:
   - "hack/**"
   - "config/**"
   - "**/zz_generated*.go"
+  - "cmd/sink/main.go"
+  - "cmd/vacuum/main.go"
+  - "pkg/database/fake/**"
+  - "pkg/constants/**"
+  - "cmd/operator/test/**"

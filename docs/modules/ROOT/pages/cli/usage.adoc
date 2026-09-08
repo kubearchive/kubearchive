@@ -79,8 +79,12 @@ For example, `pods`, `pod`, `po` resolve to the Pod resource.
 |`false`
 
 |`--limit`
-|Maximum number of resources to return
+|Maximum number of resources to return. Use `0` to return all matching resources.
 |`100`
+
+|`--page-size`
+|Number of resources requested per KubeArchive API call (max `1000`). `0` selects it automatically as `min(limit, 1000)`.
+|`0`
 
 |`--after`
 |Only return resources created after this timestamp (RFC3339 format)
@@ -151,6 +155,16 @@ It prints a single integer to stdout, making it suitable for use in scripts: `CO
 ====
 Use label selectors effectively to filter large result sets. KubeArchive may contain extensive historical data,
 so targeted queries perform better than broad searches.
+====
+
+[NOTE]
+====
+The `get` command automatically paginates through the KubeArchive API, so `--limit` can exceed the server's
+per-request maximum of 1000. Results are streamed to the terminal as each page arrives. Use `--limit 0` to
+retrieve every matching resource, and `--page-size` to tune how many resources are fetched per API request.
+
+The meaning of `--limit` changed: it now caps the total number of results and accepts `0` (all) and values
+above 1000, whereas it previously rejected those values.
 ====
 
 == logs Command

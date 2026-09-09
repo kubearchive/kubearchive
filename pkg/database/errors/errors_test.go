@@ -56,6 +56,16 @@ func TestWrapQueryError(t *testing.T) {
 			expected: &pq.Error{Code: "42P01", Message: "relation does not exist"},
 		},
 		{
+			name: "cancelled context with pq 57014 returns query timeout",
+			ctxFunc: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel() // simulate upstream proxy disconnect
+				return ctx
+			},
+			err:      &pq.Error{Code: "57014", Message: "canceling statement due to user request"},
+			expected: ErrQueryTimeout,
+		},
+		{
 			name:     "generic error not wrapped",
 			ctxFunc:  func() context.Context { return context.Background() },
 			err:      errors.New("some other error"),
@@ -78,6 +88,13 @@ func TestWrapQueryError(t *testing.T) {
 			if tt.expected == ErrContextQueryTimeout {
 				if !errors.Is(result, ErrContextQueryTimeout) {
 					t.Errorf("expected ErrContextQueryTimeout, got %v", result)
+				}
+				return
+			}
+
+			if tt.expected == ErrQueryTimeout {
+				if !errors.Is(result, ErrQueryTimeout) {
+					t.Errorf("expected ErrQueryTimeout, got %v", result)
 				}
 				return
 			}

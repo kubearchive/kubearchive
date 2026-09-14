@@ -81,6 +81,18 @@ When a query exceeds the timeout the API returns:
 {"message": "context deadline exceeded: query timeout: context deadline exceeded"}
 ----
 
-with HTTP status `504 Gateway Timeout`. Clients can retry the request
-with narrower filters (namespace, label selector, timestamp range) to
-reduce query execution time.
+with HTTP status `504 Gateway Timeout`.
+
+When an upstream proxy (for example the Konflux UI gateway) disconnects
+before the query timeout fires, PostgreSQL cancels the in-flight
+statement with error 57014. In this case the API also returns HTTP
+`504 Gateway Timeout` with a message of the form:
+
+[source,json]
+----
+{"message": "query timeout: pq: canceling statement due to user request"}
+----
+
+In both cases clients can retry the request with narrower filters
+(namespace, label selector, timestamp range) to reduce query execution
+time.

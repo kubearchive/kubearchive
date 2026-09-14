@@ -27,7 +27,7 @@ func WrapQueryError(ctx context.Context, err error) error {
 		return nil
 	}
 
-	// Check for PostgreSQL query cancellation (57014) before ctx.Err() so it takes priority over a cancelled context
+	// pq 57014 takes priority over ctx cancellation
 	if pqErr := pq.As(err, pqerror.QueryCanceled); pqErr != nil {
 		return fmt.Errorf("%w: %w", ErrQueryTimeout, pqErr)
 	}

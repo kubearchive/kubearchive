@@ -10,15 +10,6 @@ KubeArchive archives Kubernetes resources to a JSON-capable relational database 
 - `hack/` — Dev/install/release scripts
 - `test/` — Integration and performance tests
 - `integrations/` — Database, logging, observability setup
-  - **Observability config sync:** OTel collector configs in
-    `integrations/observability/prometheus-operator/otel-collector-config.yaml`
-    and `integrations/observability/grafana/otel-collector-grafana.yaml` both
-    define pipelines for the same `quay.io/kubearchive/opentelemetry-collector-contrib`
-    collector (image referenced in their respective deployment manifests).
-    When bumping the collector version, check both directories for required
-    config syntax changes (e.g., OTTL statement updates). The grafana
-    directory's `otel-collector` container is separate from the
-    `grafana/otel-lgtm` stack — they use different images.
 
 ## Prerequisites
 
@@ -63,6 +54,7 @@ golangci-lint run
 - CRDs belong to API group `kubearchive.org`
 - Deployment: `bash hack/kubearchive-install.sh`
 - Do not edit files in `config/crds/`; re-run code generation
+- OTel collector configs `integrations/observability/prometheus-operator/otel-collector-config.yaml` and `integrations/observability/grafana/otel-collector-config.yaml` both define pipelines for the `quay.io/kubearchive/opentelemetry-collector-contrib` collector; when bumping the collector version, check both directories for required config syntax changes (e.g., OTTL statement updates). The `grafana/` directory's `otel-collector-grafana.yaml` is a separate config for the `grafana/otel-lgtm` stack.
 
 ## Review
 Last reviewed: Q2 2026. Next review: Q3 2026. See [workflow](.github/workflows/agents-md-review.yml).

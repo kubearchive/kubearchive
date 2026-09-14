@@ -59,7 +59,7 @@ func TestWrapQueryError(t *testing.T) {
 			name: "cancelled context with pq 57014 returns query timeout",
 			ctxFunc: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
-				cancel() // simulate upstream proxy disconnect
+				cancel()
 				return ctx
 			},
 			err:      &pq.Error{Code: "57014", Message: "canceling statement due to user request"},

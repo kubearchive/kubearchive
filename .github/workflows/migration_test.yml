@@ -19,9 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
         with:
           go-version: '1.25.5'
       - name: Install latest kubectl
@@ -39,7 +39,7 @@ jobs:
           chmod +x ./kind
           sudo mv kind /usr/local/bin
       - name: Install ko
-        uses: ko-build/setup-ko@v0.10
+        uses: ko-build/setup-ko@61b4d1d396f5b2e7d6bb6fefdce3dc38d1a13445
       - name: Create KinD cluster
         run: kind create cluster
       - name: Install PostgreSQL and run initial migration

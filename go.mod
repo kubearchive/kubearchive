@@ -6,7 +6,7 @@ require (
 	github.com/Cyprinus12138/otelgin v1.0.3
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/XSAM/otelsql v0.43.0
+	github.com/XSAM/otelsql v0.44.0
 	github.com/avast/retry-go/v5 v5.0.0
 	github.com/cloudevents/sdk-go/observability/opentelemetry/v2 v2.16.2
 	github.com/cloudevents/sdk-go/v2 v2.16.2
@@ -14,14 +14,14 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-logr/logr v1.4.4
 	github.com/go-sql-driver/mysql v1.10.1
-	github.com/golang-migrate/migrate/v4 v4.19.0
+	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/google/cel-go v0.32.0
 	github.com/google/uuid v1.6.0
 	github.com/huandu/go-sqlbuilder v1.43.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.12.3
-	github.com/ohler55/ojg v1.28.5
-	github.com/onsi/ginkgo/v2 v2.32.1
+	github.com/ohler55/ojg v1.28.6
+	github.com/onsi/ginkgo/v2 v2.32.2
 	github.com/onsi/gomega v1.40.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10

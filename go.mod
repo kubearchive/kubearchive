@@ -1,6 +1,8 @@
 module github.com/kubearchive/kubearchive
 
+
 go 1.25.5
+
 
 require (
 	github.com/Cyprinus12138/otelgin v1.0.3
@@ -20,7 +22,7 @@ require (
 	github.com/huandu/go-sqlbuilder v1.43.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.12.3
-	github.com/ohler55/ojg v1.28.6
+	github.com/ohler55/ojg v1.28.5
 	github.com/onsi/ginkgo/v2 v2.32.2
 	github.com/onsi/gomega v1.40.0
 	github.com/spf13/cobra v1.10.2
@@ -52,6 +54,7 @@ require (
 	sigs.k8s.io/controller-runtime v0.20.4
 	sigs.k8s.io/yaml v1.6.0
 )
+
 
 require (
 	cel.dev/expr v0.25.2 // indirect
@@ -159,9 +162,9 @@ require (
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/arch v0.22.0 // indirect
-	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/exp v0.0.0-20240823005443-9b4947da3948 // indirect
-	golang.org/x/mod v0.37.0 // indirect
+	golang.org/x/mod v0.40.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect

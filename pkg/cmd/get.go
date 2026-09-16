@@ -526,20 +526,20 @@ func (o *GetOptions) printPaginationMessage(resources []*ResourceWithAvailabilit
 	if o.ResourceInfo.Group == "" {
 		nextCmd.WriteString(o.ResourceInfo.Resource)
 	} else {
-		nextCmd.WriteString(fmt.Sprintf("%s.%s.%s", o.ResourceInfo.Resource, o.ResourceInfo.Version, o.ResourceInfo.Group))
+		fmt.Fprintf(&nextCmd, "%s.%s.%s", o.ResourceInfo.Resource, o.ResourceInfo.Version, o.ResourceInfo.Group)
 	}
 
 	// Add namespace if applicable
 	if o.ResourceInfo.Namespaced && !o.AllNamespaces {
 		namespace, _ := o.GetNamespace()
-		nextCmd.WriteString(fmt.Sprintf(" --namespace %s", namespace))
+		fmt.Fprintf(&nextCmd, " --namespace %s", namespace)
 	} else if o.AllNamespaces {
 		nextCmd.WriteString(" --all-namespaces")
 	}
 
 	// Add label selector if provided
 	if o.LabelSelector != "" {
-		nextCmd.WriteString(fmt.Sprintf(" --selector '%s'", o.LabelSelector))
+		fmt.Fprintf(&nextCmd, " --selector '%s'", o.LabelSelector)
 	}
 
 	// Add limit

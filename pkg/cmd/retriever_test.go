@@ -338,6 +338,7 @@ func TestCompleteRetriever(t *testing.T) {
 			expectCertData:      false,
 			expectError:         false,
 		},
+		//nolint:gosec //this ia a test case, not a real hardcoded certificate
 		{
 			name: "certificate path with TLS override",
 			setup: func(opts *KARetrieverOptions) {

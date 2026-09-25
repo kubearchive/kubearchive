@@ -13,7 +13,6 @@ import (
 	"os"
 	"regexp"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -319,45 +318,6 @@ func TestQueryResources(t *testing.T) {
 			}
 		})
 	}
-}
-
-type arrayArg struct {
-	args [][]map[string]string
-}
-
-// Match is a custom validator function to test if the arguments are equal without considering the order
-func (arrayArgs arrayArg) Match(v driver.Value) bool {
-	var match bool
-	for _, arg := range arrayArgs.args {
-		for _, elem := range arg {
-			argValue, err := json.Marshal(elem)
-			if err != nil {
-				return false
-			}
-			argValueStr := strings.ReplaceAll(string(argValue), "\"", "\\\"")
-			if strings.Contains(v.(string), argValueStr) {
-				match = true
-			} else {
-				match = false
-				break
-			}
-		}
-		if match {
-			return true
-		}
-	}
-	// Check existence filter for the not-in query
-	for _, arg := range arrayArgs.args {
-		for _, elem := range arg {
-			for k := range elem {
-				if !strings.Contains(v.(string), k) {
-					return false
-				}
-				match = true
-			}
-		}
-	}
-	return match
 }
 
 // setupLabelResolutionMocks adds mock expectations for PostgreSQL label resolution queries.

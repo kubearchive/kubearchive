@@ -35,3 +35,8 @@ data:
           next-cursor: "$.data.result[*].values[*][0]"
           param: start
           cursor-increment: 1
+        verification:
+          interval: 5s
+          max-retries: 6
+          timestamp-json-path: "$.data.result[*].values[*][0]"
+          timestamp-format: unix_nano

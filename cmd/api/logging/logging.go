@@ -51,8 +51,9 @@ type ApiEndpoint struct {
 	Params     map[string]interface{} `yaml:"params"`
 	Body       map[string]interface{} `yaml:"body"`
 	JsonPath   string                 `yaml:"json-path"`
-	Pagination *PaginationConfig      `yaml:"pagination"`
-	Timeout    string                 `yaml:"timeout"` // Request timeout as a duration string (e.g. "60s", "5m"). Defaults to 60s.
+	Pagination   *PaginationConfig   `yaml:"pagination"`
+	Timeout      string              `yaml:"timeout"` // Request timeout as a duration string (e.g. "60s", "5m"). Defaults to 60s.
+	Verification *VerificationConfig `yaml:"verification"`
 }
 
 const defaultRequestTimeout = 60 * time.Second
@@ -98,6 +99,12 @@ func (e *ApiEndpoint) validate(providerURL, endpointType string) error {
 		}
 		if e.Pagination.Param == "" {
 			return fmt.Errorf("provider '%s' endpoint '%s' pagination: param is required", providerURL, endpointType)
+		}
+	}
+	if e.Verification != nil {
+		e.Verification.defaults()
+		if err := e.Verification.validate(providerURL); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -286,7 +293,7 @@ func abortNoLogsFound(c *gin.Context, record *interfaces.LogRecord, requestURL s
 // It is used when tailLines is requested (to return only the last N lines) or when the
 // backend returns entries in reverse order (to re-order them). Entries are optionally
 // reversed, flattened into individual lines, and truncated to tailLinesInt.
-func writeBufferedLogs(c *gin.Context, reader *bufio.Reader, jsonPathParser jp.Expr, record *interfaces.LogRecord, requestURL string, mode string, reverse bool, tailLinesInt int) {
+func writeBufferedLogs(c *gin.Context, reader *bufio.Reader, jsonPathParser jp.Expr, record *interfaces.LogRecord, requestURL string, mode string, reverse bool, tailLinesInt int, lastLineOut *string) {
 	isTailing := tailLinesInt > 0
 	var allEntries []string
 	var lineCount int
@@ -344,12 +351,16 @@ func writeBufferedLogs(c *gin.Context, reader *bufio.Reader, jsonPathParser jp.E
 	for _, l := range flatLines {
 		c.String(http.StatusOK, l+"\n")
 	}
+
+	if lastLineOut != nil && len(flatLines) > 0 {
+		*lastLineOut = flatLines[len(flatLines)-1]
+	}
 }
 
 // streamLogs writes log lines directly to the response as they are read, without buffering.
 // It is used when returning full logs from a backend that delivers entries in forward order
 // (i.e. tailLines is not set and the endpoint's Reverse flag is false).
-func streamLogs(c *gin.Context, reader *bufio.Reader, jsonPathParser jp.Expr, record *interfaces.LogRecord, requestURL string, mode string) {
+func streamLogs(c *gin.Context, reader *bufio.Reader, jsonPathParser jp.Expr, record *interfaces.LogRecord, requestURL string, mode string, lastLineOut *string) {
 	var logsReturned bool
 	for {
 		line, readErr := reader.ReadBytes('\n')
@@ -374,6 +385,9 @@ func streamLogs(c *gin.Context, reader *bufio.Reader, jsonPathParser jp.Expr, re
 			setLogResponseHeaders(c, record)
 			c.Status(http.StatusOK)
 			logsReturned = true
+		}
+		if lastLineOut != nil && len(parsedLines) > 0 {
+			*lastLineOut = parsedLines[len(parsedLines)-1]
 		}
 		if !writeLogLines(c, parsedLines) {
 			return
@@ -511,6 +525,29 @@ func LogRetrieval() gin.HandlerFunc {
 
 		tailLinesInt, _ := strconv.Atoi(tailLines)
 
+		// Log completeness verification (full mode only)
+		var verResult verificationResult
+		if mode == "full" && providerConfig.Tail != nil &&
+			endpoint.Verification != nil && legacyFullURL == "" {
+
+			verResult = performVerification(
+				c.Request.Context(),
+				&client,
+				providerConfig.Tail,
+				record,
+				headers,
+				endpoint.Verification,
+				time.Now,
+			)
+
+			if verResult.performed {
+				c.Writer.Header().Set("Trailer", "X-Logs-Incomplete")
+				if !verResult.stable {
+					c.Header("X-Logs-Incomplete", "true")
+				}
+			}
+		}
+
 		// If pagination is configured and we're not tailing or reversing, use paginated streaming
 		if endpoint.Pagination != nil {
 			if tailLinesInt > 0 {
@@ -520,7 +557,14 @@ func LogRetrieval() gin.HandlerFunc {
 			} else if legacyFullURL != "" {
 				slog.Warn("pagination is configured but will be ignored for legacy full URLs", "mode", mode)
 			} else {
-				streamPaginatedLogs(c, &client, endpoint, record, extraVars, headers, jsonPathParser, mode)
+				var streamedLastLine string
+				streamPaginatedLogs(c, &client, endpoint, record, extraVars, headers, jsonPathParser, mode, &streamedLastLine)
+				if verResult.performed && verResult.stable && streamedLastLine != "" &&
+					streamedLastLine != verResult.lastLine {
+					c.Writer.Header().Set(http.TrailerPrefix+"X-Logs-Incomplete", "true")
+					slog.Warn("Post-stream integrity check failed: last line mismatch",
+						"pod", record.PodName)
+				}
 				return
 			}
 		}
@@ -575,10 +619,18 @@ func LogRetrieval() gin.HandlerFunc {
 
 		reader := bufio.NewReader(response.Body)
 
+		var streamedLastLine string
 		if tailLinesInt > 0 || endpoint.Reverse {
-			writeBufferedLogs(c, reader, jsonPathParser, record, requestURL, mode, endpoint.Reverse, tailLinesInt)
+			writeBufferedLogs(c, reader, jsonPathParser, record, requestURL, mode, endpoint.Reverse, tailLinesInt, &streamedLastLine)
 		} else {
-			streamLogs(c, reader, jsonPathParser, record, requestURL, mode)
+			streamLogs(c, reader, jsonPathParser, record, requestURL, mode, &streamedLastLine)
+		}
+
+		if verResult.performed && verResult.stable && streamedLastLine != "" &&
+			streamedLastLine != verResult.lastLine {
+			c.Writer.Header().Set(http.TrailerPrefix+"X-Logs-Incomplete", "true")
+			slog.Warn("Post-stream integrity check failed: last line mismatch",
+				"pod", record.PodName)
 		}
 	}
 }
@@ -618,7 +670,7 @@ func writeLogLines(c *gin.Context, lines []string) bool {
 // It makes repeated requests, advancing a cursor parameter between pages, and
 // streams each page's entries to the client. Pagination stops when no entries
 // are returned or the cursor stops advancing.
-func streamPaginatedLogs(c *gin.Context, client *http.Client, endpoint *ApiEndpoint, record *interfaces.LogRecord, extraVars map[string]string, providerHeaders map[string]string, jsonPathParser jp.Expr, mode string) {
+func streamPaginatedLogs(c *gin.Context, client *http.Client, endpoint *ApiEndpoint, record *interfaces.LogRecord, extraVars map[string]string, providerHeaders map[string]string, jsonPathParser jp.Expr, mode string, lastLineOut *string) {
 	pagination := endpoint.Pagination
 	cursorParser, err := jp.ParseString(pagination.NextCursor)
 	if err != nil {
@@ -724,6 +776,9 @@ func streamPaginatedLogs(c *gin.Context, client *http.Client, endpoint *ApiEndpo
 
 		if !writeLogLines(c, lines) {
 			return
+		}
+		if lastLineOut != nil && len(lines) > 0 {
+			*lastLineOut = lines[len(lines)-1]
 		}
 
 		slog.Info("Paginated page streamed",

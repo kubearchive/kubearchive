@@ -67,7 +67,7 @@ spec:
       description: PR tag to use on image
       name: pr-tag
       type: string
-    - default: quay.io/konflux-ci/operator-sdk-builder:latest@sha256:2737ff035f3a6d94e189cd31e7653998525c52f4d4db994ba1874a3a74bb4912
+    - default: quay.io/konflux-ci/operator-sdk-builder:latest@sha256:5c68850321d32d4266b94bf77cfa45b0ce03dc9633ebc20ce51f04f31fd23080
       description: Script runner image
       name: script-runner-image
       type: string
@@ -182,7 +182,7 @@ spec:
           - name: name
             value: ko-oci-ta
           - name: bundle
-            value: quay.io/konflux-ci/tekton-catalog/task-ko-oci-ta:0.1@sha256:b393de18bcfff30cd9ff15be59f7a9e11e8e5a5a001511ec2dc142ebad50bc6a
+            value: quay.io/konflux-ci/tekton-catalog/task-ko-oci-ta:0.1@sha256:2342ad13c65d5c62aa6ae466ee642afac9fe80a697ee151b6ec3afd4b575f665
           - name: kind
             value: task
         resolver: bundles

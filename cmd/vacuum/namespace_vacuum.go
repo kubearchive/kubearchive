@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"sort"
+	"strings"
 
 	kubearchiveapi "github.com/kubearchive/kubearchive/cmd/operator/api/v1"
 	"github.com/kubearchive/kubearchive/pkg/filters"
@@ -62,7 +63,9 @@ func namespaceVacuum(configName string) error {
 		return fmt.Errorf("unable to convert to NamespaceVacuumConfig '%s': %v", configName, err)
 	}
 
-	slog.Info("Started publishing sink events", "namespace", namespace)
+	cleanNamespace := strings.ReplaceAll(strings.ReplaceAll(namespace, "\n", ""), "\r", "")
+	slog.Info("Started publishing sink events", "namespace", cleanNamespace)
+
 	if len(config.Spec.Resources) == 0 {
 		vcep.SendByNamespace(context.Background(), namespaceVacuumEventTypePrefix, namespace)
 	} else {
@@ -75,7 +78,7 @@ func namespaceVacuum(configName string) error {
 			vcep.SendByAPIVersionKind(context.Background(), namespaceVacuumEventTypePrefix, namespace, &avk)
 		}
 	}
-	slog.Info("Finished publishing sink events", "namespace", namespace)
+	slog.Info("Finished publishing sink events", "namespace", cleanNamespace)
 
 	return nil
 }

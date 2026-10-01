@@ -338,8 +338,7 @@ func TestCompleteRetriever(t *testing.T) {
 			expectCertData:      false,
 			expectError:         false,
 		},
-		//nolint:gosec //this ia a test case, not a real hardcoded certificate
-		{
+		{ //nolint:gosec // G101: test data, not real credentials
 			name: "certificate path with TLS override",
 			setup: func(opts *KARetrieverOptions) {
 				opts.host = "https://localhost:8081"

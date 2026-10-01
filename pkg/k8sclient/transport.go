@@ -14,22 +14,21 @@ import (
 // InstrumentedRoundTripper is a custom RoundTripper that adds custom attributes
 // to http roundtripper
 type InstrumentedRoundTripper struct {
-	base http.RoundTripper
+	otelTransport http.RoundTripper
 }
 
 func NewInstrumentedRoundTripper(base http.RoundTripper) *InstrumentedRoundTripper {
-	return &InstrumentedRoundTripper{base: base}
+	return &InstrumentedRoundTripper{otelTransport: otelhttp.NewTransport(base)}
 }
 
 func (rt *InstrumentedRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	return otelhttp.NewTransport(rt.base,
-		otelhttp.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
-			reqRouteType := ExtractKubernetesRouteType(r.URL.Path)
-			return []attribute.KeyValue{
-				attribute.String("route", reqRouteType),
-			}
-		}),
-	).RoundTrip(req)
+	labeler, ok := otelhttp.LabelerFromContext(req.Context())
+	if !ok {
+		labeler = &otelhttp.Labeler{}
+		req = req.WithContext(otelhttp.ContextWithLabeler(req.Context(), labeler))
+	}
+	labeler.Add(attribute.String("route", ExtractKubernetesRouteType(req.URL.Path)))
+	return rt.otelTransport.RoundTrip(req)
 }
 
 // ExtractKubernetesRouteType determines the type of Kubernetes API interaction

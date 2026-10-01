@@ -543,17 +543,17 @@ func (o *GetOptions) printPaginationMessage(resources []*ResourceWithAvailabilit
 	}
 
 	// Add limit
-	nextCmd.WriteString(fmt.Sprintf(" --limit %d", o.Limit))
+	fmt.Fprintf(&nextCmd, " --limit %d", o.Limit)
 
 	// Add before timestamp (set to just before the oldest resource's timestamp to avoid including it)
 	// Subtract 1 nanosecond to ensure we don't include the same resource again
 	// Use UTC to match how Kubernetes stores creation timestamps, ensuring correct string comparison in the DB
 	beforeTimestamp := oldestTimestamp.Add(-1 * time.Nanosecond).UTC()
-	nextCmd.WriteString(fmt.Sprintf(" --before %s", beforeTimestamp.Format(time.RFC3339Nano)))
+	fmt.Fprintf(&nextCmd, " --before %s", beforeTimestamp.Format(time.RFC3339Nano))
 
 	// Add after timestamp if originally provided
 	if !o.After.IsZero() {
-		nextCmd.WriteString(fmt.Sprintf(" --after %s", o.After.Format(time.RFC3339)))
+		fmt.Fprintf(&nextCmd, " --after %s", o.After.Format(time.RFC3339))
 	}
 
 	// Add appropriate flags based on where more resources are likely to be found
@@ -565,7 +565,7 @@ func (o *GetOptions) printPaginationMessage(resources []*ResourceWithAvailabilit
 
 	// Add output format if specified
 	if o.OutputFormat != "" {
-		nextCmd.WriteString(fmt.Sprintf(" --output %s", o.OutputFormat))
+		fmt.Fprintf(&nextCmd, " --output %s", o.OutputFormat)
 	}
 
 	fmt.Fprintf(o.ErrOut, "\nResults are trimmed to %d, to get the next page of elements, run:\n  %s\n", len(resources), nextCmd.String())

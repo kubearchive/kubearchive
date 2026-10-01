@@ -353,8 +353,7 @@ func TestSetOptions_setToken(t *testing.T) {
 			expectError:   true,
 			errorContains: "invalid JWT format: token must have 3 parts separated by dots",
 		},
-		//nolint:gosec // this is a test case, not a real hardcoded token
-		{
+		{ //nolint:gosec // G101: test data, not real credentials
 			name:              "connectivity test fails with token",
 			token:             "valid.unauth.token",
 			clusterHost:       "https://kubearchive.example.com",

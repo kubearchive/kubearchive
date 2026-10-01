@@ -689,7 +689,7 @@ func (o *GetOptions) runStreaming(k8sResources []*unstructured.Unstructured, k8s
 	defer streamer.close()
 
 	sort.Slice(k8sResources, func(i, j int) bool {
-		return k8sResources[i].GetCreationTimestamp().Time.After(
+		return k8sResources[i].GetCreationTimestamp().After(
 			k8sResources[j].GetCreationTimestamp().Time)
 	})
 
@@ -864,4 +864,3 @@ func (o *GetOptions) printPaginationMessage(count int, oldestTimestamp time.Time
 	fmt.Fprintf(o.ErrOut, "\nResults are trimmed to %d, to get the next page of elements, run:\n  %s\n", count, nextCmd.String())
 	return nil
 }
-

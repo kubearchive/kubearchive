@@ -1290,13 +1290,13 @@ func TestStreamingMerge(t *testing.T) {
 	})
 
 	testCases := []struct {
-		name           string
-		k8sResponse    string
-		k9eResponses   []string
-		limit          int
-		outputFormat   string
-		expectedNames  []string
-		expectPagMsg   bool
+		name          string
+		k8sResponse   string
+		k9eResponses  []string
+		limit         int
+		outputFormat  string
+		expectedNames []string
+		expectPagMsg  bool
 	}{
 		{
 			name:          "k8s resources interleave across pages",
@@ -1329,21 +1329,21 @@ func TestStreamingMerge(t *testing.T) {
 			expectedNames: []string{"arch-a", "arch-b", "arch-c"},
 		},
 		{
-			name:           "limit trims across streaming batches",
-			k8sResponse:    k8sResponse,
-			k9eResponses:   []string{page1, page2},
-			limit:          3,
-			expectedNames:  []string{"arch-a", "k8s-1", "arch-b"},
-			expectPagMsg:   true,
+			name:          "limit trims across streaming batches",
+			k8sResponse:   k8sResponse,
+			k9eResponses:  []string{page1, page2},
+			limit:         3,
+			expectedNames: []string{"arch-a", "k8s-1", "arch-b"},
+			expectPagMsg:  true,
 		},
 		{
-			name:           "limit trims across streaming batches (json)",
-			k8sResponse:    k8sResponse,
-			k9eResponses:   []string{page1, page2},
-			limit:          3,
-			outputFormat:   "json",
-			expectedNames:  []string{"arch-a", "k8s-1", "arch-b"},
-			expectPagMsg:   true,
+			name:          "limit trims across streaming batches (json)",
+			k8sResponse:   k8sResponse,
+			k9eResponses:  []string{page1, page2},
+			limit:         3,
+			outputFormat:  "json",
+			expectedNames: []string{"arch-a", "k8s-1", "arch-b"},
+			expectPagMsg:  true,
 		},
 	}
 

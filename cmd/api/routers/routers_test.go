@@ -991,6 +991,55 @@ func TestQueryTimeout(t *testing.T) {
 	}
 }
 
+// slowPingDBReader is a test double whose Ping method blocks until the context
+// is cancelled (simulating a fully exhausted connection pool). All other methods
+// delegate to the embedded slowDBReader which also blocks.
+type slowPingDBReader struct {
+	slowDBReader
+}
+
+func (s *slowPingDBReader) Ping(ctx context.Context) error {
+	return s.block(ctx)
+}
+
+// TestReadyzPingTimeout verifies that the readiness probe returns 503 within the
+// readyzPingTimeout when Ping blocks (e.g. because the connection pool is
+// exhausted by long-running queries).
+func TestReadyzPingTimeout(t *testing.T) {
+	const blockFor = 10 * time.Second // much longer than readyzPingTimeout (3s)
+
+	slow := &slowPingDBReader{slowDBReader{blockFor: blockFor}}
+	ctrl := Controller{Database: slow}
+	router := gin.Default()
+	router.GET("/readyz", ctrl.Readyz)
+
+	start := time.Now()
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	router.ServeHTTP(res, req)
+	elapsed := time.Since(start)
+
+	assert.Equal(t, http.StatusServiceUnavailable, res.Code,
+		"expected 503 when Ping blocks due to pool exhaustion")
+	assert.Less(t, elapsed, blockFor,
+		"response took %v but blockFor is %v — readyzPingTimeout should have fired first", elapsed, blockFor)
+}
+
+// TestReadyzPingAvailable verifies that when the database is responsive the
+// readiness probe returns 200 OK within the timeout.
+func TestReadyzPingAvailable(t *testing.T) {
+	ctrl := Controller{Database: fake.NewFakeDatabase(testResources, testLogUrls)}
+	router := gin.Default()
+	router.GET("/readyz", ctrl.Readyz)
+
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	router.ServeHTTP(res, req)
+
+	assert.Equal(t, http.StatusOK, res.Code)
+	assert.Contains(t, res.Body.String(), "ready")
+}
+
 // TestQueryTimeoutDisabled verifies that when QueryTimeout is zero the handler
 // does NOT impose a timeout — the fast fake DB returns normally.
 func TestQueryTimeoutDisabled(t *testing.T) {

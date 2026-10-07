@@ -114,11 +114,15 @@ spec:
               path: /livez
               port: 8081
               scheme: HTTPS
+            timeoutSeconds: 5
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /readyz
               port: 8081
               scheme: HTTPS
+            timeoutSeconds: 5
+            failureThreshold: 3
 ---
 kind: Service
 apiVersion: v1

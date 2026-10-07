@@ -372,13 +372,13 @@ const readyzPingTimeout = 3 * time.Second
 
 // readyzContext returns a child context bounded by readyzPingTimeout so
 // the readiness probe never blocks longer than the Kubernetes probe timeout.
-func (c *Controller) readyzContext(ctx context.Context) (context.Context, context.CancelFunc) {
+func readyzContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, readyzPingTimeout)
 }
 
 // Readyz checks Database connection
 func (c *Controller) Readyz(context *gin.Context) {
-	pingCtx, cancel := c.readyzContext(context.Request.Context())
+	pingCtx, cancel := readyzContext(context.Request.Context())
 	defer cancel()
 	err := c.Database.Ping(pingCtx)
 	if err != nil {

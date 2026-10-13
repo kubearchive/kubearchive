@@ -55,5 +55,12 @@ golangci-lint run
 - Deployment: `bash hack/kubearchive-install.sh`
 - Do not edit files in `config/crds/`; re-run code generation
 
+## Security Conventions
+
+- **Never log credential values in test code.** Do not pass Secret data (passwords, tokens, connection strings — including base64-encoded forms) to `t.Log`, `t.Logf`, `fmt.Print`, or `log.Print`. Use a placeholder like `[REDACTED]` in log messages.
+- **Suppress shell tracing around credentials.** In shell scripts that handle `DB_PASSWORD`, `DATABASE_URL`, or other Secret values, disable `set -x` / `set -o xtrace` before reading or writing credential variables, and re-enable after.
+- **Use context with timeout for pod exec.** Integration tests that execute commands inside pods (e.g., `psql` via `StreamWithContext`) must use `context.WithTimeout` to prevent indefinite hangs if the command stalls.
+- **Kubernetes Secrets ship with empty values.** The database credential Secret template (`config/templates/database/database_secret.yaml`) uses empty `stringData` fields. Install scripts (`hack/kubearchive-install.sh`, `integrations/database/postgresql/install.sh`) populate credentials at runtime. Reviews should verify that install scripts preserve existing credentials across `ko apply`.
+
 ## Review
 Last reviewed: Q2 2026. Next review: Q3 2026. See [workflow](.github/workflows/agents-md-review.yml).

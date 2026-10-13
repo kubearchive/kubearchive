@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 type LoggerConfig struct {
@@ -42,16 +43,26 @@ func Logger(conf LoggerConfig) gin.HandlerFunc {
 			logLevel = slog.LevelInfo
 		}
 
-		slog.Log(
-			c.Request.Context(),
-			logLevel,
-			"Served request",
+		attrs := []any{
 			"method", c.Request.Method,
 			"status", c.Writer.Status(),
 			"latency", end.Sub(start),
 			"client", c.ClientIP(),
 			"path", path,
 			"errors", c.Errors.ByType(1).String(),
+		}
+
+		if usr, exists := c.Get("user"); exists {
+			if userInfo, ok := usr.(user.Info); ok {
+				attrs = append(attrs, "user", userInfo.GetName())
+			}
+		}
+
+		slog.Log(
+			c.Request.Context(),
+			logLevel,
+			"Served request",
+			attrs...,
 		)
 	}
 

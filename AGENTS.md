@@ -33,7 +33,7 @@ Container images are built with `ko` (`.ko.yaml`). There is no Makefile.
 Unit tests require envtest binaries for operator controllers:
 
 ```bash
-export KUBEBUILDER_ASSETS=$(cmd/operator/bin/setup-envtest use --bin-dir cmd/operator/bin -p path)
+export KUBEBUILDER_ASSETS=${PWD}/$(cmd/operator/bin/setup-envtest use --bin-dir cmd/operator/bin -p path)
 go test ./...
 ```
 

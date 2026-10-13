@@ -54,6 +54,7 @@ golangci-lint run
 - CRDs belong to API group `kubearchive.org`
 - Deployment: `bash hack/kubearchive-install.sh`
 - Do not edit files in `config/crds/`; re-run code generation
+- OTTL transforms in `integrations/observability/prometheus-operator/otel-collector-config.yaml` and `integrations/observability/grafana/otel-collector-grafana.yaml` must stay in sync; check both when bumping collector versions
 
 ## Review
 Last reviewed: Q2 2026. Next review: Q3 2026. See [workflow](.github/workflows/agents-md-review.yml).

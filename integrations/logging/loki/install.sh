@@ -103,6 +103,7 @@ if [ "${VECTOR}" == "True" ]; then
   #Deploy Vector to loki namespace
   helm upgrade --install kubearchive-vector vector/vector \
     --namespace ${NAMESPACE} \
+    --version 0.57.0 \
     --set "customConfig.sinks.loki.endpoint=${LOKI_ENDPOINT}" \
     --values values.vector.yaml
 

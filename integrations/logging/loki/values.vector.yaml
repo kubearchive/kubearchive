@@ -13,8 +13,6 @@ env:
       secretKeyRef:
         name: loki-basic-auth
         key: PASSWORD
-  - name: VECTOR_LOG
-    value: "info"
 customConfig:
   data_dir: /vector-data-dir
   api:
@@ -107,6 +105,6 @@ customConfig:
         stream: "{{`{{ namespace }}`}}"
 image:
   repository: quay.io/kubearchive/vector
-  tag: 0.46.1-distroless-libc
+  tag: 0.57.0-distroless-libc
   pullPolicy: IfNotPresent
   base: "debian"

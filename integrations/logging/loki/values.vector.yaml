@@ -18,7 +18,6 @@ customConfig:
   api:
     enabled: true
     address: 127.0.0.1:8686
-    playground: false
   sources:
     k8s_logs:
       type: kubernetes_logs
@@ -101,6 +100,7 @@ customConfig:
         max_events: 100
         timeout_secs: 5
         max_bytes: 1048576  # 1MB
+      dangerously_allow_unconfined_template_resolution: true
       labels:
         stream: "{{`{{ namespace }}`}}"
 image:

@@ -71,7 +71,7 @@ fi
 set -o errexit -o xtrace
 cd ${SCRIPT_DIR}
 
-helm repo add grafana https://grafana.github.io/helm-charts
+helm repo add grafana https://grafana-community.github.io/helm-charts
 helm repo add vector https://helm.vector.dev
 helm repo update
 
@@ -88,11 +88,11 @@ fi
 set -e
 
 # Deploy loki with built-in Minio
-helm upgrade --install --create-namespace --namespace ${NAMESPACE} --values values.loki.yaml loki grafana/loki
+helm upgrade --install --create-namespace --namespace ${NAMESPACE} --version 18.5.2 --values values.loki.yaml loki grafana/loki
 
 # Deploy Grafana
 if [ "${GRAFANA}" == "True" ]; then
-  helm upgrade --install --create-namespace --namespace ${NAMESPACE} --values values.grafana.yaml grafana grafana/grafana
+  helm upgrade --install --create-namespace --version 12.8.0 --namespace ${NAMESPACE} --values values.grafana.yaml grafana grafana/grafana
 fi
 
 if [ "${VECTOR}" == "True" ]; then

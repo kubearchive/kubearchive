@@ -100,7 +100,7 @@ customConfig:
         max_events: 100
         timeout_secs: 5
         max_bytes: 1048576  # 1MB
-      dangerously_allow_unconfined_template_resolution: true
+      dangerously_allow_unconfined_template_resolution: true #flag is required for Vector 0.57.0 compatibility, this is safe since this is a contolled testing environment
       labels:
         stream: "{{`{{ namespace }}`}}"
 image:

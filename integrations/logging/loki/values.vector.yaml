@@ -13,14 +13,11 @@ env:
       secretKeyRef:
         name: loki-basic-auth
         key: PASSWORD
-  - name: VECTOR_LOG
-    value: "info"
 customConfig:
   data_dir: /vector-data-dir
   api:
     enabled: true
     address: 127.0.0.1:8686
-    playground: false
   sources:
     k8s_logs:
       type: kubernetes_logs
@@ -103,10 +100,11 @@ customConfig:
         max_events: 100
         timeout_secs: 5
         max_bytes: 1048576  # 1MB
+      dangerously_allow_unconfined_template_resolution: true #flag is required for Vector 0.57.0 compatibility, this is safe since this is a contolled testing environment
       labels:
         stream: "{{`{{ namespace }}`}}"
 image:
   repository: quay.io/kubearchive/vector
-  tag: 0.46.1-distroless-libc
+  tag: 0.57.0-distroless-libc
   pullPolicy: IfNotPresent
   base: "debian"

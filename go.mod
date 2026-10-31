@@ -3,7 +3,7 @@ module github.com/kubearchive/kubearchive
 go 1.26.6
 
 require (
-	cel.dev/cel-go v0.33.0
+	cel.dev/cel-go v0.33.1
 	github.com/Cyprinus12138/otelgin v1.0.3
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/semver/v3 v3.5.0

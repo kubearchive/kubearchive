@@ -8,33 +8,55 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/avast/retry-go/v5"
 	"github.com/kubearchive/kubearchive/test"
-	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	k8sretry "k8s.io/client-go/util/retry"
 )
 
 // TestDatabaseConnection verifies the database connection retries using the Sink component.
 func TestDatabaseConnection(t *testing.T) {
 	clientset, dynclient := test.GetKubernetesClient(t)
 
-	// Fence database to make it unavailable - https://cloudnative-pg.io/documentation/1.24/fencing/
 	clusterResource := schema.GroupVersionResource{Group: "postgresql.cnpg.io", Version: "v1", Resource: "clusters"}
-	resource, err := dynclient.Resource(clusterResource).Namespace("postgresql").Get(context.Background(), "kubearchive", metav1.GetOptions{})
+	database := dynclient.Resource(clusterResource).Namespace("postgresql")
+	unfenceDatabase := func() error {
+		_, err := database.Patch(context.Background(), "kubearchive", types.MergePatchType,
+			[]byte(`{"metadata":{"annotations":{"cnpg.io/fencedInstances":null}}}`), metav1.PatchOptions{})
+		return err
+	}
+
+	originalScale, err := clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	annotations := resource.GetAnnotations()
-	annotations["cnpg.io/fencedInstances"] = "[\"*\"]"
-	resource.SetAnnotations(annotations)
+	t.Cleanup(func() {
+		if restoreErr := setSinkReplicas(clientset, originalScale.Spec.Replicas); restoreErr != nil {
+			t.Errorf("Could not restore sink replicas: %v", restoreErr)
+			return
+		}
+		if originalScale.Spec.Replicas > 0 {
+			waitForDeploymentReady(t, "kubearchive-sink")
+		}
+	})
+	// Cleanup runs in reverse order: restore the database before waiting for the sink.
+	t.Cleanup(func() {
+		if unfenceErr := unfenceDatabase(); unfenceErr != nil {
+			t.Errorf("Could not unfence database: %v", unfenceErr)
+		}
+	})
 
-	_, err = dynclient.Resource(clusterResource).Namespace("postgresql").Update(context.Background(), resource, metav1.UpdateOptions{})
+	// Fence database to make it unavailable - https://cloudnative-pg.io/documentation/1.24/fencing/
+	_, err = database.Patch(context.Background(), "kubearchive", types.MergePatchType,
+		[]byte(`{"metadata":{"annotations":{"cnpg.io/fencedInstances":"[\"*\"]"}}}`), metav1.PatchOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,42 +65,33 @@ func TestDatabaseConnection(t *testing.T) {
 	podName := test.GetPodName(t, clientset, "kubearchive", "kubearchive-sink")
 
 	// restart sink pod - replicas = 0
-	deploymentScaleSink, err := clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
+	err = setSinkReplicas(clientset, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	scaleSink := *deploymentScaleSink
-	scaleSink.Spec.Replicas = 0
-	usSink, err := clientset.AppsV1().Deployments("kubearchive").UpdateScale(context.Background(), "kubearchive-sink", &scaleSink, metav1.UpdateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("Changing sink to %d replicas", scaleSink.Spec.Replicas)
-	t.Log(*usSink)
+	t.Logf("Changing sink to 0 replicas")
 
 	t.Logf("Waiting for sink pod '%s' to disappear", podName)
-	err = retry.New(retry.Attempts(10), retry.MaxDelay(2*time.Second)).Do(func() error {
+	err = retry.New(retry.Attempts(30), retry.MaxDelay(2*time.Second)).Do(func() error {
 		_, e := clientset.CoreV1().Pods("kubearchive").Get(context.Background(), podName, metav1.GetOptions{})
-		return e
+		if apierrors.IsNotFound(e) {
+			return nil
+		}
+		if e != nil {
+			return e
+		}
+		return fmt.Errorf("Sink pod '%s' still exists", podName)
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// restart sink pod - replicas = 1
-	deploymentScaleSink, err = clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
+	err = setSinkReplicas(clientset, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	scaleSink = *deploymentScaleSink
-	scaleSink.Spec.Replicas = 1
-	usSink, err = clientset.AppsV1().Deployments("kubearchive").UpdateScale(context.Background(), "kubearchive-sink", &scaleSink, metav1.UpdateOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("Changing sink to %d replicas", scaleSink.Spec.Replicas)
-	t.Log(*usSink)
+	t.Logf("Changing sink to 1 replicas")
 
 	// wait to sink pod ready and generate connection retries with the database
 	t.Logf("Waiting for sink to be up, and to generate retries with the database")
@@ -100,15 +113,7 @@ func TestDatabaseConnection(t *testing.T) {
 	}
 
 	// Unfence database
-	resource, err = dynclient.Resource(clusterResource).Namespace("postgresql").Get(context.Background(), "kubearchive", metav1.GetOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	annotations = resource.GetAnnotations()
-	delete(annotations, "cnpg.io/fencedInstances")
-	resource.SetAnnotations(annotations)
-
-	_, err = dynclient.Resource(clusterResource).Namespace("postgresql").Update(context.Background(), resource, metav1.UpdateOptions{})
+	err = unfenceDatabase()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,21 +137,17 @@ func TestDatabaseConnection(t *testing.T) {
 	}
 
 	// Wait for sink pod to be ready.
-	podName = test.GetPodName(t, clientset, "kubearchive", "kubearchive-sink")
-	err = retry.New(retry.Attempts(10), retry.MaxDelay(2*time.Second)).Do(func() error {
-		pod, e := clientset.CoreV1().Pods("kubearchive").Get(context.Background(), podName, metav1.GetOptions{})
-		if e != nil {
-			return e
-		}
+	waitForDeploymentReady(t, "kubearchive-sink")
+}
 
-		for _, condition := range pod.Status.Conditions {
-			if condition.Type == corev1.PodReady && condition.Status == corev1.ConditionTrue {
-				return nil
-			}
+func setSinkReplicas(clientset kubernetes.Interface, replicas int32) error {
+	return k8sretry.RetryOnConflict(k8sretry.DefaultRetry, func() error {
+		scale, err := clientset.AppsV1().Deployments("kubearchive").GetScale(context.Background(), "kubearchive-sink", metav1.GetOptions{})
+		if err != nil {
+			return err
 		}
-		return errors.New("Sink pod is not in 'Ready' status")
+		scale.Spec.Replicas = replicas
+		_, err = clientset.AppsV1().Deployments("kubearchive").UpdateScale(context.Background(), "kubearchive-sink", scale, metav1.UpdateOptions{})
+		return err
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 }

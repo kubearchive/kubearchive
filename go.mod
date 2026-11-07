@@ -8,7 +8,7 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/XSAM/otelsql v0.44.0
-	github.com/avast/retry-go/v5 v5.0.1
+	github.com/avast/retry-go/v5 v5.1.1
 	github.com/cloudevents/sdk-go/observability/opentelemetry/v2 v2.16.2
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	github.com/gin-contrib/gzip v1.2.9

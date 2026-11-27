@@ -101,8 +101,9 @@ if [ "${VECTOR}" == "True" ]; then
   echo "Using Loki endpoint: ${LOKI_ENDPOINT}"
 
   #Deploy Vector to loki namespace
+  # Chart 0.42.1 ships Vector 0.46.1, matching the image tag in values.vector.yaml
   helm upgrade --install kubearchive-vector vector/vector \
-    --namespace ${NAMESPACE} \
+    --namespace ${NAMESPACE} --version 0.42.1 \
     --set "customConfig.sinks.loki.endpoint=${LOKI_ENDPOINT}" \
     --values values.vector.yaml
 

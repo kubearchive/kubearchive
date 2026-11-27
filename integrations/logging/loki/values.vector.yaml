@@ -13,8 +13,6 @@ env:
       secretKeyRef:
         name: loki-basic-auth
         key: PASSWORD
-  - name: VECTOR_LOG
-    value: "info"
 customConfig:
   data_dir: /vector-data-dir
   api:
